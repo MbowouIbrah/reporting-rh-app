@@ -4,7 +4,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.kpi import formules as f
-from app.kpi.moteur import Ligne, Params, PeriodeData, Refs, annuel, individuel, mensuel
+from app.kpi.moteur import Budgets, Ligne, Params, PeriodeData, Refs, annuel, individuel, mensuel
 
 REFS = Refs(
     services=("SAV PL", "Commerce VN"), activites=("Front office", "Back Office"),
@@ -109,7 +109,9 @@ def test_blocs_service_site_contrat():
                if (x["contrat"], x["activite"]) == ("MAD", "Back Office"))
     assert mad["effectif"]["m"] == 1 and mad["ms"]["m"] == 40
     assert r["a_type_charge"][-1] == {"rubrique": "TOTAL CHARGES", "exclu": False, "m1": None,
-                                      "m": 140, "var": None, "var_pct": None}
+                                      "m": 140, "var": None, "var_pct": None,
+                                      "budget": 1_200_000, "ecart": 140 - 1_200_000,
+                                      "ecart_pct": D(140 - 1_200_000) / 1_200_000}
     assert [a["effectif"]["m"] for a in svc["Commerce VN"]["activites"]] == [0, 1]
     assert svc["SAV PL"]["effectif"]["m"] == 1
     flags = {x["rubrique"]: x["exclu"] for x in r["a_type_charge"]}
@@ -180,3 +182,21 @@ def test_invariants_toujours_vrais(cur_l, prev_l):
     e = r["synthese"]["effectif"]
     if prev_l:
         assert e["debut"] + e["recrutements"] - e["departs"] == e["fin"]
+
+
+def test_budgets_blocs_abc():
+    cur = pd(L(1, Brut_Réel=1000), L(2, service="Commerce VN", site="Yaoundé", Brut_Réel=500))
+    bud = Budgets({"Brut Réel": D(800), "Commission": D(0)}, {"SAV PL": D(900)},
+                  {"Yaoundé": D(250)})
+    r = mensuel(cur, None, REFS, Params(), bud)
+    a = {x["rubrique"]: x for x in r["a_type_charge"]}
+    assert a["Brut Réel"]["budget"] == 800 and a["Brut Réel"]["ecart"] == 700
+    assert a["Brut Réel"]["ecart_pct"] == D(700) / 800
+    assert a["Commission"]["ecart_pct"] == f.NA  # budget nul
+    assert a["Primes sur ventes"]["budget"] is None and a["Primes sur ventes"]["ecart"] is None
+    svc = {b["service"]: b["total"] for b in r["b_service_activite"]}
+    assert svc["SAV PL"]["ecart"] == 100 and svc["Commerce VN"]["budget"] is None
+    sites = {c["site"]: c["ms"] for c in r["c_site"]}
+    assert sites["Yaoundé"]["ecart"] == 250 and sites["Douala"]["ecart_pct"] is None
+    # le total reste la formule budget_employe x effectif, jamais la somme des budgets saisis
+    assert a["TOTAL CHARGES"]["budget"] == 1_200_000

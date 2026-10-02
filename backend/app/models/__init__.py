@@ -12,7 +12,7 @@ from app.models.imports import (  # noqa: F401
     LotImportPrecedent,
     StagingLigne,
 )
-from app.models.pilotage import CaPeriode, Parametre  # noqa: F401
+from app.models.pilotage import Budget, CaPeriode, Parametre  # noqa: F401
 from app.models.referentiel import (  # noqa: F401
     Activite,
     Poste,

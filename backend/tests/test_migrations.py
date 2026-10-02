@@ -6,7 +6,7 @@ from app.core.config import settings
 
 TABLES = {"perimetre", "perimetre_regle", "utilisateur", "role_assignment", "audit_event"}
 TABLES3 = {"service", "periode", "salarie", "situation_mensuelle", "montant", "lot_import",
-           "staging_ligne", "import_anomalie", "rubrique_regle"}
+           "staging_ligne", "import_anomalie", "rubrique_regle", "budget"}
 
 
 def test_montee_et_descente(tmp_path, monkeypatch):

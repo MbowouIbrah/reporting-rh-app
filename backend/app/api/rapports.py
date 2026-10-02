@@ -101,7 +101,8 @@ def mensuel(
     if cur is None or not cur.lignes:
         raise HTTPException(404, "Aucune donnée pour cette période")
     prev = ch.filtrer(ch.charger_periode(db, scope, *ch.precedente(annee, mois)), service, site)
-    res = moteur.mensuel(cur, prev, ch.charger_refs(db), ch.charger_params(db, annee, mois))
+    res = moteur.mensuel(cur, prev, ch.charger_refs(db), ch.charger_params(db, annee, mois),
+                         ch.charger_budgets(db, scope, annee, mois, service, site))
     return _sortie(p, res)
 
 

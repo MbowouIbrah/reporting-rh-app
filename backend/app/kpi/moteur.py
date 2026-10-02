@@ -61,6 +61,20 @@ class Params:
     budget_employe: Decimal | None = Decimal(600000)
 
 
+@dataclass(frozen=True)
+class Budgets:
+    """Budgets mensuels saisis, par libellé (rubrique, service, site)."""
+
+    rubrique: dict[str, Decimal] = field(default_factory=dict)
+    service: dict[str, Decimal] = field(default_factory=dict)
+    site: dict[str, Decimal] = field(default_factory=dict)
+
+
+def _bud(m: Decimal | None, b: Decimal | None) -> dict:
+    ecart, pct = f.ecart_budget(m, b)
+    return {"budget": b, "ecart": ecart, "ecart_pct": pct}
+
+
 def _ok(pd: PeriodeData | None) -> PeriodeData | None:
     return pd if pd is not None and pd.lignes else None
 
@@ -81,7 +95,9 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
     return [(n, cell(a.get(n, ZERO), b.get(n, ZERO) if prev else None)) for n in noms]
 
 
-def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params) -> dict:
+def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
+            budgets: Budgets | None = None) -> dict:
+    budgets = budgets or Budgets()
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
     eff, eff1 = len(cur.ids), len(prev.ids) if prev else None
@@ -118,7 +134,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
 
     a_type = [
         {"rubrique": r, "exclu": r in cur.exclues,
-         **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
+         **cell(cur.rubrique(r), prev.rubrique(r) if prev else None),
+         **_bud(cur.rubrique(r), budgets.rubrique.get(r))}
         for r in refs.rubriques if r != ABSENCES
     ]
     # chemin indépendant de PeriodeData.ms : somme des rubriques comptées dans le total
@@ -135,7 +152,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             if prev else None
         b_service.append({
             "service": s,
-            "total": cell(sub.ms, sub1.ms if sub1 else None),
+            "total": {**cell(sub.ms, sub1.ms if sub1 else None),
+                      **_bud(sub.ms, budgets.service.get(s))},
             "effectif": cell(Decimal(len(sub.ids)), Decimal(len(sub1.ids)) if sub1 else None),
             "activites": [
                 {"activite": n, **c, "effectif": cell(
@@ -150,7 +168,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     sites_eff = {s: (len({L.salarie_id for L in cur.lignes if L.site == s}),
                      len({L.salarie_id for L in prev.lignes if L.site == s}) if prev else None)
                  for s in refs.sites}
-    c_site = [{"site": s, "ms": sites_ms[s],
+    c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
                "effectif": {"m": sites_eff[s][0], "m1": sites_eff[s][1]}} for s in refs.sites]
     ms_sites = sum((c["ms"]["m"] for c in c_site), ZERO)
 
@@ -215,7 +233,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     return {
         "synthese": synthese,
         "a_type_charge": a_type
-        + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1)}],
+        + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
+            **_bud(ms_a, bud)}],
         "b_service_activite": b_service,
         "c_site": c_site,
         "d_contrat": {"effectifs": d_eff, "indicateurs": d_indic,

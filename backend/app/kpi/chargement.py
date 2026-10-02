@@ -7,9 +7,9 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.kpi.moteur import Ligne, Params, PeriodeData, Refs
+from app.kpi.moteur import Budgets, Ligne, Params, PeriodeData, Refs
 from app.models.donnees import Montant, Periode, SituationMensuelle
-from app.models.pilotage import CaPeriode, Parametre
+from app.models.pilotage import Budget, CaPeriode, Parametre
 from app.models.referentiel import Activite, Rubrique, RubriqueRegle, Service, Site, TypeContrat
 from app.repos.scope import Scope, apply_scope
 
@@ -31,6 +31,32 @@ def charger_params(db: Session, annee: int, mois: int) -> Params:
     defaut = Params()
     return Params(valeurs.get("jours_ouvres", defaut.jours_ouvres),
                   valeurs.get("budget_employe", defaut.budget_employe))
+
+
+def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
+                    service: str | None, site: str | None) -> Budgets:
+    """Budgets de la période visibles pour ce périmètre et ces filtres : un budget n'est montré
+    que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global)."""
+    pid = db.scalar(select(Periode.id).where(Periode.annee == annee, Periode.mois == mois))
+    if pid is None:
+        return Budgets()
+
+    def lus(axe: str, model) -> dict[str, Decimal]:
+        q = (select(model.libelle, Budget.valeur)
+             .join(model, model.id == Budget.cible_id)
+             .where(Budget.periode_id == pid, Budget.axe == axe, model.actif))
+        return {lib: Decimal(str(v)) for lib, v in db.execute(q)}
+
+    def visible(vals: dict[str, Decimal], dim: str, autre: str | None, choisi: str | None):
+        if autre:
+            return {}
+        if not scope.unrestricted:
+            vals = {k: v for k, v in vals.items() if k in scope.rules.get(dim, ())}
+        return {k: v for k, v in vals.items() if choisi in (None, k)}
+
+    rubrique = lus("rubrique", Rubrique) if scope.unrestricted and not service and not site else {}
+    return Budgets(rubrique, visible(lus("service", Service), "service", site, service),
+                   visible(lus("site", Site), "site", service, site))
 
 
 def exclues_a_date(db: Session, annee: int, mois: int) -> frozenset[str]:
