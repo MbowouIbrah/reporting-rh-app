@@ -145,6 +145,24 @@ def test_annuel_cumul_moyenne_nb_mois_et_marge_ytd():
     assert r2["cumul_ytd"]["m"] == 300 and r2["marge_ytd"] == 200
 
 
+def test_annuel_blocs_coherents_avec_le_cumul():
+    n = {1: pd(L(1, Brut_Réel=100), L(2, Brut_Réel=40, site="Yaoundé", ctr="CDD", Absences_nb=3)),
+         2: pd(L(1, Brut_Réel=200), L(3, Brut_Réel=60, service="Commerce VN"))}
+    n1 = {1: pd(L(1, Brut_Réel=50), L(9, Brut_Réel=10))}
+    bud = {1: Budgets(site={"Douala": D(500)}), 2: Budgets(site={"Douala": D(400)})}
+    r = annuel(n, n1, 12, REFS, Params(), bud)
+    total = next(x for x in r["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
+    assert total["m"] == r["cumul_ytd"]["m"] == 400 and total["m1"] == 60
+    assert sum(b["total"]["m"] for b in r["b_service_activite"]) == 400
+    assert sum(c["ms"]["m"] for c in r["c_site"]) == 400
+    douala = next(c for c in r["c_site"] if c["site"] == "Douala")
+    assert douala["ms"]["budget"] == 900 and douala["effectif"]["m"] == D("1.5")
+    assert next(c for c in r["c_site"] if c["site"] == "Yaoundé")["ms"]["budget"] is None
+    tot = r["d_contrat"]["indicateurs"][-1]
+    assert (tot["debut"], tot["fin"], tot["recrutements"], tot["departs"]) == (2, 2, 2, 1)
+    assert tot["absences"] == 3
+
+
 def test_annuel_sans_n1():
     r = annuel({1: pd(L(1, Brut_Réel=10))}, {}, 12, REFS, Params())
     assert r["cumul_ytd"]["m1"] is None and r["moyenne_mensuelle"]["m1"] is None

@@ -83,7 +83,7 @@ export interface Mensuel {
     effectif: Cell
     activites: ({ activite: string; effectif: Cell } & Cell)[]
   }[]
-  c_site: { site: string; ms: Cell & Budget; effectif: { m: number; m1: number | null } }[]
+  c_site: { site: string; ms: Cell & Budget; effectif: { m: number | string | null; m1: number | string | null } }[]
   d_contrat: {
     effectifs: ({ contrat: string } & Cell)[]
     indicateurs: Indicateurs[]
@@ -113,6 +113,10 @@ export interface Annuel {
   cumul_annee_n1: Dec | null
   marge_ytd?: Val
   nb_mois_marge?: number
+  a_type_charge: Mensuel['a_type_charge']
+  b_service_activite: Mensuel['b_service_activite']
+  c_site: Mensuel['c_site']
+  d_contrat: Mensuel['d_contrat']
   par_service: ({
     service: string
     nb_mois: number

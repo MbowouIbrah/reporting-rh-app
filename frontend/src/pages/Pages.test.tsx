@@ -33,6 +33,8 @@ function routes(avecMarge: boolean, perms: string[]) {
         serie_n: serie.map((s) => (avecMarge ? { ...s, ca: null, marge: null, taux_marge: null } : s)),
         serie_n1: serie, cumul_ytd: { ...cell('2000'), nb_mois: 2, nb_mois_n1: 2 },
         moyenne_mensuelle: cell('1000'), cumul_annee_n1: null, par_service: [],
+        a_type_charge: [], b_service_activite: [], c_site: [],
+        d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
       }
     return {}
   }
@@ -73,7 +75,7 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
 
 test('Annuel : affiche Nb de mois saisis', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
-  expect(await screen.findByText('Nb de mois saisis')).toBeInTheDocument()
+  expect(await screen.findByText(/Nb de mois saisis/)).toBeInTheDocument()
 })
 
 test('Individuel : message sans matricule', async () => {

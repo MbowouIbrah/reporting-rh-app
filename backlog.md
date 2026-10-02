@@ -4,7 +4,7 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 
 | ID | Date | Demandeur | Description | Cycle cible | Statut |
 |---|---|---|---|---|---|
-| B-001 | 2026-10-02 | Cadrage | SSO Keycloak + Cerbos, MFA pour l'administrateur | 2 | À faire |
+| B-001 | 2026-10-02 | Cadrage | SSO Keycloak + Cerbos, MFA pour l'administrateur | 2 | Partiel : blocs exposés par /annuel et affichés (commit 05d) ; reste export xlsx annuel aligné, rotation Excel, effectifs annuels (moyennes mensuelles, note Excel) à valider avec l'utilisateur |
 | B-002 | 2026-10-02 | Cadrage | Plusieurs administrateurs, délégation de saisie par périmètre, circuit de validation | 2 | À faire |
 | B-003 | 2026-10-02 | Cadrage | Import direct depuis le SIRH / la paie | 2 | À faire |
 | B-004 | 2026-10-02 | Cadrage | Export PDF du résumé et envoi mensuel par e-mail | 2 | À faire |

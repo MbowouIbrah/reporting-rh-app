@@ -17,7 +17,7 @@ export default function Layout() {
   const [ouvert, setOuvert] = useState(false)
   const role = me?.roles[0]?.role
   return (
-    <div className="app">
+    <div className="app layout-ecran">
       <header className="topbar">
        <div className="topbar-inner">
         <div className="marque">

@@ -253,8 +253,114 @@ def avec_donnees(pds: dict[int, PeriodeData], jusqu_au: int = 12) -> list[int]:
     return [m for m in sorted(pds) if m <= jusqu_au and _ok(pds[m])]
 
 
+def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
+                   budgets: dict[int, Budgets]) -> dict:
+    """Blocs A à D de l'onglet ANNUEL : cumul des mois saisis jusqu'au mois choisi (N contre N-1).
+    Les effectifs sont des moyennes mensuelles sur ces mois (note de l'Excel)."""
+    nb = len(ok)
+
+    def cum(pds, mois_ok, mesure) -> Decimal | None:
+        return sum((mesure(pds[m]) for m in mois_ok), ZERO) if mois_ok else None
+
+    def moy_eff(pds, mois_ok, pred) -> Decimal | None:
+        if not mois_ok:
+            return None
+        tot = sum(len({L.salarie_id for L in pds[m].lignes if pred(L)}) for m in mois_ok)
+        return Decimal(tot) / len(mois_ok)
+
+    def cell_ms(pred) -> dict:
+        return cell(cum(n, ok, lambda pd: sum((pd.total(L) for L in pd.lignes if pred(L)), ZERO)),
+                    cum(n1, ok1, lambda pd: sum((pd.total(L) for L in pd.lignes if pred(L)), ZERO)))
+
+    def cell_eff(pred) -> dict:
+        return cell(moy_eff(n, ok, pred), moy_eff(n1, ok1, pred))
+
+    def bud(axe: str, cle: str, reel: Decimal | None) -> dict:
+        vals = [getattr(budgets[m], axe).get(cle) for m in ok if m in budgets]
+        vals = [v for v in vals if v is not None]
+        return _bud(reel, sum(vals, ZERO) if vals else None)
+
+    exclues = n[ok[-1]].exclues if ok else frozenset()
+    a_type = [
+        {"rubrique": r, "exclu": r in exclues,
+         **cell(cum(n, ok, lambda pd, r=r: pd.rubrique(r)),
+                cum(n1, ok1, lambda pd, r=r: pd.rubrique(r))),
+         **bud("rubrique", r, cum(n, ok, lambda pd, r=r: pd.rubrique(r)))}
+        for r in refs.rubriques if r != ABSENCES
+    ]
+    ms_n, ms_n1 = cum(n, ok, lambda pd: pd.ms), cum(n1, ok1, lambda pd: pd.ms)
+    a_type.append({"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_n, ms_n1),
+                   **bud("rubrique", "TOTAL CHARGES", ms_n)})
+
+    b_service = []
+    for s in refs.services:
+        tot = cell_ms(lambda L, s=s: L.service == s)
+        b_service.append({
+            "service": s,
+            "total": {**tot, **bud("service", s, tot["m"])},
+            "effectif": cell_eff(lambda L, s=s: L.service == s),
+            "activites": [
+                {"activite": a, **cell_ms(lambda L, s=s, a=a: L.service == s and L.activite == a),
+                 "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a)}
+                for a in refs.activites],
+        })
+
+    c_site = []
+    for s in refs.sites:
+        ms = cell_ms(lambda L, s=s: L.site == s)
+        e = cell_eff(lambda L, s=s: L.site == s)
+        c_site.append({"site": s, "ms": {**ms, **bud("site", s, ms["m"])},
+                       "effectif": {"m": e["m"], "m1": e["m1"]}})
+
+    def fin_an(pds, mois_ok, contrat) -> int | None:
+        if not mois_ok:
+            return None
+        return len({L.salarie_id for L in pds[mois_ok[-1]].lignes
+                    if contrat is None or L.contrat == contrat})
+
+    def indicateurs(contrat: str | None) -> dict:
+        def ids(pds, mois_ok):
+            return {L.salarie_id for m in mois_ok for L in pds[m].lignes
+                    if contrat is None or L.contrat == contrat}
+        c, p = ids(n, ok), (ids(n1, ok1) if ok1 else None)
+        rec = len(c - p) if p is not None else None
+        dep = len(p - c) if p is not None else None
+        fin, debut = fin_an(n, ok, contrat), fin_an(n1, ok1, contrat)
+        abs_ = cum(n, ok, lambda pd: sum(
+            (L.montants.get(ABSENCES, ZERO) for L in pd.lignes
+             if contrat is None or L.contrat == contrat), ZERO)) or ZERO
+        return {
+            "contrat": contrat or "TOTAL", "debut": debut, "recrutements": rec, "departs": dep,
+            "fin": fin or 0,
+            "taux_rotation": (f.taux_rotation(rec or 0, dep or 0, debut, fin or 0)
+                              if p is not None else None),
+            "absences": abs_,
+            "taux_absenteisme": (f.taux_absenteisme(abs_, (fin or 0) * nb, params.jours_ouvres)
+                                 if nb else None),
+        }
+
+    d_indic = [indicateurs(c) for c in refs.contrats] + [indicateurs(None)]
+    ventilation = [
+        {"contrat": c, "activite": a,
+         "ms": cell_ms(lambda L, c=c, a=a: L.contrat == c and L.activite == a),
+         "effectif": cell_eff(lambda L, c=c, a=a: L.contrat == c and L.activite == a)}
+        for c in refs.contrats for a in refs.activites]
+    return {
+        "a_type_charge": a_type,
+        "b_service_activite": b_service,
+        "c_site": c_site,
+        "d_contrat": {"indicateurs": d_indic, "ventilation": ventilation,
+                      "effectifs": [{"contrat": c, **cell_eff(lambda L, c=c: L.contrat == c)}
+                                    for c in refs.contrats],
+                      "total": cell_eff(lambda L: True)},
+        "effectif_global": cell_eff(lambda L: True),
+        "nb_mois_absences": nb,
+    }
+
+
 def annuel(
-    n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params
+    n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
+    budgets: dict[int, Budgets] | None = None,
 ) -> dict:
     """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul."""
     def serie(pds):
@@ -291,7 +397,9 @@ def annuel(
     s_n = ms_service(n, ok)
     s_n1 = ms_service(n1, ok1)
     complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
+    blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
     return {
+        **blocs,
         "serie_n": serie(n),
         "serie_n1": serie(n1),
         "cumul_ytd": {**cell(c if nb else None, c1 if nb1 else None), "nb_mois": nb,

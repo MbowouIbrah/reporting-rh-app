@@ -222,3 +222,37 @@ table.dense td.num { text-align: right; }
   .tuile { padding: var(--sp-3) var(--sp-4); }
   .tuile-hero { grid-column: 1 / -1; }
 }
+
+/* Mensuel et Annuel : grille de tableaux comme les onglets Excel, tout visible sans défilement de page */
+.bandeau { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-5); align-items: center; padding: 4px 12px; border-radius: var(--radius); font-size: 13px; margin: 0 0 var(--sp-2); }
+.bandeau.ok { background: var(--paper-2); color: var(--navy-2); }
+.bandeau.ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
+.panneau { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.panneau > h3 { margin: 0; padding: 5px 10px; font-size: 13px; color: var(--navy); border-bottom: 1px solid var(--rule); }
+.panneau-corps { overflow: auto; min-height: 0; flex: 1; }
+.panneau table.dense { font-size: 12px; margin: 0; }
+.panneau table.dense th, .panneau table.dense td { padding: 2px 8px; line-height: 1.35; }
+.panneau table.dense tbody th[scope='row'] { white-space: nowrap; }
+.grille-rapport { display: grid; gap: var(--sp-2); grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grille-rapport .panneau { max-height: 70vh; }
+@media (min-width: 1100px) {
+  .layout-ecran > .page:has(.page-ecran) { max-width: none; padding-bottom: var(--sp-2); }
+  .page-ecran { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .page-ecran > h2 { font-size: var(--fs-lg); margin-bottom: 2px; }
+  .page-ecran .filtres { margin-bottom: var(--sp-1); padding: 0; position: static; align-items: center; gap: var(--sp-1) var(--sp-3); }
+  .page-ecran .filtres label { display: flex; align-items: center; gap: var(--sp-2); }
+  .layout-ecran:has(.page-ecran) > .page { padding-top: var(--sp-2); }
+  .page-ecran .filtres select, .page-ecran .filtres input, .page-ecran .filtres > a.bouton { height: 32px; }
+  .grille-rapport { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .grille-rapport .panneau { max-height: none; }
+  .p-global { grid-column: 1 / span 7; }
+  .p-service { grid-column: 8 / span 5; }
+  .p-site { grid-column: 1 / span 5; }
+  .p-effectifs { grid-column: 6 / span 3; }
+  .p-contrat { grid-column: 9 / span 4; }
+}
+@media (max-width: 1099px) { .grille-rapport > .panneau { grid-column: 1 / -1; } }
+@media (min-width: 1100px) {
+  .layout-ecran:has(.page-ecran) { height: 100dvh; display: flex; flex-direction: column; }
+  .layout-ecran:has(.page-ecran) > .page { flex: 1; min-height: 0; width: 100%; }
+}

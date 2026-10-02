@@ -1,102 +1,33 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAnnuel } from '../api/rapports'
-import type { Annuel as AnnuelData, Cell } from '../api/types'
+import type { Annuel as AnnuelData } from '../api/types'
+import { AnalyseEffectifs, Contrats, Panneau, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, entier, fcfa, MOIS, pct } from '../lib/format'
-
-function Ligne({ label, c, note }: { label: string; c: Cell; note?: string }) {
-  return (
-    <tr>
-      <th scope="row">
-        {label}
-        {note && <span className="note"> {note}</span>}
-      </th>
-      <td className="num">{fcfa(c.m1)}</td>
-      <td className="num">{fcfa(c.m)}</td>
-      <td className={cls(c.var)}>{fcfa(c.var)}</td>
-      <td className={cls(c.var_pct)}>{pct(c.var_pct)}</td>
-    </tr>
-  )
-}
+import { entier, fcfa, MOIS } from '../lib/format'
 
 function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: number }) {
+  const lib = { prec: `${annee - 1}`, cour: `${annee}` }
   return (
     <>
-      <div className="table-scroll"><table className="dense">
-        <thead>
-          <tr>
-            <th scope="col">Indicateur</th>
-            <th scope="col">{annee - 1}</th>
-            <th scope="col">{annee}</th>
-            <th scope="col">Écart</th>
-            <th scope="col">Écart %</th>
-          </tr>
-        </thead>
-        <tbody>
-          <Ligne label={`Cumul de janvier à ${MOIS[mois - 1].toLowerCase()}`} c={d.cumul_ytd} />
-          <Ligne label="Moyenne mensuelle" c={d.moyenne_mensuelle} />
-          <tr>
-            <th scope="row">Cumul année complète</th>
-            <td className="num">{fcfa(d.cumul_annee_n1)}</td>
-            <td className="num">(en cours)</td>
-            <td />
-            <td />
-          </tr>
-          <tr>
-            <th scope="row">Nb de mois saisis</th>
-            <td className="num">{entier(d.cumul_ytd.nb_mois_n1)}</td>
-            <td className="num">{entier(d.cumul_ytd.nb_mois)}</td>
-            <td />
-            <td />
-          </tr>
-          {d.marge_ytd !== undefined && (
-            <tr>
-              <th scope="row">
-                Marge cumulée <span className="note">({entier(d.nb_mois_marge)} mois avec CA)</span>
-              </th>
-              <td />
-              <td className={cls(d.marge_ytd)}>{fcfa(d.marge_ytd)}</td>
-              <td />
-              <td />
-            </tr>
-          )}
-        </tbody>
-      </table></div>
-
-      <h3>Par service</h3>
-      <div className="table-scroll"><table className="dense">
-        <thead>
-          <tr>
-            <th scope="col">Service</th>
-            <th scope="col">Cumul {annee - 1}</th>
-            <th scope="col">Cumul {annee}</th>
-            <th scope="col">Moy./mois {annee - 1}</th>
-            <th scope="col">Moy./mois {annee}</th>
-            <th scope="col">Écart moy. %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {d.par_service
-            .filter((s) => Number(s.m ?? 0) !== 0 || Number(s.m1 ?? 0) !== 0)
-            .map((s) => (
-              <tr key={s.service}>
-                <th scope="row">{s.service}</th>
-                <td className="num">
-                  {fcfa(s.m1)} <span className="note">({s.nb_mois_n1} m)</span>
-                </td>
-                <td className="num">
-                  {fcfa(s.m)} <span className="note">({s.nb_mois} m)</span>
-                </td>
-                <td className="num">{fcfa(s.moy_m1)}</td>
-                <td className="num">{fcfa(s.moy_m)}</td>
-                <td className={cls(s.ecart_moy_pct)}>{pct(s.ecart_moy_pct)}</td>
-              </tr>
-            ))}
-        </tbody>
-      </table></div>
+      <p className="bandeau ok">
+        <span>Cumul de janvier à {MOIS[mois - 1].toLowerCase()}</span>
+        <span>Moyenne mensuelle : <strong>{fcfa(d.moyenne_mensuelle.m)}</strong></span>
+        <span>Année {annee - 1} complète : <strong>{fcfa(d.cumul_annee_n1)}</strong></span>
+        <span>Nb de mois saisis : <strong>{entier(d.cumul_ytd.nb_mois)}</strong> en {annee}, <strong>{entier(d.cumul_ytd.nb_mois_n1)}</strong> en {annee - 1}</span>
+        {d.marge_ytd !== undefined && (
+          <span>Marge cumulée : <strong>{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge)} mois avec CA)</span>
+        )}
+      </p>
+      <div className="grille-rapport">
+        <Panneau titre="1. Reporting global" className="p-global"><TypesCharge d={d} lib={lib} /></Panneau>
+        <Panneau titre="2. Répartition par service et activité" className="p-service"><ServicesActivites d={d} lib={lib} /></Panneau>
+        <Panneau titre="3. Répartition par site" className="p-site"><Sites d={d} lib={lib} /></Panneau>
+        <Panneau titre="4. Analyse des effectifs" className="p-effectifs"><AnalyseEffectifs d={d} /></Panneau>
+        <Panneau titre="5. Nature de contrat" className="p-contrat"><Contrats d={d} lib={lib} /></Panneau>
+      </div>
     </>
   )
 }
@@ -109,7 +40,7 @@ export default function Annuel() {
     enabled: !!f.filtres,
   })
   return (
-    <section>
+    <section className="page-ecran">
       <h2>Comparatif annuel</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>

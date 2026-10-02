@@ -150,8 +150,10 @@ def _annuel(db, p, annee, mois, service, site) -> dict:
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
+    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site)
+               for m in moteur.avec_donnees(n, mois)}
     res = moteur.annuel(n, annee_pds(annee - 1), mois, ch.charger_refs(db),
-                        ch.charger_params(db, annee, mois))
+                        ch.charger_params(db, annee, mois), budgets)
     return _sortie(p, res)
 
 
