@@ -1,5 +1,31 @@
 @import './tokens.css';
 
+/* Fondations (R1) */
+html { -webkit-text-size-adjust: 100%; }
+body { font-variant-numeric: tabular-nums; }
+:where(a) { color: var(--navy-2); text-underline-offset: 2px; }
+:where(a:hover) { color: var(--red-deep); }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+::selection { background: var(--red-soft); color: var(--ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.grid-12 { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--sp-4); }
+.container { width: 100%; max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+@media print {
+  body { background: #fff; }
+  .topbar, .filtres, .btn, .btn-link { display: none !important; }
+  .page { max-width: none; padding: 0; }
+  table.dense thead { display: table-header-group; }
+  table.dense tr { break-inside: avoid; }
+  .tuile { break-inside: avoid; box-shadow: none; }
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: var(--font-body);
