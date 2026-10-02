@@ -24,7 +24,7 @@ function Ligne({ label, c, note }: { label: string; c: Cell; note?: string }) {
 function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: number }) {
   return (
     <>
-      <table className="dense">
+      <div className="table-scroll"><table className="dense">
         <thead>
           <tr>
             <th scope="col">Indicateur</th>
@@ -63,10 +63,10 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
             </tr>
           )}
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Par service</h3>
-      <table className="dense">
+      <div className="table-scroll"><table className="dense">
         <thead>
           <tr>
             <th scope="col">Service</th>
@@ -95,7 +95,7 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
               </tr>
             ))}
         </tbody>
-      </table>
+      </table></div>
     </>
   )
 }

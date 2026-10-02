@@ -31,16 +31,17 @@ export default function Resume() {
             {MOIS[f.filtres.mois - 1]} {f.filtres.annee}
           </p>
           <div className="tuiles">
-            {aCa && <Tuile titre="Chiffre d’affaires" valeur={montrer(s.ca)} />}
-            {aCa && <Tuile titre="Marge" valeur={montrer(s.marge)} />}
+            {aCa && <Tuile titre="Chiffre d’affaires" valeur={montrer(s.ca)} hero absence="CA du mois non saisi" />}
+            {aCa && <Tuile titre="Marge" valeur={montrer(s.marge)} absence="CA du mois non saisi" />}
             {aCa && <Tuile titre="Taux de marge" valeur={s.taux_marge == null ? '—' : pct(s.taux_marge)} />}
-            <Tuile titre="Masse salariale" valeur={fcfa(s.ms.m)} cell={s.ms} />
+            <Tuile titre="Masse salariale" valeur={fcfa(s.ms.m)} cell={s.ms} hero={!aCa} />
             <Tuile titre="Commissions" valeur={fcfa(s.commissions.m)} cell={s.commissions} />
             <Tuile titre="Primes productivité" valeur={fcfa(s.primes_total.m)} cell={s.primes_total} />
           </div>
         </>
       )}
       {ann.data && (
+        <div className="table-scroll">
         <table className="dense">
           <thead>
             <tr>
@@ -54,7 +55,7 @@ export default function Resume() {
             </tr>
           </thead>
           <tbody>
-            {ann.data.serie_n.map((m) => (
+            {ann.data.serie_n.filter((m) => m.mois <= (f.filtres?.mois ?? 12)).map((m) => (
               <tr key={m.mois}>
                 <th scope="row">{MOIS[m.mois - 1]}</th>
                 {aCa && <td className="num">{montrer(m.ca)}</td>}
@@ -67,6 +68,7 @@ export default function Resume() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   )

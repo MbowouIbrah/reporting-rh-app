@@ -149,3 +149,14 @@ tr.sous th { padding-left: 28px; }
   .topbar nav { display: none; flex-basis: 100%; flex-direction: column; }
   .topbar nav.ouvert { display: flex; }
 }
+
+/* Tableaux de données (R3) */
+.table-scroll { max-height: 70vh; overflow: auto; border: 1px solid var(--rule); border-radius: var(--radius); margin-bottom: var(--sp-3); }
+table.dense { margin: 0; }
+table.dense thead th { position: sticky; top: 0; z-index: 2; }
+table.dense tbody th[scope='row'] { position: sticky; left: 0; background: var(--surface); text-align: left; z-index: 1; border-right: 1px solid var(--rule); }
+table.dense tbody tr:hover td, table.dense tbody tr:hover th { background: var(--surface-hover); }
+table.dense tr.total th, table.dense tr.total td { font-weight: var(--fw-bold); background: var(--paper-3); border-top: 2px solid var(--navy-3); }
+table.dense tr.groupe th, table.dense tr.groupe td { font-weight: var(--fw-bold); background: var(--paper-2); }
+table.dense tr.sous th { padding-left: var(--sp-5); font-weight: var(--fw-regular); }
+table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-style: italic; }

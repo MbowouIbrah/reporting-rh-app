@@ -26,6 +26,7 @@ export default function Individuel() {
   return (
     <section>
       <h2>Fiche individuelle</h2>
+      <p className="note">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
       {f.filtres && <FiltresPeriode filtres={f.filtres} annees={f.annees} avecMois={false} onChange={f.set} />}
       <label className="filtres">
         Matricule

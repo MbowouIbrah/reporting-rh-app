@@ -3,6 +3,8 @@ import { getMensuel } from '../api/rapports'
 import type { Indicateurs, Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
+import { Section } from '../components/Kit'
+import Tuile from '../components/Tuile'
 import { EnTete, LigneCell } from '../components/Lignes'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, entier, fcfa, MOIS, pct } from '../lib/format'
@@ -43,8 +45,15 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
           : 'Contrôles de cohérence : OK'}
       </div>
 
-      <h3>Synthèse</h3>
-      <table className="dense">
+      <div className="tuiles">
+        <Tuile titre="Masse salariale" valeur={fcfa(s.ms.m)} cell={s.ms} hero />
+        <Tuile titre="Commissions" valeur={fcfa(s.commissions.m)} cell={s.commissions} />
+        <Tuile titre="Effectif fin de mois" valeur={entier(s.effectif.fin)} />
+        <Tuile titre="Absentéisme" valeur={pct(s.taux_absenteisme)} />
+      </div>
+
+      <Section titre="Synthèse">
+      <div className="table-scroll"><table className="dense">
         <EnTete premiere="Indicateur" budget />
         <tbody>
           <LigneCell label="Masse salariale" cell={s.ms} budget={s.ms} className="total" />
@@ -71,10 +80,11 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
             <td colSpan={2} />
           </tr>
         </tbody>
-      </table>
+      </table></div>
+      </Section>
 
-      <h3>A. Par type de charge</h3>
-      <table className="dense">
+      <Section titre="A. Par type de charge" ouverte={true}>
+      <div className="table-scroll"><table className="dense">
         <EnTete premiere="Type de charge" />
         <tbody>
           {d.a_type_charge.map((r) => (
@@ -86,10 +96,11 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
             />
           ))}
         </tbody>
-      </table>
+      </table></div>
+      </Section>
 
-      <h3>B. Par service et activité</h3>
-      <table className="dense">
+      <Section titre="B. Par service et activité" ouverte={false}>
+      <div className="table-scroll"><table className="dense">
         <EnTete premiere="Service / activité" />
         <tbody>
           {d.b_service_activite
@@ -98,10 +109,11 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
               <ServiceBloc key={b.service} b={b} />
             ))}
         </tbody>
-      </table>
+      </table></div>
+      </Section>
 
-      <h3>C. Par site</h3>
-      <table className="dense">
+      <Section titre="C. Par site" ouverte={false}>
+      <div className="table-scroll"><table className="dense">
         <thead>
           <tr>
             <th scope="col">Site</th>
@@ -126,10 +138,11 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
+      </Section>
 
-      <h3>D. Par type de contrat</h3>
-      <table className="dense">
+      <Section titre="D. Par type de contrat" ouverte={false}>
+      <div className="table-scroll"><table className="dense">
         <thead>
           <tr>
             <th scope="col">Indicateur</th>
@@ -149,8 +162,8 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
           <Ligne label="Absences (jours)" f={(i) => fcfa(i.absences)} d={d} />
           <Ligne label="Taux d’absentéisme" f={(i) => pct(i.taux_absenteisme)} d={d} />
         </tbody>
-      </table>
-      <table className="dense">
+      </table></div>
+      <div className="table-scroll"><table className="dense">
         <EnTete premiere="Contrat × activité (masse salariale)" />
         <tbody>
           {d.d_contrat.ventilation
@@ -159,7 +172,8 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
               <LigneCell key={`${v.contrat}-${v.activite}`} label={`${v.contrat} · ${v.activite}`} cell={v.ms} />
             ))}
         </tbody>
-      </table>
+      </table></div>
+      </Section>
       <p className="note">
         L’Excel d’origine présente un écart d’arrondi de 11 FCFA sur certains totaux ; l’application est exacte.
       </p>
