@@ -36,7 +36,7 @@ Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC(18,3)`, 
 Blocs de restitution (mensuel) : A type de charge, B service × activité, C site (MS + effectif), D effectifs × contrat (CDI, CDD, MAD, Total), ventilation contrat × activité. Colonnes : M-1, M, VAR, VAR %, Budget, Écart, %.
 Annuel : N / N-1, cumul YTD, moyenne mensuelle, nb de mois saisis, ventilation par service. Individuel : un matricule sur 12 mois. Graphes : masse salariale, effectif, absences, répartition par contrat (4 séries maximum, axe masse salariale non forcé à zéro).
 
-Écart connu : l'Excel présente 11 FCFA d'écart d'arrondi entre le bloc A et les blocs B/C. L'application est exacte, donc sans écart ; l'exception est listée dans `golden/ecarts_connus.yaml`.
+Écart connu : l'Excel additionne le nombre d'absences aux montants FCFA des exclusions (+11 en juin 2026, +78 et +164 dans RESULTAT_ATTENDU.md). L'application est exacte ; l'exception est listée dans `golden/ecarts_connus.yaml`.
 
 ## 2. Rôles, périmètres, droits
 

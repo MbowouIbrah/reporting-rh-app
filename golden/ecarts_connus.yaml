@@ -1,0 +1,7 @@
+# Écarts connus entre l'Excel (ou son golden) et l'application. Lus par tests/test_parite_annuel_resume.py.
+- id: exclus_absences
+  feuilles: {resume: [K6, K11]}
+  raison: "Excel (COL_EXCLUSIONS) additionne Absences (nb) aux montants FCFA : +11 en juin 2026"
+  ecart_attendu: "mensuel.synthese.absences.m"
+- id: var_pct_na
+  raison: "VAR % : l'application renvoie n/a ou null là où l'Excel affiche 0 ou vide ; accepté"

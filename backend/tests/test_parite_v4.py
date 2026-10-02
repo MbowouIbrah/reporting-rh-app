@@ -39,7 +39,7 @@ def rapport(make_client):
 
 
 def proche(app, xl, ou):
-    if app is None or isinstance(app, str):  # « — » ou « n/a » : écart de présentation documenté
+    if app is None or app in ("—", "n/a"):  # écart de présentation documenté
         return
     assert xl is not None, ou
     assert abs(D(str(app)) - D(str(xl))) <= TOL, (ou, app, xl)
