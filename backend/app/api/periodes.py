@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api._commun import parse_montant
 from app.db.session import get_db
 from app.imports.regles import norm
 from app.imports.service import DIM_MODELS
@@ -100,13 +101,7 @@ def saisir_ca(
         if ligne is not None:
             db.delete(ligne)
     else:
-        try:
-            v = Decimal(body.valeur.strip().replace(",", "."))
-        except InvalidOperation:
-            raise HTTPException(422, "Montant invalide") from None
-        if not v.is_finite() or v < 0 or abs(v) >= Decimal("1e15"):
-            raise HTTPException(422, "Montant invalide")
-        v = v.quantize(Decimal("0.001"))
+        v = parse_montant(body.valeur)
         if ligne is None:
             db.add(CaPeriode(periode_id=pid, valeur=v))
         else:
