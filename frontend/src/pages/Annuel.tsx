@@ -112,9 +112,10 @@ export default function Annuel() {
     <section>
       <h2>Comparatif annuel</h2>
       {f.filtres && (
-        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
+        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
+          {q.data && <LienExport rapport="annuel" filtres={f.filtres} />}
+        </FiltresPeriode>
       )}
-      {q.data && f.filtres && <LienExport rapport="annuel" filtres={f.filtres} />}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && <Etat type="chargement" />}
       {q.error && <Etat type={etatErreur(q.error)} />}

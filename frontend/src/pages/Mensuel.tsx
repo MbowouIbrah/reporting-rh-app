@@ -8,7 +8,7 @@ import { Section } from '../components/Kit'
 import Tuile from '../components/Tuile'
 import { EnTete, LigneCell } from '../components/Lignes'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, entier, fcfa, MOIS, pct } from '../lib/format'
+import { cls, entier, fcfa, pct } from '../lib/format'
 
 const nonNul = (v: string | null) => v !== null && Number(v) !== 0
 
@@ -24,23 +24,23 @@ export default function Mensuel() {
     <section>
       <h2>Reporting mensuel</h2>
       {f.filtres && (
-        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
+        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
+          {q.data && <LienExport rapport="mensuel" filtres={f.filtres} />}
+        </FiltresPeriode>
       )}
-      {q.data && f.filtres && <LienExport rapport="mensuel" filtres={f.filtres} />}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && <Etat type="chargement" />}
       {q.error && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && <Contenu d={q.data} titre={`${MOIS[f.filtres.mois - 1]} ${f.filtres.annee}`} />}
+      {q.data && f.filtres && <Contenu d={q.data} />}
     </section>
   )
 }
 
-function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
+function Contenu({ d }: { d: MensuelData }) {
   const s = d.synthese
   const bloquants = d.controles.filter((c) => c.bloquant)
   return (
     <>
-      <p className="micro">{titre}</p>
       <div className={bloquants.length ? 'controles ko' : 'controles ok'} role="status">
         {bloquants.length
           ? `Contrôles en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`

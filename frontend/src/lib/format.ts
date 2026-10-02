@@ -8,6 +8,8 @@ export const MOIS = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
+export const MOIS_COURTS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+
 /** Montant en FCFA. null -> « — », 'n/a' -> « n/a ». Number() sert à l'affichage seulement. */
 export function fcfa(v: Val | number | undefined): string {
   if (v === null || v === undefined) return '—'

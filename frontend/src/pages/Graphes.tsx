@@ -5,12 +5,13 @@ import { getAnnuel, getMensuel } from '../api/rapports'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
-import { fcfa, MOIS } from '../lib/format'
+import { fcfa, MOIS_COURTS } from '../lib/format'
 
 const C1 = '#3b5bdb'
 const C2 = '#0c8599'
 const C3 = '#e8590c'
 const GRILLE = '#e7e7ea'
+const AXE = { tickLine: false, axisLine: false, tick: { fill: '#6b6f82', fontSize: 12 } }
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
@@ -32,7 +33,7 @@ export default function Graphes() {
   const erreur = ann.error ?? men.error
 
   const serie = ann.data?.serie_n.map((m) => ({
-    mois: MOIS[m.mois - 1].slice(0, 3),
+    mois: MOIS_COURTS[m.mois - 1],
     ms: m.ms === null ? null : Number(m.ms),
     effectif: m.effectif,
     absences: m.absences === null ? null : Number(m.absences),
@@ -54,8 +55,8 @@ export default function Graphes() {
             <Carte titre="Masse salariale mensuelle (FCFA)">
               <LineChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis dataKey="mois" />
-                <YAxis domain={['dataMin * 0.98', 'dataMax * 1.02']} tickFormatter={(v) => fcfa(v)} width={90} />
+                <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
+                <YAxis domain={[0, 'auto']} tickFormatter={(v) => fcfa(v)} width={90} {...AXE} />
                 <Tooltip formatter={(v) => fcfa(Number(v))} />
                 <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} />
               </LineChart>
@@ -63,8 +64,8 @@ export default function Graphes() {
             <Carte titre="Effectif">
               <BarChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis dataKey="mois" />
-                <YAxis allowDecimals={false} />
+                <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
+                <YAxis allowDecimals={false} {...AXE} />
                 <Tooltip />
                 <Bar dataKey="effectif" name="Effectif" fill={C2} radius={[3, 3, 0, 0]} />
               </BarChart>
@@ -72,8 +73,8 @@ export default function Graphes() {
             <Carte titre="Absences (jours)">
               <BarChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis dataKey="mois" />
-                <YAxis />
+                <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
+                <YAxis {...AXE} />
                 <Tooltip />
                 <Bar dataKey="absences" name="Absences" fill={C3} radius={[3, 3, 0, 0]} />
               </BarChart>
@@ -84,8 +85,8 @@ export default function Graphes() {
           <Carte titre="Effectif par type de contrat">
             <BarChart data={contrats}>
               <CartesianGrid stroke={GRILLE} vertical={false} />
-              <XAxis dataKey="contrat" />
-              <YAxis allowDecimals={false} />
+              <XAxis dataKey="contrat" {...AXE} />
+              <YAxis allowDecimals={false} {...AXE} />
               <Tooltip />
               <Bar dataKey="effectif" name="Effectif" fill={C1} radius={[3, 3, 0, 0]} />
             </BarChart>

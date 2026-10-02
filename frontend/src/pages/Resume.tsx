@@ -6,7 +6,7 @@ import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import Tuile from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, pct } from '../lib/format'
+import { cls, fcfa, MOIS, MOIS_COURTS, pct } from '../lib/format'
 
 const TendanceMs = lazy(() => import('../components/TendanceMs'))
 
@@ -30,9 +30,6 @@ export default function Resume() {
       {erreur && <Etat type={etatErreur(erreur)} />}
       {s && f.filtres && (
         <>
-          <p className="micro">
-            {MOIS[f.filtres.mois - 1]} {f.filtres.annee}
-          </p>
           <div className="tuiles">
             {aCa && <Tuile titre="Chiffre d’affaires" valeur={montrer(s.ca)} hero absence="CA du mois non saisi" />}
             {aCa && <Tuile titre="Marge" valeur={montrer(s.marge)} absence="CA du mois non saisi" />}
@@ -48,7 +45,7 @@ export default function Resume() {
           <TendanceMs
             points={ann.data.serie_n
               .filter((m) => m.mois <= f.filtres!.mois && m.ms !== null)
-              .map((m) => ({ mois: MOIS[m.mois - 1].slice(0, 3), ms: Number(m.ms) }))}
+              .map((m) => ({ mois: MOIS_COURTS[m.mois - 1], ms: Number(m.ms) }))}
           />
         </Suspense>
       )}
