@@ -3,6 +3,12 @@ export type Dec = string
 /** Valeur d'un indicateur : décimal, 'n/a' (division par zéro) ou null (donnée absente). */
 export type Val = Dec | 'n/a' | null
 
+export interface Budget {
+  budget?: Val
+  ecart?: Val
+  ecart_pct?: Val
+}
+
 export interface Cell {
   m1: Val
   m: Val
@@ -70,14 +76,14 @@ export interface Mensuel {
     marge?: Val
     taux_marge?: Val
   }
-  a_type_charge: ({ rubrique: string; exclu: boolean } & Cell)[]
+  a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
   b_service_activite: {
     service: string
-    total: Cell
+    total: Cell & Budget
     effectif: Cell
     activites: ({ activite: string; effectif: Cell } & Cell)[]
   }[]
-  c_site: { site: string; ms: Cell; effectif: { m: number; m1: number | null } }[]
+  c_site: { site: string; ms: Cell & Budget; effectif: { m: number; m1: number | null } }[]
   d_contrat: {
     effectifs: ({ contrat: string } & Cell)[]
     indicateurs: Indicateurs[]

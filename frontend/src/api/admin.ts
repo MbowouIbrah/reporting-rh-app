@@ -172,3 +172,32 @@ export const useModifierRubrique = () =>
   useAction(({ id, ...b }: { id: number; actif?: boolean; ordre?: number }) =>
     api(`/parametrage/rubriques/${id}`, json('PUT', b)),
   )
+
+// ---- budgets ----
+export type AxeBudget = 'rubrique' | 'service' | 'site'
+export interface LigneBudget {
+  cible_id: number
+  libelle: string
+  actif: boolean
+  valeur: string | null
+}
+export interface BudgetsVue {
+  periode_id: number
+  annee: number
+  mois: number
+  statut: string
+  lignes: Record<AxeBudget, LigneBudget[]>
+}
+export const useBudgets = (periodeId: number | null) =>
+  useQuery({
+    queryKey: ['admin', 'budgets', periodeId],
+    queryFn: () => api<BudgetsVue>(`/budgets?periode_id=${periodeId}`),
+    enabled: periodeId !== null,
+    retry: queryRetry,
+  })
+export const useSaisirBudgets = () =>
+  useAction(({ id, lignes }: { id: number; lignes: { axe: AxeBudget; cible_id: number; valeur: string | null }[] }) =>
+    api(`/budgets/${id}`, json('PUT', { lignes })),
+  )
+export const useCopierBudgets = () =>
+  useAction(({ id, depuis }: { id: number; depuis: number }) => api(`/budgets/${id}/copie`, json('POST', { depuis })))

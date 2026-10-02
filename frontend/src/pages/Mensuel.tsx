@@ -85,13 +85,14 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
 
       <Section titre="A. Par type de charge" ouverte={true}>
       <div className="table-scroll"><table className="dense">
-        <EnTete premiere="Type de charge" />
+        <EnTete premiere="Type de charge" budget />
         <tbody>
           {d.a_type_charge.map((r) => (
             <LigneCell
               key={r.rubrique}
               label={r.exclu ? <em>{r.rubrique} (exclu)</em> : r.rubrique}
               cell={r}
+              budget={r}
               className={r.rubrique === 'TOTAL CHARGES' ? 'total' : r.exclu ? 'exclu' : undefined}
             />
           ))}
@@ -101,7 +102,7 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
 
       <Section titre="B. Par service et activité" ouverte={false}>
       <div className="table-scroll"><table className="dense">
-        <EnTete premiere="Service / activité" />
+        <EnTete premiere="Service / activité" budget />
         <tbody>
           {d.b_service_activite
             .filter((b) => nonNul(b.total.m) || nonNul(b.total.m1))
@@ -123,6 +124,9 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
             <th scope="col">Var. %</th>
             <th scope="col">Eff. M-1</th>
             <th scope="col">Eff. M</th>
+            <th scope="col">Budget</th>
+            <th scope="col">Écart</th>
+            <th scope="col">% Budget</th>
           </tr>
         </thead>
         <tbody>
@@ -135,6 +139,9 @@ function Contenu({ d, titre }: { d: MensuelData; titre: string }) {
               <td className={cls(r.ms.var_pct)}>{pct(r.ms.var_pct)}</td>
               <td className="num">{entier(r.effectif.m1)}</td>
               <td className="num">{entier(r.effectif.m)}</td>
+              <td className="num">{fcfa(r.ms.budget ?? null)}</td>
+              <td className={cls(r.ms.ecart ?? null)}>{fcfa(r.ms.ecart ?? null)}</td>
+              <td className={cls(r.ms.ecart_pct ?? null)}>{pct(r.ms.ecart_pct ?? null)}</td>
             </tr>
           ))}
         </tbody>
@@ -205,7 +212,7 @@ function Ligne({
 function ServiceBloc({ b }: { b: MensuelData['b_service_activite'][number] }) {
   return (
     <>
-      <LigneCell label={`${b.service} (effectif ${entier(Number(b.effectif.m))})`} cell={b.total} className="groupe" />
+      <LigneCell label={`${b.service} (effectif ${entier(Number(b.effectif.m))})`} cell={b.total} budget={b.total} className="groupe" />
       {b.activites
         .filter((a) => nonNul(a.m) || nonNul(a.m1))
         .map((a) => (

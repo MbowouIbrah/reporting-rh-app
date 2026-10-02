@@ -1,12 +1,8 @@
 import type { ReactNode } from 'react'
-import type { Cell, Val } from '../api/types'
+import type { Budget as BudgetCols, Cell, Val } from '../api/types'
 import { cls, fcfa, pct } from '../lib/format'
 
-interface Budget {
-  budget: Val
-  ecart: Val
-  ecart_pct: Val
-}
+type Budget = BudgetCols
 
 /** Ligne M-1 | M | Variation | Var. % (+ Budget | Écart | % si fourni). */
 export function LigneCell({
@@ -31,9 +27,9 @@ export function LigneCell({
       <td className={cls(cell.var_pct)}>{pct(cell.var_pct)}</td>
       {budget && (
         <>
-          <td className="num">{fcfa(budget.budget)}</td>
-          <td className={cls(budget.ecart)}>{fcfa(budget.ecart)}</td>
-          <td className={cls(budget.ecart_pct)}>{pct(budget.ecart_pct)}</td>
+          <td className="num">{fcfa(budget.budget ?? null)}</td>
+          <td className={cls(budget.ecart ?? null)}>{fcfa(budget.ecart ?? null)}</td>
+          <td className={cls(budget.ecart_pct ?? null)}>{pct(budget.ecart_pct ?? null)}</td>
         </>
       )}
     </tr>
