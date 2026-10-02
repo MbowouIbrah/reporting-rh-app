@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.imports.regles import norm
 from app.imports.service import DIM_MODELS
+from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
+from app.models.auth import PerimetreRegle
 from app.models.donnees import Periode
 from app.models.pilotage import CaPeriode
 from app.models.referentiel import RefAlias, Rubrique
@@ -163,3 +165,62 @@ def ajouter_alias(
                  {"dimension": dimension, "alias": a.alias_norm, "cible_id": a.cible_id})
     db.commit()
     return {"alias": a.alias_norm, "cible_id": a.cible_id}
+
+
+class RefPatch(BaseModel):
+    libelle: str | None = None
+    actif: bool | None = None
+
+
+@router.put("/referentiels/{dimension}/{rid}")
+def modifier_referentiel(
+    dimension: str, rid: int, body: RefPatch, apercu: bool = False,
+    p: Principal = Depends(current_principal), db: Session = Depends(get_db),
+):
+    """Renomme / (dés)active une valeur. Le renommage est propagé aux règles de périmètre
+    et l'ancien libellé reste résolu à l'import (alias), dans la même transaction."""
+    authorize(p, "referentiel:write")
+    model = _modele(dimension)
+    row = db.get(model, rid)
+    if row is None:
+        raise HTTPException(404, "Valeur introuvable")
+    avant = {"libelle": row.libelle, "actif": row.actif}
+    ancien = row.libelle
+    nouveau = body.libelle.strip() if body.libelle is not None else ancien
+    renomme = nouveau != ancien
+    if renomme:
+        if not nouveau:
+            raise HTTPException(422, "Libellé vide")
+        if dimension == "rubrique" and ancien in {ABSENCES, COMMISSION, *PRIMES}:
+            raise HTTPException(409, "Rubrique utilisée par le moteur KPI : renommage interdit")
+        if db.scalar(select(model.id).where(model.libelle == nouveau, model.id != rid)):
+            raise HTTPException(409, "Libellé déjà utilisé")
+        pris = db.scalar(select(RefAlias).where(
+            RefAlias.dimension == dimension, RefAlias.alias_norm == norm(nouveau)))
+        if pris is not None and pris.cible_id != rid:
+            raise HTTPException(409, "Libellé déjà utilisé comme alias d'une autre valeur")
+    regles = []
+    if renomme and dimension in ("service", "site"):
+        regles = list(db.scalars(select(PerimetreRegle).where(
+            PerimetreRegle.dimension == dimension, PerimetreRegle.valeur == ancien)))
+    if apercu:
+        return {"perimetres_maj": len({r.perimetre_id for r in regles})}
+    if body.actif is not None:
+        row.actif = body.actif
+    if renomme:
+        row.libelle = nouveau
+        for r in regles:
+            r.valeur = nouveau
+        if pris is not None:  # l'alias du nouveau libellé pointait déjà ici : devenu inutile
+            db.delete(pris)
+            db.flush()
+        if not db.scalar(select(RefAlias.id).where(
+                RefAlias.dimension == dimension, RefAlias.alias_norm == norm(ancien))):
+            db.add(RefAlias(dimension=dimension, alias_norm=norm(ancien), cible_id=rid))
+    db.flush()
+    audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant,
+                 {"libelle": row.libelle, "actif": row.actif,
+                  "perimetres_maj": len({r.perimetre_id for r in regles})})
+    db.commit()
+    return {"id": rid, "libelle": row.libelle, "actif": row.actif,
+            "perimetres_maj": len({r.perimetre_id for r in regles})}

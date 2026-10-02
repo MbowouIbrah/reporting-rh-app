@@ -6,6 +6,7 @@ import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
+import Referentiels from './pages/admin/Referentiels'
 import Perimetres from './pages/admin/Perimetres'
 import Utilisateurs from './pages/admin/Utilisateurs'
 import Periodes from './pages/admin/Periodes'
@@ -65,6 +66,14 @@ export default function App() {
           element={
             <RequireAuth perm="perimetre:write">
               <Perimetres />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/referentiels"
+          element={
+            <RequireAuth perm="referentiel:write">
+              <Referentiels />
             </RequireAuth>
           }
         />

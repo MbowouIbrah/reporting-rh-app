@@ -102,3 +102,25 @@ export const useCreerPerimetre = () => useAction((b: NouveauPerimetre) => api('/
 export const useModifierPerimetre = () =>
   useAction(({ id, ...b }: NouveauPerimetre & { id: number }) => api(`/perimetres/${id}`, json('PUT', b)))
 export const useSupprimerPerimetre = () => useAction((id: number) => api(`/perimetres/${id}`, json('DELETE')))
+
+// ---- référentiels ----
+export type Dimension = 'service' | 'site' | 'activite' | 'type_contrat'
+export interface RefModif {
+  dim: Dimension
+  id: number
+  libelle?: string
+  actif?: boolean
+}
+export interface RefResultat {
+  perimetres_maj: number
+}
+export const useReferentielDim = (dim: Dimension) =>
+  useQuery({
+    queryKey: ['admin', 'ref', dim],
+    queryFn: () => api<Referentiel>(`/referentiels/${dim}`),
+    retry: queryRetry,
+  })
+export const apercuRenommage = ({ dim, id, ...b }: RefModif) =>
+  api<RefResultat>(`/referentiels/${dim}/${id}?apercu=true`, json('PUT', b))
+export const useModifierRef = () =>
+  useAction(({ dim, id, ...b }: RefModif) => api<RefResultat>(`/referentiels/${dim}/${id}`, json('PUT', b)))
