@@ -26,12 +26,13 @@ periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situati
 | P3 | Modèle, référentiels, import | L | Import V4 = 1 398 lignes, 0 bloquant ; fichier « pièges » -> 1 anomalie localisée/cas ; idempotent ; annulation OK |
 | P4 | Moteur KPI + API rapports | L | Parité golden sur 18 périodes, invariants OK, couverture kpi/ >= 90 % |
 | P5 | Front : Résumé, Mensuel, Annuel, Individuel, Graphes | L | Playwright par rôle, filtres indépendants par page, conformité RESULTAT_ATTENDU.md |
+| P5b | Refonte UI (`docs/PLAN_REFONTE_UI.md`) : tokens, kit de composants, pages, accessibilité, captures avant/après | M (~6,5 j) | Présentation seule : valeurs et masquages inchangés, Playwright par rôle inchangé, Lighthouse accessibilité >= 95, validé par l'admin |
 | P6 | Admin et saisie : CRUD, CA, budgets, rubriques, utilisateurs, clôture, historique | M | Tout tracé ; période close refusée |
 | P7 | Exports xlsx | S | = écran au FCFA près, filtré par périmètre |
 | P8 | Double run 2 mois réels Excel vs app | M | Écart nul ou documenté ; validation admin + DRH |
 | P9 | Mise en prod : sauvegarde/restauration testées, runbook, rollback, comptes, Excel archivé | S | |
 
-Dépendances : P1 -> P2 / P3 (parallèles) -> P4 -> P5 (+P2) ; P6 après P3 ; P7 après P4 ; P8 après P5+P6.
+Dépendances : P1 -> P2 / P3 (parallèles) -> P4 -> P5 (+P2) -> P5b ; P6 après P3 et après le kit de composants de P5b (R2) ; P7 après P4 ; P8 après P5+P6.
 
 ## Migration et parité
 1. Même pipeline d'import + mapping colonnes V4->V5 (Variable -> Commission).

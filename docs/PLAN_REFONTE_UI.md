@@ -1,12 +1,12 @@
 # Plan : refonte de l'interface (phase P5b)
 
-Statut : proposé, non commencé. Rédigé le 2026-10-02.
+Statut : intégré au plan (phase P5b, entre P5 et P6), prêt à démarrer. Rédigé le 2026-10-02, relu et ajusté le même jour.
 
 ## 1. Contexte et règle de coexistence
 
-Le front fonctionnel (P5) est en cours : `Resume`, `Mensuel`, `Annuel`, `Individuel`, `Layout`, `FiltresPeriode`, `Lignes`, `Etat` sont écrits mais non commités ; la page `Graphes` n'existe pas encore. Une refonte visuelle menée en parallèle sur les mêmes fichiers créerait des conflits et des régressions.
+Le front fonctionnel P5 est livré et commité (`05-a` à `05-c`) : 14 vitest, 7 Playwright par rôle, build vert. `Graphes` existe en version simple (recharts, 4 graphes, chargement différé). La condition de démarrage ci-dessous est donc remplie.
 
-**Règle : la refonte démarre une fois P5 commité et vert** (build, tests, Playwright par rôle). Elle ne modifie ni `api/`, ni `auth/`, ni `hooks/`, ni `lib/format.ts`, ni les règles de périmètre ou de masquage (marge sans `marge:read`, fiche nominative). Elle touche uniquement la présentation : `styles/`, `components/`, la structure JSX des `pages/`.
+**Règle : la refonte part de P5 commité et vert (c'est le cas)** (build, tests, Playwright par rôle). Elle ne modifie ni `api/`, ni `auth/`, ni `hooks/`, ni `lib/format.ts`, ni les règles de périmètre ou de masquage (marge sans `marge:read`, fiche nominative). Elle touche uniquement la présentation : `styles/`, `components/`, la structure JSX des `pages/`.
 
 Ce qui est déjà en place et reste acquis : tokens cfaoacademy (rouge `#e3001b`, marine `#1a1f3c`, Space Grotesk / DM Sans / JetBrains Mono), React 19, TanStack Query, états `Etat` (vide, chargement, erreur).
 
@@ -16,6 +16,19 @@ Ce qui est déjà en place et reste acquis : tokens cfaoacademy (rouge `#e3001b`
 - `ui-ux-pro-max` : palette de données, types de graphiques, règles de tableaux.
 - `design-taste-frontend` / `frontend-design` : éviter le rendu générique.
 - `web-design-guidelines` : contrôle final accessibilité et bonnes pratiques.
+
+## 2b. Ajustements après analyse (périmètre réel)
+
+- **Pas de nouvelle donnée.** Les points suivants du plan exigent des champs que l'API n'expose pas ; ils sont reportés ou reformulés pour respecter « présentation seulement » :
+  - Résumé « alertes notables » : reformulé en mise en évidence des variations M-1 déjà calculées (`var_pct`) et du bandeau de contrôles ; pas de moteur d'alertes (backlog cycle 2 : alertes de variation).
+  - Mensuel « comparaison N-1 en colonnes » : l'API ne renvoie que M-1. Hors P5b ; à reprendre avec un champ N-1 côté `moteur.mensuel` si la DRH le confirme (ajouter à `backlog.md`).
+  - Tuile « mini-courbe » : possible pour MS, commissions, primes (série `annuel.serie_n`, déjà chargée par le Résumé).
+- **Individuel « données sensibles non affichées par défaut »** : simple affichage masqué/révélé côté présentation, sans toucher à `nominatif:read` ni au journal `lecture_fiche` (journalisé à l'appel API, inchangé).
+- **Déjà acquis par P5, à conserver** : classes `neg`/`num`, états `Etat` (403/404/vide), masquage de la marge par absence de clé, filtres dans l'URL, lazy `Graphes`.
+- **Mode sombre** : optionnel, dernier du R1 ; abandonné si le temps manque (usage bureau).
+- **Nouveaux outils** : axe et Lighthouse ne sont pas installés ; les ajouter en devDependencies (`@axe-core/playwright`, `lighthouse` en npx) ; attention au disque C: serré.
+- **Branche** `refonte-ui` dans le dépôt local (pas de remote) ; merge sur la branche principale une fois les critères §5 validés.
+- **P6** : les pages d'administration utilisent le kit dès leur création ; P6 démarre après R2 (kit de composants) au plus tard.
 
 ## 3. Objectifs de design
 
@@ -88,4 +101,4 @@ Format du dépôt `NN-x: description`, par exemple :
 
 ## 8. Estimation
 
-Environ 6,5 jours de travail, hors page Graphes si P5 la livre d'abord au format simple.
+Environ 6,5 jours de travail (Graphes simple déjà livré : seule sa refonte visuelle reste, dans R3).
