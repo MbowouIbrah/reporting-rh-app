@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import { AuthProvider } from '../../auth/AuthContext'
 import Periodes from './Periodes'
 
 const base = { id: 1, annee: 2026, mois: 3, statut: 'ouverte', close_le: null, ca: null }
@@ -9,11 +11,17 @@ function rendu(periodes: unknown[]) {
   const appels: { url: string; init?: RequestInit }[] = []
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
     appels.push({ url: String(u), init })
+    if (String(u).includes('/auth/me'))
+      return new Response(JSON.stringify({ id: 1, email: 'a@b.c', roles: [], permissions: ['saisie:write'] }))
     return new Response(JSON.stringify(init?.method === 'PUT' ? { ...base, ca: '12.500' } : periodes))
   })
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <Periodes />
+      <AuthProvider>
+        <MemoryRouter>
+          <Periodes />
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
   return appels

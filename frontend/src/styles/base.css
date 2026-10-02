@@ -175,3 +175,7 @@ table.dense td.num { text-align: right; }
 .confirmer { border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); max-width: 28rem; }
 .confirmer::backdrop { background: rgba(0, 0, 0, 0.4); }
 .confirmer-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-3); }
+
+.sous-nav { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
+.sous-nav a { padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); color: var(--navy); text-decoration: none; }
+.sous-nav a.active { background: var(--navy); color: #fff; }

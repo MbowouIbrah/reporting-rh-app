@@ -88,6 +88,17 @@ def _perimetre_dict(p: Perimetre) -> dict:
     }
 
 
+def _est_admin_actif(u: Utilisateur) -> bool:
+    return u.actif and any(r.role == "rh_admin" for r in u.roles)
+
+
+def _exiger_autre_admin(db: Session, u: Utilisateur) -> None:
+    """Garde : au moins un rh_admin actif doit subsister après l'opération."""
+    autres = db.scalars(select(Utilisateur).where(Utilisateur.id != u.id)).all()
+    if not any(_est_admin_actif(x) for x in autres):
+        raise HTTPException(409, "Il doit rester au moins un administrateur actif")
+
+
 def _flush(db: Session) -> None:
     try:
         db.flush()
@@ -143,6 +154,11 @@ def update_user(
     if u is None:
         raise HTTPException(404, "Utilisateur introuvable")
     avant = _user_dict(u)
+    if _est_admin_actif(u):
+        perd_actif = body.actif is False
+        perd_role = body.roles is not None and not any(r.role == "rh_admin" for r in body.roles)
+        if perd_actif or perd_role:
+            _exiger_autre_admin(db, u)
     if body.nom is not None:
         u.nom = body.nom
     if body.actif is not None:
@@ -170,6 +186,8 @@ def delete_user(
     u = db.get(Utilisateur, user_id)
     if u is None:
         raise HTTPException(404, "Utilisateur introuvable")
+    if _est_admin_actif(u):
+        _exiger_autre_admin(db, u)
     audit.record(db, p.user_id, "delete", "utilisateur", u.id, _user_dict(u), None)
     db.delete(u)
     _commit(db)
@@ -252,10 +270,20 @@ def delete_perimetre(
 # ---- Journal d'audit ----
 @router.get("/audit")
 def list_audit(
-    limit: int = 100, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+    limit: int = 100,
+    offset: int = 0,
+    entite: str | None = None,
+    entite_id: str | None = None,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
 ):
     authorize(p, "audit:read")
-    q = select(AuditEvent).order_by(AuditEvent.id.desc()).limit(min(max(limit, 1), 500))
+    q = select(AuditEvent).order_by(AuditEvent.id.desc())
+    if entite:
+        q = q.where(AuditEvent.entite == entite)
+    if entite_id:
+        q = q.where(AuditEvent.entite_id == entite_id)
+    q = q.offset(max(offset, 0)).limit(min(max(limit, 1), 500))
     return [
         {
             "id": e.id,

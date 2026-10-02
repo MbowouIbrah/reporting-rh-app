@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCloturer, usePeriodesAdmin, useRouvrir, useSaisirCa, type PeriodeAdmin } from '../../api/admin'
 import { Badge, Bouton, Carte, Champ, ChampMontant, Confirmer } from '../../components/Kit'
+import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
 
 const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
@@ -77,6 +78,7 @@ export default function Periodes() {
 
   return (
     <>
+      <AdminNav />
       <h2>Périodes et chiffre d’affaires</h2>
       {[...(q.data ?? [])].reverse().map((p) => (
         <Ligne
