@@ -164,3 +164,5 @@ table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-sty
 .graphes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
 .graphe { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); box-shadow: var(--shadow-1); }
 .graphe figcaption { font-family: var(--font-display); font-weight: var(--fw-bold); color: var(--navy); margin-bottom: var(--sp-3); }
+.tuile-hero .note { color: #dfe1ee; }
+table.dense td.num { text-align: right; }

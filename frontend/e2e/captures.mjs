@@ -5,12 +5,12 @@ import { chromium } from '@playwright/test'
 
 const dossier = `captures/${process.argv[2] || 'avant'}`
 const PW = '<mot-de-passe-test>'
-const BASE = 'http://localhost:5173/reporting-rh/'
+const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/reporting-rh/`
 const roles = [
   ['drh', 'drh@exemple.invalid', ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']],
   ['perimetre', 'dps.equipment@exemple.invalid', ['resume', 'mensuel']],
 ]
-const tailles = [[1440, 900], [390, 844]]
+const tailles = [[1440, 900], [1024, 768], [390, 844]]
 
 mkdirSync(dossier, { recursive: true })
 const browser = await chromium.launch({ executablePath: process.env.E2E_CHROMIUM || undefined })
@@ -23,7 +23,7 @@ for (const [nom, email, pages] of roles) {
     await page.getByLabel('Mot de passe').fill(PW)
     if (nom === 'drh' && w === 1440) await page.screenshot({ path: `${dossier}/connexion-${w}.png` })
     await page.getByRole('button', { name: 'Se connecter' }).click()
-    await page.getByRole('navigation', { name: 'Rapports' }).waitFor()
+    await page.waitForURL(/resume/)
     for (const p of pages) {
       await page.goto(`${BASE}${p}`)
       await page.waitForLoadState('networkidle')
