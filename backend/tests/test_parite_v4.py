@@ -31,7 +31,8 @@ def excel():
 def rapport(make_client):
     c = make_client("admin@exemple.invalid")
     r = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)})
-    assert r.status_code == 201 and c.post(f"{API}/imports/{r.json()['id']}/valider").status_code == 200
+    assert r.status_code == 201
+    assert c.post(f"{API}/imports/{r.json()['id']}/valider").status_code == 200
     r = c.get(f"{API}/rapports/mensuel", params={"annee": 2026, "mois": 6})
     assert r.status_code == 200, r.text
     return r.json()
@@ -95,8 +96,7 @@ def test_bloc_d_contrat(rapport, excel):
     contrat = None
     for r in range(101, 113, 2):
         contrat = excel.get(f"B{r}") or contrat
-        v = vent[(contrat, excel[f"C{r}"] if excel.get(f"C{r}") else prev_act)]
-        prev_act = v["activite"]
+        v = vent[(contrat, excel[f"C{r}"])]
         proche(v["ms"]["m1"], excel[f"E{r}"], (contrat, v["activite"], "ms M-1"))
         proche(v["ms"]["m"], excel[f"F{r}"], (contrat, v["activite"], "ms M"))
         proche(v["effectif"]["m"], excel[f"F{r + 1}"], (contrat, v["activite"], "eff"))
