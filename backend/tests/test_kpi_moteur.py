@@ -105,10 +105,15 @@ def test_blocs_service_site_contrat():
     assert {e["contrat"]: e["m"] for e in r["d_contrat"]["effectifs"]} == {"CDI": 1, "CDD": 0,
                                                                           "MAD": 1}
     assert r["d_contrat"]["total"]["m"] == 2
-    assert next(x for x in r["d_contrat"]["ventilation"]
-                if (x["contrat"], x["activite"]) == ("MAD", "Back Office"))["m"] == 1
-    assert r["a_type_charge"][-1] == {"rubrique": "TOTAL CHARGES", "m1": None, "m": 140,
-                                      "var": None, "var_pct": None}
+    mad = next(x for x in r["d_contrat"]["ventilation"]
+               if (x["contrat"], x["activite"]) == ("MAD", "Back Office"))
+    assert mad["effectif"]["m"] == 1 and mad["ms"]["m"] == 40
+    assert r["a_type_charge"][-1] == {"rubrique": "TOTAL CHARGES", "exclu": False, "m1": None,
+                                      "m": 140, "var": None, "var_pct": None}
+    assert [a["effectif"]["m"] for a in svc["Commerce VN"]["activites"]] == [0, 1]
+    assert svc["SAV PL"]["effectif"]["m"] == 1
+    flags = {x["rubrique"]: x["exclu"] for x in r["a_type_charge"]}
+    assert flags["Primes sur ventes"] and not flags["Brut Réel"] and "Absences (nb)" not in flags
 
 
 def test_controle_bloquant_si_referentiel_incomplet():

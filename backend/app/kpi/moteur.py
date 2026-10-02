@@ -114,12 +114,14 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     def mont(rub):
         return lambda pd, L: L.montants.get(rub, ZERO)
 
-    inclus = [r for r in refs.rubriques if r not in cur.exclues]
     a_type = [
-        {"rubrique": r, **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
-        for r in inclus
+        {"rubrique": r, "exclu": r in cur.exclues,
+         **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
+        for r in refs.rubriques if r != ABSENCES
     ]
-    ms_a = sum((x["m"] for x in a_type), ZERO)  # chemin indépendant : somme des rubriques
+    # chemin indépendant de PeriodeData.ms : somme des rubriques comptées dans le total
+    ms_a = sum((x["m"] for x in a_type if not x["exclu"]), ZERO)
+    ms_a1 = sum((x["m1"] for x in a_type if not x["exclu"]), ZERO) if prev else None
 
     def total(pd, L):
         return pd.total(L)
@@ -132,9 +134,13 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         b_service.append({
             "service": s,
             "total": cell(sub.ms, sub1.ms if sub1 else None),
-            "activites": [{"activite": n, **c} for n, c in _cells(
-                PeriodeData(tuple(L for L in sub.lignes), cur.exclues),
-                sub1, refs.activites, lambda L: L.activite, total)],
+            "effectif": cell(Decimal(len(sub.ids)), Decimal(len(sub1.ids)) if sub1 else None),
+            "activites": [
+                {"activite": n, **c, "effectif": cell(
+                    Decimal(len({L.salarie_id for L in sub.lignes if L.activite == n})),
+                    Decimal(len({L.salarie_id for L in sub1.lignes if L.activite == n}))
+                    if sub1 else None)}
+                for n, c in _cells(sub, sub1, refs.activites, lambda L: L.activite, total)],
         })
     ms_services = sum((b["total"]["m"] for b in b_service), ZERO)
 
@@ -153,12 +159,17 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                                    None if prev is None else Decimal(eff_contrat(prev, c)))}
              for c in refs.contrats]
     total_contrats = sum((d["m"] for d in d_eff), ZERO)
-    ventilation = [
-        {"contrat": c, "activite": a,
-         "m": sum(1 for L in cur.lignes if L.contrat == c and L.activite == a),
-         "m1": sum(1 for L in prev.lignes if L.contrat == c and L.activite == a) if prev else None}
-        for c in refs.contrats for a in refs.activites
-    ]
+    def ventil(pd, c, a):
+        sel = [L for L in pd.lignes if L.contrat == c and L.activite == a] if pd else []
+        return (sum((pd.total(L) for L in sel), ZERO), Decimal(len({L.salarie_id for L in sel}))
+                ) if pd else (None, None)
+
+    ventilation = []
+    for c in refs.contrats:
+        for a in refs.activites:
+            (ms_c, ef_c), (ms_c1, ef_c1) = ventil(cur, c, a), ventil(prev, c, a)
+            ventilation.append({"contrat": c, "activite": a, "ms": cell(ms_c, ms_c1),
+                                "effectif": cell(ef_c, ef_c1)})
 
     controles = [
         _controle("MS type de charge = service = site", ms_a, ms_services, ms_sites, ms),
@@ -169,7 +180,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                                    Decimal(eff1 + recrut - departs), Decimal(eff)))
     return {
         "synthese": synthese,
-        "a_type_charge": a_type + [{"rubrique": "TOTAL CHARGES", **cell(ms_a, ms1)}],
+        "a_type_charge": a_type
+        + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1)}],
         "b_service_activite": b_service,
         "c_site": c_site,
         "d_contrat": {"effectifs": d_eff,
