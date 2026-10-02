@@ -11,7 +11,9 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 
+import pythoncom
 import win32com.client as win32
 
 MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août",
@@ -19,6 +21,17 @@ MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août
 FEUILLES = {"mensuel": ("REPORTING_RH_MENSUEL", "B1:V115"),
             "annuel": ("REPORTING_RH_ANNUEL ", "A1:U148"),
             "resume": ("RÉSUMÉ", "B1:N32")}
+
+
+def retry(fn, *a, essais=60):
+    """Excel répond « appel rejeté » tant qu'il charge ou recalcule : on réessaie."""
+    for i in range(essais):
+        try:
+            return fn(*a)
+        except pythoncom.com_error as e:
+            if e.hresult != -2147418111 or i == essais - 1:
+                raise
+            time.sleep(1)
 
 
 def adresse(r0: int, c0: int, i: int, j: int) -> str:
@@ -52,20 +65,20 @@ def main(classeur: str, periodes: str, sortie: str) -> None:
     resultat = {}
     wb = None
     try:
-        wb = excel.Workbooks.Open(copie, 0, True)  # lecture seule
-        sel = wb.Worksheets("REPORTING_RH_MENSUEL")
+        wb = retry(excel.Workbooks.Open, copie, 0, True)  # lecture seule
+        sel = retry(wb.Worksheets, "REPORTING_RH_MENSUEL")
         for annee, mois in json.load(open(periodes)):
-            sel.Range("C4").Value = MOIS[mois - 1]
-            sel.Range("D4").Value = annee
-            excel.Calculate()
-            excel.CalculateFull()
+            retry(setattr, sel.Range("C4"), "Value", MOIS[mois - 1])
+            retry(setattr, sel.Range("D4"), "Value", annee)
+            retry(excel.CalculateFull)
             resultat[f"{annee}-{mois:02d}"] = {
-                k: releve(wb.Worksheets(nom), plage) for k, (nom, plage) in FEUILLES.items()}
+                k: retry(releve, retry(wb.Worksheets, nom), plage)
+                for k, (nom, plage) in FEUILLES.items()}
             print("ok", annee, mois, flush=True)
     finally:
         if wb is not None:
-            wb.Close(False)
-        excel.Quit()
+            retry(wb.Close, False)
+        retry(excel.Quit)
         shutil.rmtree(tmp, ignore_errors=True)
     with open(sortie, "w", encoding="utf-8") as f:
         json.dump(resultat, f, ensure_ascii=False, indent=0, sort_keys=True)
