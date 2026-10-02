@@ -1,26 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAnnuel, getMensuel } from '../api/rapports'
-import type { Cell, Val } from '../api/types'
+import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
+import Tuile from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, isNeg, MOIS, pct } from '../lib/format'
-
-function Tuile({ titre, valeur, cell }: { titre: string; valeur: string; cell?: Cell }) {
-  const v = cell?.var_pct
-  const fleche = v == null || v === 'n/a' ? '' : isNeg(v) ? '▼' : '▲'
-  return (
-    <div className="tuile">
-      <span className="micro">{titre}</span>
-      <strong>{valeur}</strong>
-      {cell && (
-        <span className={cls(v)}>
-          {fleche} {pct(v)} vs M-1
-        </span>
-      )}
-    </div>
-  )
-}
+import { cls, fcfa, MOIS, pct } from '../lib/format'
 
 export default function Resume() {
   const f = useFiltres()

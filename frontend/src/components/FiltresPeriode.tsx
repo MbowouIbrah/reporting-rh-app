@@ -55,6 +55,24 @@ export default function FiltresPeriode({ filtres, annees, services, sites, avecM
           </select>
         </label>
       )}
+      {(filtres.service || filtres.site) && (
+        <button
+          type="button"
+          className="bouton bouton-lien"
+          onClick={() => onChange({ service: undefined, site: undefined })}
+        >
+          Réinitialiser
+        </button>
+      )}
+      <p className="filtres-resume" aria-live="polite">
+        {[avecMois ? MOIS[filtres.mois - 1] : null, String(filtres.annee), filtres.site, filtres.service]
+          .filter(Boolean)
+          .map((t) => (
+            <span key={t} className="puce">
+              {t}
+            </span>
+          ))}
+      </p>
     </div>
   )
 }

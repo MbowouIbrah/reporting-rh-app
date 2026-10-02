@@ -10,10 +10,38 @@ const TEXTE: Record<TypeEtat, string> = {
   erreur: 'Une erreur est survenue. Réessayez.',
 }
 
-export default function Etat({ type }: { type: TypeEtat }) {
+const AIDE: Partial<Record<TypeEtat, string>> = {
+  '403': 'Votre rôle ne donne pas accès à ce contenu. Contactez la DRH si besoin.',
+  '404': 'Choisissez une autre période, ou vérifiez que les données ont été importées.',
+  vide: 'Aucune période n’est encore disponible.',
+}
+
+interface Props {
+  type: TypeEtat
+  /** Action proposée dans l'état d'erreur (ex. relancer la requête). */
+  onRetry?: () => void
+}
+
+export default function Etat({ type, onRetry }: Props) {
+  if (type === 'chargement') {
+    return (
+      <div className="etat" role="status" aria-live="polite">
+        <div className="squelette" aria-hidden="true">
+          <span /> <span /> <span />
+        </div>
+        <span className="sr-only">{TEXTE[type]}</span>
+      </div>
+    )
+  }
   return (
-    <div className="etat" role={type === 'chargement' ? 'status' : 'alert'}>
-      {TEXTE[type]}
+    <div className={`etat etat-${type}`} role="alert">
+      <strong>{TEXTE[type]}</strong>
+      {AIDE[type] && <span className="note">{AIDE[type]}</span>}
+      {type === 'erreur' && onRetry && (
+        <button type="button" className="bouton bouton-secondaire" onClick={onRetry}>
+          Réessayer
+        </button>
+      )}
     </div>
   )
 }

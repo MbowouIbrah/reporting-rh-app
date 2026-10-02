@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
@@ -12,6 +13,8 @@ const ONGLETS = [
 export default function Layout() {
   const { me, can, logout } = useAuth()
   const navigate = useNavigate()
+  const [ouvert, setOuvert] = useState(false)
+  const role = me?.roles[0]?.role
   return (
     <div className="app">
       <header className="topbar">
@@ -19,7 +22,16 @@ export default function Layout() {
         <h1>
           Reporting <span className="accent">RH</span>
         </h1>
-        <nav aria-label="Rapports">
+        <button
+          type="button"
+          className="menu-toggle"
+          aria-expanded={ouvert}
+          aria-controls="nav-rapports"
+          onClick={() => setOuvert((o) => !o)}
+        >
+          Menu
+        </button>
+        <nav id="nav-rapports" aria-label="Rapports" className={ouvert ? 'ouvert' : undefined} onClick={() => setOuvert(false)}>
           {ONGLETS.filter((o) => !o.perm || can(o.perm)).map((o) => (
             <NavLink key={o.to} to={o.to}>
               {o.label}
@@ -27,7 +39,10 @@ export default function Layout() {
           ))}
         </nav>
         <div className="user">
-          <span>{me?.email}</span>
+          <span>
+            {me?.email}
+            {role && <span className="badge badge-neutre">{role}</span>}
+          </span>
           <button
             className="btn-link"
             onClick={async () => {
