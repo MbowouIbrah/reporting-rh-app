@@ -179,3 +179,31 @@ table.dense td.num { text-align: right; }
 .sous-nav { display: flex; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-4); }
 .sous-nav a { padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--rule-strong); color: var(--navy); text-decoration: none; }
 .sous-nav a.active { background: var(--navy); color: #fff; }
+
+/* Barre d'application et gabarit de page : un seul gabarit (--page-max, --page-gutter) */
+.topbar { padding: 0; border-bottom: 1px solid var(--rule); border-top: 3px solid var(--red); box-shadow: var(--shadow-1); }
+.topbar-inner { width: 100%; display: flex; align-items: center; gap: var(--sp-2) var(--sp-6); max-width: var(--page-max); margin-inline: auto; padding: var(--sp-3) var(--page-gutter); min-height: 64px; }
+.marque { display: grid; gap: 2px; line-height: 1; flex: none; }
+.marque .micro { font-size: 10px; }
+.topbar h1 { font-size: var(--fs-lg); line-height: 1.1; }
+.topbar nav { flex: 1; gap: var(--sp-1); }
+.topbar nav a { padding: var(--sp-2) var(--sp-3); }
+.topbar .user { margin-left: auto; flex: none; gap: var(--sp-4); }
+.user-id { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.user-id .badge { margin-left: 0; text-transform: capitalize; }
+.topbar .btn-link { text-decoration: none; font-weight: var(--fw-bold); }
+.topbar .btn-link:hover { text-decoration: underline; }
+.page { max-width: var(--page-max); padding: var(--sp-5) var(--page-gutter) var(--sp-7); }
+.page h2 { font-size: var(--fs-2xl); margin-bottom: var(--sp-1); }
+.note-entete { margin-bottom: var(--sp-4); }
+.filtres { gap: var(--sp-3) var(--sp-4); }
+.filtres select, .filtres input { height: 40px; }
+.vide-guide { display: grid; gap: var(--sp-1); justify-items: center; text-align: center; padding: var(--sp-7) var(--sp-4); background: var(--surface); border: 1px dashed var(--rule-strong); border-radius: var(--radius-lg); color: var(--navy); }
+@media (min-width: 721px) { .topbar nav { flex-wrap: nowrap; } .topbar nav a { white-space: nowrap; } }
+@media (max-width: 1180px) { .topbar-inner { gap: var(--sp-2) var(--sp-4); } .user-email { display: none; } }
+@media (max-width: 720px) {
+  .topbar-inner { flex-wrap: wrap; }
+  .topbar .user { margin-left: 0; flex-basis: 100%; justify-content: space-between; }
+  .user-email { display: inline; }
+  .topbar nav { flex-basis: 100%; }
+}

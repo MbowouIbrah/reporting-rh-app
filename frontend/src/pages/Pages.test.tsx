@@ -78,7 +78,7 @@ test('Annuel : affiche Nb de mois saisis', async () => {
 
 test('Individuel : message sans matricule', async () => {
   rendu(<Individuel />, '/individuel', ['report:read', 'nominatif:read'])
-  expect(await screen.findByText('Aucun employé sélectionné.')).toBeInTheDocument()
+  expect(await screen.findByText('Sélectionnez un employé')).toBeInTheDocument()
 })
 
 test('Individuel : accès refusé sans nominatif:read', async () => {

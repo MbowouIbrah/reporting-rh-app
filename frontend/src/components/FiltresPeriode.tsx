@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { FiltresPage } from '../api/rapports'
 import { MOIS } from '../lib/format'
 
@@ -7,10 +8,13 @@ interface Props {
   services?: string[]
   sites?: string[]
   avecMois?: boolean
+  /** Champs supplémentaires, alignés sur la même ligne que les filtres. */
+  children?: ReactNode
   onChange: (patch: Record<string, string | number | undefined>) => void
 }
 
-export default function FiltresPeriode({ filtres, annees, services, sites, avecMois = true, onChange }: Props) {
+export default function FiltresPeriode({ filtres, annees, services, sites, avecMois = true, children, onChange }: Props) {
+  const puces = [avecMois ? MOIS[filtres.mois - 1] : null, String(filtres.annee), filtres.site, filtres.service].filter(Boolean)
   return (
     <div className="filtres" role="group" aria-label="Filtres">
       <label>
@@ -64,15 +68,17 @@ export default function FiltresPeriode({ filtres, annees, services, sites, avecM
           Réinitialiser
         </button>
       )}
+      {children}
+      {puces.length > 1 && (
       <p className="filtres-resume" aria-live="polite">
-        {[avecMois ? MOIS[filtres.mois - 1] : null, String(filtres.annee), filtres.site, filtres.service]
-          .filter(Boolean)
+        {puces
           .map((t) => (
             <span key={t} className="puce">
               {t}
             </span>
           ))}
       </p>
+      )}
     </div>
   )
 }

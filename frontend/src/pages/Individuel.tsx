@@ -26,21 +26,36 @@ export default function Individuel() {
   return (
     <section>
       <h2>Fiche individuelle</h2>
-      <p className="note">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
-      {f.filtres && <FiltresPeriode filtres={f.filtres} annees={f.annees} avecMois={false} onChange={f.set} />}
-      <label className="filtres">
-        Matricule
-        <input list="matricules" value={saisie} onChange={(e) => setSaisie(e.target.value)} />
-        <datalist id="matricules">
-          {salaries.data?.map((s) => (
-            <option key={s.matricule} value={s.matricule}>
-              {s.nom}
-            </option>
-          ))}
-        </datalist>
-      </label>
-      {!matricule && <Etat type="vide" />}
-      {!matricule && <p className="note">Aucun employé sélectionné.</p>}
+      <p className="note note-entete">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
+      {f.filtres && (
+        <FiltresPeriode filtres={f.filtres} annees={f.annees} avecMois={false} onChange={f.set}>
+          <label>
+            Matricule
+            <input
+              list="matricules"
+              value={saisie}
+              placeholder="Ex. E1"
+              autoComplete="off"
+              onChange={(e) => setSaisie(e.target.value)}
+            />
+            <datalist id="matricules">
+              {salaries.data?.map((s) => (
+                <option key={s.matricule} value={s.matricule}>
+                  {s.nom}
+                </option>
+              ))}
+            </datalist>
+          </label>
+        </FiltresPeriode>
+      )}
+      {!matricule && (
+        <div className="vide-guide">
+          <strong>Sélectionnez un employé</strong>
+          <span className="note">
+            {saisie.trim() ? 'Aucun matricule ne correspond à cette saisie.' : 'Saisissez un matricule ou choisissez-le dans la liste.'}
+          </span>
+        </div>
+      )}
       {q.isLoading && <Etat type="chargement" />}
       {q.error && <Etat type={etatErreur(q.error)} />}
       {q.data && (

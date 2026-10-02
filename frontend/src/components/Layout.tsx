@@ -19,10 +19,13 @@ export default function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="micro">CFAO · Ressources humaines</span>
-        <h1>
-          Reporting <span className="accent">RH</span>
-        </h1>
+       <div className="topbar-inner">
+        <div className="marque">
+          <span className="micro">CFAO · Ressources humaines</span>
+          <h1>
+            Reporting <span className="accent">RH</span>
+          </h1>
+        </div>
         <button
           type="button"
           className="menu-toggle"
@@ -40,9 +43,9 @@ export default function Layout() {
           ))}
         </nav>
         <div className="user">
-          <span>
-            {me?.email}
-            {role && <span className="badge badge-neutre">{role}</span>}
+          <span className="user-id">
+            <span className="user-email">{me?.email}</span>
+            {role && <span className="badge badge-neutre">{role.replace(/_/g, ' ')}</span>}
           </span>
           <button
             className="btn-link"
@@ -54,6 +57,7 @@ export default function Layout() {
             Déconnexion
           </button>
         </div>
+       </div>
       </header>
       <main className="page">
         <Outlet />
