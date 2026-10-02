@@ -160,3 +160,7 @@ table.dense tr.total th, table.dense tr.total td { font-weight: var(--fw-bold); 
 table.dense tr.groupe th, table.dense tr.groupe td { font-weight: var(--fw-bold); background: var(--paper-2); }
 table.dense tr.sous th { padding-left: var(--sp-5); font-weight: var(--fw-regular); }
 table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-style: italic; }
+
+.graphes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
+.graphe { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); box-shadow: var(--shadow-1); }
+.graphe figcaption { font-family: var(--font-display); font-weight: var(--fw-bold); color: var(--navy); margin-bottom: var(--sp-3); }

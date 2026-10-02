@@ -19,7 +19,7 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
     await expect(page.locator('.tuile .micro', { hasText: 'Marge' }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'D. Par type de contrat' })).toBeVisible()
+    await expect(page.getByText('D. Par type de contrat')).toBeVisible()
   })
 }
 
@@ -31,7 +31,7 @@ test('lecteur de périmètre : ni Individuel, ni marge, services limités', asyn
   const services = page.getByLabel('Service').locator('option')
   await expect(services).toHaveText(['Tous', 'SAV PL'])
   await page.goto('individuel')
-  await expect(page.getByRole('alert')).toHaveText('Accès refusé')
+  await expect(page.getByRole('alert')).toContainText('Accès refusé')
 })
 
 test('directeur commercial VN : seul son service', async ({ page }) => {

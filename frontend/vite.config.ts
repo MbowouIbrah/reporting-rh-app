@@ -1,3 +1,4 @@
+declare const process: { env: Record<string, string | undefined> }
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
@@ -7,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/reporting-rh/api': {
-        target: 'http://localhost:8000',
+        target: `http://localhost:${process.env.API_PORT || 8000}`,
         rewrite: (p) => p.replace('/reporting-rh/api', '/api'),
       },
     },

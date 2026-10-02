@@ -7,7 +7,10 @@ import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
 import { fcfa, MOIS } from '../lib/format'
 
-const COULEUR = '#1a1f3c'
+const C1 = '#3b5bdb'
+const C2 = '#0c8599'
+const C3 = '#e8590c'
+const GRILLE = '#e7e7ea'
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
@@ -50,29 +53,29 @@ export default function Graphes() {
           <>
             <Carte titre="Masse salariale mensuelle (FCFA)">
               <LineChart data={serie}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" />
                 <YAxis domain={['dataMin * 0.98', 'dataMax * 1.02']} tickFormatter={(v) => fcfa(v)} width={90} />
                 <Tooltip formatter={(v) => fcfa(Number(v))} />
-                <Line dataKey="ms" name="Masse salariale" stroke={COULEUR} strokeWidth={2} connectNulls={false} />
+                <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} />
               </LineChart>
             </Carte>
             <Carte titre="Effectif">
               <BarChart data={serie}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="effectif" name="Effectif" fill={COULEUR} />
+                <Bar dataKey="effectif" name="Effectif" fill={C2} radius={[3, 3, 0, 0]} />
               </BarChart>
             </Carte>
             <Carte titre="Absences (jours)">
               <BarChart data={serie}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="absences" name="Absences" fill={COULEUR} />
+                <Bar dataKey="absences" name="Absences" fill={C3} radius={[3, 3, 0, 0]} />
               </BarChart>
             </Carte>
           </>
@@ -80,15 +83,46 @@ export default function Graphes() {
         {contrats && (
           <Carte titre="Effectif par type de contrat">
             <BarChart data={contrats}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid stroke={GRILLE} vertical={false} />
               <XAxis dataKey="contrat" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="effectif" name="Effectif" fill={COULEUR} />
+              <Bar dataKey="effectif" name="Effectif" fill={C1} radius={[3, 3, 0, 0]} />
             </BarChart>
           </Carte>
         )}
       </div>
+      {serie && (
+        <details className="section">
+          <summary>
+            <span className="section-titre">Voir les données en tableau</span>
+          </summary>
+          <div className="section-corps">
+            <div className="table-scroll">
+              <table className="dense">
+                <thead>
+                  <tr>
+                    <th scope="col">Mois</th>
+                    <th scope="col">Masse salariale</th>
+                    <th scope="col">Effectif</th>
+                    <th scope="col">Absences (jours)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serie.map((m) => (
+                    <tr key={m.mois}>
+                      <th scope="row">{m.mois}</th>
+                      <td className="num">{fcfa(m.ms)}</td>
+                      <td className="num">{m.effectif ?? '—'}</td>
+                      <td className="num">{fcfa(m.absences)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      )}
     </section>
   )
 }

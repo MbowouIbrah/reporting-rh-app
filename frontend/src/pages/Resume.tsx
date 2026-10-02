@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { lazy, Suspense } from 'react'
 import { getAnnuel, getMensuel } from '../api/rapports'
 import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
@@ -6,6 +7,8 @@ import FiltresPeriode from '../components/FiltresPeriode'
 import Tuile from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, fcfa, MOIS, pct } from '../lib/format'
+
+const TendanceMs = lazy(() => import('../components/TendanceMs'))
 
 export default function Resume() {
   const f = useFiltres()
@@ -39,6 +42,15 @@ export default function Resume() {
             <Tuile titre="Primes productivité" valeur={fcfa(s.primes_total.m)} cell={s.primes_total} />
           </div>
         </>
+      )}
+      {ann.data && f.filtres && (
+        <Suspense fallback={<Etat type="chargement" />}>
+          <TendanceMs
+            points={ann.data.serie_n
+              .filter((m) => m.mois <= f.filtres!.mois && m.ms !== null)
+              .map((m) => ({ mois: MOIS[m.mois - 1].slice(0, 3), ms: Number(m.ms) }))}
+          />
+        </Suspense>
       )}
       {ann.data && (
         <div className="table-scroll">
