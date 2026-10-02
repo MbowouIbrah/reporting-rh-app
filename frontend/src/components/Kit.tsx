@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 type Ton = 'neutre' | 'succes' | 'alerte' | 'erreur' | 'info'
@@ -49,5 +50,92 @@ export function Section({
       </summary>
       <div className="section-corps">{children}</div>
     </details>
+  )
+}
+
+/** Champ de formulaire : étiquette liée, erreur annoncée, aria-invalid. */
+export function Champ({
+  label,
+  erreur,
+  children,
+}: {
+  label: string
+  erreur?: string | null
+  children: (p: { id: string; 'aria-invalid': boolean; 'aria-describedby'?: string }) => ReactNode
+}) {
+  const id = useId()
+  const errId = `${id}-err`
+  return (
+    <div className="champ">
+      <label htmlFor={id}>{label}</label>
+      {children({ id, 'aria-invalid': !!erreur, 'aria-describedby': erreur ? errId : undefined })}
+      {erreur && (
+        <p id={errId} className="champ-erreur" role="alert">
+          {erreur}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Montant saisi : toujours une chaîne (jamais float), virgule ou point acceptés. */
+export function ChampMontant({
+  label,
+  valeur,
+  onChange,
+  erreur,
+}: {
+  label: string
+  valeur: string
+  onChange: (v: string) => void
+  erreur?: string | null
+}) {
+  return (
+    <Champ label={label} erreur={erreur}>
+      {(p) => (
+        <input {...p} type="text" inputMode="decimal" value={valeur} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </Champ>
+  )
+}
+
+/** Confirmation modale native (<dialog>), focus géré par le navigateur. */
+export function Confirmer({
+  ouvert,
+  titre,
+  children,
+  confirmer = 'Confirmer',
+  desactive,
+  onConfirmer,
+  onAnnuler,
+}: {
+  ouvert: boolean
+  titre: string
+  children?: ReactNode
+  confirmer?: string
+  desactive?: boolean
+  onConfirmer: () => void
+  onAnnuler: () => void
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const d = ref.current
+    if (!d) return
+    if (ouvert && !d.open) d.showModal?.() ?? d.setAttribute('open', '')
+    if (!ouvert && d.open) d.close?.() ?? d.removeAttribute('open')
+  }, [ouvert])
+  return (
+    <dialog ref={ref} className="confirmer" aria-labelledby="confirmer-titre" onCancel={onAnnuler}>
+      <h3 id="confirmer-titre">{titre}</h3>
+      {children}
+      <div className="confirmer-actions">
+        <Bouton variante="secondaire" onClick={onAnnuler}>
+          Annuler
+        </Bouton>
+        <Bouton onClick={onConfirmer} disabled={desactive}>
+          {confirmer}
+        </Bouton>
+      </div>
+    </dialog>
   )
 }

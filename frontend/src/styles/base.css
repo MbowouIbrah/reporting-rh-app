@@ -166,3 +166,12 @@ table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-sty
 .graphe figcaption { font-family: var(--font-display); font-weight: var(--fw-bold); color: var(--navy); margin-bottom: var(--sp-3); }
 .tuile-hero .note { color: #dfe1ee; }
 table.dense td.num { text-align: right; }
+
+/* Formulaires d'administration */
+.champ { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-3); }
+.champ input, .champ select, .champ textarea { padding: 8px 10px; border: 1px solid var(--rule-strong); border-radius: var(--radius); font: inherit; }
+.champ input[aria-invalid='true'] { border-color: var(--error); }
+.champ-erreur { color: var(--error); font-size: var(--fs-sm); margin: 0; }
+.confirmer { border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); max-width: 28rem; }
+.confirmer::backdrop { background: rgba(0, 0, 0, 0.4); }
+.confirmer-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-3); }

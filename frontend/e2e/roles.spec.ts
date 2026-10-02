@@ -12,10 +12,13 @@ async function connecter(page: Page, email: string) {
 
 const onglets = (page: Page) => page.getByRole('navigation', { name: 'Rapports' }).getByRole('link')
 
+const BASE_ONGLETS = ['Résumé', 'Mensuel', 'Annuel', 'Graphes', 'Individuel']
 for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
-  test(`${email} : 5 onglets, marge visible, contrôles OK`, async ({ page }) => {
+  test(`${email} : onglets, marge visible, contrôles OK`, async ({ page }) => {
     await connecter(page, email)
-    await expect(onglets(page)).toHaveText(['Résumé', 'Mensuel', 'Annuel', 'Graphes', 'Individuel'])
+    await expect(onglets(page)).toHaveText(
+      email.startsWith('admin') ? [...BASE_ONGLETS, 'Administration'] : BASE_ONGLETS,
+    )
     await expect(page.locator('.tuile .micro', { hasText: 'Marge' }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()

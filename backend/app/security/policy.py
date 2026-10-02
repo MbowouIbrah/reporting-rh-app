@@ -21,6 +21,8 @@ POLICY: dict[str, set[str]] = {
         "periode:write",
         "nominatif:read",
         "marge:read",
+        "saisie:write",
+        "referentiel:write",
     },
     GLOBAL: _READ | {"nominatif:read", "marge:read"},
     PERIMETRE: _READ | {"nominatif:read"},  # soumis au drapeau nominatif

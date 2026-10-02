@@ -6,6 +6,7 @@ import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
+import Periodes from './pages/admin/Periodes'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 
@@ -38,6 +39,14 @@ export default function App() {
           element={
             <RequireAuth perm="nominatif:read">
               <Individuel />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/periodes"
+          element={
+            <RequireAuth perm="saisie:write">
+              <Periodes />
             </RequireAuth>
           }
         />
