@@ -1,0 +1,55 @@
+name: reporting-rh
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reporting_rh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: ${POSTGRES_DB:-reporting_rh}
+    volumes:
+      - rh_pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    # Aucun port publié : la base n'est joignable que par l'API.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    environment:
+      ENV: prod
+      POSTGRES_SERVER: db
+      POSTGRES_USER: ${POSTGRES_USER:-reporting_rh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-reporting_rh}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY requis}
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal, edge]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ../frontend
+    restart: unless-stopped
+    networks: [edge]
+
+networks:
+  internal:
+    internal: true
+  # Réseau partagé avec le nginx d'Academy (créé une fois : docker network create edge)
+  edge:
+    external: true
+
+volumes:
+  rh_pgdata:
