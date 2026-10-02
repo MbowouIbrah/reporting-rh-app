@@ -1,6 +1,7 @@
 """Parité sur les 18 périodes de la V4 avec le golden relevé par tools/golden_lo.py."""
 
 import json
+from collections import defaultdict
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,6 @@ def test_parite_18_periodes(make_client):
         assert all(not x["bloquant"] for x in rapport["controles"]), cle
         for verif in VERIF:
             try:
-                verif(rapport, feuilles["mensuel"])
+                verif(rapport, defaultdict(lambda: None, feuilles["mensuel"]))
             except AssertionError as e:
                 raise AssertionError(f"{cle} {verif.__name__}: {e}") from e
