@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.auth import Perimetre, PerimetreRegle, RoleAssignment, Utilisateur
+from app.referentiels_init import seed_referentiels
 from app.security.passwords import hash_password
 
 PERIMETRES = {
@@ -37,6 +38,7 @@ def _user(db: Session, email: str, nom: str, pw: str, role: str, pid=None, nomin
 
 
 def run(db: Session, admin_email: str, admin_password: str, demo_password: str | None) -> None:
+    seed_referentiels(db)
     ids: dict[str, int] = {}
     for code, (libelle, services) in PERIMETRES.items():
         p = db.scalar(select(Perimetre).where(Perimetre.code == code))

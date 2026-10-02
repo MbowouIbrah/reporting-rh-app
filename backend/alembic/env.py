@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
 from app.db.session import Base
