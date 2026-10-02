@@ -1,10 +1,12 @@
 """Référentiels initiaux (mêmes listes que templates/ et tools/generer_template_import.py)."""
 
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.pilotage import Parametre
 from app.models.referentiel import (
     Activite,
     RefAlias,
@@ -36,6 +38,7 @@ RUBRIQUES = [
 EXCLUES_TOTAL_LIGNE = ["Absences (nb)", "Salaire brut garantie", "Primes sur ventes",
                        "Primes sur résultats", "Productivité Ateliers"]
 DEBUT = date(2000, 1, 1)
+PARAMETRES_DEFAUT = {"jours_ouvres": "22", "budget_employe": "600000"}
 
 
 def _fill(db: Session, model, libelles: list[str]) -> None:
@@ -61,4 +64,7 @@ def seed_referentiels(db: Session) -> None:
         )
     if not db.scalar(select(RefAlias.id).where(RefAlias.dimension == "rubrique")):
         db.add(RefAlias(dimension="rubrique", alias_norm="variable", cible_id=rub["Commission"]))
+    if not db.scalar(select(Parametre.id).limit(1)):
+        db.add_all(Parametre(cle=c, valeur=Decimal(v), date_debut=DEBUT)
+                   for c, v in PARAMETRES_DEFAUT.items())
     db.flush()
