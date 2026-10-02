@@ -22,3 +22,4 @@ cd frontend && npm install && npm run dev   # http://localhost:5173/reporting-rh
 4. Inclure `deploy/nginx-academy-snippet.conf` dans le nginx d'Academy, puis recharger.
 
 La base n'expose aucun port. L'API applique les migrations Alembic au démarrage.
+Exploitation, sauvegardes, restauration, rollback : [docs/RUNBOOK.md](docs/RUNBOOK.md).
