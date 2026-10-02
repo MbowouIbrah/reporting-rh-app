@@ -3,6 +3,7 @@ import { getMensuel } from '../api/rapports'
 import type { Indicateurs, Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
+import LienExport from '../components/LienExport'
 import { Section } from '../components/Kit'
 import Tuile from '../components/Tuile'
 import { EnTete, LigneCell } from '../components/Lignes'
@@ -25,6 +26,7 @@ export default function Mensuel() {
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
       )}
+      {q.data && f.filtres && <LienExport rapport="mensuel" filtres={f.filtres} />}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && <Etat type="chargement" />}
       {q.error && <Etat type={etatErreur(q.error)} />}

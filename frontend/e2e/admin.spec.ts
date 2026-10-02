@@ -40,3 +40,12 @@ test('lecteur de périmètre : pas de Journal ni d’administration', async ({ p
   await page.goto('admin/journal')
   await expect(page.getByRole('alert')).toContainText('Accès refusé')
 })
+
+test('export xlsx mensuel : téléchargement avec les filtres de l’écran', async ({ page }) => {
+  await connecter(page, 'admin@exemple.invalid')
+  await page.getByRole('link', { name: 'Mensuel' }).click()
+  const lien = page.getByRole('link', { name: 'Exporter (xlsx)' })
+  await expect(lien).toBeVisible()
+  const [dl] = await Promise.all([page.waitForEvent('download'), lien.click()])
+  expect(dl.suggestedFilename()).toMatch(/^reporting-mensuel-\d{4}-\d{2}\.xlsx$/)
+})

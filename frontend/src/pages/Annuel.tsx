@@ -3,6 +3,7 @@ import { getAnnuel } from '../api/rapports'
 import type { Annuel as AnnuelData, Cell } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
+import LienExport from '../components/LienExport'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, entier, fcfa, MOIS, pct } from '../lib/format'
 
@@ -113,6 +114,7 @@ export default function Annuel() {
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
       )}
+      {q.data && f.filtres && <LienExport rapport="annuel" filtres={f.filtres} />}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && <Etat type="chargement" />}
       {q.error && <Etat type={etatErreur(q.error)} />}

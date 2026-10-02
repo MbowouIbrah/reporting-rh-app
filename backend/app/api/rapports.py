@@ -1,10 +1,11 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.exports import xlsx
 from app.imports.regles import norm
 from app.kpi import chargement as ch
 from app.kpi import moteur
@@ -16,6 +17,14 @@ from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge"}
+
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx(contenu: bytes, nom: str) -> Response:
+    return Response(contenu, media_type=XLSX,
+                    headers={"Content-Disposition": f'attachment; filename="{nom}"'})
 
 
 def jsonable(x):
@@ -86,15 +95,7 @@ def salaries(
                   key=lambda x: x["matricule"])
 
 
-@router.get("/mensuel")
-def mensuel(
-    annee: int = Query(ge=2000, le=2100),
-    mois: int = Query(ge=1, le=12),
-    service: str | None = None,
-    site: str | None = None,
-    p: Principal = Depends(current_principal),
-    db: Session = Depends(get_db),
-):
+def _mensuel(db, p, annee, mois, service, site) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
     cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site)
@@ -106,15 +107,35 @@ def mensuel(
     return _sortie(p, res)
 
 
-@router.get("/annuel")
-def annuel(
+@router.get("/mensuel")
+def mensuel(
     annee: int = Query(ge=2000, le=2100),
-    mois: int = Query(12, ge=1, le=12),
+    mois: int = Query(ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
+    return _mensuel(db, p, annee, mois, service, site)
+
+
+@router.get("/mensuel/export")
+def mensuel_export(
+    annee: int = Query(ge=2000, le=2100),
+    mois: int = Query(ge=1, le=12),
+    service: str | None = None,
+    site: str | None = None,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    res = _mensuel(db, p, annee, mois, service, site)
+    audit.record(db, p.user_id, "export", "rapport_mensuel", f"{annee}-{mois:02d}", None,
+                 {"service": service, "site": site})
+    db.commit()
+    return _xlsx(xlsx.mensuel(res, annee, mois), f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
+
+
+def _annuel(db, p, annee, mois, service, site) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
 
@@ -132,6 +153,34 @@ def annuel(
     res = moteur.annuel(n, annee_pds(annee - 1), mois, ch.charger_refs(db),
                         ch.charger_params(db, annee, mois))
     return _sortie(p, res)
+
+
+@router.get("/annuel")
+def annuel(
+    annee: int = Query(ge=2000, le=2100),
+    mois: int = Query(12, ge=1, le=12),
+    service: str | None = None,
+    site: str | None = None,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    return _annuel(db, p, annee, mois, service, site)
+
+
+@router.get("/annuel/export")
+def annuel_export(
+    annee: int = Query(ge=2000, le=2100),
+    mois: int = Query(12, ge=1, le=12),
+    service: str | None = None,
+    site: str | None = None,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    res = _annuel(db, p, annee, mois, service, site)
+    audit.record(db, p.user_id, "export", "rapport_annuel", f"{annee}-{mois:02d}", None,
+                 {"service": service, "site": site})
+    db.commit()
+    return _xlsx(xlsx.annuel(res, annee, mois), f"reporting-annuel-{annee}.xlsx")
 
 
 @router.get("/individuel")
