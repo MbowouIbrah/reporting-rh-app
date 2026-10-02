@@ -74,7 +74,7 @@ class ImportAnomalie(Base):
     num_ligne: Mapped[int | None] = mapped_column(Integer, nullable=True)
     colonne: Mapped[str | None] = mapped_column(String(100), nullable=True)
     code: Mapped[str] = mapped_column(String(40))
-    gravite: Mapped[str] = mapped_column(String(12))  # bloquant | avertissement
+    gravite: Mapped[str] = mapped_column(String(20))  # bloquant | avertissement
     valeur: Mapped[str | None] = mapped_column(String(500), nullable=True)
     message: Mapped[str] = mapped_column(String(500))
 

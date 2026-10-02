@@ -97,7 +97,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     def add(num, col, code, grav, val, msg):
         nonlocal nb_bloq
         nb_bloq += grav == BLOQUANT
-        anos.append(Anomalie(num, col, code, grav, None if val is None else str(val)[:500], msg))
+        anos.append(Anomalie(num, None if col is None else str(col)[:100], code, grav, None if val is None else str(val)[:500], msg))
 
     # ---- en-têtes
     rub_canon = {norm(r): r for r, _ in refs.rubriques} | refs.rubrique_alias

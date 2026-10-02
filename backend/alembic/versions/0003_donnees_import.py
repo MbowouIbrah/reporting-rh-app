@@ -116,7 +116,7 @@ def upgrade() -> None:
     sa.Column('num_ligne', sa.Integer(), nullable=True),
     sa.Column('colonne', sa.String(length=100), nullable=True),
     sa.Column('code', sa.String(length=40), nullable=False),
-    sa.Column('gravite', sa.String(length=12), nullable=False),
+    sa.Column('gravite', sa.String(length=20), nullable=False),
     sa.Column('valeur', sa.String(length=500), nullable=True),
     sa.Column('message', sa.String(length=500), nullable=False),
     sa.ForeignKeyConstraint(['lot_id'], ['lot_import.id'], ondelete='CASCADE'),
