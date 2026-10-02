@@ -59,6 +59,8 @@ Règles :
 - Toute lecture de fiche individuelle est journalisée. Toute écriture produit un `audit_event`.
 - Ajouter une personne = une ligne `utilisateur` + une `role_assignment`.
 
+Décision (2026-10-02) : les hypothèses **[H]** ci-dessus (périmètre Equipment, nominatif, marge pour lecteurs à périmètre) sont retenues telles quelles ; la première présentation aux parties prenantes dira ce qu'il faut modifier. Ce sont des données de configuration, pas du code.
+
 ## 3. Autres décisions de cadrage
 - Plusieurs administrateurs : hors cycle 1 (une seule personne modifie le système).
 - Jours ouvrés (22) et budget par employé (600 000) : paramètres datés, modifiables par l'administrateur.
