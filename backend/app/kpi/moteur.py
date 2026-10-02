@@ -11,7 +11,7 @@ from app.kpi import formules as f
 
 ABSENCES = "Absences (nb)"
 COMMISSION = "Commission"
-PRIMES = ("Primes sur ventes", "Primes sur résultats", "Primes exceptionnelles")
+PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
 ZERO = Decimal(0)
 
 
@@ -105,6 +105,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "marge": marge_,
         "taux_marge": f.taux_marge(cur.ca, ms),
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
+        "primes_total": cell(sum((cur.rubrique(r) for r in PRIMES), ZERO),
+                             sum((prev.rubrique(r) for r in PRIMES), ZERO) if prev else None),
         "primes": [
             {"rubrique": r, **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
             for r in PRIMES
@@ -152,6 +154,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                "effectif": {"m": sites_eff[s][0], "m1": sites_eff[s][1]}} for s in refs.sites]
     ms_sites = sum((c["ms"]["m"] for c in c_site), ZERO)
 
+    ctrl_contrats: list[dict] = []
+
     def eff_contrat(pd, contrat):
         return len({L.salarie_id for L in pd.lignes if L.contrat == contrat}) if pd else None
 
@@ -171,10 +175,40 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             ventilation.append({"contrat": c, "activite": a, "ms": cell(ms_c, ms_c1),
                                 "effectif": cell(ef_c, ef_c1)})
 
+    def indicateurs(contrat: str | None) -> dict:
+        def sel(pd):
+            if pd is None:
+                return None
+            lignes = tuple(L for L in pd.lignes if contrat is None or L.contrat == contrat)
+            return PeriodeData(lignes, pd.exclues)
+        c, p = sel(cur), sel(prev)
+        ids, ids1 = c.ids, (p.ids if p else None)
+        rec = len(ids - ids1) if p else None
+        dep = len(ids1 - ids) if p else None
+        abs_ = c.rubrique(ABSENCES)
+        return {
+            "contrat": contrat or "TOTAL",
+            "debut": len(ids1) if p else None, "recrutements": rec, "departs": dep,
+            "fin": len(ids),
+            "taux_rotation": (
+                f.taux_rotation(rec or 0, dep or 0, len(ids1), len(ids)) if p else None),
+            "absences": abs_,
+            "taux_absenteisme": f.taux_absenteisme(abs_, len(ids), params.jours_ouvres),
+        }
+
+    d_indic = [indicateurs(c) for c in refs.contrats] + [indicateurs(None)]
+    for champ in ("debut", "fin"):  # flux non additifs si changement de contrat
+        vals = [d[champ] for d in d_indic[:-1]]
+        if None not in vals:
+            controles_extra = _controle(f"Total contrats = somme ({champ})",
+                                        Decimal(sum(vals)), Decimal(d_indic[-1][champ]))
+            ctrl_contrats.append(controles_extra)
+
     controles = [
         _controle("MS type de charge = service = site", ms_a, ms_services, ms_sites, ms),
         _controle("Total contrats = CDI + CDD + MAD", total_contrats, Decimal(eff)),
     ]
+    controles.extend(ctrl_contrats)
     if eff1 is not None:
         controles.append(_controle("Effectif fin = début + recrutements − départs",
                                    Decimal(eff1 + recrut - departs), Decimal(eff)))
@@ -184,7 +218,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1)}],
         "b_service_activite": b_service,
         "c_site": c_site,
-        "d_contrat": {"effectifs": d_eff,
+        "d_contrat": {"effectifs": d_eff, "indicateurs": d_indic,
                       "total": cell(Decimal(eff), None if eff1 is None else Decimal(eff1)),
                       "ventilation": ventilation},
         "controles": controles,
@@ -209,7 +243,12 @@ def annuel(
                  "ms": pds[m].ms if _ok(pds.get(m)) else None,
                  "effectif": len(pds[m].ids) if _ok(pds.get(m)) else None,
                  "absences": pds[m].rubrique(ABSENCES) if _ok(pds.get(m)) else None,
-                 "ca": pds[m].ca if _ok(pds.get(m)) else None}
+                 "ca": pds[m].ca if _ok(pds.get(m)) else None,
+                 "commissions": pds[m].rubrique(COMMISSION) if _ok(pds.get(m)) else None,
+                 "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
+                 if _ok(pds.get(m)) else None,
+                 "marge": f.marge(pds[m].ca, pds[m].ms) if _ok(pds.get(m)) else None,
+                 "taux_marge": f.taux_marge(pds[m].ca, pds[m].ms) if _ok(pds.get(m)) else None}
                 for m in range(1, 13)]
 
     def cumul(pds):
@@ -229,8 +268,10 @@ def annuel(
                 out[L.service] += pds[m].total(L)
         return out
 
+    ok1 = avec_donnees(n1, mois)
     s_n = ms_service(n, ok)
-    s_n1 = ms_service(n1, avec_donnees(n1, mois))
+    s_n1 = ms_service(n1, ok1)
+    complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
     return {
         "serie_n": serie(n),
         "serie_n1": serie(n1),
@@ -239,9 +280,16 @@ def annuel(
         "moyenne_mensuelle": cell(moy, moy1),
         "marge_ytd": marge_ytd,
         "nb_mois_marge": len(avec_ca),
-        "par_service": [{"service": s, **cell(s_n.get(s, ZERO) if nb else None,
-                                              s_n1.get(s, ZERO) if nb1 else None)}
-                        for s in refs.services],
+        "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
+        "par_service": [
+            {"service": s, **cell(s_n.get(s, ZERO) if nb else None,
+                                  s_n1.get(s, ZERO) if nb1 else None),
+             "nb_mois": nb, "nb_mois_n1": nb1,
+             "moy_m": f.moyenne(s_n.get(s, ZERO), nb),
+             "moy_m1": f.moyenne(s_n1.get(s, ZERO), nb1),
+             "ecart_moy_pct": f.variation_pct(f.moyenne(s_n.get(s, ZERO), nb),
+                                              f.moyenne(s_n1.get(s, ZERO), nb1))}
+            for s in refs.services],
     }
 
 

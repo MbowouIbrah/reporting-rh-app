@@ -130,3 +130,33 @@ def test_individuel_hors_perimetre_nominatif(charge, make_client, db):
     c = make_client(EQUIP)
     assert get(c, "individuel", annee=2026, matricule="E1").status_code == 200
     assert get(c, "individuel", annee=2026, matricule="E3").status_code == 404  # Administration
+
+
+def test_filtres_et_salaries(charge, make_client):
+    f = get(make_client(EQUIP), "filtres", annee=2026).json()
+    assert f["services"] == ["SAV PL"]
+    assert get(make_client(VN), "filtres", annee=2026).json()["services"] == ["Commerce VN"]
+    assert "Administration" in get(charge, "filtres", annee=2026).json()["services"]
+    assert get(make_client(EQUIP), "salaries", annee=2026).status_code == 403
+    noms = [x["matricule"] for x in get(make_client(DRH), "salaries", annee=2026).json()]
+    assert noms == sorted(noms) and "E1" in noms
+
+
+def test_annuel_serie_sans_marge_pour_perimetre(charge, make_client):
+    equip = get(make_client(EQUIP), "annuel", annee=2026, mois=2).json()
+    assert all("marge" not in x and "taux_marge" not in x for x in equip["serie_n"])
+    assert "commissions" in equip["serie_n"][0] and "primes" in equip["serie_n"][0]
+    adm = get(charge, "annuel", annee=2026, mois=2).json()
+    assert adm["serie_n"][0]["marge"] is not None
+    sav = next(x for x in adm["par_service"] if x["service"] == "SAV PL")
+    assert sav["nb_mois"] == 2 and sav["moy_m"] is not None
+
+
+def test_mensuel_bloc_d_indicateurs_et_permissions(charge, make_client):
+    r = get(charge, "mensuel", annee=2026, mois=2).json()
+    ind = r["d_contrat"]["indicateurs"]
+    assert ind[-1]["contrat"] == "TOTAL" and ind[-1]["fin"] == 3
+    assert sum(x["fin"] for x in ind[:-1]) == ind[-1]["fin"]
+    assert not any(c["bloquant"] for c in r["controles"])
+    me = make_client(EQUIP).get(f"{API}/auth/me").json()
+    assert "report:read" in me["permissions"] and "nominatif:read" not in me["permissions"]

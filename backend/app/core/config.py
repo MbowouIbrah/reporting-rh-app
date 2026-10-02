@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Reporting RH"
     ENV: str = "dev"  # dev | test | prod
     API_PREFIX: str = "/api/v1"
+    COOKIE_PATH_PREFIX: str = ""  # "/reporting-rh" derrière nginx
 
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432

@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       '/reporting-rh/api': {
         target: 'http://localhost:8000',
-        rewrite: (p) => p.replace('/reporting-rh/api', ''),
+        rewrite: (p) => p.replace('/reporting-rh/api', '/api'),
       },
     },
   },

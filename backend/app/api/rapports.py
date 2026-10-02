@@ -53,6 +53,39 @@ def periodes(p: Principal = Depends(current_principal), db: Session = Depends(ge
     return out
 
 
+def _lignes_annee(db: Session, p: Principal, annee: int):
+    scope = scope_for(db, p)
+    for m in range(1, 13):
+        pd = ch.charger_periode(db, scope, annee, m)
+        if pd is not None:
+            yield from pd.lignes
+
+
+@router.get("/filtres")
+def filtres(
+    annee: int = Query(ge=2000, le=2100),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    authorize(p, "report:read")
+    lignes = list(_lignes_annee(db, p, annee))
+    return {"services": sorted({L.service for L in lignes}),
+            "sites": sorted({L.site for L in lignes})}
+
+
+@router.get("/salaries")
+def salaries(
+    annee: int = Query(ge=2000, le=2100),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    authorize(p, "nominatif:read")
+    ids = {L.salarie_id for L in _lignes_annee(db, p, annee)}
+    rows = db.scalars(select(Salarie).where(Salarie.id.in_(ids))) if ids else []
+    return sorted(({"matricule": r.matricule, "nom": r.nom} for r in rows),
+                  key=lambda x: x["matricule"])
+
+
 @router.get("/mensuel")
 def mensuel(
     annee: int = Query(ge=2000, le=2100),

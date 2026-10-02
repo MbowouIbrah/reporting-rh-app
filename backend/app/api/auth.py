@@ -9,10 +9,11 @@ from app.models.auth import Utilisateur
 from app.security import audit
 from app.security.deps import current_principal, to_principal
 from app.security.passwords import hash_password, verify_password
-from app.security.policy import Principal
+from app.security.policy import POLICY, Principal, is_allowed
 from app.security.tokens import make_token, read_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+COOKIE_AUTH_PATH = f"{settings.COOKIE_PATH_PREFIX}{settings.API_PREFIX}/auth"
 
 # Hash factice : la durée de vérification ne révèle pas si l'e-mail existe.
 _DUMMY_HASH = hash_password("dummy-password")
@@ -36,7 +37,7 @@ def _set_cookies(response: Response, user_id: int) -> None:
         "refresh_token",
         make_token(user_id, "refresh"),
         max_age=settings.REFRESH_TOKEN_DAYS * 86400,
-        path=f"{settings.API_PREFIX}/auth",
+        path=COOKIE_AUTH_PATH,
         **opts,
     )
 
@@ -49,6 +50,9 @@ def _me(p: Principal) -> dict:
             {"role": a.role, "perimetre_id": a.perimetre_id, "nominatif": a.nominatif}
             for a in p.assignments
         ],
+        "permissions": sorted(
+            a for a in set().union(*POLICY.values()) if is_allowed(p, a)
+        ),
     }
 
 
@@ -83,7 +87,7 @@ def refresh(
 @router.post("/logout")
 def logout(response: Response) -> dict:
     response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path=f"{settings.API_PREFIX}/auth")
+    response.delete_cookie("refresh_token", path=COOKIE_AUTH_PATH)
     return {"status": "ok"}
 
 
