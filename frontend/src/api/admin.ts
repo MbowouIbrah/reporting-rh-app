@@ -124,3 +124,51 @@ export const apercuRenommage = ({ dim, id, ...b }: RefModif) =>
   api<RefResultat>(`/referentiels/${dim}/${id}?apercu=true`, json('PUT', b))
 export const useModifierRef = () =>
   useAction(({ dim, id, ...b }: RefModif) => api<RefResultat>(`/referentiels/${dim}/${id}`, json('PUT', b)))
+
+// ---- paramétrage daté ----
+export interface RubriqueP {
+  id: number
+  libelle: string
+  unite: 'FCFA' | 'jours'
+  ordre: number
+  actif: boolean
+  moteur: boolean
+}
+export interface RegleP {
+  id: number
+  rubrique_id: number
+  regle: 'exclu_total_ligne' | 'exclu_total_general'
+  date_debut: string
+  date_fin: string | null
+}
+export interface ParametreP {
+  id: number
+  cle: 'jours_ouvres' | 'budget_employe'
+  valeur: string
+  date_debut: string
+}
+export interface Parametrage {
+  rubriques: RubriqueP[]
+  regles: RegleP[]
+  parametres: ParametreP[]
+}
+export const useParametrage = () =>
+  useQuery({ queryKey: ['admin', 'parametrage'], queryFn: () => api<Parametrage>('/parametrage'), retry: queryRetry })
+export const useCreerParametre = () =>
+  useAction((b: { cle: string; valeur: string; date_debut: string }) =>
+    api('/parametrage/parametres', json('POST', b)),
+  )
+export const useCreerRegle = () =>
+  useAction((b: { rubrique_id: number; regle: string; date_debut: string }) =>
+    api('/parametrage/regles', json('POST', b)),
+  )
+export const useTerminerRegle = () =>
+  useAction(({ id, date_fin }: { id: number; date_fin: string }) =>
+    api(`/parametrage/regles/${id}/fin`, json('POST', { date_fin })),
+  )
+export const useCreerRubrique = () =>
+  useAction((b: { libelle: string; unite: string }) => api('/parametrage/rubriques', json('POST', b)))
+export const useModifierRubrique = () =>
+  useAction(({ id, ...b }: { id: number; actif?: boolean; ordre?: number }) =>
+    api(`/parametrage/rubriques/${id}`, json('PUT', b)),
+  )

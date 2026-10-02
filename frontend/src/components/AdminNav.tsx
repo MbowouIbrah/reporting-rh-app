@@ -6,6 +6,7 @@ const LIENS = [
   { to: '/admin/utilisateurs', label: 'Utilisateurs', perm: 'users:read' },
   { to: '/admin/perimetres', label: 'Périmètres', perm: 'perimetre:write' },
   { to: '/admin/referentiels', label: 'Référentiels', perm: 'referentiel:write' },
+  { to: '/admin/parametrage', label: 'Paramétrage', perm: 'referentiel:write' },
 ]
 
 export default function AdminNav() {
