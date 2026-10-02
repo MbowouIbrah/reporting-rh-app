@@ -1,19 +1,38 @@
 import { type FormEvent, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ApiError } from '../api/client'
+import { useAuth } from '../auth/AuthContext'
 
-/** Page de connexion. L'authentification réelle arrive en P2 (POST /auth/login). */
 export default function Login() {
+  const { login } = useAuth()
+  const navigate = useNavigate()
+  const [sp] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     if (!email || !password) {
       setError('Renseignez votre adresse e-mail et votre mot de passe.')
       return
     }
-    setError('L’authentification sera activée à la prochaine étape.')
+    setBusy(true)
+    try {
+      await login(email, password)
+      const next = sp.get('next')
+      navigate(next?.startsWith('/') && !next.startsWith('//') ? next : '/resume', { replace: true })
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 401
+          ? 'Identifiants invalides.'
+          : 'Connexion impossible pour le moment. Réessayez.',
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -36,7 +55,7 @@ export default function Login() {
           <label htmlFor="password">Mot de passe</label>
           <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <button className="btn" type="submit">
+        <button className="btn" type="submit" disabled={busy}>
           Se connecter
         </button>
       </form>
