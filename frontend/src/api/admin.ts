@@ -201,3 +201,25 @@ export const useSaisirBudgets = () =>
   )
 export const useCopierBudgets = () =>
   useAction(({ id, depuis }: { id: number; depuis: number }) => api(`/budgets/${id}/copie`, json('POST', { depuis })))
+
+// ---- journal d'audit ----
+export interface EvenementAudit {
+  id: number
+  ts: string
+  utilisateur_id: number | null
+  action: string
+  entite: string
+  entite_id: string | null
+  avant: Record<string, unknown> | null
+  apres: Record<string, unknown> | null
+}
+export const useAudit = (f: { entite: string; entite_id: string; limit: number }) => {
+  const qs = new URLSearchParams({ limit: String(f.limit) })
+  if (f.entite) qs.set('entite', f.entite)
+  if (f.entite_id) qs.set('entite_id', f.entite_id)
+  return useQuery({
+    queryKey: ['admin', 'audit', f],
+    queryFn: () => api<EvenementAudit[]>(`/audit?${qs}`),
+    retry: queryRetry,
+  })
+}

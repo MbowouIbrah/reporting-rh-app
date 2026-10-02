@@ -7,6 +7,7 @@ import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Budgets from './pages/admin/Budgets'
+import Journal from './pages/admin/Journal'
 import Parametrage from './pages/admin/Parametrage'
 import Referentiels from './pages/admin/Referentiels'
 import Perimetres from './pages/admin/Perimetres'
@@ -92,6 +93,14 @@ export default function App() {
           element={
             <RequireAuth perm="referentiel:write">
               <Parametrage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/journal"
+          element={
+            <RequireAuth perm="audit:read">
+              <Journal />
             </RequireAuth>
           }
         />

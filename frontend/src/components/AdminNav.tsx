@@ -8,6 +8,7 @@ const LIENS = [
   { to: '/admin/referentiels', label: 'Référentiels', perm: 'referentiel:write' },
   { to: '/admin/budgets', label: 'Budgets', perm: 'saisie:write' },
   { to: '/admin/parametrage', label: 'Paramétrage', perm: 'referentiel:write' },
+  { to: '/admin/journal', label: 'Journal', perm: 'audit:read' },
 ]
 
 export default function AdminNav() {
