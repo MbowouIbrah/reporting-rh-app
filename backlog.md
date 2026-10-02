@@ -14,6 +14,5 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 | B-008 | 2026-10-02 | Cadrage | Tableau de bord des journaux d'audit | 2 | À faire |
 | B-009 | 2026-10-02 | Cadrage | CA par périmètre (marge visible par les lecteurs à périmètre) | 2 | À faire |
 | B-010 | 2026-10-02 | Cadrage | Mobile / hors ligne | 3 | À faire |
-
-- Onglet ANNUEL de l'Excel non exposé par `/annuel` : bloc A par rubrique, B par activité, C sites avec budgets annuels, D contrat, analyse des effectifs. Rotation Excel = (recrutements + départs) / 2 / fin, différente de la formule P0.
-- Golden par période pour annuel et résumé : `tools/golden_lo.py` ne fixe que MENSUEL (le sélecteur des onglets annuel/résumé est figé sur 2026 / juin).
+| B-011 | 2026-10-02 | P5 | Onglet ANNUEL de l'Excel non exposé par /annuel (blocs A rubrique, B activité, C sites et budgets annuels, D contrat, effectifs) ; rotation Excel différente de la formule P0 | 2 | À faire |
+| B-012 | 2026-10-02 | P5 | Golden par période pour annuel et résumé (tools/golden_lo.py ne fixe que MENSUEL) | 3 | À faire |
