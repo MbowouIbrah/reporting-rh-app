@@ -1,0 +1,50 @@
+"""Base de recette Playwright : SQLite fichier, comptes de démo, 2 mois de données + CA.
+
+Usage (depuis backend/) : DATABASE_URL=sqlite:///e2e.db python ../tools/e2e_seed.py
+Mot de passe de tous les comptes : voir PW.
+"""
+
+import os
+import sys
+from decimal import Decimal
+from pathlib import Path
+
+BACKEND = Path(__file__).resolve().parent.parent / "backend"
+sys.path.insert(0, str(BACKEND))
+os.environ.setdefault("ENV", "test")
+os.environ.setdefault("SECRET_KEY", "<cle-de-test>")
+os.environ["COOKIE_SECURE"] = "false"
+
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import select  # noqa: E402
+
+import app.models  # noqa: E402,F401
+from app.db.session import Base, SessionLocal, engine  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.donnees import Periode  # noqa: E402
+from app.models.pilotage import CaPeriode  # noqa: E402
+from app.seed import run  # noqa: E402
+from tests.test_import_regles import xlsx  # noqa: E402
+from tests.test_rapports_api import API, XLSX, donnees  # noqa: E402
+
+PW = "<mot-de-passe-test>"
+
+
+def main() -> None:
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        run(db, "admin@exemple.invalid", PW, PW)
+        c = TestClient(app)
+        assert c.post(f"{API}/auth/login", json={"email": "admin@exemple.invalid", "password": PW}).status_code == 200
+        lot = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(donnees()), XLSX)}).json()
+        assert lot["statut"] == "pret", lot
+        assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
+        pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
+        db.add(CaPeriode(periode_id=pid, valeur=Decimal("10000")))
+        db.commit()
+    print("e2e seed ok")
+
+
+if __name__ == "__main__":
+    main()

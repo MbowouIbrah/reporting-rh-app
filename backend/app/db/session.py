@@ -12,8 +12,10 @@ class Base(DeclarativeBase):
 _opts: dict = {"pool_pre_ping": True}
 if settings.db_url.startswith("postgresql"):
     _opts.update(pool_size=5, max_overflow=5)
-else:  # tests : SQLite en mémoire partagée entre les threads
-    _opts.update(connect_args={"check_same_thread": False}, poolclass=StaticPool)
+else:  # SQLite (tests, recette e2e)
+    _opts.update(connect_args={"check_same_thread": False})
+    if ":memory:" in settings.db_url:  # mémoire partagée entre les threads (connexion unique)
+        _opts.update(poolclass=StaticPool)
 engine = create_engine(settings.db_url, **_opts)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
