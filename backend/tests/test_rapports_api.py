@@ -122,10 +122,16 @@ def test_individuel_nominatif_et_journal(charge, make_client, db):
 def test_individuel_tous(charge, make_client):
     assert get(make_client(EQUIP), "individuel/tous", annee=2026).status_code == 403
     j = get(make_client(DRH), "individuel/tous", annee=2026).json()
-    mat = [x["matricule"] for x in j["salaries"]]
-    assert mat == sorted(mat) and "E1" in mat and "E3" in mat
-    e1 = next(x for x in j["salaries"] if x["matricule"] == "E1")
-    assert len(e1["totaux"]) == 12 and e1["nb_mois"] == 2 and D(e1["cumul"]) == D("2100.5")
+    assert len(j["mois"]) == 12 and j["matricule"] is None
+    jan = j["mois"][0]
+    assert jan["present"] and jan["effectif"] == 3 and D(jan["total"]) == D("7000.5")
+    assert D(jan["budget"]) == D("1800000")
+    assert not j["mois"][5]["present"]
+    un = get(make_client(DRH), "individuel/tous", annee=2026, matricule="e1").json()
+    assert un["nom"] == "Ann" and un["mois"][0]["effectif"] == 1
+    sv = get(make_client(DRH), "individuel/tous", annee=2026, service="SAV PL").json()
+    assert sv["mois"][0]["effectif"] == 1
+    assert get(make_client(DRH), "individuel/tous", annee=2026, matricule="ZZZ").status_code == 404
 
 
 def test_individuel_hors_perimetre_nominatif(charge, make_client, db):

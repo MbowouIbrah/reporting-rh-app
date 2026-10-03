@@ -5,7 +5,7 @@ import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, pct } from '../lib/format'
+import { cls, fcfa, MOIS, pct, somme } from '../lib/format'
 
 function Case({ titre, valeur, note, children }: { titre: string; valeur: string; note?: ReactNode; children?: ReactNode }) {
   return (
@@ -19,23 +19,6 @@ function Case({ titre, valeur, note, children }: { titre: string; valeur: string
       {note && <span className="note">{note}</span>}
     </div>
   )
-}
-
-/** Somme de montants décimaux (3 décimales) en entiers, sans flottant. null si aucune valeur. */
-function somme(valeurs: Val[]): string | null {
-  let total = 0n
-  let n = 0
-  for (const v of valeurs) {
-    if (v === null || v === 'n/a') continue
-    const [e, d = ''] = v.split('.')
-    const neg = e.startsWith('-')
-    const milli = BigInt(e.replace('-', '') || '0') * 1000n + BigInt(d.padEnd(3, '0').slice(0, 3))
-    total += neg ? -milli : milli
-    n += 1
-  }
-  if (n === 0) return null
-  const abs = total < 0n ? -total : total
-  return `${total < 0n ? '-' : ''}${abs / 1000n}.${String(abs % 1000n).padStart(3, '0')}`
 }
 
 export default function Resume() {

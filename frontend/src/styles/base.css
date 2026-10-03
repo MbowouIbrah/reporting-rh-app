@@ -419,3 +419,16 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, #d
 .rapport-excel .filtres input { height: 36px; border: 1px solid var(--pointille); background: #fde9d9; color: var(--brun); font: inherit; font-size: 14px; font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; width: 140px; }
 .rapport-excel .filtres input::placeholder { color: var(--brun); opacity: .55; font-weight: 400; }
 .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { white-space: nowrap; }
+.individuel-excel table.individuel tr.sous th, .individuel-excel table.individuel tr.sous td { font-size: .9em; color: #595959; background: #fff; }
+@media (min-width: 1100px) { .individuel-excel table.individuel { font-size: clamp(9.5px, 1.3vh, 12px); } .individuel-excel table.individuel thead th { white-space: normal; vertical-align: bottom; } }
+.rapport-excel.individuel-excel .panneau table.individuel th, .rapport-excel.individuel-excel .panneau table.individuel td { padding-inline: 6px; padding-block: 1px; }
+.rapport-excel.individuel-excel .panneau table.individuel thead th { white-space: normal; min-width: 0; line-height: 1.15; font-size: 10px; padding-block: 4px; }
+.rapport-excel.individuel-excel .panneau table.individuel tbody th[scope="row"] { position: sticky; left: 0; z-index: 1; background: inherit; min-width: 78px; }
+.rapport-excel.individuel-excel .panneau table.individuel tr.groupe th { background: #ececec; }
+.rapport-excel.individuel-excel .panneau table.individuel tr.sous th { background: #fff; }
+.rapport-excel.individuel-excel .panneau table.individuel tr.total th { background: var(--peche); }
+.rapport-excel.individuel-excel .panneau table.individuel td { font-size: 11px; }
+.rapport-excel.individuel-excel .panneau table.individuel th, .rapport-excel.individuel-excel .panneau table.individuel td { padding-inline: 3px; }
+.rapport-excel.individuel-excel .panneau table.individuel td { font-size: 10px; letter-spacing: -.01em; }
+.rapport-excel.individuel-excel .panneau table.individuel thead th { font-size: 9px; }
+.rapport-excel.individuel-excel .panneau table.individuel tbody th[scope="row"] { min-width: 0; font-size: 10.5px; }

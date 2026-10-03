@@ -149,15 +149,16 @@ export interface Individuel {
 
 export interface IndividuelTous {
   annee: number
-  salaries: {
-    matricule: string
-    nom: string
-    service: string | null
-    site: string | null
-    contrat: string | null
-    totaux: (Dec | null)[]
-    cumul: Dec
-    nb_mois: number
-    moyenne: Val
+  matricule: string | null
+  nom: string | null
+  rubriques: string[]
+  mois: {
+    mois: number
+    present: boolean
+    effectif?: number
+    montants?: Record<string, Val>
+    staff?: Record<string, number>
+    total?: Dec
+    budget?: Dec | null
   }[]
 }

@@ -26,7 +26,8 @@ export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({
 export const getIndividuel = (annee: number, matricule: string) =>
   api<Individuel>(`/rapports/individuel${qs({ annee, matricule })}`)
 
-export const getIndividuelTous = (annee: number) => api<IndividuelTous>(`/rapports/individuel/tous${qs({ annee })}`)
+export const getIndividuelTous = (p: { annee: number; matricule?: string; service?: string; site?: string }) =>
+  api<IndividuelTous>(`/rapports/individuel/tous${qs(p)}`)
 
 /** Lien de téléchargement xlsx : mêmes filtres que l'écran, authentifié par le cookie. */
 export const urlExport = (rapport: 'mensuel' | 'annuel', f: FiltresPage) =>
