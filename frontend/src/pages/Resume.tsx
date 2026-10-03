@@ -55,28 +55,11 @@ export default function Resume() {
       <h2 className="bandeau-titre">RÉSUMÉ — Indicateurs de pilotage</h2>
       {f.filtres && (
         <div className="filtre-annee">
-          <span className="filtre-annee-label" id="lbl-annee">Année</span>
-          <div className="segments" role="radiogroup" aria-labelledby="lbl-annee">
-            {f.annees.map((an) => (
-              <button
-                key={an}
-                type="button"
-                role="radio"
-                aria-checked={an === f.filtres!.annee}
-                className={an === f.filtres!.annee ? 'segment actif' : 'segment'}
-                onClick={() => f.set({ annee: an, mois: undefined })}
-              >
-                {an}
-              </button>
-            ))}
-          </div>
-          <label className="pastille-cumul">
-            Cumul à fin de
-            <select aria-label="Mois de fin du cumul" value={f.filtres.mois} onChange={(e) => f.set({ mois: e.target.value })}>
-              {MOIS.map((nom, i) => (
-                <option key={nom} value={i + 1}>
-                  {nom}
-                </option>
+          <label className="selecteur-annee">
+            <span className="filtre-annee-label">Année</span>
+            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value, mois: undefined })}>
+              {f.annees.map((an) => (
+                <option key={an}>{an}</option>
               ))}
             </select>
           </label>

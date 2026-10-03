@@ -303,19 +303,15 @@ table.dense td.num { text-align: right; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: #f6f6f6; }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
-/* Résumé : filtre d'année en segments */
+/* Résumé : filtre d'année */
 .filtre-annee { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: var(--sp-3); }
 .filtre-annee-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.segments { display: inline-flex; padding: 3px; gap: 2px; background: #ececec; border-radius: 999px; }
-.segment { border: 0; background: transparent; font: inherit; font-weight: 600; font-size: 13px; color: #555; padding: 5px 16px; border-radius: 999px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
-.segment:hover { color: var(--navy); background: rgba(255,255,255,.7); }
-.segment.actif { background: var(--navy); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-.segment:focus-visible { outline: 2px solid var(--red, #c8102e); outline-offset: 2px; }
-.pastille-cumul { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--brun, #7f3f00); background: #fde9d9; border: 1px solid var(--pointille, #c07a2c); border-radius: 999px; padding: 3px 12px; }
-.pastille-cumul select { border: 0; background: transparent; font: inherit; font-weight: 700; color: inherit; cursor: pointer; padding: 2px 0; }
-.pastille-cumul:focus-within { outline: 2px solid var(--red, #c8102e); outline-offset: 2px; }
+.selecteur-annee { display: inline-flex; align-items: center; gap: 10px; }
+.selecteur-annee select { appearance: none; border: 1px solid #cfcfcf; border-radius: 999px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%231a1f3c' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center; font: inherit; font-weight: 700; color: var(--navy); padding: 6px 34px 6px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.selecteur-annee select:hover { border-color: var(--navy); }
+.selecteur-annee select:focus-visible { outline: 2px solid var(--red, #c8102e); outline-offset: 2px; box-shadow: 0 0 0 3px rgba(200,16,46,.12); }
+@media (prefers-reduced-motion: reduce) { .selecteur-annee select { transition: none; } }
 .filtre-annee .comparaison { margin-left: auto; }
-@media (prefers-reduced-motion: reduce) { .segment { transition: none; } }
 
 /* Résumé : occupe exactement la hauteur de l'écran sans défilement ; tailles proportionnelles à la hauteur, le tableau absorbe le reste */
 @media (min-width: 1100px) {
@@ -323,7 +319,7 @@ table.dense td.num { text-align: right; }
   .resume-excel .bandeau-titre { padding: calc(var(--v) * .6) 20px; margin-bottom: var(--v); font-size: clamp(14px, 2.2vh, 18px); }
   .resume-excel h3.bandeau-titre { margin-top: var(--v); padding: calc(var(--v) * .4) 14px; font-size: clamp(12px, 1.7vh, 14px); }
   .resume-excel .filtre-annee { margin-bottom: var(--v); }
-  .resume-excel .segment { padding-block: clamp(2px, .7vh, 5px); }
+  .resume-excel .selecteur-annee select { padding-block: clamp(2px, .7vh, 6px); }
   .resume-excel .cases { margin-bottom: var(--v); }
   .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
   .resume-excel .cases .case strong { font-size: clamp(14px, 2.2vh, 19px); min-height: 0; padding-top: 0; }
