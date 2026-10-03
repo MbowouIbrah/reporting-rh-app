@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { getAnnuel, getMensuel } from '../api/rapports'
+import { getAnnuel } from '../api/rapports'
 import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import { Variation } from '../components/Tuile'
@@ -21,62 +21,81 @@ function Case({ titre, valeur, note, children }: { titre: string; valeur: string
   )
 }
 
+/** Somme de montants décimaux (3 décimales) en entiers, sans flottant. null si aucune valeur. */
+function somme(valeurs: Val[]): string | null {
+  let total = 0n
+  let n = 0
+  for (const v of valeurs) {
+    if (v === null || v === 'n/a') continue
+    const [e, d = ''] = v.split('.')
+    const neg = e.startsWith('-')
+    const milli = BigInt(e.replace('-', '') || '0') * 1000n + BigInt(d.padEnd(3, '0').slice(0, 3))
+    total += neg ? -milli : milli
+    n += 1
+  }
+  if (n === 0) return null
+  const abs = total < 0n ? -total : total
+  return `${total < 0n ? '-' : ''}${abs / 1000n}.${String(abs % 1000n).padStart(3, '0')}`
+}
+
 export default function Resume() {
   const f = useFiltres()
-  // Résumé : périmètre global du mois ; service/site ne s'appliquent pas (CA global).
+  // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi ; service/site ne s'appliquent pas (CA global).
   const base = f.filtres && { annee: f.filtres.annee, mois: f.filtres.mois }
-  const men = useQuery({ queryKey: ['mensuel', base], queryFn: () => getMensuel(base!), enabled: !!base })
   const ann = useQuery({ queryKey: ['annuel', base], queryFn: () => getAnnuel(base!), enabled: !!base })
-  const erreur = men.error ?? ann.error
-  const s = men.data?.synthese
-  const aCa = s !== undefined && 'ca' in s
+  const erreur = ann.error
+  const a = ann.data
+  const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
+  const ca = a && somme(a.serie_n.map((l) => l.ca ?? null))
+  const tauxMarge = ca && a?.marge_ytd != null && a.marge_ytd !== 'n/a' && Number(ca) !== 0 ? Number(a.marge_ytd) / Number(ca) : null
   const m = f.filtres?.mois ?? 1
-  const precedent = f.filtres ? `${MOIS[(m + 10) % 12]} ${m === 1 ? f.filtres.annee - 1 : f.filtres.annee}` : ''
+  const jusqua = f.filtres ? `${MOIS[m - 1]} ${f.filtres.annee}` : ''
 
   return (
     <section className="page-ecran page-etroite resume-excel">
       <h2 className="bandeau-titre">RÉSUMÉ — Indicateurs de pilotage</h2>
       {f.filtres && (
-        <div className="periode" role="group" aria-label="Filtres">
-          <span className="periode-label">PÉRIODE</span>
-          <select aria-label="Mois" value={f.filtres.mois} onChange={(e) => f.set({ mois: e.target.value })}>
-            {MOIS.map((nom, i) => (
-              <option key={nom} value={i + 1}>
-                {nom}
-              </option>
+        <div className="filtre-annee">
+          <span className="filtre-annee-label" id="lbl-annee">Année</span>
+          <div className="segments" role="radiogroup" aria-labelledby="lbl-annee">
+            {f.annees.map((an) => (
+              <button
+                key={an}
+                type="button"
+                role="radio"
+                aria-checked={an === f.filtres!.annee}
+                className={an === f.filtres!.annee ? 'segment actif' : 'segment'}
+                onClick={() => f.set({ annee: an, mois: undefined })}
+              >
+                {an}
+              </button>
             ))}
-          </select>
-          <select aria-label="Année" value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value, mois: undefined })}>
-            {f.annees.map((a) => (
-              <option key={a}>{a}</option>
-            ))}
-          </select>
-          <em className="comparaison">Comparaison : {precedent}</em>
+          </div>
+          <span className="pastille-cumul">Cumul à fin {jusqua}</span>
+          <em className="comparaison">Comparé à la même période de {f.filtres.annee - 1}</em>
         </div>
       )}
       {f.vide && <Etat type="vide" />}
-      {(men.isLoading || ann.isLoading) && <Etat type="chargement" />}
+      {ann.isLoading && <Etat type="chargement" />}
       {erreur && <Etat type={etatErreur(erreur)} />}
-      {s && f.filtres && (
+      {a && (
         <>
           {aCa && (
             <div className="cases">
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(s.ca)} note="à saisir dans le suivi mensuel" />
-              <Case titre="MARGE" valeur={montrer(s.marge)} note="à saisir dans le suivi mensuel" />
-              <Case titre="TAUX DE MARGE" valeur={s.taux_marge == null ? '—' : pct(s.taux_marge)} note="calculé : marge / CA" />
-              <Case titre="RÉMUNÉRATION GLOBALE" valeur={montrer(s.remuneration_globale)} note="charges + postes exclus" />
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(ca)} note="à saisir dans le suivi mensuel" />
+              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note="à saisir dans le suivi mensuel" />
+              <Case titre="TAUX DE MARGE" valeur={tauxMarge === null ? '—' : pct(String(tauxMarge))} note="calculé : marge / CA" />
+              <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} note="masse salariale" />
             </div>
           )}
           <div className="cases">
-            <Case titre="MASSE SALARIALE" valeur={fcfa(s.ms.m)}>
-              <Variation v={s.ms.var_pct} />
+            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)}>
+              <Variation v={a.cumul_ytd.var_pct} vs="vs N-1" />
             </Case>
-            <Case titre="COMMISSIONS" valeur={fcfa(s.commissions.m)}>
-              <Variation v={s.commissions.var_pct} />
-            </Case>
-            <Case titre="PRIMES PRODUCTIVITÉ" valeur={fcfa(s.primes_total.m)} note="3 colonnes à alimenter" />
-            <Case titre="EXCLUS DU TOTAL" valeur={montrer(s.exclus)} note="brut garanti, primes" />
+            <Case titre="COMMISSIONS" valeur={montrer(somme(a.serie_n.map((l) => l.commissions)))} note="cumul de l’année" />
+            <Case titre="PRIMES PRODUCTIVITÉ" valeur={montrer(somme(a.serie_n.map((l) => l.primes)))} note="cumul de l’année" />
+            <Case titre="MASSE SALARIALE N-1" valeur={montrer(a.cumul_ytd.m1)} note="même période" />
           </div>
           {aCa && (
             <p className="regle">
@@ -86,7 +105,7 @@ export default function Resume() {
           )}
         </>
       )}
-      {ann.data && (
+      {a && (
         <>
           <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
           <div className="table-scroll">
@@ -103,7 +122,7 @@ export default function Resume() {
                 </tr>
               </thead>
               <tbody>
-                {ann.data.serie_n.map((l) => (
+                {a.serie_n.map((l) => (
                   <tr key={l.mois}>
                     <th scope="row">{MOIS[l.mois - 1]}</th>
                     {aCa && <td className="num saisi">{montrer(l.ca)}</td>}
