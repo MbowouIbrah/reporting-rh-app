@@ -19,7 +19,7 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
     await expect(onglets(page)).toHaveText(
       email.startsWith('admin') ? [...BASE_ONGLETS, 'Administration'] : BASE_ONGLETS,
     )
-    await expect(page.locator('.tuile .micro', { hasText: 'Marge' }).first()).toBeVisible()
+    await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
     await expect(page.getByText('5. Nature de contrat')).toBeVisible()
@@ -29,7 +29,7 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
 test('lecteur de périmètre : ni Individuel, ni marge, services limités', async ({ page }) => {
   await connecter(page, 'dps.equipment@exemple.invalid')
   await expect(onglets(page)).toHaveText(['Résumé', 'Mensuel', 'Annuel', 'Graphes'])
-  await expect(page.locator('.tuile .micro', { hasText: 'Marge' })).toHaveCount(0)
+  await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ })).toHaveCount(0)
   await page.getByRole('link', { name: 'Mensuel' }).click()
   const services = page.getByLabel('Service').locator('option')
   await expect(services).toHaveText(['Tous', 'SAV PL'])

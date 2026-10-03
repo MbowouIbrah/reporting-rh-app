@@ -69,6 +69,8 @@ export interface Mensuel {
     taux_rotation: Val
     absences: Cell
     taux_absenteisme: Val
+    exclus: Dec
+    remuneration_globale: Dec
     commissions: Cell
     primes_total: Cell
     primes: ({ rubrique: string } & Cell)[]

@@ -61,15 +61,15 @@ afterEach(() => vi.restoreAllMocks())
 
 test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
-  const tuile = (await screen.findByText('Marge', { selector: '.micro' })).closest('.tuile')!
+  const tuile = (await screen.findByText('MARGE', { selector: '.micro' })).closest('.tuile')!
   expect(tuile).toHaveTextContent('—')
   expect(tuile).not.toHaveTextContent('0')
 })
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
-  await screen.findByText('Masse salariale', { selector: '.micro' })
-  expect(screen.queryByText('Marge', { selector: '.micro' })).toBeNull()
+  await screen.findByText('MASSE SALARIALE', { selector: '.micro' })
+  expect(screen.queryByText('MARGE', { selector: '.micro' })).toBeNull()
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
 })
 

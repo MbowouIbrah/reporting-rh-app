@@ -279,3 +279,40 @@ table.dense td.num { text-align: right; }
 @media (min-width: 900px) { .tuiles.compactes:has(> :nth-child(6):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .page-etroite { max-width: 1000px; margin-inline: auto; width: 100%; }
 @media (min-width: 1100px) { .resume-bas { flex: none; align-content: start; } }
+
+/* Résumé : reproduction de l'onglet RÉSUMÉ de l'Excel */
+.resume-excel { --gris-bandeau: #58595b; --gris-etiq: #d9d9d9; --brun: #7f3f00; --creme: #fffdf3; --pointille: #c07a2c; padding-bottom: var(--sp-4); }
+.resume-excel .bandeau-titre { background: var(--gris-bandeau); color: #fff; font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: 0; padding: 8px 20px; margin: 0 0 var(--sp-3); }
+.resume-excel h3.bandeau-titre { font-size: 15px; margin-top: var(--sp-3); margin-bottom: 0; padding: 6px 14px; }
+.periode { display: flex; align-items: center; gap: 0; margin-bottom: var(--sp-3); }
+.periode-label { background: var(--gris-etiq); color: #444; font-weight: 700; font-size: 12px; padding: 0 20px; height: 34px; display: inline-flex; align-items: center; }
+.periode select { height: 34px; min-width: 0; border: 1px solid var(--pointille); background: #fde9d9; color: var(--brun); font: inherit; font-weight: 700; padding: 0 12px; border-radius: 0; text-align: center; }
+.comparaison { margin-left: auto; color: var(--muted); font-size: 13px; }
+.cases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #bbb; background: var(--surface); margin-bottom: var(--sp-3); }
+.cases .case { border: 0; border-right: 1px solid #ddd; border-radius: 0; box-shadow: none; background: var(--surface); padding: 6px 10px 4px; gap: 2px; min-height: 88px; align-content: start; }
+.cases .case:last-child { border-right: 0; }
+.cases .case .micro { font-family: var(--font-body); font-size: 11px; font-weight: 700; letter-spacing: 0; color: #666; text-transform: none; }
+.cases .case strong { font-size: 18px; text-align: right; min-height: 34px; padding-top: 8px; color: var(--navy); }
+.cases .case .devise { font-size: 12px; font-weight: 400; color: var(--muted); }
+.cases .case .note { font-style: italic; font-size: 11px; color: #777; }
+.cases .case .variation { text-align: right; font-size: 11px; }
+.regle { background: #f2f2f2; color: #777; font-style: italic; font-size: 12px; padding: 8px 14px; margin: 0; }
+.suivi thead th { background: var(--gris-etiq); color: #666; font-size: 12px; text-align: right; }
+.suivi thead th:first-child { text-align: left; }
+.suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
+.suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
+.suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: #f6f6f6; }
+@media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
+/* Résumé : tout tient dans l'écran (Excel : une seule vue) */
+@media (min-width: 1100px) {
+  .resume-excel { padding-bottom: 0; }
+  .resume-excel .bandeau-titre { padding: 5px 20px; margin-bottom: var(--sp-2); font-size: 16px; }
+  .resume-excel h3.bandeau-titre { margin-top: var(--sp-2); padding: 4px 14px; font-size: 13px; }
+  .resume-excel .periode { margin-bottom: var(--sp-2); }
+  .resume-excel .periode-label, .resume-excel .periode select { height: 28px; }
+  .resume-excel .cases { margin-bottom: var(--sp-2); }
+  .resume-excel .cases .case { min-height: 60px; padding: 4px 10px 2px; gap: 0; }
+  .resume-excel .cases .case strong { min-height: 22px; padding-top: 2px; font-size: 16px; }
+  .resume-excel .regle { padding: 4px 14px; }
+  .resume-excel .suivi th, .resume-excel .suivi td { padding-block: 2px; line-height: 1.3; font-size: 12.5px; }
+}

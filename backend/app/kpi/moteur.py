@@ -107,6 +107,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     bud = f.budget(eff, params.budget_employe)
     ecart, ecart_pct = f.ecart_budget(ms, bud)
     marge_ = f.marge(cur.ca, ms)
+    exclus = sum((cur.rubrique(r) for r in cur.exclues if r != ABSENCES), ZERO)
 
     synthese = {
         "ms": {**cell(ms, ms1), "budget": bud, "ecart": ecart, "ecart_pct": ecart_pct},
@@ -120,6 +121,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "ca": cur.ca,
         "marge": marge_,
         "taux_marge": f.taux_marge(cur.ca, ms),
+        "exclus": exclus,
+        "remuneration_globale": ms + exclus,
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
         "primes_total": cell(sum((cur.rubrique(r) for r in PRIMES), ZERO),
                              sum((prev.rubrique(r) for r in PRIMES), ZERO) if prev else None),
