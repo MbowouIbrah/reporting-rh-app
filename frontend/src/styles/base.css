@@ -264,7 +264,7 @@ table.dense td.num { text-align: right; }
 .compactes .tuile .micro { font-size: 12px; }
 .compactes .tuile .variation, .compactes .tuile .note { font-size: 11px; }
 .compactes .tuile-hero { grid-column: auto; }
-.resume-bas { display: grid; gap: var(--sp-2); grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.resume-bas { display: grid; gap: var(--sp-2); grid-template-columns: minmax(0, 1fr); }
 .resume-bas .graphe { order: 2; margin: 0; padding: 8px; display: flex; flex-direction: column; min-height: 220px; }
 .resume-bas .graphe figcaption { margin-bottom: 4px; font-size: 13px; }
 .graphe-zone { flex: 1; min-height: 0; }
