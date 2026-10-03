@@ -330,7 +330,7 @@ table.dense td.num { text-align: right; }
 }
 
 /* Mensuel et Annuel : onglet Excel, sections empilées pleine largeur, page défilante */
-.rapport-excel { --gris-bandeau: #58595b; --gris-section: #808080; --gris-etiq: #d9d9d9; --brun: #7f3f00; --peche: #fce4d6; --pointille: #c07a2c; max-width: 1180px; margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
+.rapport-excel { --gris-bandeau: #58595b; --gris-section: #808080; --gris-etiq: #d9d9d9; --brun: #7f3f00; --peche: #fce4d6; --pointille: #c07a2c; max-width: 1000px; margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
 .rapport-excel .bandeau-titre { background: var(--gris-bandeau); color: #fff; font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: 0; padding: 9px 20px; margin: 0 0 var(--sp-3); }
 .rapport-excel .filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0 0 var(--sp-3); padding: 0; position: static; }
 .rapport-excel .filtres label { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: #404040; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
@@ -389,7 +389,6 @@ table.dense td.num { text-align: right; }
   .rapport-excel .snap-section { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .rapport-excel .snap-section > .panneau { align-self: start; max-height: 100%; min-width: 0; }
 }
-@media (min-width: 1300px) { .rapport-excel { max-width: min(1400px, 100%); } }
 @media (max-width: 1099px) { .rapport-excel .snap-section { display: flex; flex-direction: column; gap: var(--sp-4); } }
 
 @media (min-width: 1100px) {

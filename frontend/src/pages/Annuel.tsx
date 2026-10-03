@@ -30,17 +30,20 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
             panneaux: [{ titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={lib} /> }],
           },
           {
-            id: 's-repartitions',
-            titre: 'Services, sites, effectifs et contrats',
-            colonnes: '1fr 1fr',
+            id: 's-services',
+            titre: 'Services, effectifs et contrats',
             panneaux: [
               [
                 { titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> },
                 { titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
                 { titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
               ],
-              { titre: '3. Répartition par site', contenu: <Sites d={d} lib={lib} /> },
             ],
+          },
+          {
+            id: 's-sites',
+            titre: 'Sites',
+            panneaux: [{ titre: '3. Répartition par site', contenu: <Sites d={d} lib={lib} /> }],
           },
         ]}
       />
