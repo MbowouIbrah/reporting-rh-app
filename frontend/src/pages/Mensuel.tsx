@@ -53,10 +53,10 @@ function Contenu({ d }: { d: MensuelData }) {
       <SnapSections
         sections={[
           { id: 's-global', titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> },
-          { id: 's-service', titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={LIB} /> },
+          { id: 's-service', className: 'court', titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={LIB} /> },
           { id: 's-site', titre: '3. Répartition par site', contenu: <Sites d={d} lib={LIB} /> },
-          { id: 's-effectifs', titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
-          { id: 's-contrat', titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={LIB} /> },
+          { id: 's-effectifs', className: 'court', titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+          { id: 's-contrat', className: 'court', titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={LIB} /> },
         ]}
       />
     </>

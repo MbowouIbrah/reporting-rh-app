@@ -383,3 +383,11 @@ table.dense td.num { text-align: right; }
 @media (min-width: 1100px) and (max-width: 1300px) { .rapport-excel { padding-right: 44px; } }
 @media (max-width: 1099px) { .snap-scroll { display: flex; flex-direction: column; gap: var(--sp-4); } }
 @media (prefers-reduced-motion: reduce) { .snap-scroll { scroll-behavior: auto; } .rail-puce, .rail-bulle { transition: none; } }
+
+/* Sections courtes : le tableau occupe toute la hauteur, texte plus grand */
+@media (min-width: 1100px) {
+  .rapport-excel .snap-section .panneau-corps > table.dense { height: 100%; }
+  .rapport-excel .snap-section.court .panneau-corps > table.dense { font-size: clamp(13px, 2.4vh, 19px); }
+  .rapport-excel .snap-section.court table.dense th, .rapport-excel .snap-section.court table.dense td { padding-block: clamp(3px, .9vh, 12px); }
+  .rapport-excel .snap-section.court table.dense thead th { font-size: clamp(11px, 1.7vh, 14px); }
+}
