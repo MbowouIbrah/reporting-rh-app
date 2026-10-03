@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.budgets import router as budgets_router
+from app.api.donnees import router as donnees_router
 from app.api.health import router as health_router
 from app.api.imports import router as imports_router
 from app.api.parametrage import router as parametrage_router
@@ -34,3 +35,4 @@ app.include_router(parametrage_router, prefix=settings.API_PREFIX)
 app.include_router(budgets_router, prefix=settings.API_PREFIX)
 app.include_router(rapports_router, prefix=settings.API_PREFIX)
 app.include_router(salaries_router, prefix=settings.API_PREFIX)
+app.include_router(donnees_router, prefix=settings.API_PREFIX)

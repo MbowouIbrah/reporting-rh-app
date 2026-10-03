@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
-from app.imports.lecture import FichierIllisible, lire
+from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import BLOQUANT, Refs, norm, valider
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
@@ -81,10 +81,15 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes) -> LotImport:
         feuille = lire(contenu)
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
+    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu))
+
+
+def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha: str,
+                     taille: int) -> LotImport:
     lignes, anos, stats = valider(feuille, charger_refs(db))
     nb_b = sum(1 for a in anos if a.gravite == BLOQUANT)
     lot = LotImport(
-        fichier_nom=nom[:255], sha256=sha, taille=len(contenu), cree_par=user_id,
+        fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,
         statut="rejete" if nb_b else "pret", nb_lignes=len(lignes), nb_bloquants=nb_b,
         nb_avert=len(anos) - nb_b, stats=stats,
     )
@@ -157,6 +162,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
         periodes[(a, m)] = p.id
 
     salaries = {s.matricule_norm: s.id for s in db.scalars(select(Salarie))}
+    nouveaux = set()
     for r in rows:
         k = r.matricule.casefold()
         if k not in salaries:
@@ -164,6 +170,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
             db.add(s)
             db.flush()
             salaries[k] = s.id
+            nouveaux.add(k)
 
     postes = {norm(k): v for k, v in _ids(db, Poste).items()}
     for r in rows:
@@ -176,6 +183,18 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
 
     ids = {d: _ids(db, m) for d, m in DIM_MODELS.items() if d != "poste"}
     rub = _ids(db, Rubrique)
+
+    # fiche employé des nouveaux salariés : attributs de leur première ligne
+    for r in rows:
+        k = r.matricule.casefold()
+        if k in nouveaux:
+            nouveaux.discard(k)
+            db.execute(update(Salarie).where(Salarie.id == salaries[k]).values(
+                service_id=ids["service"][r.donnees["service"]],
+                site_id=ids["site"][r.donnees["site"]],
+                activite_id=ids["activite"][r.donnees["activite"]],
+                type_contrat_id=ids["type_contrat"][r.donnees["type_contrat"]],
+                poste_id=postes.get(norm(r.donnees["poste"])) if r.donnees.get("poste") else None))
 
     # archive puis remplacement par clé (période, salarié)
     pids = set(periodes[k] for k in cles_periodes)

@@ -59,3 +59,38 @@ def modele_employes(refs: dict[str, list[str]], exemples: list[list] | None = No
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
+
+
+def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, list[str]],
+                   lignes: list[list]) -> bytes:
+    """Feuille DONNEES au format de l'import : consignes lignes 1-2, en-tête ligne 3.
+
+    lignes : [matricule, nom, poste, contrat, activité, site, service, *montants (rubriques)].
+    """
+    from app.imports.regles import ATTRIBUTS, MOIS
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DONNEES"
+    ws["A1"] = (f"Données de {MOIS[mois - 1]} {annee} : une ligne par employé. Ne pas modifier les "
+                "colonnes ANNÉE et MOIS. Cellule vide = pas de montant ; listes déroulantes.")
+    ws["A1"].font = Font(italic=True)
+    ws["A2"] = "Importer ensuite ce fichier dans Administration > Données mensuelles."
+    entete(ws, 3, ATTRIBUTS + rubriques)
+    for i, ligne in enumerate(lignes, start=4):
+        mat, nom, *reste = ligne
+        poste, contrat, activite, site, service, *montants = reste
+        valeurs = [annee, MOIS[mois - 1], mat, nom, poste, contrat, activite, site, service,
+                   *montants]
+        for j, v in enumerate(valeurs, start=1):
+            c = ws.cell(i, j, v)
+            if j > len(ATTRIBUTS):
+                c.number_format = "#,##0.###"
+    plages = listes(wb, refs)
+    derniere = max(500, len(lignes) + 3)
+    for col, nom in ((5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):
+        liste_deroulante(ws, plages[nom], col, 4, derniere)
+    ws.freeze_panes = "E4"
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
