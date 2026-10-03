@@ -63,7 +63,7 @@ test('fiche individuelle puis déconnexion', async ({ page }) => {
   await connecter(page, 'drh@exemple.invalid')
   await page.getByRole('link', { name: 'Individuel' }).click()
   await expect(page.getByText('Sélectionnez un employé')).toBeVisible()
-  await page.getByLabel('Matricule').fill('E1')
+  await page.getByLabel('Matricule').selectOption('E1')
   await expect(page.getByRole('heading', { name: /Ann/ })).toBeVisible()
   await page.getByRole('button', { name: 'Déconnexion' }).click()
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible()

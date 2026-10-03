@@ -31,20 +31,14 @@ export default function Individuel() {
         <FiltresPeriode filtres={f.filtres} annees={f.annees} avecMois={false} onChange={f.set}>
           <label>
             Matricule
-            <input
-              list="matricules"
-              value={saisie}
-              placeholder="Ex. E1"
-              autoComplete="off"
-              onChange={(e) => setSaisie(e.target.value)}
-            />
-            <datalist id="matricules">
+            <select value={saisie} onChange={(e) => setSaisie(e.target.value)}>
+              <option value="">Choisir…</option>
               {salaries.data?.map((s) => (
                 <option key={s.matricule} value={s.matricule}>
-                  {s.nom}
+                  {s.matricule} — {s.nom}
                 </option>
               ))}
-            </datalist>
+            </select>
           </label>
         </FiltresPeriode>
       )}
@@ -53,7 +47,7 @@ export default function Individuel() {
         <div className="vide-guide">
           <strong>Sélectionnez un employé</strong>
           <span className="note">
-            {saisie.trim() ? 'Aucun matricule ne correspond à cette saisie.' : 'Saisissez un matricule ou choisissez-le dans la liste.'}
+            Choisissez un matricule dans la liste.
           </span>
         </div>
       )}
