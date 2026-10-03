@@ -1,8 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 
+import sqlalchemy as sa
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -44,6 +46,15 @@ class Salarie(Base):
     matricule: Mapped[str] = mapped_column(String(30))
     matricule_norm: Mapped[str] = mapped_column(String(30), unique=True)
     nom: Mapped[str] = mapped_column(String(200))
+    # Fiche employé : valeurs par défaut reprises à l'ajout d'une ligne mensuelle.
+    poste_id: Mapped[int | None] = mapped_column(ForeignKey("poste.id"), nullable=True)
+    service_id: Mapped[int | None] = mapped_column(ForeignKey("service.id"), nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("site.id"), nullable=True)
+    activite_id: Mapped[int | None] = mapped_column(ForeignKey("activite.id"), nullable=True)
+    type_contrat_id: Mapped[int | None] = mapped_column(
+        ForeignKey("type_contrat.id"), nullable=True
+    )
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa.true())
 
 
 class SituationMensuelle(Base):

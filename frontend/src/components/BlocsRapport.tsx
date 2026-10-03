@@ -67,7 +67,6 @@ const num = (v: number | string | null | undefined) => (v == null ? '—' : fcfa
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
-  const exclus = d.a_type_charge.filter((r) => r !== total && r.exclu)
   return (
     <table className="dense">
       <Tete premiere="Type de charge" lib={lib} budget />
@@ -76,18 +75,22 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
           <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
         ))}
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
-        {exclus.length > 0 && (
-          <>
-            <tr className="sous-titre">
-              <th scope="colgroup" colSpan={8}>
-                Éléments exclus du total
-              </th>
-            </tr>
-            {exclus.map((r) => (
-              <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
-            ))}
-          </>
-        )}
+      </tbody>
+    </table>
+  )
+}
+
+/** 1 bis. Éléments exclus du total général : tableau distinct. */
+export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
+  const exclus = d.a_type_charge.filter((r) => r.rubrique !== 'TOTAL CHARGES' && r.exclu)
+  if (exclus.length === 0) return null
+  return (
+    <table className="dense">
+      <Tete premiere="Élément exclu" lib={lib} budget />
+      <tbody>
+        {exclus.map((r) => (
+          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
+        ))}
       </tbody>
     </table>
   )

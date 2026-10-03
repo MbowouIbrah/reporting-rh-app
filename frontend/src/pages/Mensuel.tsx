@@ -4,7 +4,7 @@ import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
-import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
 import { entier, pct } from '../lib/format'
@@ -55,7 +55,12 @@ function Contenu({ d }: { d: MensuelData }) {
           {
             id: 's-global',
             titre: 'Reporting global',
-            panneaux: [{ titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> }],
+            panneaux: [
+              [
+                { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> },
+                { titre: 'Éléments exclus du total', contenu: <TypesExclus d={d} lib={LIB} /> },
+              ],
+            ],
           },
           {
             id: 's-services',
