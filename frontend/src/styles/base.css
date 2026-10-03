@@ -328,3 +328,24 @@ table.dense td.num { text-align: right; }
   .resume-excel .suivi { height: 100%; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: clamp(0px, .4vh, 4px); line-height: 1.2; font-size: clamp(11px, 1.65vh, 13.5px); }
 }
+
+/* Mensuel et Annuel : onglet Excel, sections empilées pleine largeur, page défilante */
+.rapport-excel { --gris-bandeau: #58595b; --gris-section: #808080; --gris-etiq: #d9d9d9; --brun: #7f3f00; --peche: #fce4d6; --pointille: #c07a2c; max-width: 1180px; margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
+.rapport-excel .bandeau-titre { background: var(--gris-bandeau); color: #fff; font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: 0; padding: 9px 20px; margin: 0 0 var(--sp-3); }
+.rapport-excel .filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0 0 var(--sp-3); padding: 0; position: static; }
+.rapport-excel .filtres label { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: #404040; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
+.rapport-excel .filtres select { height: 36px; border: 1px solid var(--pointille); background: #fde9d9; color: var(--brun); font: inherit; font-size: 14px; font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; letter-spacing: 0; min-width: 96px; }
+.rapport-excel .filtres > a.bouton { height: 36px; }
+.rapport-excel .bandeau { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-6); padding: 8px 14px; margin: 0 0 var(--sp-3); border-radius: 0; font-size: 14px; background: #f2f2f2; color: #404040; }
+.rapport-excel .bandeau.ko { background: var(--red-soft); color: var(--red-deep); }
+.rapport-excel .grille-rapport { display: flex; flex-direction: column; gap: var(--sp-4); }
+.rapport-excel .panneau { border: 0; border-radius: 0; background: transparent; }
+.rapport-excel .panneau > h3 { background: var(--gris-section); color: #fff; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; padding: 7px 16px; margin: 0; border: 0; }
+.rapport-excel .panneau-corps { overflow-x: auto; overflow-y: visible; border: 1px solid #cfcfcf; border-top: 0; background: var(--surface); }
+.rapport-excel .panneau table.dense { font-size: 14px; }
+.rapport-excel .panneau table.dense thead th { position: static; background: var(--gris-etiq); color: #404040; font-size: 12px; font-weight: 700; text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid #bbb; }
+.rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { padding: 6px 12px; line-height: 1.4; }
+.rapport-excel .panneau table.dense tbody tr:nth-child(even) td, .rapport-excel .panneau table.dense tbody tr:nth-child(even) th { background: #f6f6f6; }
+.rapport-excel .panneau table.dense tr.groupe th, .rapport-excel .panneau table.dense tr.groupe td { background: #ececec; }
+.rapport-excel .panneau table.dense tr.total th, .rapport-excel .panneau table.dense tr.total td { background: var(--peche); color: var(--brun); border-top: 1px solid var(--pointille); }
+@media (max-width: 720px) { .rapport-excel .filtres label { width: 100%; justify-content: space-between; } }

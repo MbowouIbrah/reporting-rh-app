@@ -19,8 +19,8 @@ export default function Mensuel() {
   })
 
   return (
-    <section className="page-ecran">
-      <h2>Reporting mensuel</h2>
+    <section className="rapport-excel">
+      <h2 className="bandeau-titre">REPORTING MENSUEL — Charges RH par période</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
           {q.data && <LienExport rapport="mensuel" filtres={f.filtres} />}

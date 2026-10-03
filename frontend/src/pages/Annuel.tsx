@@ -40,8 +40,8 @@ export default function Annuel() {
     enabled: !!f.filtres,
   })
   return (
-    <section className="page-ecran">
-      <h2>Comparatif annuel</h2>
+    <section className="rapport-excel">
+      <h2 className="bandeau-titre">COMPARATIF ANNUEL — Charges RH sur l’année</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
           {q.data && <LienExport rapport="annuel" filtres={f.filtres} />}
