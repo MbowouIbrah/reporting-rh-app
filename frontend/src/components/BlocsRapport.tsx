@@ -65,19 +65,29 @@ const num = (v: number | string | null | undefined) => (v == null ? '—' : fcfa
 
 /** 1. Reporting global : types de charge, TOTAL GÉNÉRAL en dernière ligne. */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
+  const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
+  const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
+  const exclus = d.a_type_charge.filter((r) => r !== total && r.exclu)
   return (
     <table className="dense">
       <Tete premiere="Type de charge" lib={lib} budget />
       <tbody>
-        {d.a_type_charge.map((r) => (
-          <Ligne
-            key={r.rubrique}
-            label={r.rubrique === 'TOTAL CHARGES' ? 'TOTAL GÉNÉRAL' : r.exclu ? <em>{r.rubrique} (exclu)</em> : r.rubrique}
-            cell={r}
-            budget={r}
-            className={r.rubrique === 'TOTAL CHARGES' ? 'total' : r.exclu ? 'exclu' : undefined}
-          />
+        {inclus.map((r) => (
+          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
         ))}
+        {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
+        {exclus.length > 0 && (
+          <>
+            <tr className="sous-titre">
+              <th scope="colgroup" colSpan={8}>
+                Éléments exclus du total
+              </th>
+            </tr>
+            {exclus.map((r) => (
+              <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
+            ))}
+          </>
+        )}
       </tbody>
     </table>
   )

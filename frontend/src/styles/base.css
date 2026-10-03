@@ -401,3 +401,4 @@ table.dense td.num { text-align: right; }
   .rapport-excel .snap-colonne table.dense th, .rapport-excel .snap-colonne table.dense td { padding-block: clamp(0px, .15vh, 2px); line-height: 1.25; }
   .rapport-excel .snap-colonne > .panneau > h3 { padding-block: calc(var(--v) * .4); }
 }
+table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, #d9d9d9); color: #404040; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding-block: 3px; }
