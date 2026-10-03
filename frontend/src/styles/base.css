@@ -303,17 +303,18 @@ table.dense td.num { text-align: right; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: #f6f6f6; }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
-/* Résumé : occupe exactement la hauteur de l'écran, le tableau de suivi absorbe l'espace restant */
+/* Résumé : occupe exactement la hauteur de l'écran sans défilement ; tailles proportionnelles à la hauteur, le tableau absorbe le reste */
 @media (min-width: 1100px) {
-  .resume-excel { padding-bottom: 0; }
-  .resume-excel .bandeau-titre { padding: 8px 20px; margin-bottom: var(--sp-3); font-size: 18px; }
-  .resume-excel h3.bandeau-titre { margin-top: var(--sp-3); padding: 6px 14px; font-size: 14px; }
-  .resume-excel .periode { margin-bottom: var(--sp-3); }
-  .resume-excel .cases { margin-bottom: var(--sp-3); }
-  .resume-excel .cases .case { min-height: 84px; }
-  .resume-excel .cases .case strong { font-size: 19px; }
-  .resume-excel .regle { padding: 6px 14px; }
+  .resume-excel { padding-bottom: 0; --v: clamp(4px, 1.1vh, 14px); }
+  .resume-excel .bandeau-titre { padding: calc(var(--v) * .6) 20px; margin-bottom: var(--v); font-size: clamp(14px, 2.2vh, 18px); }
+  .resume-excel h3.bandeau-titre { margin-top: var(--v); padding: calc(var(--v) * .4) 14px; font-size: clamp(12px, 1.7vh, 14px); }
+  .resume-excel .periode { margin-bottom: var(--v); }
+  .resume-excel .periode-label, .resume-excel .periode select { height: clamp(24px, 3.8vh, 34px); }
+  .resume-excel .cases { margin-bottom: var(--v); }
+  .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
+  .resume-excel .cases .case strong { font-size: clamp(14px, 2.2vh, 19px); min-height: 0; padding-top: 0; }
+  .resume-excel .regle { padding: calc(var(--v) * .4) 14px; font-size: clamp(10px, 1.4vh, 12px); }
   .resume-excel > .table-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; margin: 0; }
   .resume-excel .suivi { height: 100%; }
-  .resume-excel .suivi th, .resume-excel .suivi td { padding-block: 4px; font-size: 13.5px; }
+  .resume-excel .suivi th, .resume-excel .suivi td { padding-block: clamp(0px, .4vh, 4px); line-height: 1.2; font-size: clamp(11px, 1.65vh, 13.5px); }
 }
