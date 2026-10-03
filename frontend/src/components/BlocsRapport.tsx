@@ -11,9 +11,9 @@ export interface Libelles {
 
 const nonNul = (v: string | null) => v !== null && Number(v) !== 0
 
-export function Panneau({ titre, className, children }: { titre: string; className?: string; children: ReactNode }) {
+export function Panneau({ titre, className, id, children }: { titre: string; className?: string; id?: string; children: ReactNode }) {
   return (
-    <section className={`panneau ${className ?? ''}`} aria-label={titre}>
+    <section id={id} className={`panneau ${className ?? ''}`} aria-label={titre}>
       <h3>{titre}</h3>
       <div className="panneau-corps">{children}</div>
     </section>

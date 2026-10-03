@@ -4,7 +4,8 @@ import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
-import { AnalyseEffectifs, Contrats, Panneau, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
 import { entier, pct } from '../lib/format'
 
@@ -19,7 +20,7 @@ export default function Mensuel() {
   })
 
   return (
-    <section className="rapport-excel">
+    <section className="page-ecran rapport-excel">
       <h2 className="bandeau-titre">REPORTING MENSUEL — Charges RH par période</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
@@ -49,13 +50,15 @@ function Contenu({ d }: { d: MensuelData }) {
         <span>Rotation : <strong>{pct(s.taux_rotation)}</strong></span>
         <span>Absentéisme : <strong>{pct(s.taux_absenteisme)}</strong></span>
       </p>
-      <div className="grille-rapport">
-        <Panneau titre="1. Reporting global" className="p-global"><TypesCharge d={d} lib={LIB} /></Panneau>
-        <Panneau titre="2. Répartition par service et activité" className="p-service"><ServicesActivites d={d} lib={LIB} /></Panneau>
-        <Panneau titre="3. Répartition par site" className="p-site"><Sites d={d} lib={LIB} /></Panneau>
-        <Panneau titre="4. Analyse des effectifs" className="p-effectifs"><AnalyseEffectifs d={d} /></Panneau>
-        <Panneau titre="5. Nature de contrat" className="p-contrat"><Contrats d={d} lib={LIB} /></Panneau>
-      </div>
+      <SnapSections
+        sections={[
+          { id: 's-global', titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> },
+          { id: 's-service', titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={LIB} /> },
+          { id: 's-site', titre: '3. Répartition par site', contenu: <Sites d={d} lib={LIB} /> },
+          { id: 's-effectifs', titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+          { id: 's-contrat', titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={LIB} /> },
+        ]}
+      />
     </>
   )
 }

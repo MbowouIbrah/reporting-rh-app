@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAnnuel } from '../api/rapports'
 import type { Annuel as AnnuelData } from '../api/types'
-import { AnalyseEffectifs, Contrats, Panneau, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
@@ -21,13 +22,15 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
           <span>Marge cumulée : <strong>{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge)} mois avec CA)</span>
         )}
       </p>
-      <div className="grille-rapport">
-        <Panneau titre="1. Reporting global" className="p-global"><TypesCharge d={d} lib={lib} /></Panneau>
-        <Panneau titre="2. Répartition par service et activité" className="p-service"><ServicesActivites d={d} lib={lib} /></Panneau>
-        <Panneau titre="3. Répartition par site" className="p-site"><Sites d={d} lib={lib} /></Panneau>
-        <Panneau titre="4. Analyse des effectifs" className="p-effectifs"><AnalyseEffectifs d={d} /></Panneau>
-        <Panneau titre="5. Nature de contrat" className="p-contrat"><Contrats d={d} lib={lib} /></Panneau>
-      </div>
+      <SnapSections
+        sections={[
+          { id: 's-global', titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={lib} /> },
+          { id: 's-service', titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> },
+          { id: 's-site', titre: '3. Répartition par site', contenu: <Sites d={d} lib={lib} /> },
+          { id: 's-effectifs', titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+          { id: 's-contrat', titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
+        ]}
+      />
     </>
   )
 }
@@ -40,7 +43,7 @@ export default function Annuel() {
     enabled: !!f.filtres,
   })
   return (
-    <section className="rapport-excel">
+    <section className="page-ecran rapport-excel">
       <h2 className="bandeau-titre">COMPARATIF ANNUEL — Charges RH sur l’année</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
