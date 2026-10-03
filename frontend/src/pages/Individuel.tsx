@@ -7,6 +7,22 @@ import Etat, { etatErreur } from '../components/Etat'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, fcfa, MOIS, somme } from '../lib/format'
 
+/** Les 12 postes de l'onglet Excel, dans l'ordre du fichier. */
+const COLONNES = [
+  'Crédit téléphonique',
+  'Brut Réel',
+  'Commission',
+  'Charges Patronales',
+  'Frais de mission',
+  'Salaire brut garantie',
+  'Primes exceptionnelles',
+  'Logement site déporté',
+  'Carburant véhicule service',
+  'Assurance Maladie',
+  'TVA & Marge MAD',
+  'Formation',
+]
+
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
   const f = useFiltres()
@@ -25,7 +41,9 @@ export default function Individuel() {
     enabled: annee !== undefined,
   })
   const d = q.data
-  const rubriques = d?.rubriques ?? []
+  const rubriques = COLONNES
+  const totalMois = (m: NonNullable<typeof d>['mois'][number]) =>
+    somme(rubriques.map((r) => m.montants?.[r] ?? null)) ?? '0'
   const val = (v: Val | undefined) => v ?? '0'
   const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
   const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
@@ -42,6 +60,17 @@ export default function Individuel() {
               {salaries.data?.map((s) => (
                 <option key={s.matricule} value={s.matricule}>
                   {s.matricule} — {s.nom}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Nom
+            <select value={matricule} onChange={(e) => setMatricule(e.target.value)}>
+              <option value="">(Tous)</option>
+              {salaries.data?.map((s) => (
+                <option key={s.matricule} value={s.matricule}>
+                  {s.nom}
                 </option>
               ))}
             </select>
@@ -109,7 +138,7 @@ export default function Individuel() {
                         {fcfa(val(m.montants?.[r]))}
                       </td>
                     ))}
-                    <td className="num">{fcfa(val(m.total))}</td>
+                    <td className="num">{fcfa(totalMois(m))}</td>
                     <td className="num">{fcfa(val(m.budget ?? undefined))}</td>
                   </tr>
                   <tr className="sous">
@@ -131,7 +160,7 @@ export default function Individuel() {
                     {fcfa(totalRub(r))}
                   </td>
                 ))}
-                <td className="num">{fcfa(somme(d.mois.map((m) => m.total ?? null)) ?? '0')}</td>
+                <td className="num">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
                 <td className="num">{fcfa(somme(d.mois.map((m) => m.budget ?? null)) ?? '0')}</td>
               </tr>
               <tr className="total">
@@ -150,7 +179,7 @@ export default function Individuel() {
       )}
       {d && (
         <p className="note">
-          Note : le total mensuel additionne les rubriques comptées dans le total ; les rubriques exclues n’y figurent pas.
+          Note : le TOTAL MENSUEL additionne les 12 postes affichés ci-dessus. La ligne « Brut Réel » du reporting global n’y figure pas.
         </p>
       )}
     </section>
