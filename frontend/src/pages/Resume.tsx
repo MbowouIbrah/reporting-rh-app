@@ -49,8 +49,6 @@ export default function Resume() {
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
   const ca = a && somme(a.serie_n.map((l) => l.ca ?? null))
   const tauxMarge = ca && a?.marge_ytd != null && a.marge_ytd !== 'n/a' && Number(ca) !== 0 ? Number(a.marge_ytd) / Number(ca) : null
-  const m = f.filtres?.mois ?? 1
-  const jusqua = f.filtres ? `${MOIS[m - 1]} ${f.filtres.annee}` : ''
 
   return (
     <section className="page-ecran page-etroite resume-excel">
@@ -72,7 +70,16 @@ export default function Resume() {
               </button>
             ))}
           </div>
-          <span className="pastille-cumul">Cumul à fin {jusqua}</span>
+          <label className="pastille-cumul">
+            Cumul à fin de
+            <select aria-label="Mois de fin du cumul" value={f.filtres.mois} onChange={(e) => f.set({ mois: e.target.value })}>
+              {MOIS.map((nom, i) => (
+                <option key={nom} value={i + 1}>
+                  {nom}
+                </option>
+              ))}
+            </select>
+          </label>
           <em className="comparaison">Comparé à la même période de {f.filtres.annee - 1}</em>
         </div>
       )}
