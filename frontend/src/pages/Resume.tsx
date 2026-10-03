@@ -19,7 +19,7 @@ export default function Resume() {
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
 
   return (
-    <section className="page-ecran">
+    <section className="page-ecran page-etroite">
       <h2>Résumé</h2>
       {f.filtres && <FiltresPeriode filtres={f.filtres} annees={f.annees} onChange={f.set} />}
       {f.vide && <Etat type="vide" />}
