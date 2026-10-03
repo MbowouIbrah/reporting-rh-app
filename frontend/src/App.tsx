@@ -6,7 +6,10 @@ import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
+import Acces from './pages/admin/Acces'
 import Budgets from './pages/admin/Budgets'
+import DonneesMensuelles from './pages/admin/DonneesMensuelles'
+import Employes from './pages/admin/Employes'
 import Journal from './pages/admin/Journal'
 import Parametrage from './pages/admin/Parametrage'
 import Referentiels from './pages/admin/Referentiels'
@@ -53,6 +56,30 @@ export default function App() {
           element={
             <RequireAuth perm="saisie:write">
               <Periodes />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/employes"
+          element={
+            <RequireAuth perm="saisie:write">
+              <Employes />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/donnees"
+          element={
+            <RequireAuth perm="saisie:write">
+              <DonneesMensuelles />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/acces"
+          element={
+            <RequireAuth perm="users:read">
+              <Acces />
             </RequireAuth>
           }
         />

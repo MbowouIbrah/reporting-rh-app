@@ -432,3 +432,24 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, #d
 .rapport-excel.individuel-excel .panneau table.individuel td { font-size: 10px; letter-spacing: -.01em; }
 .rapport-excel.individuel-excel .panneau table.individuel thead th { font-size: 9px; }
 .rapport-excel.individuel-excel .panneau table.individuel tbody th[scope="row"] { min-width: 0; font-size: 10.5px; }
+
+/* Administration : parcours guidé, aperçus d'import, formulaires en fenêtre */
+.sous-nav-2 { margin-top: calc(var(--sp-2) * -1); }
+.sous-nav-2 a { font-size: 13px; padding: 4px 10px; }
+.sous-nav-2 a.active { background: var(--navy); color: #fff; }
+ol.etapes { list-style: none; counter-reset: etape; margin: 0 0 var(--sp-3); padding: 0; display: grid; gap: var(--sp-3); }
+ol.etapes li { counter-increment: etape; display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+ol.etapes li::before { content: counter(etape); width: 24px; height: 24px; border-radius: 50%; background: var(--navy); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+label.bouton { cursor: pointer; display: inline-block; }
+.apercu-import { border: 1px dashed var(--rule-strong); border-radius: var(--radius-lg); padding: var(--sp-3); margin-top: var(--sp-3); background: var(--surface-2, #f7f7f7); }
+.apercu-import ul { margin: var(--sp-2) 0; padding-left: 1.2em; font-size: 13px; }
+.formulaire-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); max-height: 60vh; overflow-y: auto; padding: 2px; }
+.formulaire-grille > .note, .formulaire-grille > .champ-erreur, .formulaire-grille > .case { grid-column: 1 / -1; }
+.tableau-defilant { overflow-x: auto; }
+.roles-aide { display: grid; gap: var(--sp-3); margin: 0; }
+.roles-aide dt { font-weight: 600; }
+.roles-aide dd { margin: 0; color: var(--ink-2, #555); }
+@media (max-width: 640px) { .formulaire-grille { grid-template-columns: 1fr; } }
+label.bouton { font-size: 13px; line-height: normal; }
+.tableau-defilant table.dense thead th { text-align: left; }
+.tableau-defilant table.dense thead th.num { text-align: right; }

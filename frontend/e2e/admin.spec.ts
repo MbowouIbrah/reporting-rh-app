@@ -15,10 +15,11 @@ test('admin : pages Budgets, Paramétrage et Journal accessibles', async ({ page
   const nav = page.getByRole('navigation', { name: 'Administration' })
   for (const [lien, titre] of [
     ['Budgets', 'Budgets mensuels'],
-    ['Paramétrage', 'Paramétrage'],
+    ['Rubriques et règles', 'Paramétrage'],
     ['Journal', 'Journal d’audit'],
   ]) {
     await page.goto('admin/utilisateurs')
+    await nav.getByRole('link', { name: 'Réglages' }).click()
     await nav.getByRole('link', { name: lien }).click()
     await expect(page.getByRole('heading', { name: titre, level: 2 })).toBeVisible()
   }

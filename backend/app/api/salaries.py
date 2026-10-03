@@ -86,6 +86,13 @@ def liste(p: Principal = Depends(current_principal), db: Session = Depends(get_d
     return [_dict(s, idx) for s in db.scalars(select(Salarie).order_by(Salarie.matricule))]
 
 
+@router.get("/listes")
+def listes(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(p, "saisie:write")
+    idx = Index(db)
+    return {c: sorted(idx.libelles[c].values()) for c in DIMS}
+
+
 @router.post("", status_code=201)
 def creer(f: FicheIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "saisie:write")

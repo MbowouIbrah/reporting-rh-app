@@ -60,3 +60,10 @@ def test_import_anomalies_tout_ou_rien(make_client):
     assert len(r.json()["anomalies"]) == 2
     r = c.post(f"{API}/import?simuler=false", files={"fichier": ("e.xlsx", f, XLSX)})
     assert r.status_code == 422 and c.get(API).json() == []
+
+
+def test_listes_pour_les_menus(make_client):
+    r = make_client(ADMIN).get(f"{API}/listes")
+    assert r.status_code == 200
+    assert set(r.json()) == {"poste", "type_contrat", "activite", "site", "service"}
+    assert make_client(DRH).get(f"{API}/listes").status_code == 403
