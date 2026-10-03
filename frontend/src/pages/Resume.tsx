@@ -22,7 +22,7 @@ export default function Resume() {
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
 
   return (
-    <section>
+    <section className="page-ecran">
       <h2>Résumé</h2>
       {f.filtres && <FiltresPeriode filtres={f.filtres} annees={f.annees} onChange={f.set} />}
       {f.vide && <Etat type="vide" />}
@@ -30,7 +30,7 @@ export default function Resume() {
       {erreur && <Etat type={etatErreur(erreur)} />}
       {s && f.filtres && (
         <>
-          <div className="tuiles">
+          <div className="tuiles compactes">
             {aCa && <Tuile titre="Chiffre d’affaires" valeur={montrer(s.ca)} hero absence="CA du mois non saisi" />}
             {aCa && <Tuile titre="Marge" valeur={montrer(s.marge)} absence="CA du mois non saisi" />}
             {aCa && <Tuile titre="Taux de marge" valeur={s.taux_marge == null ? '—' : pct(s.taux_marge)} />}
@@ -41,6 +41,7 @@ export default function Resume() {
         </>
       )}
       {ann.data && f.filtres && (
+        <div className="resume-bas">
         <Suspense fallback={<Etat type="chargement" />}>
           <TendanceMs
             points={ann.data.serie_n
@@ -48,8 +49,6 @@ export default function Resume() {
               .map((m) => ({ mois: MOIS_COURTS[m.mois - 1], ms: Number(m.ms) }))}
           />
         </Suspense>
-      )}
-      {ann.data && (
         <div className="table-scroll">
         <table className="dense">
           <thead>
@@ -64,7 +63,7 @@ export default function Resume() {
             </tr>
           </thead>
           <tbody>
-            {ann.data.serie_n.filter((m) => m.mois <= (f.filtres?.mois ?? 12)).map((m) => (
+            {ann.data.serie_n.map((m) => (
               <tr key={m.mois}>
                 <th scope="row">{MOIS[m.mois - 1]}</th>
                 {aCa && <td className="num">{montrer(m.ca)}</td>}
@@ -77,6 +76,7 @@ export default function Resume() {
             ))}
           </tbody>
         </table>
+        </div>
         </div>
       )}
     </section>

@@ -5,10 +5,10 @@ const AXE = { tickLine: false, axisLine: false, tick: { fill: '#6b6f82', fontSiz
 
 export default function TendanceMs({ points }: { points: { mois: string; ms: number }[] }) {
   return (
-    <figure className="graphe" style={{ marginBottom: 16 }}>
+    <figure className="graphe graphe-fluide">
       <figcaption>Masse salariale mensuelle (FCFA)</figcaption>
       <div
-        style={{ height: 200 }}
+        className="graphe-zone"
         role="img"
         aria-label="Courbe de la masse salariale par mois ; données détaillées dans le tableau ci-dessous"
       >

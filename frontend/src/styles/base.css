@@ -256,3 +256,24 @@ table.dense td.num { text-align: right; }
   .layout-ecran:has(.page-ecran) { height: 100dvh; display: flex; flex-direction: column; }
   .layout-ecran:has(.page-ecran) > .page { flex: 1; min-height: 0; width: 100%; }
 }
+
+/* Résumé : tuiles compactes en bandeau, tableau de suivi et courbe côte à côte */
+.tuiles.compactes { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2); margin: var(--sp-1) 0 var(--sp-2); }
+.compactes .tuile { padding: 6px 10px; gap: 0; }
+.compactes .tuile strong { font-size: 18px; }
+.compactes .tuile .micro { font-size: 12px; }
+.compactes .tuile .variation, .compactes .tuile .note { font-size: 11px; }
+.compactes .tuile-hero { grid-column: auto; }
+.resume-bas { display: grid; gap: var(--sp-2); grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.resume-bas .graphe { order: 2; margin: 0; padding: 8px; display: flex; flex-direction: column; min-height: 220px; }
+.resume-bas .graphe figcaption { margin-bottom: 4px; font-size: 13px; }
+.graphe-zone { flex: 1; min-height: 0; }
+.resume-bas .table-scroll { order: 1; margin: 0; max-height: none; }
+.resume-bas table.dense { font-size: 12px; }
+.resume-bas table.dense th, .resume-bas table.dense td { padding: 3px 8px; }
+@media (min-width: 1100px) {
+  .resume-bas { flex: 1; min-height: 0; }
+  .resume-bas .table-scroll { overflow: auto; min-height: 0; }
+}
+@media (max-width: 1099px) { .resume-bas { grid-template-columns: 1fr; } .graphe-zone { height: 200px; flex: none; } }
+@media (min-width: 900px) { .tuiles.compactes:has(> :nth-child(6):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
