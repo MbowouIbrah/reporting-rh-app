@@ -146,3 +146,18 @@ export interface Individuel {
   nb_mois: number
   moyenne: Val
 }
+
+export interface IndividuelTous {
+  annee: number
+  salaries: {
+    matricule: string
+    nom: string
+    service: string | null
+    site: string | null
+    contrat: string | null
+    totaux: (Dec | null)[]
+    cumul: Dec
+    nb_mois: number
+    moyenne: Val
+  }[]
+}

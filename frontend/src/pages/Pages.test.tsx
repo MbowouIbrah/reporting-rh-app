@@ -18,6 +18,7 @@ function routes(avecMarge: boolean, perms: string[]) {
     if (url.includes('/auth/me')) return { id: 1, email: 'a@b.c', roles: [], permissions: perms }
     if (url.includes('/rapports/periodes')) return [{ annee: 2026, mois: 2, statut: 'ouverte' }]
     if (url.includes('/rapports/filtres')) return { services: [], sites: [] }
+    if (url.includes('/rapports/individuel/tous')) return { annee: 2026, salaries: [] }
     if (url.includes('/rapports/salaries')) return [{ matricule: 'E1', nom: 'Ann' }]
     if (url.includes('/rapports/mensuel'))
       return {
@@ -78,9 +79,9 @@ test('Annuel : affiche Nb de mois saisis', async () => {
   expect(await screen.findByText(/Nb de mois saisis/)).toBeInTheDocument()
 })
 
-test('Individuel : message sans matricule', async () => {
+test('Individuel : tous les salariés par défaut', async () => {
   rendu(<Individuel />, '/individuel', ['report:read', 'nominatif:read'])
-  expect(await screen.findByText('Sélectionnez un employé')).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Tous les salariés' })).toBeInTheDocument()
 })
 
 test('Individuel : accès refusé sans nominatif:read', async () => {

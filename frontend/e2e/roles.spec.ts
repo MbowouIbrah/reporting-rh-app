@@ -62,7 +62,7 @@ test('access token supprimé : rattrapé par le refresh', async ({ page, context
 test('fiche individuelle puis déconnexion', async ({ page }) => {
   await connecter(page, 'drh@exemple.invalid')
   await page.getByRole('link', { name: 'Individuel' }).click()
-  await expect(page.getByText('Sélectionnez un employé')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Tous les salariés' })).toBeVisible()
   await page.getByLabel('Matricule').selectOption('E1')
   await expect(page.getByRole('heading', { name: /Ann/ })).toBeVisible()
   await page.getByRole('button', { name: 'Déconnexion' }).click()

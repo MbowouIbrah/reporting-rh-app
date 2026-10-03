@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Annuel, Filtres, Individuel, Me, Mensuel, Periode, Salarie } from './types'
+import type { Annuel, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
 
 export interface FiltresPage {
   annee: number
@@ -25,6 +25,8 @@ export const getMensuel = (f: FiltresPage) => api<Mensuel>(`/rapports/mensuel${q
 export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({ ...f })}`)
 export const getIndividuel = (annee: number, matricule: string) =>
   api<Individuel>(`/rapports/individuel${qs({ annee, matricule })}`)
+
+export const getIndividuelTous = (annee: number) => api<IndividuelTous>(`/rapports/individuel/tous${qs({ annee })}`)
 
 /** Lien de téléchargement xlsx : mêmes filtres que l'écran, authentifié par le cookie. */
 export const urlExport = (rapport: 'mensuel' | 'annuel', f: FiltresPage) =>

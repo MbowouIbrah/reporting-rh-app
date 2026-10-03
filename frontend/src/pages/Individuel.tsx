@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { getIndividuel, getSalaries } from '../api/rapports'
+import { getIndividuel, getIndividuelTous, getSalaries } from '../api/rapports'
 import { Panneau } from '../components/BlocsRapport'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, entier, fcfa, MOIS } from '../lib/format'
+import { cls, entier, fcfa, MOIS, MOIS_COURTS } from '../lib/format'
 
 export default function Individuel() {
   const f = useFiltres()
@@ -22,6 +22,11 @@ export default function Individuel() {
     queryFn: () => getIndividuel(annee!, matricule!),
     enabled: annee !== undefined && !!matricule,
   })
+  const tous = useQuery({
+    queryKey: ['individuel-tous', annee],
+    queryFn: () => getIndividuelTous(annee!),
+    enabled: annee !== undefined && !matricule,
+  })
   const rubriques = [...new Set(q.data?.mois.flatMap((m) => Object.keys(m.rubriques ?? {})))]
 
   return (
@@ -32,7 +37,7 @@ export default function Individuel() {
           <label>
             Matricule
             <select value={saisie} onChange={(e) => setSaisie(e.target.value)}>
-              <option value="">Choisir…</option>
+              <option value="">Tous les salariés</option>
               {salaries.data?.map((s) => (
                 <option key={s.matricule} value={s.matricule}>
                   {s.matricule} — {s.nom}
@@ -43,16 +48,42 @@ export default function Individuel() {
         </FiltresPeriode>
       )}
       <p className="note note-entete">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
-      {!matricule && (
-        <div className="vide-guide">
-          <strong>Sélectionnez un employé</strong>
-          <span className="note">
-            Choisissez un matricule dans la liste.
-          </span>
-        </div>
+      {!matricule && tous.data && (
+        <Panneau titre="Tous les salariés">
+          <table className="dense">
+            <thead>
+              <tr>
+                <th scope="col">Matricule</th>
+                <th scope="col">Nom</th>
+                <th scope="col">Service</th>
+                {MOIS_COURTS.map((m) => (
+                  <th scope="col" key={m}>
+                    {m}
+                  </th>
+                ))}
+                <th scope="col">Cumul</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tous.data.salaries.map((s) => (
+                <tr key={s.matricule}>
+                  <th scope="row">{s.matricule}</th>
+                  <td>{s.nom}</td>
+                  <td>{s.service ?? '—'}</td>
+                  {s.totaux.map((t, i) => (
+                    <td className="num" key={i}>
+                      {fcfa(t)}
+                    </td>
+                  ))}
+                  <td className="num">{fcfa(s.cumul)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panneau>
       )}
-      {q.isLoading && <Etat type="chargement" />}
-      {q.error && <Etat type={etatErreur(q.error)} />}
+      {(q.isLoading || tous.isLoading) && <Etat type="chargement" />}
+      {(q.error ?? tous.error) && <Etat type={etatErreur((q.error ?? tous.error)!)} />}
       {q.data && (
         <>
           <Panneau titre={`${q.data.nom} (${q.data.matricule})`}>

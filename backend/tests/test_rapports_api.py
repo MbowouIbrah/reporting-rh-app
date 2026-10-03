@@ -119,6 +119,15 @@ def test_individuel_nominatif_et_journal(charge, make_client, db):
     assert len(ev) == 1
 
 
+def test_individuel_tous(charge, make_client):
+    assert get(make_client(EQUIP), "individuel/tous", annee=2026).status_code == 403
+    j = get(make_client(DRH), "individuel/tous", annee=2026).json()
+    mat = [x["matricule"] for x in j["salaries"]]
+    assert mat == sorted(mat) and "E1" in mat and "E3" in mat
+    e1 = next(x for x in j["salaries"] if x["matricule"] == "E1")
+    assert len(e1["totaux"]) == 12 and e1["nb_mois"] == 2 and D(e1["cumul"]) == D("2100.5")
+
+
 def test_individuel_hors_perimetre_nominatif(charge, make_client, db):
     """Un lecteur à périmètre avec drapeau nominatif ne voit que son périmètre."""
     from app.models.auth import RoleAssignment, Utilisateur

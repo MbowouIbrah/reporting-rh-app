@@ -185,6 +185,36 @@ def annuel_export(
     return _xlsx(xlsx.annuel(res, annee, mois), f"reporting-annuel-{annee}.xlsx")
 
 
+@router.get("/individuel/tous")
+def individuel_tous(
+    annee: int = Query(ge=2000, le=2100),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Tous les salariés du périmètre : total par mois, cumul et moyenne."""
+    authorize(p, "nominatif:read")
+    scope = scope_for(db, p)
+    pds = {m: pd for m in range(1, 13)
+           if (pd := ch.charger_periode(db, scope, annee, m)) is not None}
+    ids = {L.salarie_id for pd in pds.values() for L in pd.lignes}
+    sals = list(db.scalars(select(Salarie).where(Salarie.id.in_(ids)))) if ids else []
+    refs = ch.charger_refs(db)
+    audit.record(db, p.user_id, "lecture_fiche", "salarie", None, None,
+                 {"annee": annee, "tous": True})
+    db.commit()
+    out = []
+    for sal in sorted(sals, key=lambda x: x.matricule):
+        r = moteur.individuel(pds, sal.id, refs)
+        dern = next((x for x in reversed(r["mois"]) if x["present"]), None)
+        out.append({"matricule": sal.matricule, "nom": sal.nom,
+                    "service": dern["service"] if dern else None,
+                    "site": dern["site"] if dern else None,
+                    "contrat": dern["contrat"] if dern else None,
+                    "totaux": [x["total"] for x in r["mois"]],
+                    "cumul": r["cumul"], "nb_mois": r["nb_mois"], "moyenne": r["moyenne"]})
+    return jsonable({"annee": annee, "salaries": out})
+
+
 @router.get("/individuel")
 def individuel(
     annee: int = Query(ge=2000, le=2100),
