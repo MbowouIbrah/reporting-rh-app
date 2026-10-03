@@ -17,7 +17,7 @@ function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
     <figure className="graphe">
       <figcaption>{titre}</figcaption>
-      <div style={{ height: 260 }}>
+      <div className="graphe-zone">
         <ResponsiveContainer width="100%" height="100%">
           {children as React.ReactElement}
         </ResponsiveContainer>
@@ -41,10 +41,10 @@ export default function Graphes() {
   const contrats = men.data?.d_contrat.effectifs.map((c) => ({ contrat: c.contrat, effectif: Number(c.m) }))
 
   return (
-    <section>
-      <h2>Graphes</h2>
+    <section className="page-ecran page-etroite rapport-excel graphes-excel">
+      <h2 className="bandeau-titre">GRAPHES — Évolution sur l’année</h2>
       {f.filtres && (
-        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
+        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {(ann.isLoading || men.isLoading) && <Etat type="chargement" />}
@@ -94,7 +94,7 @@ export default function Graphes() {
         )}
       </div>
       {serie && (
-        <details className="section">
+        <details className="section details-donnees">
           <summary>
             <span className="section-titre">Voir les données en tableau</span>
           </summary>

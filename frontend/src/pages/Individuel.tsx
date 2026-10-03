@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getIndividuel, getSalaries } from '../api/rapports'
+import { Panneau } from '../components/BlocsRapport'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
@@ -24,9 +25,8 @@ export default function Individuel() {
   const rubriques = [...new Set(q.data?.mois.flatMap((m) => Object.keys(m.rubriques ?? {})))]
 
   return (
-    <section>
-      <h2>Fiche individuelle</h2>
-      <p className="note note-entete">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
+    <section className="page-ecran page-etroite rapport-excel">
+      <h2 className="bandeau-titre">FICHE INDIVIDUELLE — Charges RH par salarié</h2>
       {f.filtres && (
         <FiltresPeriode filtres={f.filtres} annees={f.annees} avecMois={false} onChange={f.set}>
           <label>
@@ -48,6 +48,7 @@ export default function Individuel() {
           </label>
         </FiltresPeriode>
       )}
+      <p className="note note-entete">La consultation d’une fiche nominative est enregistrée dans le journal d’audit.</p>
       {!matricule && (
         <div className="vide-guide">
           <strong>Sélectionnez un employé</strong>
@@ -60,10 +61,7 @@ export default function Individuel() {
       {q.error && <Etat type={etatErreur(q.error)} />}
       {q.data && (
         <>
-          <h3>
-            {q.data.nom} <span className="note">({q.data.matricule})</span>
-          </h3>
-          <div className="table-scroll">
+          <Panneau titre={`${q.data.nom} (${q.data.matricule})`}>
             <table className="dense">
               <thead>
                 <tr>
@@ -104,7 +102,7 @@ export default function Individuel() {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </Panneau>
         </>
       )}
     </section>

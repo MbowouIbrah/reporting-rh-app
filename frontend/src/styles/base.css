@@ -402,3 +402,20 @@ table.dense td.num { text-align: right; }
   .rapport-excel .snap-colonne > .panneau > h3 { padding-block: calc(var(--v) * .4); }
 }
 table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, #d9d9d9); color: #404040; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding-block: 3px; }
+
+/* Individuel et Graphes : même cadre que le Mensuel (une page, largeur du Résumé) */
+.graphes-excel .graphe { background: var(--surface); border: 1px solid #cfcfcf; border-radius: 0; box-shadow: none; padding: 0; display: flex; flex-direction: column; min-height: 0; margin: 0; }
+.graphes-excel .graphe figcaption { background: var(--gris-section); color: #fff; font: 700 14px/1.2 var(--font-body); text-transform: uppercase; letter-spacing: .02em; padding: 7px 16px; margin: 0; }
+.graphes-excel .graphe-zone { padding: 8px; height: 240px; }
+.graphes-excel .details-donnees { margin-top: var(--sp-3); }
+@media (min-width: 1100px) {
+  .graphes-excel .graphes { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--v, 8px); margin: 0 0 var(--v, 8px); }
+  .graphes-excel .graphe-zone { flex: 1; min-height: 0; height: auto; }
+  .graphes-excel .details-donnees { display: none; }
+  .page-ecran.rapport-excel:not(.graphes-excel) .panneau { min-height: 0; display: flex; flex-direction: column; }
+  .page-ecran.rapport-excel:not(.graphes-excel) .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
+  .page-ecran.rapport-excel:not(.graphes-excel) .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; }
+}
+.rapport-excel .filtres input { height: 36px; border: 1px solid var(--pointille); background: #fde9d9; color: var(--brun); font: inherit; font-size: 14px; font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; width: 140px; }
+.rapport-excel .filtres input::placeholder { color: var(--brun); opacity: .55; font-weight: 400; }
+.rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { white-space: nowrap; }
