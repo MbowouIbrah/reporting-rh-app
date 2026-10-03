@@ -62,7 +62,7 @@ export default function Annuel() {
     <section className="page-ecran rapport-excel">
       <h2 className="bandeau-titre">COMPARATIF ANNUEL — Charges RH sur l’année</h2>
       {f.filtres && (
-        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
+        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
           {q.data && <LienExport rapport="annuel" filtres={f.filtres} />}
         </FiltresPeriode>
       )}
