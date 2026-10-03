@@ -391,3 +391,14 @@ table.dense td.num { text-align: right; }
 }
 @media (min-width: 1300px) { .rapport-excel { max-width: min(1400px, 100%); } }
 @media (max-width: 1099px) { .rapport-excel .snap-section { display: flex; flex-direction: column; gap: var(--sp-4); } }
+
+@media (min-width: 1100px) {
+  .rapport-excel .snap-colonne { display: flex; flex-direction: column; gap: var(--v); min-height: 0; min-width: 0; align-self: stretch; }
+  .rapport-excel .snap-colonne > .panneau { flex: 0 1 auto; min-height: 0; max-height: none; }
+}
+@media (max-width: 1099px) { .rapport-excel .snap-colonne { display: flex; flex-direction: column; gap: var(--sp-4); } }
+@media (min-width: 1100px) {
+  .rapport-excel .snap-colonne table.dense { font-size: clamp(10.5px, 1.5vh, 13px); }
+  .rapport-excel .snap-colonne table.dense th, .rapport-excel .snap-colonne table.dense td { padding-block: clamp(0px, .15vh, 2px); line-height: 1.25; }
+  .rapport-excel .snap-colonne > .panneau > h3 { padding-block: calc(var(--v) * .4); }
+}

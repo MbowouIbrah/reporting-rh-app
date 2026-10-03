@@ -11,7 +11,8 @@ export interface SectionSnap {
   id: string
   titre: string
   colonnes?: string
-  panneaux: PanneauSnap[]
+  /** Un tableau seul, ou une liste de tableaux empilés dans une même colonne. */
+  panneaux: (PanneauSnap | PanneauSnap[])[]
 }
 
 /**
@@ -46,11 +47,21 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
       <div className="snap-scroll" ref={zone}>
         {sections.map((s) => (
           <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
-            {s.panneaux.map((pn) => (
-              <Panneau key={pn.titre} titre={pn.titre}>
-                {pn.contenu}
-              </Panneau>
-            ))}
+            {s.panneaux.map((pn) =>
+              Array.isArray(pn) ? (
+                <div key={pn[0].titre} className="snap-colonne">
+                  {pn.map((x) => (
+                    <Panneau key={x.titre} titre={x.titre}>
+                      {x.contenu}
+                    </Panneau>
+                  ))}
+                </div>
+              ) : (
+                <Panneau key={pn.titre} titre={pn.titre}>
+                  {pn.contenu}
+                </Panneau>
+              ),
+            )}
           </div>
         ))}
       </div>
