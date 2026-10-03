@@ -35,7 +35,7 @@ export default function Resume() {
   const precedent = f.filtres ? `${MOIS[(m + 10) % 12]} ${m === 1 ? f.filtres.annee - 1 : f.filtres.annee}` : ''
 
   return (
-    <section className="page-etroite resume-excel">
+    <section className="page-ecran page-etroite resume-excel">
       <h2 className="bandeau-titre">RÉSUMÉ — Indicateurs de pilotage</h2>
       {f.filtres && (
         <div className="periode" role="group" aria-label="Filtres">

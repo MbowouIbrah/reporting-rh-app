@@ -303,16 +303,17 @@ table.dense td.num { text-align: right; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: #f6f6f6; }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
-/* Résumé : tout tient dans l'écran (Excel : une seule vue) */
+/* Résumé : occupe exactement la hauteur de l'écran, le tableau de suivi absorbe l'espace restant */
 @media (min-width: 1100px) {
   .resume-excel { padding-bottom: 0; }
-  .resume-excel .bandeau-titre { padding: 5px 20px; margin-bottom: var(--sp-2); font-size: 16px; }
-  .resume-excel h3.bandeau-titre { margin-top: var(--sp-2); padding: 4px 14px; font-size: 13px; }
-  .resume-excel .periode { margin-bottom: var(--sp-2); }
-  .resume-excel .periode-label, .resume-excel .periode select { height: 28px; }
-  .resume-excel .cases { margin-bottom: var(--sp-2); }
-  .resume-excel .cases .case { min-height: 60px; padding: 4px 10px 2px; gap: 0; }
-  .resume-excel .cases .case strong { min-height: 22px; padding-top: 2px; font-size: 16px; }
-  .resume-excel .regle { padding: 4px 14px; }
-  .resume-excel .suivi th, .resume-excel .suivi td { padding-block: 2px; line-height: 1.3; font-size: 12.5px; }
+  .resume-excel .bandeau-titre { padding: 8px 20px; margin-bottom: var(--sp-3); font-size: 18px; }
+  .resume-excel h3.bandeau-titre { margin-top: var(--sp-3); padding: 6px 14px; font-size: 14px; }
+  .resume-excel .periode { margin-bottom: var(--sp-3); }
+  .resume-excel .cases { margin-bottom: var(--sp-3); }
+  .resume-excel .cases .case { min-height: 84px; }
+  .resume-excel .cases .case strong { font-size: 19px; }
+  .resume-excel .regle { padding: 6px 14px; }
+  .resume-excel > .table-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; margin: 0; }
+  .resume-excel .suivi { height: 100%; }
+  .resume-excel .suivi th, .resume-excel .suivi td { padding-block: 4px; font-size: 13.5px; }
 }
