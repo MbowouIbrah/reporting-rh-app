@@ -1,11 +1,17 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Panneau } from './BlocsRapport'
 
+export interface PanneauSnap {
+  titre: string
+  contenu: ReactNode
+}
+
+/** Un écran : un ou plusieurs tableaux qui vont ensemble, côte à côte (colonnes en fr). */
 export interface SectionSnap {
   id: string
   titre: string
-  contenu: ReactNode
-  className?: string
+  colonnes?: string
+  panneaux: PanneauSnap[]
 }
 
 /**
@@ -39,9 +45,13 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
     <div className="snap-zone">
       <div className="snap-scroll" ref={zone}>
         {sections.map((s) => (
-          <Panneau key={s.id} id={s.id} titre={s.titre} className={`snap-section ${s.className ?? ''}`}>
-            {s.contenu}
-          </Panneau>
+          <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
+            {s.panneaux.map((pn) => (
+              <Panneau key={pn.titre} titre={pn.titre}>
+                {pn.contenu}
+              </Panneau>
+            ))}
+          </div>
         ))}
       </div>
       <nav className="rail" aria-label="Sections du rapport">
@@ -54,7 +64,7 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
             aria-current={s.id === actif ? 'true' : undefined}
             onClick={() => aller(s.id)}
           >
-            <span className="rail-bulle">{s.titre.replace(/^\d+\.\s*/, '')}</span>
+            <span className="rail-bulle">{s.titre}</span>
             <span className="rail-puce" aria-hidden="true" />
           </button>
         ))}

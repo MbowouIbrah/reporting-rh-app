@@ -364,7 +364,7 @@ table.dense td.num { text-align: right; }
   .snap-scroll { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; overscroll-behavior: contain; scrollbar-width: none; }
   .snap-scroll::-webkit-scrollbar { display: none; }
   .rapport-excel .snap-section { height: 100%; box-sizing: border-box; scroll-snap-align: start; scroll-snap-stop: always; padding-bottom: var(--v); }
-  .rapport-excel .snap-section > h3 { font-size: clamp(12px, 1.8vh, 14px); padding: calc(var(--v) * .6) 16px; }
+  .rapport-excel .snap-section .panneau > h3 { font-size: clamp(12px, 1.8vh, 14px); padding: calc(var(--v) * .6) 16px; }
   .rapport-excel .snap-section .panneau-corps { flex: 1; min-height: 0; overflow-y: auto; }
   .rapport-excel .panneau table.dense { font-size: clamp(11px, 1.65vh, 14px); }
   .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { padding-block: clamp(1px, .45vh, 6px); line-height: 1.3; }
@@ -384,10 +384,10 @@ table.dense td.num { text-align: right; }
 @media (max-width: 1099px) { .snap-scroll { display: flex; flex-direction: column; gap: var(--sp-4); } }
 @media (prefers-reduced-motion: reduce) { .snap-scroll { scroll-behavior: auto; } .rail-puce, .rail-bulle { transition: none; } }
 
-/* Sections courtes : le tableau occupe toute la hauteur, texte plus grand */
+/* Un écran = un ou plusieurs tableaux côte à côte */
 @media (min-width: 1100px) {
-  .rapport-excel .snap-section .panneau-corps > table.dense { height: 100%; }
-  .rapport-excel .snap-section.court .panneau-corps > table.dense { font-size: clamp(13px, 2.4vh, 19px); }
-  .rapport-excel .snap-section.court table.dense th, .rapport-excel .snap-section.court table.dense td { padding-block: clamp(3px, .9vh, 12px); }
-  .rapport-excel .snap-section.court table.dense thead th { font-size: clamp(11px, 1.7vh, 14px); }
+  .rapport-excel .snap-section { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .rapport-excel .snap-section > .panneau { align-self: start; max-height: 100%; min-width: 0; }
 }
+@media (min-width: 1300px) { .rapport-excel { max-width: min(1400px, 100%); } }
+@media (max-width: 1099px) { .rapport-excel .snap-section { display: flex; flex-direction: column; gap: var(--sp-4); } }
