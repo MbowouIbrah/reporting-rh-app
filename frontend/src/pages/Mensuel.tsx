@@ -58,7 +58,7 @@ function Contenu({ d }: { d: MensuelData }) {
             panneaux: [
               [
                 { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> },
-                { titre: 'Éléments exclus du total', contenu: <TypesExclus d={d} lib={LIB} /> },
+                { titre: 'Charges exclues du total', contenu: <TypesExclus d={d} lib={LIB} /> },
               ],
             ],
           },

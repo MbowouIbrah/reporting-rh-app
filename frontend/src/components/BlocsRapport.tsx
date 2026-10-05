@@ -80,13 +80,13 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   )
 }
 
-/** 1 bis. Éléments exclus du total général : tableau distinct. */
+/** 1 bis. Charges exclues du total général : tableau distinct. */
 export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
   const exclus = d.a_type_charge.filter((r) => r.rubrique !== 'TOTAL CHARGES' && r.exclu)
   if (exclus.length === 0) return null
   return (
     <table className="dense tab-global">
-      <Tete premiere="Élément exclu" lib={lib} budget />
+      <Tete premiere="Charge exclue" lib={lib} budget />
       <tbody>
         {exclus.map((r) => (
           <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
