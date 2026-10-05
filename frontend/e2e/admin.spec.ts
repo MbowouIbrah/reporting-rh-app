@@ -10,19 +10,19 @@ async function connecter(page: Page, email: string) {
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }
 
-test('admin : pages Budgets, Paramétrage et Journal accessibles', async ({ page }) => {
+test('admin : navigation limitée aux quatre onglets', async ({ page }) => {
   await connecter(page, 'admin@exemple.invalid')
+  await page.goto('admin/periodes')
   const nav = page.getByRole('navigation', { name: 'Administration' })
   for (const [lien, titre] of [
-    ['Budgets', 'Budgets mensuels'],
-    ['Rubriques et règles', 'Paramétrage'],
-    ['Journal', 'Journal d’audit'],
+    ['Employés', 'Employés'],
+    ['Données mensuelles', 'Données mensuelles'],
+    ['Accès', 'Accès : qui voit quoi'],
   ]) {
-    await page.goto('admin/utilisateurs')
-    await nav.getByRole('link', { name: 'Réglages' }).click()
     await nav.getByRole('link', { name: lien }).click()
     await expect(page.getByRole('heading', { name: titre, level: 2 })).toBeVisible()
   }
+  await expect(nav.getByRole('link')).toHaveCount(4)
 })
 
 test('journal : filtre par entité et diff d’un événement', async ({ page }) => {

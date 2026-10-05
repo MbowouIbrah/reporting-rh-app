@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { usePerimetresAdmin, useUsers, type PerimetreAdmin, type RoleAdmin } from '../../api/admin'
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
@@ -46,11 +45,6 @@ export default function Acces() {
       <h2>Accès : qui voit quoi</h2>
       <Carte
         titre={`Utilisateurs (${users.data?.length ?? 0})`}
-        actions={
-          <span className="note">
-            <Link to="/admin/utilisateurs">Gérer les comptes</Link> · <Link to="/admin/perimetres">Gérer les périmètres</Link>
-          </span>
-        }
       >
         <div className="tableau-defilant">
           <table className="dense">

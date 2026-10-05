@@ -434,9 +434,6 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, #d
 .rapport-excel.individuel-excel .panneau table.individuel tbody th[scope="row"] { min-width: 0; font-size: 10.5px; }
 
 /* Administration : parcours guidé, aperçus d'import, formulaires en fenêtre */
-.sous-nav-2 { margin-top: calc(var(--sp-2) * -1); }
-.sous-nav-2 a { font-size: 13px; padding: 4px 10px; }
-.sous-nav-2 a.active { background: var(--navy); color: #fff; }
 ol.etapes { list-style: none; counter-reset: etape; margin: 0 0 var(--sp-3); padding: 0; display: grid; gap: var(--sp-3); }
 ol.etapes li { counter-increment: etape; display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 ol.etapes li::before { content: counter(etape); width: 24px; height: 24px; border-radius: 50%; background: var(--navy); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
