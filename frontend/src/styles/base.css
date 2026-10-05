@@ -453,3 +453,6 @@ label.bouton { cursor: pointer; display: inline-block; }
 label.bouton { font-size: 13px; line-height: normal; }
 .tableau-defilant table.dense thead th { text-align: left; }
 .tableau-defilant table.dense thead th.num { text-align: right; }
+table.dense.tab-global { table-layout: fixed; width: 100%; }
+table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
+table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }

@@ -68,7 +68,7 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
   return (
-    <table className="dense">
+    <table className="dense tab-global">
       <Tete premiere="Type de charge" lib={lib} budget />
       <tbody>
         {inclus.map((r) => (
@@ -85,7 +85,7 @@ export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
   const exclus = d.a_type_charge.filter((r) => r.rubrique !== 'TOTAL CHARGES' && r.exclu)
   if (exclus.length === 0) return null
   return (
-    <table className="dense">
+    <table className="dense tab-global">
       <Tete premiere="Élément exclu" lib={lib} budget />
       <tbody>
         {exclus.map((r) => (
