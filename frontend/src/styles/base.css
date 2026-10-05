@@ -456,3 +456,4 @@ label.bouton { font-size: 13px; line-height: normal; }
 table.dense.tab-global { table-layout: fixed; width: 100%; }
 table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
 table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }
+.individuel-excel.rapport-excel.page-etroite { max-width: none; }
