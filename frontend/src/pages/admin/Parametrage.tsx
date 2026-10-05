@@ -207,9 +207,11 @@ export default function Parametrage() {
     <>
       <AdminNav />
       <h2>Paramétrage</h2>
-      <Parametres d={q.data} />
-      <Regles d={q.data} />
-      <Rubriques d={q.data} />
+      <div className="trio">
+        <Parametres d={q.data} />
+        <Regles d={q.data} />
+        <Rubriques d={q.data} />
+      </div>
     </>
   )
 }

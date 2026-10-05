@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 const ONGLETS = [
@@ -14,10 +14,11 @@ const ONGLETS = [
 export default function Layout() {
   const { me, can, logout } = useAuth()
   const navigate = useNavigate()
+  const admin = useLocation().pathname.startsWith('/admin')
   const [ouvert, setOuvert] = useState(false)
   const role = me?.roles[0]?.role
   return (
-    <div className="app layout-ecran">
+    <div className={`app layout-ecran${admin ? ' ecran-admin' : ''}`}>
       <header className="topbar">
        <div className="topbar-inner">
         <div className="marque">

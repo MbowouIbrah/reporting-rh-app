@@ -90,6 +90,7 @@ export default function Perimetres() {
           {err}
         </p>
       )}
+      <div className="duo">
       <Carte>
         <table className="dense">
           <thead>
@@ -120,6 +121,7 @@ export default function Perimetres() {
         </table>
       </Carte>
       <Edition key={edit?.id ?? 'new'} initial={edit ?? undefined} onFini={() => setEdit(null)} />
+      </div>
       <Confirmer
         ouvert={!!cible}
         titre="Supprimer le périmètre"

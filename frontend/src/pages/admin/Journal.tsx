@@ -75,7 +75,7 @@ export default function Journal() {
     <>
       <AdminNav />
       <h2>Journal d’audit</h2>
-      <Carte titre="Filtres">
+      <Carte titre="Filtres" >
         <Champ label="Entité">
           {(p) => (
             <select {...p} value={entite} onChange={(e) => maj('entite', e.target.value)}>
@@ -96,6 +96,7 @@ export default function Journal() {
       {q.isError && <Etat type="erreur" onRetry={() => q.refetch()} />}
       {q.data && q.data.length === 0 && <p className="note">Aucun événement.</p>}
       {q.data && q.data.length > 0 && (
+        <div className="journal-defilant">
         <table>
           <thead>
             <tr>
@@ -146,6 +147,7 @@ export default function Journal() {
             ])}
           </tbody>
         </table>
+        </div>
       )}
       {q.data && q.data.length >= limit && limit < MAX && (
         <Bouton variante="secondaire" onClick={() => setLimit(limit + PAS)}>

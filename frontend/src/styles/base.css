@@ -457,3 +457,22 @@ table.dense.tab-global { table-layout: fixed; width: 100%; }
 table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
 table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }
 .individuel-excel.rapport-excel.page-etroite { max-width: calc(var(--page-max) - 2 * var(--page-gutter)); }
+
+/* Administration : chaque écran tient dans la hauteur de la fenêtre, les tableaux défilent à l'intérieur */
+@media (min-width: 900px) {
+  .layout-ecran.ecran-admin { height: 100dvh; display: flex; flex-direction: column; }
+  .ecran-admin > .page { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; overflow: hidden; padding-block: var(--sp-2); }
+  .ecran-admin > .page > h2 { font-size: var(--fs-lg); margin: 0 0 var(--sp-1); }
+  .ecran-admin > .page > .carte { margin-bottom: var(--sp-2); padding: var(--sp-3); flex: none; }
+  .ecran-admin > .page > .carte:has(.tableau-defilant) { flex: 1 1 0; min-height: 120px; display: flex; flex-direction: column; }
+  .ecran-admin .carte .tableau-defilant { flex: 1; min-height: 0; overflow: auto; }
+}
+@media (min-width: 900px) {
+  .ecran-admin .duo, .ecran-admin .trio { flex: 1; min-height: 0; display: grid; gap: var(--sp-3); }
+  .ecran-admin .duo { grid-template-columns: minmax(0, 1fr) 360px; }
+  .ecran-admin .trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ecran-admin .duo > .carte, .ecran-admin .trio > .carte { margin: 0; min-height: 0; overflow: auto; }
+  .ecran-admin .journal-defilant { flex: 1; min-height: 0; overflow: auto; }
+}
+.ecran-admin table.dense thead th { text-align: left; }
+.ecran-admin table.dense thead th.num { text-align: right; }

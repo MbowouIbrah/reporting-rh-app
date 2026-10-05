@@ -123,6 +123,7 @@ export default function Utilisateurs() {
           {err}
         </p>
       )}
+      <div className="duo">
       <Carte>
         <table className="dense">
           <thead>
@@ -164,6 +165,7 @@ export default function Utilisateurs() {
         </table>
       </Carte>
       <Formulaire />
+      </div>
       <Confirmer
         ouvert={!!cible}
         titre="Supprimer l’utilisateur"
