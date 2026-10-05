@@ -14,13 +14,9 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
   return (
     <>
       <p className="bandeau ok">
-        <span>Cumul de janvier à {MOIS[mois - 1].toLowerCase()}</span>
-        <span>Moyenne mensuelle : <strong>{fcfa(d.moyenne_mensuelle.m)}</strong></span>
-        <span>Année {annee - 1} complète : <strong>{fcfa(d.cumul_annee_n1)}</strong></span>
-        <span>Nb de mois saisis : <strong>{entier(d.cumul_ytd.nb_mois)}</strong> en {annee}, <strong>{entier(d.cumul_ytd.nb_mois_n1)}</strong> en {annee - 1}</span>
-        {d.marge_ytd !== undefined && (
-          <span>Marge cumulée : <strong>{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge)} mois avec CA)</span>
-        )}
+        <span>Cumul de janvier à {MOIS[mois - 1].toLowerCase()} {annee}</span>
+        <span>Moyenne mensuelle : <strong>{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
+        {d.marge_ytd !== undefined && <span>Marge cumulée : <strong>{fcfa(d.marge_ytd)}</strong></span>}
       </p>
       <SnapSections
         sections={[

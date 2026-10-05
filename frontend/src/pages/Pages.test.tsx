@@ -74,9 +74,9 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
 })
 
-test('Annuel : affiche Nb de mois saisis', async () => {
+test('Annuel : affiche la moyenne mensuelle', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
-  expect(await screen.findByText(/Nb de mois saisis/)).toBeInTheDocument()
+  expect(await screen.findByText(/Moyenne mensuelle/)).toBeInTheDocument()
 })
 
 test('Individuel : tous les salariés par défaut', async () => {
