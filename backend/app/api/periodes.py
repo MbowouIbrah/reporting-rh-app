@@ -42,6 +42,26 @@ def liste(p: Principal = Depends(current_principal), db: Session = Depends(get_d
     return [_periode(x, db) for x in rows]
 
 
+class Mois(BaseModel):
+    annee: int
+    mois: int
+
+
+@router.post("/periodes", status_code=201)
+def ouvrir(body: Mois, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(p, "periode:write")
+    if not (2000 <= body.annee <= 2100 and 1 <= body.mois <= 12):
+        raise HTTPException(422, "Mois invalide")
+    if db.scalar(select(Periode.id).where(Periode.annee == body.annee, Periode.mois == body.mois)):
+        raise HTTPException(409, "Ce mois existe déjà")
+    per = Periode(annee=body.annee, mois=body.mois)
+    db.add(per)
+    db.flush()
+    audit.record(db, p.user_id, "ouverture", "periode", per.id, None, _periode(per, db))
+    db.commit()
+    return _periode(per, db)
+
+
 def _get(db: Session, pid: int) -> Periode:
     per = db.get(Periode, pid)
     if per is None:

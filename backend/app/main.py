@@ -8,6 +8,7 @@ from app.api.donnees import router as donnees_router
 from app.api.health import router as health_router
 from app.api.imports import router as imports_router
 from app.api.parametrage import router as parametrage_router
+from app.api.parcours import router as parcours_router
 from app.api.periodes import router as periodes_router
 from app.api.rapports import router as rapports_router
 from app.api.salaries import router as salaries_router
@@ -35,4 +36,5 @@ app.include_router(parametrage_router, prefix=settings.API_PREFIX)
 app.include_router(budgets_router, prefix=settings.API_PREFIX)
 app.include_router(rapports_router, prefix=settings.API_PREFIX)
 app.include_router(salaries_router, prefix=settings.API_PREFIX)
+app.include_router(parcours_router, prefix=settings.API_PREFIX)
 app.include_router(donnees_router, prefix=settings.API_PREFIX)
