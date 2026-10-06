@@ -79,10 +79,11 @@ function Saisie({ vue }: { vue: BudgetsVue }) {
   )
 }
 
-export default function Budgets() {
+export default function Budgets({ periodeId }: { periodeId?: number } = {}) {
   const periodes = usePeriodesAdmin()
   const copier = useCopierBudgets()
-  const [pid, setPid] = useState<number | null>(null)
+  const [choisi, setPid] = useState<number | null>(null)
+  const pid = periodeId ?? choisi
   const [source, setSource] = useState('')
   const [confirmer, setConfirmer] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -103,8 +104,9 @@ export default function Budgets() {
 
   return (
     <>
-      <AdminNav />
-      <h2>Budgets mensuels</h2>
+      {periodeId === undefined && <AdminNav />}
+      {periodeId === undefined && <h2>Budgets mensuels</h2>}
+      {periodeId === undefined && (
       <Champ label="Période">
         {(p) => (
           <select {...p} value={pid ?? ''} onChange={(e) => setPid(e.target.value ? Number(e.target.value) : null)}>
@@ -117,6 +119,7 @@ export default function Budgets() {
           </select>
         )}
       </Champ>
+      )}
       {pid !== null && vue.isLoading && <Etat type="chargement" />}
       {pid !== null && vue.isError && <Etat type="erreur" onRetry={() => vue.refetch()} />}
       {vue.data && pid !== null && (

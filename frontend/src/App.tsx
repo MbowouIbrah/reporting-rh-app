@@ -8,14 +8,13 @@ import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Acces from './pages/admin/Acces'
 import Budgets from './pages/admin/Budgets'
-import DonneesMensuelles from './pages/admin/DonneesMensuelles'
+import Cloture from './pages/admin/Cloture'
 import Employes from './pages/admin/Employes'
 import Journal from './pages/admin/Journal'
 import Parametrage from './pages/admin/Parametrage'
 import Referentiels from './pages/admin/Referentiels'
 import Perimetres from './pages/admin/Perimetres'
 import Utilisateurs from './pages/admin/Utilisateurs'
-import Periodes from './pages/admin/Periodes'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 
@@ -52,26 +51,20 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/periodes"
+          path="/admin/cloture"
           element={
             <RequireAuth perm="saisie:write">
-              <Periodes />
+              <Cloture />
             </RequireAuth>
           }
         />
+        <Route path="/admin/periodes" element={<Navigate to="/admin/cloture?etape=ca" replace />} />
+        <Route path="/admin/donnees" element={<Navigate to="/admin/cloture?etape=donnees" replace />} />
         <Route
           path="/admin/employes"
           element={
             <RequireAuth perm="saisie:write">
               <Employes />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/donnees"
-          element={
-            <RequireAuth perm="saisie:write">
-              <DonneesMensuelles />
             </RequireAuth>
           }
         />

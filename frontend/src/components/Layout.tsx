@@ -8,7 +8,7 @@ const ONGLETS = [
   { to: '/annuel', label: 'Annuel' },
   { to: '/graphes', label: 'Graphes' },
   { to: '/individuel', label: 'Individuel', perm: 'nominatif:read' },
-  { to: '/admin/periodes', label: 'Administration', perm: 'saisie:write' },
+  { to: '/admin/cloture', label: 'Administration', perm: 'saisie:write' },
 ]
 
 export default function Layout() {

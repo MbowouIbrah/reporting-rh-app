@@ -10,19 +10,18 @@ async function connecter(page: Page, email: string) {
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }
 
-test('admin : navigation limitée aux quatre onglets', async ({ page }) => {
+test('admin : navigation limitée aux trois onglets', async ({ page }) => {
   await connecter(page, 'admin@exemple.invalid')
-  await page.goto('admin/periodes')
+  await page.goto('admin/cloture')
   const nav = page.getByRole('navigation', { name: 'Administration' })
   for (const [lien, titre] of [
     ['Employés', 'Employés'],
-    ['Données mensuelles', 'Données mensuelles'],
     ['Accès', 'Accès : qui voit quoi'],
   ]) {
     await nav.getByRole('link', { name: lien }).click()
     await expect(page.getByRole('heading', { name: titre, level: 2 })).toBeVisible()
   }
-  await expect(nav.getByRole('link')).toHaveCount(4)
+  await expect(nav.getByRole('link')).toHaveCount(3)
 })
 
 test('journal : filtre par entité et diff d’un événement', async ({ page }) => {

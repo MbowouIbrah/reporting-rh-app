@@ -8,9 +8,8 @@ interface Lien {
 }
 
 const LIENS: Lien[] = [
-  { to: '/admin/periodes', label: 'Périodes et CA', perm: 'saisie:write' },
+  { to: '/admin/cloture', label: 'Fin de mois', perm: 'saisie:write' },
   { to: '/admin/employes', label: 'Employés', perm: 'saisie:write' },
-  { to: '/admin/donnees', label: 'Données mensuelles', perm: 'saisie:write' },
   { to: '/admin/acces', label: 'Accès', perm: 'users:read' },
 ]
 

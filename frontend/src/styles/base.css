@@ -473,3 +473,11 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 }
 .ecran-admin table.dense thead th { text-align: left; }
 .ecran-admin table.dense thead th.num { text-align: right; }
+
+/* Parcours de fin de mois */
+.stepper { display: flex; gap: var(--sp-2); margin: var(--sp-2) 0; flex-wrap: wrap; }
+.pastille { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); background: var(--surface); color: var(--navy); cursor: pointer; text-align: left; }
+.pastille.active { border-color: var(--navy); box-shadow: 0 0 0 1px var(--navy); }
+.pastille-num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 12px; }
+.pastille-texte { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ecran-admin .contenu-etape { flex: 1; min-height: 0; overflow: auto; }

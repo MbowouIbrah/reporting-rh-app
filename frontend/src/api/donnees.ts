@@ -134,3 +134,33 @@ export const useAnomalies = (lotId: number | null) =>
   })
 export const useValiderLot = () => useEcriture((id: number) => post<Lot>(`/imports/${id}/valider`))
 export const useAnnulerLot = () => useEcriture((id: number) => post<Lot>(`/imports/${id}/annuler`))
+
+// ---- parcours de fin de mois ----
+export type StatutEtape = 'fait' | 'a_faire' | 'a_revoir' | 'reportable' | 'facultatif'
+export interface EtapeParcours {
+  cle: 'mois' | 'donnees' | 'controles' | 'ca' | 'budgets'
+  libelle: string
+  statut: StatutEtape
+  resume: string
+}
+export interface Parcours {
+  annee: number
+  mois: number
+  existe: boolean
+  periode_id: number | null
+  ca: string | null
+  effectifs: {
+    total: number
+    entrees: { matricule: string; nom: string }[]
+    sorties: { matricule: string; nom: string }[]
+  }
+  etapes: EtapeParcours[]
+}
+export const useParcours = (annee: number, mois: number) =>
+  useQuery({
+    queryKey: ['admin', 'parcours', annee, mois],
+    queryFn: () => api<Parcours>(`/parcours?annee=${annee}&mois=${mois}`),
+    retry: queryRetry,
+  })
+export const useOuvrirMois = () =>
+  useEcriture((m: { annee: number; mois: number }) => post<{ id: number }>('/periodes', m))

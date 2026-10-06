@@ -90,13 +90,13 @@ function ControleLot({ lot, onFini }: { lot: Lot; onFini: () => void }) {
   )
 }
 
-export default function DonneesMensuelles() {
+export default function DonneesMensuelles({ periode }: { periode?: { annee: number; mois: number } } = {}) {
   const periodes = usePeriodesAdmin()
   const aujourdhui = new Date()
   const derniere = periodes.data?.[periodes.data.length - 1]
   const [choix, setChoix] = useState<{ annee: number; mois: number } | null>(null)
-  const annee = choix?.annee ?? derniere?.annee ?? aujourdhui.getFullYear()
-  const mois = choix?.mois ?? derniere?.mois ?? aujourdhui.getMonth() + 1
+  const annee = periode?.annee ?? choix?.annee ?? derniere?.annee ?? aujourdhui.getFullYear()
+  const mois = periode?.mois ?? choix?.mois ?? derniere?.mois ?? aujourdhui.getMonth() + 1
   const donnees = useDonneesMois(annee, mois)
   const lots = useLots()
   const salaries = useSalariesAdmin()
@@ -161,9 +161,10 @@ export default function DonneesMensuelles() {
 
   return (
     <>
-      <AdminNav />
-      <h2>Données mensuelles</h2>
+      {!periode && <AdminNav />}
+      {!periode && <h2>Données mensuelles</h2>}
       <Carte titre="Choisir le mois">
+        {!periode && (
         <div className="filtres">
           <label>
             Mois
@@ -185,6 +186,7 @@ export default function DonneesMensuelles() {
           </label>
           {d.close && <Badge ton="neutre">Période close : saisie verrouillée</Badge>}
         </div>
+        )}
         {!d.close && (
           <ol className="etapes">
             <li>
