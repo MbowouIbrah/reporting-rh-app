@@ -7,3 +7,5 @@ dist/
 .env
 *.db
 deploy/.env
+
+.coverage
