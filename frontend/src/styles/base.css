@@ -284,7 +284,7 @@ table.dense td.num { text-align: right; }
 }
 @media (max-width: 1099px) { .resume-bas { grid-template-columns: 1fr; } .graphe-zone { height: 200px; flex: none; } }
 @media (min-width: 900px) { .tuiles.compactes:has(> :nth-child(6):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
-.page-etroite { max-width: 1000px; margin-inline: auto; width: 100%; }
+.page-etroite { max-width: calc(var(--page-max) - 2 * var(--page-gutter)); margin-inline: auto; width: 100%; }
 @media (min-width: 1100px) { .resume-bas { flex: none; align-content: start; } }
 
 /* Résumé : reproduction de l'onglet RÉSUMÉ de l'Excel */
@@ -337,7 +337,7 @@ table.dense td.num { text-align: right; }
 }
 
 /* Mensuel et Annuel : onglet Excel, sections empilées pleine largeur, page défilante */
-.rapport-excel { --gris-bandeau: var(--rapport-titre); --gris-section: var(--rapport-section); --gris-etiq: var(--rapport-entete); --brun: var(--navy); --peche: var(--rapport-total); --pointille: var(--rule-strong); max-width: 1000px; margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
+.rapport-excel { --gris-bandeau: var(--rapport-titre); --gris-section: var(--rapport-section); --gris-etiq: var(--rapport-entete); --brun: var(--navy); --peche: var(--rapport-total); --pointille: var(--rule-strong); max-width: calc(var(--page-max) - 2 * var(--page-gutter)); margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
 .rapport-excel .bandeau-titre { background: var(--gris-bandeau); color: var(--paper); font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: 0; padding: 9px 20px; margin: 0 0 var(--sp-3); }
 .rapport-excel .filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0 0 var(--sp-3); padding: 0; position: static; }
 .rapport-excel .filtres label { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
@@ -387,7 +387,7 @@ table.dense td.num { text-align: right; }
   .rail-point:hover .rail-bulle, .rail-point:focus-visible .rail-bulle { opacity: 1; transform: translate(0, -50%); }
   .rail-point:focus-visible { outline: 2px solid var(--red); outline-offset: -4px; border-radius: 50%; }
 }
-@media (min-width: 1100px) and (max-width: 1300px) { .rapport-excel { padding-right: 44px; } }
+@media (min-width: 1100px) and (max-width: 1340px) { .rapport-excel { padding-right: 44px; } }
 @media (max-width: 1099px) { .snap-scroll { display: flex; flex-direction: column; gap: var(--sp-4); } }
 @media (prefers-reduced-motion: reduce) { .snap-scroll { scroll-behavior: auto; } .rail-puce, .rail-bulle { transition: none; } }
 
@@ -459,7 +459,6 @@ ol.etapes li::before { content: counter(etape); width: 24px; height: 24px; borde
 table.dense.tab-global { table-layout: fixed; width: 100%; }
 table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
 table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }
-.individuel-excel.rapport-excel.page-etroite { max-width: calc(var(--page-max) - 2 * var(--page-gutter)); }
 
 /* Administration : chaque écran tient dans la hauteur de la fenêtre, les tableaux défilent à l'intérieur */
 @media (min-width: 900px) {
