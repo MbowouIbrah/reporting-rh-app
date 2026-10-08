@@ -59,7 +59,7 @@ def periodes(p: Principal = Depends(current_principal), db: Session = Depends(ge
     for per in db.scalars(select(Periode).order_by(Periode.annee, Periode.mois)):
         pd = ch.charger_periode(db, scope, per.annee, per.mois)
         if pd is not None and pd.lignes:
-            out.append({"annee": per.annee, "mois": per.mois, "statut": per.statut})
+            out.append({"annee": per.annee, "mois": per.mois})
     return out
 
 

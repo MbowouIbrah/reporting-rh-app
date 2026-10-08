@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,7 +15,6 @@ from app.models.auth import PerimetreRegle
 from app.models.donnees import Periode
 from app.models.pilotage import CaPeriode
 from app.models.referentiel import RefAlias, Rubrique
-from app.repos.verrou import exiger_ouverte
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
@@ -30,9 +28,7 @@ def _ca(db: Session, pid: int) -> str | None:
 
 
 def _periode(p: Periode, db: Session) -> dict:
-    return {"id": p.id, "annee": p.annee, "mois": p.mois, "statut": p.statut,
-            "close_le": p.close_le.isoformat() if p.close_le else None,
-            "ca": _ca(db, p.id)}
+    return {"id": p.id, "annee": p.annee, "mois": p.mois, "ca": _ca(db, p.id)}
 
 
 @router.get("/periodes")
@@ -69,41 +65,6 @@ def _get(db: Session, pid: int) -> Periode:
     return per
 
 
-@router.post("/periodes/{pid}/cloturer")
-def cloturer(pid: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    authorize(p, "periode:write")
-    per = _get(db, pid)
-    if per.statut == "close":
-        raise HTTPException(409, "Période déjà close")
-    avant = _periode(per, db)
-    per.statut, per.close_le, per.close_par = "close", datetime.now(UTC), p.user_id
-    audit.record(db, p.user_id, "cloture", "periode", pid, avant, _periode(per, db))
-    db.commit()
-    return _periode(per, db)
-
-
-class Motif(BaseModel):
-    motif: str
-
-
-@router.post("/periodes/{pid}/rouvrir")
-def rouvrir(
-    pid: int, body: Motif, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
-):
-    authorize(p, "periode:write")
-    if len(body.motif.strip()) < 5:
-        raise HTTPException(422, "Motif obligatoire (5 caractères minimum)")
-    per = _get(db, pid)
-    if per.statut != "close":
-        raise HTTPException(409, "Période non close")
-    avant = _periode(per, db)
-    per.statut, per.close_le, per.close_par = "ouverte", None, None
-    audit.record(db, p.user_id, "reouverture", "periode", pid, avant,
-                 {**_periode(per, db), "motif": body.motif.strip()})
-    db.commit()
-    return _periode(per, db)
-
-
 class Ca(BaseModel):
     valeur: str | None
 
@@ -114,7 +75,6 @@ def saisir_ca(
 ):
     authorize(p, "saisie:write")
     per = _get(db, pid)
-    exiger_ouverte(db, pid)
     avant = _periode(per, db)
     ligne = db.get(CaPeriode, pid)
     if body.valeur is None or not body.valeur.strip():

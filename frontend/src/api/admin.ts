@@ -5,8 +5,6 @@ export interface PeriodeAdmin {
   id: number
   annee: number
   mois: number
-  statut: 'ouverte' | 'close'
-  close_le: string | null
   ca: string | null
 }
 
@@ -21,7 +19,7 @@ function useEcriture<V>(fn: (v: V) => Promise<PeriodeAdmin>) {
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      qc.invalidateQueries() // liste admin + tous les rapports (CA, statut)
+      qc.invalidateQueries() // liste admin + tous les rapports (CA)
     },
   })
 }
@@ -179,7 +177,6 @@ export interface BudgetsVue {
   periode_id: number
   annee: number
   mois: number
-  statut: string
   lignes: Record<AxeBudget, LigneBudget[]>
 }
 export const useBudgets = (periodeId: number | null) =>

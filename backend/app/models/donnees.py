@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -6,7 +5,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -28,15 +26,11 @@ class Periode(Base):
     __table_args__ = (
         UniqueConstraint("annee", "mois"),
         CheckConstraint("mois BETWEEN 1 AND 12"),
-        CheckConstraint("statut IN ('ouverte','close')"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     annee: Mapped[int] = mapped_column(SmallInteger)
     mois: Mapped[int] = mapped_column(SmallInteger)
-    statut: Mapped[str] = mapped_column(String(10), default="ouverte")
-    close_le: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    close_par: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Salarie(Base):

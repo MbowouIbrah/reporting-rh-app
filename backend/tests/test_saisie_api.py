@@ -10,8 +10,8 @@ API = "/api/v1"
 ADMIN, DRH = "admin@exemple.invalid", "drh@exemple.invalid"
 
 
-def periode(db, statut="ouverte"):
-    per = Periode(annee=2026, mois=1, statut=statut)
+def periode(db):
+    per = Periode(annee=2026, mois=1)
     db.add(per)
     db.commit()
     return per.id
@@ -41,11 +41,6 @@ def test_ca_null_supprime(db, make_client):
     assert put(c, pid, None).json()["ca"] is None
     db.expire_all()
     assert db.get(CaPeriode, pid) is None
-
-
-def test_ca_periode_close_409(db, make_client):
-    pid = periode(db, "close")
-    assert put(make_client(ADMIN), pid, "5").status_code == 409
 
 
 def test_ca_lecteur_403_et_invalide_422(db, make_client):

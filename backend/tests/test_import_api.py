@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models.auth import AuditEvent
-from app.models.donnees import Montant, Periode, SituationMensuelle
+from app.models.donnees import Montant, SituationMensuelle
 from app.models.referentiel import Rubrique
 from tests.test_import_regles import ligne, xlsx
 
@@ -46,9 +46,8 @@ def test_lecteurs_403_sur_imports_et_periodes(make_client, who):
     assert c.get(f"{API}/imports/1").status_code == 403
     assert c.get(f"{API}/periodes").status_code == 403
     assert up(c, fichier_a()).status_code == 403
-    for path in ("/imports/1/valider", "/imports/1/annuler", "/periodes/1/cloturer"):
+    for path in ("/imports/1/valider", "/imports/1/annuler"):
         assert c.post(f"{API}{path}").status_code == 403
-    assert c.post(f"{API}/periodes/1/rouvrir", json={"motif": "test motif"}).status_code == 403
     assert c.post(f"{API}/referentiels/site/alias", json={"alias": "x", "cible_id": 1}
                   ).status_code == 403
 
@@ -123,28 +122,6 @@ def test_annuler_lot_pret(make_client):
     lot = up(c, fichier_a()).json()
     assert c.post(f"{API}/imports/{lot['id']}/annuler").json()["statut"] == "annule"
     assert c.post(f"{API}/imports/{lot['id']}/annuler").status_code == 409
-
-
-def test_periode_close_refusee_et_reouverture_tracee(make_client, db):
-    c = make_client(ADMIN)
-    lot = up(c, fichier_a()).json()
-    c.post(f"{API}/imports/{lot['id']}/valider")
-    pid = c.get(f"{API}/periodes").json()[0]["id"]
-    assert c.post(f"{API}/periodes/{pid}/cloturer").json()["statut"] == "close"
-    # nouvel import sur la période close : rejeté à l'analyse
-    rej = up(c, fichier_b()).json()
-    assert rej["statut"] == "rejete"
-    codes = {a["code"] for a in c.get(f"{API}/imports/{rej['id']}/anomalies").json()}
-    assert "PERIODE_CLOSE" in codes
-    # annulation d'un lot validé sur période close : refusée
-    assert c.post(f"{API}/imports/{lot['id']}/annuler").status_code == 409
-    # réouverture : motif obligatoire, tracée
-    assert c.post(f"{API}/periodes/{pid}/rouvrir", json={"motif": "x"}).status_code == 422
-    assert c.post(f"{API}/periodes/{pid}/rouvrir", json={"motif": "correction paie"}
-                  ).json()["statut"] == "ouverte"
-    ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "reouverture")).one()
-    assert ev.apres["motif"] == "correction paie"
-    assert db.get(Periode, pid).statut == "ouverte"
 
 
 def test_ecritures_auditees(make_client, db):

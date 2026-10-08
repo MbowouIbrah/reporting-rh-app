@@ -20,7 +20,7 @@ def test_ouvrir_un_mois_puis_doublon(make_client):
     d, st = etapes(c, 2026, 5)
     assert d["existe"] is False and st["mois"] == "a_faire"
     r = c.post(f"{API}/periodes", json={"annee": 2026, "mois": 5})
-    assert r.status_code == 201 and r.json()["statut"] == "ouverte"
+    assert r.status_code == 201 and r.json()["mois"]
     assert c.post(f"{API}/periodes", json={"annee": 2026, "mois": 5}).status_code == 409
     assert c.post(f"{API}/periodes", json={"annee": 2026, "mois": 13}).status_code == 422
     d, st = etapes(c, 2026, 5)

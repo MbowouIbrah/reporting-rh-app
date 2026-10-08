@@ -26,7 +26,6 @@ export interface Me {
 export interface Periode {
   annee: number
   mois: number
-  statut: string
 }
 
 export interface Filtres {

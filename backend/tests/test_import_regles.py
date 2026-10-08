@@ -76,10 +76,10 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         ligne(MATRICULE="E12", Formation="1.200,5"),                                # 14 ambigu
         ligne(MATRICULE="E 13"),                                                    # 15 espace
         ligne(MATRICULE="E14", Formation=10**15),                                   # 16 bornes
-        ligne(MATRICULE="E15", MOIS="Mars"),                                        # 17 close
+        ligne(MATRICULE="E15", MOIS="Mars"),                                        # 17 autre mois
         ligne(MATRICULE="E16", Formation="1.23456"),                                # 18 précision
     ]
-    L, ens, anos, _ = run(rows, postes={"p"}, periodes_closes={(2026, 3)})
+    L, ens, anos, _ = run(rows, postes={"p"})
     assert ens == {
         (2, "ANNÉE+MOIS+MATRICULE", "DOUBLON"), (3, "ANNÉE+MOIS+MATRICULE", "DOUBLON"),
         (4, "Service", "REFERENTIEL_INCONNU"),
@@ -95,12 +95,11 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (14, "Formation", "NON_NUMERIQUE"),
         (15, "MATRICULE", "MATRICULE_ESPACE"),
         (16, "Formation", "MONTANT_HORS_BORNES"),
-        (17, "MOIS", "PERIODE_CLOSE"),
         (18, "Formation", "PRECISION_TRONQUEE"),
         (18, "Formation", "TEXTE_CONVERTI"),
     }
     bloq = {x.num for x in L if x.bloquant}
-    assert bloq == {2, 3, 4, 5, 6, 10, 11, 14, 15, 16, 17}
+    assert bloq == {2, 3, 4, 5, 6, 10, 11, 14, 15, 16}
     by = {x.num: x for x in L}
     assert str(by[12].montants["Formation"]) == "1200.500"
     assert str(by[18].montants["Formation"]) == "1.235"

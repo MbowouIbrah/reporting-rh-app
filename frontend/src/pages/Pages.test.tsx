@@ -16,7 +16,7 @@ const serie = Array.from({ length: 12 }, (_, i) => ({
 function routes(avecMarge: boolean, perms: string[]) {
   return (url: string): unknown => {
     if (url.includes('/auth/me')) return { id: 1, email: 'a@b.c', roles: [], permissions: perms }
-    if (url.includes('/rapports/periodes')) return [{ annee: 2026, mois: 2, statut: 'ouverte' }]
+    if (url.includes('/rapports/periodes')) return [{ annee: 2026, mois: 2 }]
     if (url.includes('/rapports/filtres')) return { services: [], sites: [] }
     if (url.includes('/rapports/individuel/tous')) return { annee: 2026, matricule: null, nom: null, rubriques: ['Bonus'], mois: [{ mois: 1, present: false }] }
     if (url.includes('/rapports/salaries')) return [{ matricule: 'E1', nom: 'Ann' }]

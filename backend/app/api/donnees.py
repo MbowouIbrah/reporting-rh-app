@@ -69,8 +69,7 @@ def _lignes(db: Session, annee: int, mois: int) -> list[dict]:
 def donnees_du_mois(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le=12),
                     p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "saisie:write")
-    per = db.scalar(select(Periode).where(Periode.annee == annee, Periode.mois == mois))
-    return {"annee": annee, "mois": mois, "close": bool(per and per.statut == "close"),
+    return {"annee": annee, "mois": mois,
             "rubriques": [{"libelle": r.libelle, "unite": r.unite} for r in _rubriques(db)],
             "lignes": _lignes(db, annee, mois)}
 

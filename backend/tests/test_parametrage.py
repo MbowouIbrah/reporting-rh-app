@@ -1,7 +1,6 @@
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent
-from app.models.donnees import Periode
 from tests import test_rapports_api as rapports
 
 API, DRH = rapports.API, rapports.DRH
@@ -12,11 +11,6 @@ P = f"{API}/parametrage"
 
 def _rub(c, libelle):
     return next(r["id"] for r in c.get(P).json()["rubriques"] if r["libelle"] == libelle)
-
-
-def _clore(c, db):
-    pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
-    assert c.post(f"{API}/periodes/{pid}/cloturer").status_code == 200
 
 
 def test_lecture_et_droits(charge, make_client):
@@ -40,13 +34,11 @@ def test_parametre_cree_audite_et_immuable(charge, db):
                            ).status_code == 422
 
 
-def test_parametre_refuse_sur_mois_clos(charge, db):
-    _clore(charge, db)
-    # une valeur datée avant ou pendant le mois clos, sans valeur suivante, l'affecterait
+def test_parametre_passe_autorise(charge, db):
+    """Pas de clôture : une valeur datée dans le passé s'applique, le journal la trace."""
     assert charge.post(f"{P}/parametres", json={
-        "cle": "jours_ouvres", "valeur": "20", "date_debut": "2026-01-01"}).status_code == 409
-    assert charge.post(f"{P}/parametres", json={
-        "cle": "jours_ouvres", "valeur": "20", "date_debut": "2026-02-01"}).status_code == 201
+        "cle": "jours_ouvres", "valeur": "20", "date_debut": "2026-01-01"}).status_code == 201
+    assert db.scalars(select(AuditEvent).where(AuditEvent.entite == "parametre")).one()
 
 
 def test_regle_fin_puis_nouvelle(charge, db):
@@ -66,17 +58,6 @@ def test_regle_fin_puis_nouvelle(charge, db):
     assert rub  # la rubrique de base existe
 
 
-def test_regle_refuse_sur_mois_clos(charge, db):
-    _clore(charge, db)
-    existante = next(r for r in charge.get(P).json()["regles"] if r["date_fin"] is None)
-    # date_fin avant le mois clos : le mois clos changerait de résultat
-    assert charge.post(f"{P}/regles/{existante['id']}/fin", json={"date_fin": "2025-12-31"}
-                       ).status_code in (409, 422)
-    # date_fin après le mois clos : seuls des mois ouverts sont touchés
-    assert charge.post(f"{P}/regles/{existante['id']}/fin", json={"date_fin": "2026-01-31"}
-                       ).status_code == 200
-
-
 def test_rubriques(charge, db):
     r = charge.post(f"{P}/rubriques", json={"libelle": "Prime X", "unite": "FCFA"})
     assert r.status_code == 201 and r.json()["actif"] is True
@@ -87,6 +68,5 @@ def test_rubriques(charge, db):
     assert charge.put(f"{P}/rubriques/{rid}", json={"ordre": 99}).json()["ordre"] == 99
     moteur = _rub(charge, "Absences (nb)")
     assert charge.put(f"{P}/rubriques/{moteur}", json={"actif": False}).status_code == 409
-    _clore(charge, db)
-    assert charge.put(f"{P}/rubriques/{rid}", json={"actif": False}).status_code == 409
+    assert charge.put(f"{P}/rubriques/{rid}", json={"actif": False}).json()["actif"] is False
     assert charge.put(f"{P}/rubriques/9999", json={"ordre": 1}).status_code == 404

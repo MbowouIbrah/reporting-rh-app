@@ -1,7 +1,7 @@
 """Rubriques, règles d'exclusion datées et paramètres datés (jours_ouvres, budget_employe).
 
 Une ligne datée n'est jamais modifiée : on pose une `date_fin` (règles) ou on crée une valeur
-plus récente (paramètres). Tout effet sur un mois clos est refusé (409)."""
+plus récente (paramètres). Chaque écriture est tracée au journal d'audit."""
 
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
-from app.models.donnees import Periode
 from app.models.pilotage import Parametre
 from app.models.referentiel import Rubrique, RubriqueRegle
 from app.security import audit
@@ -25,14 +24,6 @@ router = APIRouter(tags=["parametrage"])
 CLES = ("jours_ouvres", "budget_employe")
 REGLES = ("exclu_total_ligne", "exclu_total_general")
 MOTEUR = {ABSENCES, COMMISSION, *PRIMES}
-
-
-def _exiger_mois_ouverts(db: Session, debut: date, fin: date | None) -> None:
-    """Refuse si un mois clos a son 1er jour dans [debut, fin[ (fin None = sans limite)."""
-    for per in db.scalars(select(Periode).where(Periode.statut == "close")):
-        d = date(per.annee, per.mois, 1)
-        if d >= debut and (fin is None or d < fin):
-            raise HTTPException(409, f"Mois clos concerné : {per.mois:02d}/{per.annee}")
 
 
 def _regle(r: RubriqueRegle) -> dict:
@@ -112,8 +103,6 @@ def modifier_rubrique(
     if body.actif is False and r.libelle in MOTEUR:
         raise HTTPException(409, "Rubrique utilisée par le moteur KPI : désactivation interdite")
     if body.actif is not None and body.actif != r.actif:
-        # la liste des rubriques actives s'applique à tous les mois : aucun mois clos permis
-        _exiger_mois_ouverts(db, date.min, None)
         r.actif = body.actif
     if body.ordre is not None:
         r.ordre = body.ordre
@@ -145,7 +134,6 @@ def creer_regle(
         if r.date_fin is None or r.date_fin >= body.date_debut:
             raise HTTPException(409, "Une règle identique est déjà active à cette date : "
                                      "poser d'abord sa date de fin")
-    _exiger_mois_ouverts(db, body.date_debut, None)
     r = RubriqueRegle(rubrique_id=body.rubrique_id, regle=body.regle, date_debut=body.date_debut)
     db.add(r)
     db.flush()
@@ -172,7 +160,6 @@ def terminer_regle(
     if body.date_fin < r.date_debut:
         raise HTTPException(422, "Date de fin antérieure au début")
     # mois touchés : ceux dont le 1er jour est après date_fin
-    _exiger_mois_ouverts(db, date.fromordinal(body.date_fin.toordinal() + 1), None)
     avant = _regle(r)
     r.date_fin = body.date_fin
     db.flush()
@@ -206,10 +193,6 @@ def creer_parametre(
     if db.scalar(select(Parametre.id).where(
             Parametre.cle == body.cle, Parametre.date_debut == body.date_debut)):
         raise HTTPException(409, "Une valeur existe déjà à cette date (non modifiable)")
-    suivante = db.scalar(select(Parametre.date_debut).where(
-        Parametre.cle == body.cle, Parametre.date_debut > body.date_debut
-    ).order_by(Parametre.date_debut).limit(1))
-    _exiger_mois_ouverts(db, body.date_debut, suivante)
     x = Parametre(cle=body.cle, valeur=v.quantize(Decimal("0.001")), date_debut=body.date_debut)
     db.add(x)
     db.flush()

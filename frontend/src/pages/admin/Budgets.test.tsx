@@ -5,12 +5,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { AuthProvider } from '../../auth/AuthContext'
 import Budgets from './Budgets'
 
-const periodes = [{ id: 1, annee: 2026, mois: 3, statut: 'ouverte', close_le: null, ca: null }]
-const vue = (statut: string) => ({
+const periodes = [{ id: 1, annee: 2026, mois: 3, ca: null }]
+const vue = () => ({
   periode_id: 1,
   annee: 2026,
   mois: 3,
-  statut,
   lignes: {
     rubrique: [],
     service: [{ cible_id: 5, libelle: 'SAV PL', actif: true, valeur: null }],
@@ -18,14 +17,14 @@ const vue = (statut: string) => ({
   },
 })
 
-function rendu(statut = 'ouverte') {
+function rendu() {
   const appels: { url: string; init?: RequestInit }[] = []
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
     appels.push({ url: String(u), init })
     const url = String(u)
     if (url.includes('/auth/me'))
       return new Response(JSON.stringify({ id: 1, email: 'a@b.c', roles: [], permissions: ['saisie:write'] }))
-    if (url.includes('/budgets')) return new Response(JSON.stringify(vue(statut)))
+    if (url.includes('/budgets')) return new Response(JSON.stringify(vue()))
     return new Response(JSON.stringify(periodes))
   })
   render(
@@ -62,11 +61,4 @@ test('montant invalide : erreur, aucune écriture', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les budgets' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Montant invalide')
   expect(appels.some((a) => a.init?.method === 'PUT')).toBe(false)
-})
-
-test('période close : lecture seule', async () => {
-  rendu('close')
-  fireEvent.change(await screen.findByLabelText('Période'), { target: { value: '1' } })
-  expect(await screen.findByText('Période close : saisie verrouillée.')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Enregistrer les budgets' })).toBeNull()
 })

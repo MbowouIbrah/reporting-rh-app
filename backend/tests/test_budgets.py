@@ -48,9 +48,6 @@ def test_refus(charge, make_client, db):
         assert put(charge, pid, [{**ligne, **mauvais}]).status_code == 422, mauvais
     assert put(charge, pid, [ligne, ligne]).status_code == 422
     assert put(charge, 9999, [ligne]).status_code == 404
-    charge.post(f"{API}/periodes/{pid}/cloturer")
-    assert put(charge, pid, [ligne]).status_code == 409
-    assert charge.post(f"{API}/budgets/{pid}/copie", json={"depuis": pid + 1}).status_code == 409
 
 
 def test_copie(charge, db):

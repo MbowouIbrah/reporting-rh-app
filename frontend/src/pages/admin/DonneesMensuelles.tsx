@@ -184,32 +184,29 @@ export default function DonneesMensuelles({ periode }: { periode?: { annee: numb
               ))}
             </select>
           </label>
-          {d.close && <Badge ton="neutre">Période close : saisie verrouillée</Badge>}
         </div>
         )}
-        {!d.close && (
-          <ol className="etapes">
-            <li>
-              <Bouton
-                variante="secondaire"
-                onClick={() => telecharger(`/donnees/modele.xlsx?annee=${annee}&mois=${mois}`, `donnees_${annee}_${String(mois).padStart(2, '0')}.xlsx`)}
-              >
-                Télécharger le modèle du mois
-              </Bouton>
-              <span className="note"> Pré-rempli avec vos employés actifs.</span>
-            </li>
-            <li>
-              <ChoixFichier libelle="Importer le fichier rempli" accept=".xlsx" inputRef={fichier} onFichier={importer} />
-              <span className="note"> Un contrôle s’affiche avant l’enregistrement.</span>
-            </li>
-            <li>
-              <Bouton variante="secondaire" onClick={() => ouvrirSaisie(salaries.data?.[0]?.matricule ?? '')} disabled={!salaries.data?.length}>
-                Ajouter ou corriger une ligne
-              </Bouton>
-              <span className="note"> Pour un seul employé, sans passer par Excel.</span>
-            </li>
-          </ol>
-        )}
+        <ol className="etapes">
+          <li>
+            <Bouton
+              variante="secondaire"
+              onClick={() => telecharger(`/donnees/modele.xlsx?annee=${annee}&mois=${mois}`, `donnees_${annee}_${String(mois).padStart(2, '0')}.xlsx`)}
+            >
+              Télécharger le modèle du mois
+            </Bouton>
+            <span className="note"> Pré-rempli avec vos employés actifs.</span>
+          </li>
+          <li>
+            <ChoixFichier libelle="Importer le fichier rempli" accept=".xlsx" inputRef={fichier} onFichier={importer} />
+            <span className="note"> Un contrôle s’affiche avant l’enregistrement.</span>
+          </li>
+          <li>
+            <Bouton variante="secondaire" onClick={() => ouvrirSaisie(salaries.data?.[0]?.matricule ?? '')} disabled={!salaries.data?.length}>
+              Ajouter ou corriger une ligne
+            </Bouton>
+            <span className="note"> Pour un seul employé, sans passer par Excel.</span>
+          </li>
+        </ol>
         {errImport && (
           <p className="champ-erreur" role="alert" style={{ whiteSpace: 'pre-line' }}>
             {errImport}
@@ -239,7 +236,7 @@ export default function DonneesMensuelles({ periode }: { periode?: { annee: numb
                   <td>{l.service}</td>
                   <td>{l.site}</td>
                   <td className="num">{fcfa(l.total)}</td>
-                  <td>{!d.close && <Bouton variante="lien" onClick={() => ouvrirSaisie(l.matricule)}>Corriger</Bouton>}</td>
+                  <td><Bouton variante="lien" onClick={() => ouvrirSaisie(l.matricule)}>Corriger</Bouton></td>
                 </tr>
               ))}
               {d.lignes.length === 0 && (

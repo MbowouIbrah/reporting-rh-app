@@ -48,13 +48,12 @@ def charger_refs(db: Session) -> Refs:
     alias = {a.alias_norm: par_id[a.cible_id]
              for a in db.scalars(select(RefAlias).where(RefAlias.dimension == "rubrique"))
              if a.cible_id in par_id}
-    closes = {(p.annee, p.mois) for p in db.scalars(select(Periode).where(Periode.statut == "close"))}
     noms = {s.matricule_norm: norm(s.nom) for s in db.scalars(select(Salarie)) if s.nom}
     return Refs(
         services=index("service", Service), activites=index("activite", Activite),
         sites=index("site", Site), contrats=index("type_contrat", TypeContrat),
         rubriques=[(r.libelle, r.unite) for r in rubs], rubrique_alias=alias,
-        postes=set(index("poste", Poste)), periodes_closes=closes, noms_connus=noms,
+        postes=set(index("poste", Poste)), noms_connus=noms,
     )
 
 
@@ -148,12 +147,6 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
         raise HTTPException(409, "Lot vide")
 
     cles_periodes = {(r.annee, r.mois) for r in rows}
-    closes = [p for p in db.scalars(select(Periode).where(Periode.statut == "close"))
-              if (p.annee, p.mois) in cles_periodes]
-    if closes:
-        raise HTTPException(409, "Période close : " + ", ".join(f"{p.annee}-{p.mois:02d}"
-                                                                for p in closes))
-
     periodes = {(p.annee, p.mois): p.id for p in db.scalars(select(Periode))}
     for a, m in sorted(cles_periodes - set(periodes)):
         p = Periode(annee=a, mois=m)
@@ -259,10 +252,6 @@ def _annuler_valide(db: Session, lot: LotImport) -> None:
     if len(mes) != attendu:
         raise HTTPException(409, "Annulation impossible : un lot validé plus tard a remplacé "
                                  "des lignes de ce lot (annuler d'abord ce lot).")
-    pids = {m.periode_id for m in mes}
-    if db.scalar(select(Periode.id).where(Periode.id.in_(pids), Periode.statut == "close")):
-        raise HTTPException(409, "Annulation impossible : une période concernée est close.")
-
     sit_ids = [m.id for m in mes]
     db.execute(delete(Montant).where(Montant.situation_id.in_(sit_ids)))
     db.execute(delete(SituationMensuelle).where(SituationMensuelle.id.in_(sit_ids)))

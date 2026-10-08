@@ -26,7 +26,7 @@ def test_donnees_du_mois_et_fiche_creee_a_l_import(make_client):
     c = make_client(ADMIN)
     charger(c, [ligne(MATRICULE="E1", Noms="Ann", **{BR: "1000.5"})])
     d = c.get(f"{API}/donnees", params={"annee": 2026, "mois": 1}).json()
-    assert d["close"] is False and len(d["lignes"]) == 1
+    assert len(d["lignes"]) == 1
     assert d["lignes"][0]["montants"][BR] == "1000.500" and d["lignes"][0]["total"] == "1000.500"
     fiche = c.get(f"{API}/salaries").json()[0]
     assert fiche["matricule"] == "E1" and fiche["service"] == "SAV PL" and fiche["site"] == "Douala"

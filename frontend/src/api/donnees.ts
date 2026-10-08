@@ -35,7 +35,6 @@ export interface LigneMois {
 export interface DonneesMois {
   annee: number
   mois: number
-  close: boolean
   rubriques: { libelle: string; unite: string }[]
   lignes: LigneMois[]
 }

@@ -13,7 +13,6 @@ from app.db.session import get_db
 from app.models.donnees import Periode
 from app.models.pilotage import Budget
 from app.models.referentiel import Rubrique, Service, Site
-from app.repos.verrou import exiger_ouverte
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
@@ -50,8 +49,7 @@ def _vue(db: Session, per: Periode) -> dict:
              "valeur": vals[axe].get(r.id)}
             for r in db.scalars(q) if r.actif or r.id in vals[axe]
         ]
-    return {"periode_id": per.id, "annee": per.annee, "mois": per.mois, "statut": per.statut,
-            "lignes": lignes}
+    return {"periode_id": per.id, "annee": per.annee, "mois": per.mois, "lignes": lignes}
 
 
 @router.get("/budgets")
@@ -80,7 +78,6 @@ def saisir(
 ):
     authorize(p, "saisie:write")
     per = _periode(db, pid)
-    exiger_ouverte(db, pid)
     cles = [(x.axe, x.cible_id) for x in body.lignes]
     if len(set(cles)) != len(cles):
         raise HTTPException(422, "Cible en double")
@@ -119,7 +116,6 @@ def copier(
 ):
     authorize(p, "saisie:write")
     per = _periode(db, pid)
-    exiger_ouverte(db, pid)
     if body.depuis == pid:
         raise HTTPException(422, "Source identique à la cible")
     _periode(db, body.depuis)

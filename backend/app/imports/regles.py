@@ -33,7 +33,6 @@ class Refs:
     rubriques: list[tuple[str, str]]  # (libellé, unité) dans l'ordre
     rubrique_alias: dict[str, str] = field(default_factory=dict)  # norm -> libellé canonique
     postes: set[str] = field(default_factory=set)  # normalisés
-    periodes_closes: set[tuple[int, int]] = field(default_factory=set)
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
 
 
@@ -194,10 +193,6 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         if L.poste and norm(L.poste) not in refs.postes and norm(L.poste) not in postes_vus:
             postes_vus.add(norm(L.poste))
             add(num, "Poste", "POSTE_NOUVEAU", AVERT, L.poste, "Poste inconnu, créé à la validation.")
-
-        if L.annee and L.mois and (L.annee, L.mois) in refs.periodes_closes:
-            add(num, "MOIS", "PERIODE_CLOSE", BLOQUANT, f"{L.annee}-{L.mois:02d}",
-                "Période close : import refusé.")
 
         if L.annee and L.mois and mat and not re.search(r"\s", mat):
             cles[(L.annee, L.mois, mat.casefold())].append(num)

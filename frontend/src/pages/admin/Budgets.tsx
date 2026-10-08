@@ -26,7 +26,6 @@ function Saisie({ vue }: { vue: BudgetsVue }) {
   )
   const [vals, setVals] = useState<Record<string, string>>(initial)
   const [err, setErr] = useState<string | null>(null)
-  const close = vue.statut === 'close'
 
   const enregistrer = () => {
     const lignes = AXES.flatMap(({ axe }) =>
@@ -45,20 +44,14 @@ function Saisie({ vue }: { vue: BudgetsVue }) {
     <>
       {AXES.map(({ axe, titre }) => (
         <Carte key={axe} titre={titre}>
-          {vue.lignes[axe].map((l) =>
-            close ? (
-              <p key={l.cible_id}>
-                {l.libelle} : {l.valeur ?? '—'}
-              </p>
-            ) : (
-              <ChampMontant
-                key={l.cible_id}
-                label={`${titre} : ${l.libelle}`}
-                valeur={vals[cle(axe, l.cible_id)] ?? ''}
-                onChange={(v) => setVals({ ...vals, [cle(axe, l.cible_id)]: v })}
-              />
-            ),
-          )}
+          {vue.lignes[axe].map((l) => (
+            <ChampMontant
+              key={l.cible_id}
+              label={`${titre} : ${l.libelle}`}
+              valeur={vals[cle(axe, l.cible_id)] ?? ''}
+              onChange={(v) => setVals({ ...vals, [cle(axe, l.cible_id)]: v })}
+            />
+          ))}
         </Carte>
       ))}
       {err && (
@@ -66,13 +59,9 @@ function Saisie({ vue }: { vue: BudgetsVue }) {
           {err}
         </p>
       )}
-      {close ? (
-        <p className="note">Période close : saisie verrouillée.</p>
-      ) : (
-        <Bouton onClick={enregistrer} disabled={saisir.isPending}>
-          Enregistrer les budgets
-        </Bouton>
-      )}
+      <Bouton onClick={enregistrer} disabled={saisir.isPending}>
+        Enregistrer les budgets
+      </Bouton>
       <p className="note">Le budget total reste calculé : budget par employé × effectif.</p>
     </>
   )
@@ -123,27 +112,23 @@ export default function Budgets({ periodeId }: { periodeId?: number } = {}) {
       {pid !== null && vue.isError && <Etat type="erreur" onRetry={() => vue.refetch()} />}
       {vue.data && pid !== null && (
         <>
-          {vue.data.statut !== 'close' && (
-            <>
-              <Champ label="Copier depuis">
-                {(p) => (
-                  <select {...p} value={source} onChange={(e) => setSource(e.target.value)}>
-                    <option value="">—</option>
-                    {liste
-                      .filter((x) => x.id !== pid)
-                      .map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {nom(x)}
-                        </option>
-                      ))}
-                  </select>
-                )}
-              </Champ>
-              <Bouton variante="secondaire" disabled={!source} onClick={() => setConfirmer(true)}>
-                Copier
-              </Bouton>
-            </>
-          )}
+          <Champ label="Copier depuis">
+            {(p) => (
+              <select {...p} value={source} onChange={(e) => setSource(e.target.value)}>
+                <option value="">—</option>
+                {liste
+                  .filter((x) => x.id !== pid)
+                  .map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {nom(x)}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </Champ>
+          <Bouton variante="secondaire" disabled={!source} onClick={() => setConfirmer(true)}>
+            Copier
+          </Bouton>
           <Saisie key={`${pid}-${JSON.stringify(vue.data.lignes)}`} vue={vue.data} />
         </>
       )}
