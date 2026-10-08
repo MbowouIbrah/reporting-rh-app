@@ -1,4 +1,5 @@
-"""Classeurs xlsx construits à partir du rapport JSON déjà filtré (périmètre, marge) :
+"""Classeurs xlsx construits à partir du rapport JSON déjà filtré (périmètre, marge) et qui
+reprennent les blocs de l'écran ligne pour ligne (mêmes lignes masquées, mêmes totaux) :
 l'export est donc identique à l'écran, au FCFA près."""
 
 from decimal import Decimal, InvalidOperation
@@ -11,6 +12,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août
         "septembre", "octobre", "novembre", "décembre"]
 CELL = ("m1", "m", "var", "var_pct")
 BUDGET = ("budget", "ecart", "ecart_pct")
+TOTAL = "TOTAL CHARGES"
 
 
 def _val(v):
@@ -21,6 +23,11 @@ def _val(v):
         except InvalidOperation:
             return v
     return v
+
+
+def _non_nul(v) -> bool:
+    """Règle de l'écran (BlocsRapport.nonNul) : ligne à zéro des deux côtés masquée."""
+    return v is not None and Decimal(str(v)) != 0
 
 
 def _feuille(wb: Workbook, titre: str, entetes: list[str], lignes: list[list]):
@@ -49,85 +56,82 @@ def _sortie(wb: Workbook) -> bytes:
     return buf.getvalue()
 
 
-def mensuel(r: dict, annee: int, mois: int) -> bytes:
-    wb = Workbook()
-    ent = ["", "M-1", f"M ({MOIS[mois - 1]} {annee})", "Var", "Var %"]
-    ent_b = [*ent, "Budget", "Écart", "Écart %"]
-    s = r["synthese"]
-    eff = s["effectif"]
-    lignes = [
-        ["Masse salariale", *_cell(s["ms"], True)],
-        ["Effectif (fin de mois)", None, eff["fin"], eff.get("variation")],
-        ["Taux de rotation", None, s["taux_rotation"]],
-        ["Absences (nb)", *_cell(s["absences"])],
-        ["Taux d'absentéisme", None, s["taux_absenteisme"]],
-        ["Commissions", *_cell(s["commissions"])],
-        ["Primes (total)", *_cell(s["primes_total"])],
-        *[[f"Prime : {p['rubrique']}", *_cell(p)] for p in s["primes"]],
-    ]
-    for cle, lib in (("ca", "Chiffre d'affaires"), ("marge", "Marge"),
-                     ("taux_marge", "Taux de marge")):
-        if cle in s:
-            lignes.append([lib, None, s[cle]])
-    _feuille(wb, "Synthèse", ent_b, lignes)
-    _feuille(wb, "A Type de charge", ent_b,
-             [[x["rubrique"], *_cell(x, True)] for x in r["a_type_charge"]])
+def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
+    """Blocs 1 à 5 communs aux écrans Mensuel et Annuel (components/BlocsRapport.tsx)."""
+    var = ["Variation", "Var. %"]
+    bud = ["Budget", "Écart", "% Budget"]
+    total = next((x for x in r["a_type_charge"] if x["rubrique"] == TOTAL), None)
+    ligne_total = [["TOTAL GÉNÉRAL", *_cell(total, True)]] if total else []
+
+    inclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and not x.get("exclu")]
+    _feuille(wb, "1 Reporting global", ["Type de charge", prec, cour, *var, *bud],
+             [[x["rubrique"], *_cell(x, True)] for x in inclus] + ligne_total)
+    exclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and x.get("exclu")]
+    if exclus:
+        _feuille(wb, "Charges exclues", ["Charge exclue", prec, cour, *var, *bud],
+                 [[x["rubrique"], *_cell(x, True)] for x in exclus])
+
     b = []
     for sv in r["b_service_activite"]:
+        if not (_non_nul(sv["total"]["m"]) or _non_nul(sv["total"]["m1"])):
+            continue
         b.append([sv["service"], *_cell(sv["total"], True)])
-        b.append([f"  {sv['service']} : effectif", *_cell(sv["effectif"])])
-        for a in sv["activites"]:
-            b.append([f"  {a['activite']}", *_cell(a)])
-            b.append([f"  {a['activite']} : effectif", *_cell(a["effectif"])])
-    _feuille(wb, "B Service", ent_b, b)
-    _feuille(wb, "C Site",
-             ["Site", "MS M-1", "MS M", "Var", "Var %", "Budget", "Écart", "Écart %",
-              "Effectif M-1", "Effectif M"],
-             [[x["site"], *_cell(x["ms"], True), x["effectif"]["m1"], x["effectif"]["m"]]
-              for x in r["c_site"]])
-    d = r["d_contrat"]
-    lig = [[f"Effectif {x['contrat']}", *_cell(x)] for x in d["effectifs"]]
-    lig.append(["Effectif total", *_cell(d["total"])])
-    lig += [[f"{x['contrat']} · {x['activite']} : MS", *_cell(x["ms"])] for x in d["ventilation"]]
-    lig += [[f"{x['contrat']} · {x['activite']} : effectif", *_cell(x["effectif"])]
-            for x in d["ventilation"]]
-    _feuille(wb, "D Contrat", ent, lig)
-    _feuille(wb, "Indicateurs contrat",
-             ["Contrat", "Début", "Recrutements", "Départs", "Fin", "Taux rotation", "Absences",
-              "Taux absentéisme"],
-             [[i["contrat"], i["debut"], i["recrutements"], i["departs"], i["fin"],
-               i["taux_rotation"], i["absences"], i["taux_absenteisme"]]
-              for i in d["indicateurs"]])
-    _feuille(wb, "Contrôles", ["Contrôle", "Écart", "Bloquant"],
-             [[c["controle"], c["ecart"], "oui" if c["bloquant"] else "non"]
-              for c in r["controles"]])
+        b += [[f"  {a['activite']}", *_cell(a)]
+              for a in sv["activites"] if _non_nul(a["m"]) or _non_nul(a["m1"])]
+    b += ligne_total
+    b.append(["Effectif global", *_cell(r["d_contrat"]["total"])])
+    _feuille(wb, "2 Service et activité", ["Service / activité", prec, cour, *var, *bud], b)
+
+    s = []
+    for x in r["c_site"]:
+        s.append([x["site"], "MS", *_cell(x["ms"], True)])
+        s.append([None, "Eff", x["effectif"]["m1"], x["effectif"]["m"]])
+    _feuille(wb, "3 Site", ["Site", "Rubrique", prec, cour, *var, *bud], s)
+
+    ind = r["d_contrat"]["indicateurs"]
+    cols = [ind[-1], *ind[:-1]]  # colonne Total en premier, comme à l'écran
+    _feuille(wb, "4 Effectifs", ["Indicateur", *[i["contrat"] for i in cols]],
+             [[lib, *[i[k] for i in cols]] for lib, k in (
+                 ("Effectif début", "debut"), ("Recrutements", "recrutements"),
+                 ("Départs", "departs"), ("Effectif fin", "fin"),
+                 ("Taux de rotation", "taux_rotation"), ("Absences (jours)", "absences"),
+                 ("Taux d'absentéisme", "taux_absenteisme"))])
+
+    c = []
+    for v in r["d_contrat"]["ventilation"]:
+        if not any(_non_nul(v[g][k]) for g in ("ms", "effectif") for k in ("m", "m1")):
+            continue
+        c.append([f"{v['contrat']} · {v['activite']}", "Masse salariale", *_cell(v["ms"])])
+        c.append([None, "Effectifs", *_cell(v["effectif"])])
+    if total:
+        c.append(["TOTAL GÉNÉRAL", "Masse salariale", *_cell(total)])
+        c.append([None, "Effectifs", *_cell(r["d_contrat"]["total"])])
+    _feuille(wb, "5 Contrat", ["Contrat · activité", "Indicateur", prec, cour, *var], c)
+
+
+def mensuel(r: dict, annee: int, mois: int) -> bytes:
+    wb = Workbook()
+    s = r["synthese"]
+    bloquants = [c["controle"] for c in r["controles"] if c["bloquant"]]
+    _feuille(wb, "Synthèse", ["Indicateur", f"{MOIS[mois - 1]} {annee}"], [
+        ["Contrôles de cohérence", "Écarts : " + " ; ".join(bloquants) if bloquants else "OK"],
+        ["Effectif fin de mois", s["effectif"]["fin"]],
+        ["Taux de rotation", s["taux_rotation"]],
+        ["Taux d'absentéisme", s["taux_absenteisme"]],
+    ])
+    _blocs(wb, r, "M-1", "M")
     return _sortie(wb)
 
 
 def annuel(r: dict, annee: int, mois: int) -> bytes:
     wb = Workbook()
-    cols = ["Mois", "MS", "Effectif", "Absences", "Commissions", "Primes"]
-    marge = bool(r["serie_n"]) and "ca" in r["serie_n"][0]
-    if marge:
-        cols += ["CA", "Marge", "Taux de marge"]
-
-    def serie(s):
-        return [[MOIS[x["mois"] - 1], x["ms"], x["effectif"], x["absences"], x["commissions"],
-                 x["primes"],
-                 *([x.get("ca"), x.get("marge"), x.get("taux_marge")] if marge else [])]
-                for x in s]
-
-    _feuille(wb, str(annee), cols, serie(r["serie_n"]))
-    _feuille(wb, str(annee - 1), cols, serie(r["serie_n1"]))
-    c = r["cumul_ytd"]
-    _feuille(wb, "Cumul",
-             ["", f"{annee - 1}", f"{annee} (jusqu'à {MOIS[mois - 1]})", "Var", "Var %"],
-             [["Cumul", *_cell(c)], ["Mois saisis", c["nb_mois_n1"], c["nb_mois"]],
-              ["Moyenne mensuelle", *_cell(r["moyenne_mensuelle"])],
-              *([["Marge cumulée", None, r.get("marge_ytd")]] if marge else [])])
-    _feuille(wb, "Par service",
-             ["Service", f"{annee - 1}", f"{annee}", "Var", "Var %", "Moy. N-1", "Moy. N",
-              "Écart moy. %", "Mois N-1", "Mois N"],
-             [[x["service"], *_cell(x), x["moy_m1"], x["moy_m"], x["ecart_moy_pct"],
-               x["nb_mois_n1"], x["nb_mois"]] for x in r["par_service"]])
+    lignes = [
+        ["Période", f"Cumul de janvier à {MOIS[mois - 1]} {annee}"],
+        ["Moyenne mensuelle", r["moyenne_mensuelle"]["m"]],
+        ["Mois saisis", r["cumul_ytd"]["nb_mois"]],
+    ]
+    if "marge_ytd" in r:
+        lignes.append(["Marge cumulée", r["marge_ytd"]])
+    _feuille(wb, "Synthèse", ["Indicateur", str(annee)], lignes)
+    _blocs(wb, r, str(annee - 1), str(annee))
     return _sortie(wb)

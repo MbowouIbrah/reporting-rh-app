@@ -90,6 +90,16 @@ def test_filtre_utilisateur_restreint(charge):
     r = get(charge, "mensuel", annee=2026, mois=1, service="SAV PL").json()
     assert D(r["synthese"]["ms"]["m"]) == D("1000.5")
 
+    assert r["synthese"]["ca"] is None and r["synthese"]["marge"] is None
+
+
+def test_ca_global_absent_sous_filtre(charge):
+    # Le CA n'existe pas par service ou site : pas de marge filtrée (CA global - MS partielle).
+    a = get(charge, "annuel", annee=2026, mois=2, service="SAV PL").json()
+    assert a["marge_ytd"] is None and a["nb_mois_marge"] == 0
+    a = get(charge, "annuel", annee=2026, mois=2, site="Yaoundé").json()
+    assert a["marge_ytd"] is None
+
 
 def test_periode_inconnue_404(charge):
     assert get(charge, "mensuel", annee=2026, mois=7).status_code == 404

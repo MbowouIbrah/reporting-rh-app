@@ -102,7 +102,8 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None) -> Pe
         return None
     lignes = tuple(L for L in pd.lignes
                    if (not service or L.service == service) and (not site or L.site == site))
-    return PeriodeData(lignes, pd.exclues, pd.ca)
+    # Le CA est global : il n'existe pas pour un service ou un site, donc ni marge ni taux.
+    return PeriodeData(lignes, pd.exclues, None if (service or site) else pd.ca)
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:
