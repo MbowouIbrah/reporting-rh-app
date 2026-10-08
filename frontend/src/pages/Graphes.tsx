@@ -7,11 +7,12 @@ import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
 import { fcfa, MOIS_COURTS } from '../lib/format'
 
-const C1 = '#3b5bdb'
-const C2 = '#0c8599'
-const C3 = '#e8590c'
-const GRILLE = '#e7e7ea'
-const AXE = { tickLine: false, axisLine: false, tick: { fill: '#6b6f82', fontSize: 12 } }
+// Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
+const C1 = 'var(--data-1)'
+const C2 = 'var(--data-2)'
+const C3 = 'var(--data-3)'
+const GRILLE = 'var(--rule)'
+const AXE = { tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
@@ -56,7 +57,7 @@ export default function Graphes() {
               <LineChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
-                <YAxis domain={[0, 'auto']} tickFormatter={(v) => fcfa(v)} width={90} {...AXE} />
+                <YAxis domain={['auto', 'auto']} tickFormatter={(v) => fcfa(v)} width={90} {...AXE} />
                 <Tooltip formatter={(v) => fcfa(Number(v))} />
                 <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} />
               </LineChart>

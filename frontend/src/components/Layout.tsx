@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { ROLES } from '../lib/roles'
 import { useAuth } from '../auth/AuthContext'
 
 const ONGLETS = [
@@ -38,7 +39,7 @@ export default function Layout() {
         </button>
         <nav id="nav-rapports" aria-label="Rapports" className={ouvert ? 'ouvert' : undefined} onClick={() => setOuvert(false)}>
           {ONGLETS.filter((o) => !o.perm || can(o.perm)).map((o) => (
-            <NavLink key={o.to} to={o.to}>
+            <NavLink key={o.to} to={o.to} className={({ isActive }) => (isActive || (admin && o.to.startsWith('/admin')) ? 'active' : undefined)}>
               {o.label}
             </NavLink>
           ))}
@@ -46,7 +47,7 @@ export default function Layout() {
         <div className="user">
           <span className="user-id">
             <span className="user-email">{me?.email}</span>
-            {role && <span className="badge badge-neutre">{role.replace(/_/g, ' ')}</span>}
+            {role && <span className="badge badge-neutre">{ROLES[role as keyof typeof ROLES]?.libelle ?? role}</span>}
           </span>
           <button
             className="btn-link"

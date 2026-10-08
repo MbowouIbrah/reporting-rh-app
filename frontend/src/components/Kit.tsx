@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, RefObject } from 'react'
 
 type Ton = 'neutre' | 'succes' | 'alerte' | 'erreur' | 'info'
 
@@ -14,6 +14,28 @@ export function Bouton({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variante?: 'primaire' | 'secondaire' | 'lien' }) {
   return <button type="button" className={`bouton bouton-${variante} ${className ?? ''}`.trim()} {...rest} />
+}
+
+/** Choix d'un fichier : vrai bouton (atteignable au clavier) qui ouvre le sélecteur caché. */
+export function ChoixFichier({
+  libelle,
+  accept,
+  inputRef,
+  onFichier,
+}: {
+  libelle: string
+  accept: string
+  inputRef: RefObject<HTMLInputElement | null>
+  onFichier: (f: File | undefined) => void
+}) {
+  return (
+    <>
+      <Bouton variante="secondaire" onClick={() => inputRef.current?.click()}>
+        {libelle}
+      </Bouton>
+      <input ref={inputRef} type="file" accept={accept} hidden tabIndex={-1} aria-hidden="true" onChange={(e) => onFichier(e.target.files?.[0])} />
+    </>
+  )
 }
 
 export function Carte({ titre, children, actions }: { titre?: ReactNode; children: ReactNode; actions?: ReactNode }) {

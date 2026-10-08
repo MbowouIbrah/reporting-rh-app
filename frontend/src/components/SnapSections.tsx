@@ -44,7 +44,7 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
 
   return (
     <div className="snap-zone">
-      <div className="snap-scroll" ref={zone}>
+      <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label="Tableaux du rapport">
         {sections.map((s) => (
           <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
             {s.panneaux.map((pn) =>

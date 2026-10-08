@@ -15,7 +15,7 @@ import {
 } from '../../api/donnees'
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
-import { Badge, Bouton, Carte, Champ, ChampMontant, Confirmer } from '../../components/Kit'
+import { Badge, Bouton, Carte, ChoixFichier, Champ, ChampMontant, Confirmer } from '../../components/Kit'
 import { fcfa, MOIS } from '../../lib/format'
 
 const STATUTS: Record<Lot['statut'], [string, 'succes' | 'alerte' | 'erreur' | 'neutre']> = {
@@ -163,7 +163,7 @@ export default function DonneesMensuelles({ periode }: { periode?: { annee: numb
     <>
       {!periode && <AdminNav />}
       {!periode && <h2>Données mensuelles</h2>}
-      <Carte titre="Choisir le mois">
+      <Carte titre={periode ? 'Fichier de paie du mois' : 'Choisir le mois'}>
         {!periode && (
         <div className="filtres">
           <label>
@@ -199,10 +199,7 @@ export default function DonneesMensuelles({ periode }: { periode?: { annee: numb
               <span className="note"> Pré-rempli avec vos employés actifs.</span>
             </li>
             <li>
-              <label className="bouton bouton-secondaire">
-                Importer le fichier rempli
-                <input ref={fichier} type="file" accept=".xlsx" hidden onChange={(e) => importer(e.target.files?.[0])} />
-              </label>
+              <ChoixFichier libelle="Importer le fichier rempli" accept=".xlsx" inputRef={fichier} onFichier={importer} />
               <span className="note"> Un contrôle s’affiche avant l’enregistrement.</span>
             </li>
             <li>

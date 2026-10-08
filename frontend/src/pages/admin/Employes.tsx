@@ -11,7 +11,7 @@ import {
 } from '../../api/donnees'
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
-import { Badge, Bouton, Carte, Champ, Confirmer } from '../../components/Kit'
+import { Badge, Bouton, Carte, ChoixFichier, Champ, Confirmer } from '../../components/Kit'
 
 const VIDE: Omit<Fiche, 'id'> = {
   matricule: '',
@@ -45,8 +45,14 @@ export default function Employes() {
   const [apercu, setApercu] = useState<ResultatImport | null>(null)
   const [errImport, setErrImport] = useState<string | null>(null)
 
-  if (q.isLoading) return <Etat type="chargement" />
-  if (q.isError) return <Etat type="erreur" onRetry={() => q.refetch()} />
+  if (q.isLoading || q.isError)
+    return (
+      <>
+        <AdminNav />
+        <h2>Employés</h2>
+        {q.isLoading ? <Etat type="chargement" /> : <Etat type="erreur" onRetry={() => q.refetch()} />}
+      </>
+    )
 
   const mots = recherche.trim().toLowerCase()
   const liste = (q.data ?? []).filter((s) => !mots || `${s.matricule} ${s.nom} ${s.service ?? ''} ${s.site ?? ''}`.toLowerCase().includes(mots))
@@ -99,16 +105,7 @@ export default function Employes() {
             <span className="note"> Une ligne par employé (matricule, nom, poste, service…).</span>
           </li>
           <li>
-            <label className="bouton bouton-secondaire">
-              Importer le fichier rempli
-              <input
-                ref={fichier}
-                type="file"
-                accept=".xlsx"
-                hidden
-                onChange={(e) => choisir(e.target.files?.[0])}
-              />
-            </label>
+            <ChoixFichier libelle="Importer le fichier rempli" accept=".xlsx" inputRef={fichier} onFichier={choisir} />
             <span className="note"> {fic ? fic.name : 'Un aperçu s’affiche avant toute modification.'}</span>
           </li>
         </ol>

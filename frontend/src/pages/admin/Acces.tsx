@@ -2,21 +2,8 @@ import { usePerimetresAdmin, useUsers, type PerimetreAdmin, type RoleAdmin } fro
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
 import { Badge, Carte } from '../../components/Kit'
+import { ROLES } from '../../lib/roles'
 
-const ROLES = {
-  rh_admin: {
-    libelle: 'Administrateur RH',
-    resume: 'Tout voir, saisir les données, gérer les comptes, les périmètres et les réglages.',
-  },
-  lecteur_global: {
-    libelle: 'Lecteur global',
-    resume: 'Consulter tous les rapports, noms et marges compris. Aucune modification.',
-  },
-  lecteur_perimetre: {
-    libelle: 'Lecteur de périmètre',
-    resume: 'Consulter uniquement les services et sites de son périmètre. Les noms ne sont visibles que si c’est autorisé. Pas de marge.',
-  },
-} as const
 
 function libellePerimetre(r: RoleAdmin, perimetres: PerimetreAdmin[]) {
   if (r.role !== 'lecteur_perimetre') return 'Toute l’entreprise'
@@ -36,13 +23,25 @@ function libellePerimetre(r: RoleAdmin, perimetres: PerimetreAdmin[]) {
 export default function Acces() {
   const users = useUsers()
   const perimetres = usePerimetresAdmin()
-  if (users.isLoading || perimetres.isLoading) return <Etat type="chargement" />
-  if (users.isError) return <Etat type="erreur" onRetry={() => users.refetch()} />
   const pers = perimetres.data ?? []
+  const chargement = users.isLoading || perimetres.isLoading
+  const erreur = users.isError || perimetres.isError
   return (
     <>
       <AdminNav />
       <h2>Accès : qui voit quoi</h2>
+      {chargement && <Etat type="chargement" />}
+      {erreur && (
+        <Etat
+          type="erreur"
+          onRetry={() => {
+            users.refetch()
+            perimetres.refetch()
+          }}
+        />
+      )}
+      {!chargement && !erreur && (
+        <>
       <Carte
         titre={`Utilisateurs (${users.data?.length ?? 0})`}
       >
@@ -87,6 +86,8 @@ export default function Acces() {
           ))}
         </dl>
       </Carte>
+        </>
+      )}
     </>
   )
 }

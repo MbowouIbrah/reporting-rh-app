@@ -40,6 +40,16 @@
   --surface-hover: #f0f0f4;
   --focus: var(--navy-3);
 
+  /* Rapports (gabarit des onglets Excel) : mêmes teintes que l'administration */
+  --rapport-titre: var(--navy);
+  --rapport-section: var(--navy-2);
+  --rapport-entete: var(--paper-3);
+  --rapport-groupe: var(--surface-hover);
+  --rapport-zebre: var(--paper-2);
+  --rapport-total: var(--info-soft);
+  --rapport-saisi: var(--warning-soft);
+  --rapport-saisi-bord: var(--warning);
+
   /* Typographie */
   --font-display: 'Space Grotesk', 'DM Sans', sans-serif;
   --font-body: 'DM Sans', -apple-system, system-ui, sans-serif;
