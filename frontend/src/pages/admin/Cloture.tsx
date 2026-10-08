@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useOuvrirMois, useParcours, type EtapeParcours, type Parcours, type StatutEtape } from '../../api/donnees'
 import { useSaisirCa } from '../../api/admin'
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
 import { Badge, Bouton, Carte, ChampMontant } from '../../components/Kit'
-import { MOIS } from '../../lib/format'
+import { MOIS, montantValide, sansZerosFinaux } from '../../lib/format'
 import Budgets from './Budgets'
 import DonneesMensuelles from './DonneesMensuelles'
 
@@ -16,7 +16,6 @@ const STATUTS: Record<StatutEtape, { texte: string; ton: 'succes' | 'alerte' | '
   reportable: { texte: 'Peut attendre', ton: 'neutre' },
   facultatif: { texte: 'Facultatif', ton: 'neutre' },
 }
-const montant = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
 
 function Ouvrir({ annee, mois }: { annee: number; mois: number }) {
   const ouvrir = useOuvrirMois()
@@ -64,6 +63,18 @@ function Controles({ p, etape }: { p: Parcours; etape: EtapeParcours }) {
         <p>
           <Badge ton={s.ton}>{s.texte}</Badge> {etape.resume}
         </p>
+        {p.ecarts.length > 0 && (
+          <>
+            <ul>
+              {p.ecarts.map((e) => (
+                <li key={e.controle}>
+                  {e.controle} : écart de {sansZerosFinaux(String(e.ecart))}
+                </li>
+              ))}
+            </ul>
+            <Link to={`/mensuel?annee=${p.annee}&mois=${p.mois}`}>Voir le détail dans le rapport mensuel</Link>
+          </>
+        )}
       </Carte>
       <Carte titre={`Effectif : ${p.effectifs.total} employés`}>
         <p className="note">Présent ce mois-ci mais pas le précédent : entrée. L’inverse : départ.</p>
@@ -76,20 +87,35 @@ function Controles({ p, etape }: { p: Parcours; etape: EtapeParcours }) {
 
 function Ca({ id, ca }: { id: number; ca: string | null }) {
   const saisir = useSaisirCa()
-  const [val, setVal] = useState(ca ? String(Number(ca)) : '')
+  const [val, setVal] = useState(ca ? sansZerosFinaux(ca) : '')
   const [err, setErr] = useState<string | null>(null)
+  const [ok, setOk] = useState(false)
   const enregistrer = () => {
     const v = val.trim()
-    if (v && !montant(v)) return setErr('Montant invalide (chiffres, 3 décimales max)')
+    setOk(false)
+    if (v && !montantValide(v)) return setErr('Montant invalide (chiffres, 3 décimales max)')
     setErr(null)
-    saisir.mutate({ id, valeur: v || null }, { onError: (e) => setErr(e.message) })
+    saisir.mutate({ id, valeur: v || null }, { onSuccess: () => setOk(true), onError: (e) => setErr(e.message) })
   }
   return (
     <Carte titre="Chiffre d’affaires du mois">
-      <ChampMontant label="Chiffre d’affaires" valeur={val} onChange={setVal} erreur={err} />
+      <ChampMontant
+        label="Chiffre d’affaires"
+        valeur={val}
+        onChange={(v) => {
+          setVal(v)
+          setOk(false)
+        }}
+        erreur={err}
+      />
       <Bouton onClick={enregistrer} disabled={saisir.isPending}>
         Enregistrer
       </Bouton>
+      {ok && (
+        <p className="note" role="status">
+          Enregistré. La marge du mois est recalculée.
+        </p>
+      )}
       <p className="note">Peut être saisi à tout moment, y compris après les données.</p>
     </Carte>
   )
@@ -101,13 +127,15 @@ export default function Cloture() {
   const [a, m] = (params.get('periode') ?? '').split('-').map(Number)
   const annee = a || now.getFullYear()
   const mois = m >= 1 && m <= 12 ? m : now.getMonth() + 1
-  const cle = params.get('etape') ?? 'donnees'
   const q = useParcours(annee, mois)
   const aller = (periode: string, etape: string) => setParams({ periode, etape }, { replace: true })
   const per = (y: number, mo: number) => `${y}-${String(mo).padStart(2, '0')}`
 
   const p = q.data
   const sansMois = p && p.periode_id === null
+  // Mois non ouvert : on commence par l'ouvrir.
+  const cle = params.get('etape') ?? (sansMois ? 'mois' : 'donnees')
+  const controles = p?.etapes.find((e) => e.cle === 'controles')
 
   return (
     <>
@@ -169,7 +197,7 @@ export default function Cloture() {
                 </Carte>
               ))}
             {cle === 'donnees' && <DonneesMensuelles periode={{ annee, mois }} />}
-            {cle === 'controles' && <Controles p={p} etape={p.etapes[2]} />}
+            {cle === 'controles' && controles && <Controles p={p} etape={controles} />}
             {cle === 'ca' &&
               (sansMois ? <Ouvrir annee={annee} mois={mois} /> : <Ca key={`${annee}-${mois}`} id={p.periode_id!} ca={p.ca} />)}
             {cle === 'budgets' &&

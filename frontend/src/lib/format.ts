@@ -45,3 +45,9 @@ export function somme(valeurs: Val[]): string | null {
   const abs = total < 0n ? -total : total
   return `${total < 0n ? '-' : ''}${abs / 1000n}.${String(abs % 1000n).padStart(3, '0')}`
 }
+
+/** Montant saisi : chiffres, virgule ou point, 3 décimales au plus (NUMERIC(18,3)). */
+export const montantValide = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
+
+/** Décimal du serveur sans zéros de fin, sans passer par un flottant ("1200.500" -> "1200.5"). */
+export const sansZerosFinaux = (v: string) => (v.includes('.') ? v.replace(/0+$/, '').replace(/\.$/, '') : v)

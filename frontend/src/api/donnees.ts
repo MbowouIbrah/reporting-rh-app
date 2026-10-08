@@ -155,6 +155,8 @@ export interface Parcours {
     sorties: { matricule: string; nom: string }[]
   }
   etapes: EtapeParcours[]
+  /** Contrôles de cohérence en écart (vide si le mois n'est pas ouvert). */
+  ecarts: { controle: string; ecart: string }[]
 }
 export const useParcours = (annee: number, mois: number) =>
   useQuery({

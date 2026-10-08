@@ -10,14 +10,13 @@ import {
 import { Bouton, Carte, Champ, ChampMontant, Confirmer } from '../../components/Kit'
 import AdminNav from '../../components/AdminNav'
 import Etat from '../../components/Etat'
+import { MOIS_COURTS as MOIS, montantValide } from '../../lib/format'
 
-const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
 const AXES: { axe: AxeBudget; titre: string }[] = [
   { axe: 'rubrique', titre: 'Par rubrique (global uniquement)' },
   { axe: 'service', titre: 'Par service' },
   { axe: 'site', titre: 'Par site' },
 ]
-const montant = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
 const cle = (axe: AxeBudget, id: number) => `${axe}:${id}`
 
 function Saisie({ vue }: { vue: BudgetsVue }) {
@@ -37,7 +36,7 @@ function Saisie({ vue }: { vue: BudgetsVue }) {
         return [{ axe, cible_id: l.cible_id, valeur: v || null }]
       }),
     )
-    if (lignes.some((l) => l.valeur && !montant(l.valeur))) return setErr('Montant invalide (chiffres, 3 décimales max)')
+    if (lignes.some((l) => l.valeur && !montantValide(l.valeur))) return setErr('Montant invalide (chiffres, 3 décimales max)')
     setErr(null)
     saisir.mutate({ id: vue.periode_id, lignes }, { onError: (e) => setErr(e.message) })
   }

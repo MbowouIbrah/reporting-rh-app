@@ -12,7 +12,7 @@
 | 4 | CA du mois | Fait si saisi, sinon « Peut attendre » |
 | 5 | Budgets détaillés | Fait si une ligne, sinon « Facultatif » |
 
-Mois non ouvert : tout « À faire », CA et budgets demandent d'abord l'ouverture.
+Mois non ouvert : Mois et Données « À faire », Contrôles « À faire », CA « Peut attendre », Budgets « Facultatif » ; chaque étape porte une consigne (CA et budgets saisissables dès l'ouverture) et l'écran s'ouvre sur l'étape Mois. Les écarts des contrôles sont listés (`ecarts`) avec un lien vers le rapport mensuel.
 
 ## Effectifs automatiques
 Aucune saisie ni confirmation. Entrées = présents en M et absents de M-1 ; départs = présents en M-1 et absents de M (uniquement si M-1 contient des données). Affichés dans l'étape Contrôles.

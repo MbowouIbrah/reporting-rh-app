@@ -1,6 +1,6 @@
 """Parcours de fin de mois : statut de chaque étape, calculé depuis les données existantes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -43,13 +43,14 @@ def parcours(
     if per is None:
         return {
             "annee": annee, "mois": mois, "existe": False, "periode_id": None, "ca": None,
-            "effectifs": {"total": 0, "entrees": [], "sorties": []},
+            "effectifs": {"total": 0, "entrees": [], "sorties": []}, "ecarts": [],
             "etapes": [
                 _etape("mois", "Mois", "a_faire", "Ouvrez le mois pour commencer"),
-                _etape("donnees", "Données de paie", "a_faire", "—"),
-                _etape("controles", "Contrôles", "a_faire", "—"),
-                _etape("ca", "Chiffre d’affaires", "reportable", "—"),
-                _etape("budgets", "Budgets", "facultatif", "—"),
+                _etape("donnees", "Données de paie", "a_faire",
+                       "Importez le fichier de paie du mois"),
+                _etape("controles", "Contrôles", "a_faire", "Après les données de paie"),
+                _etape("ca", "Chiffre d’affaires", "reportable", "Saisissable dès l’ouverture"),
+                _etape("budgets", "Budgets", "facultatif", "Saisissables dès l’ouverture"),
             ],
         }
 
@@ -72,17 +73,17 @@ def parcours(
             resume = f"{en_attente} import(s) à valider · " + resume
         donnees = _etape("donnees", "Données de paie", "a_revoir" if en_attente else "fait", resume)
 
+    ecarts: list[dict] = []
     if not cur:
         controles = _etape("controles", "Contrôles", "a_faire", "En attente des données")
     else:
-        try:
-            res = _mensuel(db, p, annee, mois, None, None)
-            bloquants = sum(1 for c in res.get("controles", []) if c["bloquant"])
-        except HTTPException:
-            bloquants = 0
+        # Une erreur de calcul remonte telle quelle : jamais masquée en « contrôles bons ».
+        res = _mensuel(db, p, annee, mois, None, None)
+        ecarts = [{"controle": c["controle"], "ecart": c["ecart"]}
+                  for c in res["controles"] if c["bloquant"]]
         controles = _etape(
-            "controles", "Contrôles", "a_revoir" if bloquants else "fait",
-            f"{bloquants} écart(s) bloquant(s)" if bloquants else "Tous les contrôles sont bons",
+            "controles", "Contrôles", "a_revoir" if ecarts else "fait",
+            f"{len(ecarts)} écart(s) bloquant(s)" if ecarts else "Tous les contrôles sont bons",
         )
 
     ca = db.scalar(select(CaPeriode.valeur).where(CaPeriode.periode_id == per.id))
@@ -93,6 +94,7 @@ def parcours(
         "annee": annee, "mois": mois, "existe": True, "periode_id": per.id,
         "ca": None if ca is None else format(ca, "f"),
         "effectifs": {"total": len(cur), "entrees": entrees, "sorties": sorties},
+        "ecarts": ecarts,
         "etapes": [
             _etape("mois", "Mois", "fait", "Mois ouvert"),
             donnees,

@@ -1,5 +1,5 @@
-from tests.test_donnees_api import ADMIN, API, BR, charger
-from tests.test_import_regles import ligne
+from tests.test_donnees_api import ADMIN, API, BR, XLSX, charger
+from tests.test_import_regles import ligne, xlsx
 
 DRH = "drh@exemple.invalid"
 
@@ -37,7 +37,31 @@ def test_effectifs_deduits_des_mois_et_ca_en_dernier(make_client):
     d, st = etapes(c, 2026, 2)
     assert [x["matricule"] for x in d["effectifs"]["entrees"]] == ["E3"]
     assert [x["matricule"] for x in d["effectifs"]["sorties"]] == ["E1"]
-    assert st["donnees"] == "fait" and st["controles"] in ("fait", "a_revoir")
+    assert st["donnees"] == "fait"
+    assert (st["controles"] == "a_revoir") == bool(d["ecarts"])
     pid = d["periode_id"]
     assert c.put(f"{API}/periodes/{pid}/ca", json={"valeur": "5000"}).status_code == 200
     assert etapes(c, 2026, 2)[1]["ca"] == "fait"
+
+
+def test_lot_en_attente_a_revoir_et_budgets_faits(make_client):
+    c = make_client(ADMIN)
+    charger(c, [ligne(MATRICULE="E1", Noms="Ann", **{BR: "100"})])
+    lot = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(
+        [ligne(MATRICULE="E2", Noms="Bob", **{BR: "200"})]), XLSX)}).json()
+    assert lot["statut"] == "pret"
+    d, st = etapes(c, 2026, 1)
+    assert st["donnees"] == "a_revoir" and d["etapes"][1]["resume"].startswith("1 import(s)")
+    pid = d["periode_id"]
+    assert st["budgets"] == "facultatif"
+    rub = c.get(f"{API}/budgets", params={"periode_id": pid}).json()["lignes"]["rubrique"]
+    cible = next(x["cible_id"] for x in rub)
+    r = c.put(f"{API}/budgets/{pid}", json={"lignes": [
+        {"axe": "rubrique", "cible_id": cible, "valeur": "10"}]})
+    assert r.status_code == 200, r.text
+    assert etapes(c, 2026, 1)[1]["budgets"] == "fait"
+
+
+def test_mois_non_ouvert_donne_une_consigne_par_etape(make_client):
+    d, _ = etapes(make_client(ADMIN), 2030, 3)
+    assert all(e["resume"] not in ("", "—") for e in d["etapes"]) and d["ecarts"] == []
