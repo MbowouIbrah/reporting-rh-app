@@ -1,7 +1,7 @@
 import type { Val } from '../api/types'
 
 const NF = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 })
-const NF1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const NF1 =new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 export const MOIS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -15,6 +15,14 @@ export function fcfa(v: Val | number | undefined): string {
   if (v === null || v === undefined) return '—'
   if (v === 'n/a') return 'n/a'
   return NF.format(Number(v))
+}
+
+/** Valeur saisie telle quelle (jusqu'à 3 décimales), formatée sans flottant ; cellule vide si absente. */
+export function valeurBrute(v: string | undefined): string {
+  if (v == null) return ''
+  const [e, d] = sansZerosFinaux(v).split('.')
+  const entier = e.replace('-', '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return `${e.startsWith('-') ? '-' : ''}${entier}${d ? `,${d}` : ''}`
 }
 
 /** Pourcentage : l'API renvoie un ratio (0,05 = 5 %). */

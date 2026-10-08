@@ -31,9 +31,8 @@ await page.getByLabel('Adresse e-mail').fill('admin@exemple.invalid')
 await page.getByLabel('Mot de passe').fill(PW)
 await page.getByRole('button', { name: 'Se connecter' }).click()
 await page.getByRole('navigation', { name: 'Rapports' }).waitFor()
-for (const p of ['cloture?etape=mois', 'cloture?etape=donnees', 'cloture?etape=controles', 'cloture?etape=ca', 'cloture?etape=budgets', 'employes', 'acces', 'utilisateurs', 'perimetres', 'referentiels', 'parametrage', 'journal']) {
-  await page.goto(`${BASE}admin/${p}`)
-  await audit(`admin/${p}`)
-}
+await page.goto(`${BASE}admin`)
+await page.locator('tbody tr').first().waitFor()
+await audit('admin')
 await browser.close()
 console.log(total ? `${total} violation(s)` : 'axe: aucune violation')

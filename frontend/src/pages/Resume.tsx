@@ -88,7 +88,7 @@ export default function Resume() {
           </div>
           {aCa && (
             <p className="regle">
-              Le CA est saisi chaque mois par l’administration RH (Fin de mois) ; la marge en est déduite. Un mois sans CA
+              Le CA est saisi chaque mois par l’administration RH ; la marge en est déduite. Un mois sans CA
               reste vide.
             </p>
           )}

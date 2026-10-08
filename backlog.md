@@ -17,3 +17,4 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 | B-011 | 2026-10-02 | P5 | Onglet ANNUEL de l'Excel non exposé par /annuel (blocs A rubrique, B activité, C sites et budgets annuels, D contrat, effectifs) ; rotation Excel différente de la formule P0 | 2 | À faire |
 | B-012 | 2026-10-02 | P5 | Golden par période pour annuel et résumé (tools/golden_lo.py ne fixe que MENSUEL) | 3 | À faire |
 | B-013 | 2026-10-08 | 07e | mypy en CI : 60 erreurs de typage à résorber (dictionnaires typés `Base` dans budgets/salaries, Optional non gardés dans imports/service et moteur, stubs openpyxl), puis ajouter `mypy app` au job backend | 3 | À faire |
+| B-014 | 2026-10-08 | 08a | Feuille DONNEES (/donnees/tableau) sans pagination : ~1 400 lignes aujourd'hui ; au-delà de ~5 000, ajouter limit/offset ou virtualiser le tableau | 3 | À faire |

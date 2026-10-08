@@ -8,7 +8,7 @@ export interface FiltresPage {
   site?: string
 }
 
-const qs = (o: Record<string, string | number | undefined>) => {
+export const qs = (o: Record<string, string | number | undefined>) => {
   const p = new URLSearchParams()
   for (const [k, v] of Object.entries(o)) if (v !== undefined && v !== '') p.set(k, String(v))
   return `?${p}`

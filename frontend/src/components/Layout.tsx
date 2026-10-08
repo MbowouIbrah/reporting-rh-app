@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROLES } from '../lib/roles'
 import { useAuth } from '../auth/AuthContext'
 
@@ -9,17 +9,16 @@ const ONGLETS = [
   { to: '/annuel', label: 'Annuel' },
   { to: '/graphes', label: 'Graphes' },
   { to: '/individuel', label: 'Individuel', perm: 'nominatif:read' },
-  { to: '/admin/cloture', label: 'Administration', perm: 'saisie:write' },
+  { to: '/admin', label: 'Administration', perm: 'saisie:write' },
 ]
 
 export default function Layout() {
   const { me, can, logout } = useAuth()
   const navigate = useNavigate()
-  const admin = useLocation().pathname.startsWith('/admin')
   const [ouvert, setOuvert] = useState(false)
   const role = me?.roles[0]?.role
   return (
-    <div className={`app layout-ecran${admin ? ' ecran-admin' : ''}`}>
+    <div className="app layout-ecran">
       <header className="topbar">
        <div className="topbar-inner">
         <div className="marque">
@@ -39,7 +38,7 @@ export default function Layout() {
         </button>
         <nav id="nav-rapports" aria-label="Rapports" className={ouvert ? 'ouvert' : undefined} onClick={() => setOuvert(false)}>
           {ONGLETS.filter((o) => !o.perm || can(o.perm)).map((o) => (
-            <NavLink key={o.to} to={o.to} className={({ isActive }) => (isActive || (admin && o.to.startsWith('/admin')) ? 'active' : undefined)}>
+            <NavLink key={o.to} to={o.to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
               {o.label}
             </NavLink>
           ))}

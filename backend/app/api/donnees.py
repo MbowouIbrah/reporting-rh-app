@@ -12,10 +12,12 @@ from app.db.session import get_db
 from app.imports import modeles, service
 from app.imports.lecture import Feuille
 from app.imports.regles import ATTRIBUTS, BLOQUANT, MOIS
-from app.kpi.chargement import exclues_a_date
+from app.kpi.chargement import charger_refs, charger_tableau, exclues_a_date, options_tableau
+from app.kpi.moteur import total_ligne
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie
 from app.models.referentiel import Activite, Poste, Rubrique, Service, Site, TypeContrat
+from app.repos.scope import scope_for
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
 
@@ -60,7 +62,7 @@ def _lignes(db: Session, annee: int, mois: int) -> list[dict]:
             "activite": lib["Activité"][sit.activite_id], "site": lib["Site"][sit.site_id],
             "service": lib["Service"][sit.service_id],
             "montants": {k: str(v) for k, v in m.items()},
-            "total": str(sum((v for k, v in m.items() if k not in exclues), Decimal(0))),
+            "total": str(total_ligne(m, exclues)),
         })
     return out
 
@@ -72,6 +74,22 @@ def donnees_du_mois(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1
     return {"annee": annee, "mois": mois,
             "rubriques": [{"libelle": r.libelle, "unite": r.unite} for r in _rubriques(db)],
             "lignes": _lignes(db, annee, mois)}
+
+
+@router.get("/tableau")
+def tableau(annee: int | None = Query(None, ge=2000, le=2100),
+            mois: int | None = Query(None, ge=1, le=12),
+            service: str | None = Query(None, max_length=100),
+            site: str | None = Query(None, max_length=100),
+            q: str | None = Query(None, max_length=100),
+            p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Feuille DONNEES : une ligne par employé et par mois, dans le périmètre du demandeur."""
+    authorize(p, "saisie:write")
+    scope = scope_for(db, p)
+    return {"colonnes": list(charger_refs(db).rubriques),
+            "filtres": options_tableau(db, scope),
+            "lignes": charger_tableau(db, scope, annee=annee, mois=mois, service=service,
+                                      site=site, recherche=q)}
 
 
 @router.get("/modele.xlsx")

@@ -22,7 +22,7 @@ Reprend fidèlement les indicateurs de l'Excel d'origine, avec droits par rôle 
 Données financières et nominatives sensibles. Import mensuel de la paie. Montants en FCFA, libellés en français. Hébergé derrière le nginx d'Academy, sous `/reporting-rh/`.
 
 ## Capabilities and Constraints
-- Pages: Résumé, Mensuel (blocs A type de charge, B service/activité, C site, D contrat), Annuel, Graphes, Individuel, Connexion ; pages d'administration à venir (P6).
+- Pages: Résumé, Mensuel (blocs A type de charge, B service/activité, C site, D contrat), Annuel, Graphes, Individuel, Connexion ; Administration = feuille DONNEES de l'Excel en lecture seule, filtrable (année, mois, service, site, matricule ou nom).
 - Présentation seulement : ne pas toucher à `api/`, `auth/`, `hooks/`, `lib/format.ts`, ni aux règles de masquage (marge sans `marge:read`, fiche sans `nominatif:read`).
 - Un montant absent s'affiche « — », jamais 0 ; « n/a » pour une division par zéro ; filtres indépendants par page, portés par l'URL.
 - Stack: React 19, TypeScript, Vite, TanStack Query, react-router, recharts.

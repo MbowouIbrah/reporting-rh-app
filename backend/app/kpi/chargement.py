@@ -7,10 +7,18 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.kpi.moteur import Budgets, Ligne, Params, PeriodeData, Refs
-from app.models.donnees import Montant, Periode, SituationMensuelle
+from app.kpi.moteur import Budgets, Ligne, Params, PeriodeData, Refs, exclusions_ligne, total_ligne
+from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.pilotage import Budget, CaPeriode, Parametre
-from app.models.referentiel import Activite, Rubrique, RubriqueRegle, Service, Site, TypeContrat
+from app.models.referentiel import (
+    Activite,
+    Poste,
+    Rubrique,
+    RubriqueRegle,
+    Service,
+    Site,
+    TypeContrat,
+)
 from app.repos.scope import Scope, apply_scope
 
 
@@ -94,6 +102,74 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
                    for sid, sal, srv, site, act, ctr in rows)
     return PeriodeData(lignes, exclues_a_date(db, annee, mois),
                        None if ca is None else Decimal(str(ca)))
+
+
+def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, service: str | None,
+                        site: str | None, recherche: str | None):
+    q = apply_scope(
+        select(SituationMensuelle.id, Periode.annee, Periode.mois, Salarie.matricule, Salarie.nom,
+               Poste.libelle, TypeContrat.libelle, Activite.libelle, Site.libelle, Service.libelle)
+        .join(Periode, Periode.id == SituationMensuelle.periode_id)
+        .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
+        .outerjoin(Poste, Poste.id == SituationMensuelle.poste_id)
+        .join(TypeContrat, TypeContrat.id == SituationMensuelle.type_contrat_id)
+        .join(Activite, Activite.id == SituationMensuelle.activite_id)
+        .join(Site, Site.id == SituationMensuelle.site_id)
+        .join(Service, Service.id == SituationMensuelle.service_id),
+        scope, service=Service.libelle, site=Site.libelle)
+    for col, val in ((Periode.annee, annee), (Periode.mois, mois), (Service.libelle, service),
+                     (Site.libelle, site)):
+        if val is not None and val != "":
+            q = q.where(col == val)
+    if recherche:
+        t = recherche.strip()
+        q = q.where(Salarie.matricule.icontains(t, autoescape=True)
+                    | Salarie.nom.icontains(t, autoescape=True))
+    return q.order_by(Periode.annee, Periode.mois, Salarie.matricule)
+
+
+def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
+                    mois: int | None = None, service: str | None = None,
+                    site: str | None = None, recherche: str | None = None) -> list[dict]:
+    """Lignes de la feuille DONNEES (une par employé et par mois), dans le périmètre."""
+    q = _situations_tableau(scope, annee, mois, service, site, recherche)
+    rows = db.execute(q).all()
+    montants: dict[int, dict[str, Decimal]] = defaultdict(dict)
+    if rows:
+        ids = q.with_only_columns(SituationMensuelle.id).order_by(None)
+        mq = (select(Montant.situation_id, Rubrique.libelle, Montant.valeur)
+              .join(Rubrique, Rubrique.id == Montant.rubrique_id)
+              .where(Montant.situation_id.in_(ids)))
+        for sid, rub, val in db.execute(mq):
+            montants[sid][rub] = Decimal(str(val))
+    exclues: dict[tuple[int, int], frozenset[str]] = {}
+    mille = Decimal("0.001")
+    out = []
+    for sid, a, m, mat, nom, poste, ctr, act, site_, srv in rows:
+        ex = exclues.get((a, m))
+        if ex is None:
+            ex = exclues[(a, m)] = exclues_a_date(db, a, m)
+        mt = montants.get(sid, {})
+        out.append({
+            "annee": a, "mois": m, "matricule": mat, "nom": nom, "poste": poste,
+            "type_contrat": ctr, "activite": act, "site": site_, "service": srv,
+            "montants": {k: str(v.quantize(mille)) for k, v in mt.items()},
+            "total": str(total_ligne(mt, ex).quantize(mille)),
+            "exclusions": str(exclusions_ligne(mt, ex).quantize(mille)),
+        })
+    return out
+
+
+def options_tableau(db: Session, scope: Scope) -> dict:
+    """Valeurs proposées par les filtres du tableau, limitées au périmètre."""
+    base = _situations_tableau(scope, None, None, None, None, None).order_by(None)
+
+    def distinctes(col) -> list:
+        vals = db.scalars(base.with_only_columns(col).distinct())
+        return sorted(v for v in vals if v is not None)
+
+    return {"annees": distinctes(Periode.annee), "services": distinctes(Service.libelle),
+            "sites": distinctes(Site.libelle)}
 
 
 def filtrer(pd: PeriodeData | None, service: str | None, site: str | None) -> PeriodeData | None:

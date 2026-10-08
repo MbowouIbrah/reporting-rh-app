@@ -15,6 +15,16 @@ PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers"
 ZERO = Decimal(0)
 
 
+def total_ligne(montants: dict[str, Decimal], exclues: frozenset[str]) -> Decimal:
+    """TOTAL CHARGES d'une ligne : somme des rubriques non exclues."""
+    return sum((v for r, v in montants.items() if r not in exclues), ZERO)
+
+
+def exclusions_ligne(montants: dict[str, Decimal], exclues: frozenset[str]) -> Decimal:
+    """Total exclusions (technique) de DONNEES : somme des rubriques exclues, absences comprises."""
+    return sum((v for r, v in montants.items() if r in exclues), ZERO)
+
+
 @dataclass(frozen=True)
 class Ligne:
     salarie_id: int
@@ -32,7 +42,7 @@ class PeriodeData:
     ca: Decimal | None = None
 
     def total(self, ligne: Ligne) -> Decimal:
-        return sum((v for r, v in ligne.montants.items() if r not in self.exclues), ZERO)
+        return total_ligne(ligne.montants, self.exclues)
 
     @property
     def ids(self) -> frozenset[int]:
