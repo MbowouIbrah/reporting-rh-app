@@ -104,8 +104,15 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
                        None if ca is None else Decimal(str(ca)))
 
 
+def rubriques_exclues(db: Session) -> frozenset[str]:
+    """Rubriques exclues du TOTAL sur au moins une période (colonnes isolées dans DONNEES)."""
+    q = (select(Rubrique.libelle).join(RubriqueRegle, RubriqueRegle.rubrique_id == Rubrique.id)
+         .where(RubriqueRegle.regle == "exclu_total_ligne"))
+    return frozenset(db.scalars(q))
+
+
 def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, service: str | None,
-                        site: str | None, recherche: str | None):
+                        site: str | None, recherche: str | None, matricule: str | None = None):
     q = apply_scope(
         select(SituationMensuelle.id, Periode.annee, Periode.mois, Salarie.matricule, Salarie.nom,
                Poste.libelle, TypeContrat.libelle, Activite.libelle, Site.libelle, Service.libelle)
@@ -118,7 +125,7 @@ def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, servi
         .join(Service, Service.id == SituationMensuelle.service_id),
         scope, service=Service.libelle, site=Site.libelle)
     for col, val in ((Periode.annee, annee), (Periode.mois, mois), (Service.libelle, service),
-                     (Site.libelle, site)):
+                     (Site.libelle, site), (Salarie.matricule, matricule)):
         if val is not None and val != "":
             q = q.where(col == val)
     if recherche:
@@ -130,9 +137,10 @@ def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, servi
 
 def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
                     mois: int | None = None, service: str | None = None,
-                    site: str | None = None, recherche: str | None = None) -> list[dict]:
+                    site: str | None = None, recherche: str | None = None,
+                    matricule: str | None = None) -> list[dict]:
     """Lignes de la feuille DONNEES (une par employé et par mois), dans le périmètre."""
-    q = _situations_tableau(scope, annee, mois, service, site, recherche)
+    q = _situations_tableau(scope, annee, mois, service, site, recherche, matricule)
     rows = db.execute(q).all()
     montants: dict[int, dict[str, Decimal]] = defaultdict(dict)
     if rows:
@@ -168,8 +176,11 @@ def options_tableau(db: Session, scope: Scope) -> dict:
         vals = db.scalars(base.with_only_columns(col).distinct())
         return sorted(v for v in vals if v is not None)
 
+    salaries = db.execute(base.with_only_columns(Salarie.matricule, Salarie.nom).distinct()
+                          .order_by(Salarie.nom, Salarie.matricule))
     return {"annees": distinctes(Periode.annee), "services": distinctes(Service.libelle),
-            "sites": distinctes(Site.libelle)}
+            "sites": distinctes(Site.libelle),
+            "salaries": [{"matricule": m, "nom": n} for m, n in salaries]}
 
 
 def filtrer(pd: PeriodeData | None, service: str | None, site: str | None) -> PeriodeData | None:

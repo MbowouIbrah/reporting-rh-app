@@ -435,5 +435,45 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 /* Administration : feuille DONNEES, en-têtes Excel en casse mixte sur plusieurs lignes */
 .donnees-excel .panneau table.dense thead th { text-transform: none; white-space: normal; vertical-align: bottom; min-width: 72px; text-align: left; }
 .donnees-excel .panneau table.dense thead th.num { text-align: right; }
+/* Colonnes ANNÉE à Noms figées au défilement horizontal */
+.donnees-excel { --f1: 64px; --f2: 96px; --f3: 104px; --f4: 200px; }
+.donnees-excel table.dense .fige { position: sticky; z-index: 1; overflow: hidden; text-overflow: ellipsis; }
+.donnees-excel .panneau table.dense tbody td.fige { background: var(--surface); }
+.donnees-excel .panneau table.dense tbody tr:hover td.fige { background: var(--surface-hover); }
+.donnees-excel.page-ecran.rapport-excel .panneau table.dense thead th.fige { position: sticky; top: 0; z-index: 3; }
+.donnees-excel table.dense .fige-1 { left: 0; width: var(--f1); min-width: var(--f1); max-width: var(--f1); }
+.donnees-excel table.dense .fige-2 { left: var(--f1); width: var(--f2); min-width: var(--f2); max-width: var(--f2); }
+.donnees-excel table.dense .fige-3 { left: calc(var(--f1) + var(--f2)); width: var(--f3); min-width: var(--f3); max-width: var(--f3); }
+.donnees-excel table.dense .fige-4 { left: calc(var(--f1) + var(--f2) + var(--f3)); width: var(--f4); min-width: var(--f4); max-width: var(--f4); box-shadow: inset -1px 0 0 var(--rule-strong), 4px 0 6px -4px rgba(26, 31, 60, .25); }
+/* Téléphone : seule la colonne Noms reste figée, une fois ANNÉE à MATRICULE défilées */
+@media (max-width: 720px) {
+  .donnees-excel { --f4: 140px; }
+  .donnees-excel table.dense .fige-1, .donnees-excel table.dense .fige-2, .donnees-excel table.dense .fige-3 { left: auto; }
+  .donnees-excel table.dense .fige-4 { left: 0; }
+}
+/* Rubriques exclues du TOTAL : bloc hachuré en fin de ligne, juste avant le TOTAL */
+.donnees-excel { --hachure: repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--red-deep) 9%, transparent) 5px 7px); }
+.donnees-excel .panneau table.dense thead th.exclu { background: var(--red-soft); color: var(--red-deep); }
+.donnees-excel.rapport-excel .panneau table.dense td.exclu { color: var(--muted); font-style: italic; background-image: var(--hachure); }
+.donnees-excel .panneau table.dense .exclu-debut { border-left: 2px solid var(--red-deep); }
+.donnees-excel .exclu-mention { display: block; font-size: var(--fs-xs); font-weight: 400; font-style: italic; }
+.donnees-excel .panneau table.dense .total { border-left: 2px solid var(--navy); font-weight: 700; }
+.donnees-excel .panneau table.dense thead th.total { background: var(--peche); color: var(--brun); }
+.donnees-excel .legende-exclu { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--red-deep); }
+.donnees-excel .legende-exclu::before { content: ''; width: 18px; height: 12px; border-left: 2px solid var(--red-deep); background: var(--red-soft) var(--hachure); }
+/* Filtre Employé : même étiquette que les autres filtres, liste déroulante avec recherche */
+.rapport-excel .filtres .filtre { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
+.choix-salarie { position: relative; }
+.rapport-excel .filtres .choix-salarie input { width: 260px; text-transform: none; letter-spacing: 0; }
+.choix-salarie [role='listbox'] { position: absolute; top: calc(100% + 2px); left: 0; z-index: calc(var(--z-sticky) + 5); width: max(100%, 300px); max-height: 320px; overflow-y: auto; list-style: none; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgba(26, 31, 60, .15); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--navy); }
+.choix-salarie li { display: flex; gap: var(--sp-3); padding: 6px 12px; cursor: pointer; }
+.choix-salarie li.actif { background: var(--surface-hover); }
+.choix-salarie li[aria-selected='true'] { font-weight: 700; }
+.choix-salarie .choix-mat { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.choix-salarie .choix-vide { color: var(--muted); cursor: default; }
+@media (max-width: 720px) {
+  .rapport-excel .filtres .filtre { width: 100%; justify-content: space-between; }
+  .rapport-excel .filtres .choix-salarie input { width: min(260px, 60vw); }
+}
 /* Mobile : champs à 16 px pour éviter le zoom automatique au focus (iOS) */
 @media (max-width: 720px) { input, select, textarea { font-size: var(--fs-base) !important; } }

@@ -22,7 +22,10 @@ export interface LigneTableau {
 export interface Tableau {
   /** Rubriques dans l'ordre des colonnes de la feuille. */
   colonnes: string[]
-  filtres: { annees: number[]; services: string[]; sites: string[] }
+  /** Rubriques exclues du TOTAL, dans l'ordre des colonnes. */
+  exclues: string[]
+  /** Valeurs des filtres, limitées au périmètre ; employés triés par nom. */
+  filtres: { annees: number[]; services: string[]; sites: string[]; salaries: { matricule: string; nom: string }[] }
   lignes: LigneTableau[]
 }
 
@@ -31,7 +34,7 @@ export interface FiltresTableau {
   mois?: string
   service?: string
   site?: string
-  q?: string
+  matricule?: string
 }
 
 export const useTableau = (f: FiltresTableau) =>

@@ -12,7 +12,13 @@ from app.db.session import get_db
 from app.imports import modeles, service
 from app.imports.lecture import Feuille
 from app.imports.regles import ATTRIBUTS, BLOQUANT, MOIS
-from app.kpi.chargement import charger_refs, charger_tableau, exclues_a_date, options_tableau
+from app.kpi.chargement import (
+    charger_refs,
+    charger_tableau,
+    exclues_a_date,
+    options_tableau,
+    rubriques_exclues,
+)
 from app.kpi.moteur import total_ligne
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie
@@ -82,14 +88,18 @@ def tableau(annee: int | None = Query(None, ge=2000, le=2100),
             service: str | None = Query(None, max_length=100),
             site: str | None = Query(None, max_length=100),
             q: str | None = Query(None, max_length=100),
+            matricule: str | None = Query(None, max_length=50),
             p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Feuille DONNEES : une ligne par employé et par mois, dans le périmètre du demandeur."""
     authorize(p, "saisie:write")
     scope = scope_for(db, p)
-    return {"colonnes": list(charger_refs(db).rubriques),
+    colonnes = list(charger_refs(db).rubriques)
+    exclues = rubriques_exclues(db)
+    return {"colonnes": colonnes,
+            "exclues": [c for c in colonnes if c in exclues],
             "filtres": options_tableau(db, scope),
             "lignes": charger_tableau(db, scope, annee=annee, mois=mois, service=service,
-                                      site=site, recherche=q)}
+                                      site=site, recherche=q, matricule=matricule)}
 
 
 @router.get("/modele.xlsx")

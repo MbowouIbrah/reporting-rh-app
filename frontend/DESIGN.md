@@ -23,6 +23,8 @@ Dérivé de ce qui est livré (refonte R1 à R4). Source des valeurs : `src/styl
 - `Kit` : `Badge`, `Bouton` (primaire, secondaire, lien), `Carte`, `Section` (repliable, `<details>`).
 - `Etat` : squelette de chargement, vide, 404, 403 distinct, erreur avec « Réessayer ».
 - `Lignes` : lignes M-1 | M | variation | % (+ budget). Tableaux `table.dense` : en-têtes et libellés figés, totaux, groupes, lignes exclues en italique, défilement interne.
+- `ChoixSalarie` : combobox ARIA (nom et matricule liés, « Tous » en tête, recherche sans casse ni accents, clavier ↑ ↓ Entrée Échap).
+- Feuille DONNEES (`.donnees-excel`) : ANNÉE à Noms figées (Noms seule sous 720 px) ; rubriques exclues du TOTAL regroupées avant le TOTAL, en-tête rouge doux, cellules hachurées en italique, filet rouge à gauche.
 
 ## Accessibilité et impression
 - Focus visible, `prefers-reduced-motion`, axe (wcag2a/aa/21aa) sans violation sur les 6 pages (`e2e/axe.mjs`).

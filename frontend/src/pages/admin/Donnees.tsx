@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
+import ChoixSalarie from '../../components/ChoixSalarie'
 import Etat, { etatErreur } from '../../components/Etat'
 import { MOIS, valeurBrute } from '../../lib/format'
 
@@ -8,24 +8,21 @@ import { MOIS, valeurBrute } from '../../lib/format'
 const TITRE = 'FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois'
 const CONSIGNE =
   'Saisir ANNÉE (ex. 2025), MOIS (nom dans la liste) et MATRICULE (clé unique, ex. EMP001). Ajouter les nouveaux mois à la suite. Le TOTAL se calcule seul.'
-const FIXES = ['ANNÉE', 'MOIS', 'MATRICULE', 'Noms', 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service']
-const CALCULEES = ['TOTAL CHARGES (FCFA)', 'Total exclusions (technique)']
-const CLES = ['annee', 'mois', 'service', 'site', 'q'] as const
+// Les quatre premières colonnes (ANNÉE à Noms) restent figées au défilement horizontal.
+const FIGEES = ['ANNÉE', 'MOIS', 'MATRICULE', 'Noms']
+const FIXES = [...FIGEES, 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service']
+const EXCLUSIONS = 'Total exclusions (technique)'
+const TOTAL = 'TOTAL CHARGES (FCFA)'
+const CLES = ['annee', 'mois', 'service', 'site', 'matricule'] as const
 
 const texte = (l: LigneTableau) => [
   l.annee, MOIS[l.mois - 1], l.matricule, l.nom, l.poste ?? '', l.type_contrat, l.activite, l.site, l.service,
 ]
+const classeFixe = (i: number) => (i < FIGEES.length ? `fige fige-${i + 1}` : undefined)
 
 export default function Donnees() {
   const [params, setParams] = useSearchParams()
   const filtres: FiltresTableau = Object.fromEntries(CLES.map((k) => [k, params.get(k) ?? undefined]))
-  const [recherche, setRecherche] = useState(filtres.q ?? '')
-  // Un changement d'URL venu d'ailleurs (onglet, retour arrière) remplace la saisie en cours.
-  const [qVu, setQVu] = useState(filtres.q)
-  if (qVu !== filtres.q) {
-    setQVu(filtres.q)
-    setRecherche(filtres.q ?? '')
-  }
   const q = useTableau(filtres)
   const d = q.data
 
@@ -35,18 +32,10 @@ export default function Donnees() {
       return p
     }, { replace: true })
 
-  // La recherche part 300 ms après la dernière frappe.
-  useEffect(() => {
-    if (recherche.trim() === (filtres.q ?? '')) return
-    const t = setTimeout(() => changer({ q: recherche.trim() }), 300)
-    return () => clearTimeout(t)
-  })
-
-  const actifs = CLES.some((k) => params.has(k))
-  const reinitialiser = () => {
-    setRecherche('')
-    setParams({}, { replace: true })
-  }
+  // Rubriques comptées d'abord, puis celles exclues du total, regroupées juste avant le TOTAL.
+  const exclues = new Set(d?.exclues)
+  const comptees = d?.colonnes.filter((c) => !exclues.has(c)) ?? []
+  const horsTotal = d?.colonnes.filter((c) => exclues.has(c)) ?? []
 
   return (
     <section className="page-ecran rapport-excel donnees-excel">
@@ -83,11 +72,21 @@ export default function Donnees() {
             {d?.filtres.sites.map((s) => <option key={s}>{s}</option>)}
           </select>
         </label>
-        <label>
-          Matricule ou nom
-          <input type="search" value={recherche} maxLength={100} onChange={(e) => setRecherche(e.target.value)} />
-        </label>
-        <button type="button" className="bouton bouton-lien" onClick={reinitialiser} disabled={!actifs && !recherche}>
+        {/* Pas de <label> englobant : un clic sur une option rouvrirait la liste. */}
+        <div className="filtre">
+          <span aria-hidden="true">Employé</span>
+          <ChoixSalarie
+            salaries={d?.filtres.salaries ?? []}
+            valeur={filtres.matricule ?? ''}
+            onChange={(m) => changer({ matricule: m })}
+          />
+        </div>
+        <button
+          type="button"
+          className="bouton bouton-lien"
+          onClick={() => setParams({}, { replace: true })}
+          disabled={!CLES.some((k) => params.has(k))}
+        >
           Réinitialiser
         </button>
       </div>
@@ -97,6 +96,7 @@ export default function Donnees() {
         <>
           <p className="bandeau" role="status">
             {d.lignes.length} ligne{d.lignes.length > 1 ? 's' : ''}
+            {horsTotal.length > 0 && <span className="legende-exclu">Colonnes hachurées : exclues du TOTAL</span>}
           </p>
           {d.lignes.length === 0 ? (
             <Etat type="vide" />
@@ -106,17 +106,30 @@ export default function Donnees() {
                 <table className="dense">
                   <thead>
                     <tr>
-                      {FIXES.map((c) => <th key={c} scope="col">{c}</th>)}
-                      {[...d.colonnes, ...CALCULEES].map((c) => <th key={c} scope="col" className="num">{c}</th>)}
+                      {FIXES.map((c, i) => <th key={c} scope="col" className={classeFixe(i)}>{c}</th>)}
+                      {comptees.map((c) => <th key={c} scope="col" className="num">{c}</th>)}
+                      {horsTotal.map((c, i) => (
+                        <th key={c} scope="col" className={`num exclu${i === 0 ? ' exclu-debut' : ''}`}>
+                          {c}
+                          <span className="exclu-mention"> (exclu)</span>
+                        </th>
+                      ))}
+                      <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`}>{EXCLUSIONS}</th>
+                      <th scope="col" className="num total">{TOTAL}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {d.lignes.map((l) => (
                       <tr key={`${l.annee}-${l.mois}-${l.matricule}`}>
-                        {texte(l).map((v, i) => <td key={FIXES[i]}>{v}</td>)}
-                        {d.colonnes.map((c) => <td key={c} className="num">{valeurBrute(l.montants[c])}</td>)}
-                        <td className="num">{valeurBrute(l.total)}</td>
-                        <td className="num">{valeurBrute(l.exclusions)}</td>
+                        {texte(l).map((v, i) => (
+                          <td key={FIXES[i]} className={classeFixe(i)} title={i === 3 ? String(v) : undefined}>{v}</td>
+                        ))}
+                        {comptees.map((c) => <td key={c} className="num">{valeurBrute(l.montants[c])}</td>)}
+                        {horsTotal.map((c, i) => (
+                          <td key={c} className={`num exclu${i === 0 ? ' exclu-debut' : ''}`}>{valeurBrute(l.montants[c])}</td>
+                        ))}
+                        <td className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`}>{valeurBrute(l.exclusions)}</td>
+                        <td className="num total">{valeurBrute(l.total)}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,7 +2,7 @@ from decimal import Decimal as D
 
 import pytest
 
-from app.kpi.chargement import charger_periode, charger_tableau
+from app.kpi.chargement import charger_periode, charger_tableau, options_tableau
 from app.repos.scope import Scope
 from tests.test_donnees_api import charger
 from tests.test_rapports_api import ABS, ADMIN, API, BR, DRH, EQUIP, donnees
@@ -41,8 +41,17 @@ def test_contenu_et_calculs_en_chaines(admin):
     e2 = d["lignes"][4]
     assert (e2["total"], e2["exclusions"]) == ("2100.000", "999.000")
     assert "Bonus" not in e2["montants"]
-    assert d["filtres"] == {"annees": [2026], "services": ["Administration", "Commerce VN", "SAV PL"],
-                            "sites": ["Douala", "Yaoundé"]}
+    assert d["filtres"]["annees"] == [2026]
+    assert d["filtres"]["services"] == ["Administration", "Commerce VN", "SAV PL"]
+    assert d["filtres"]["sites"] == ["Douala", "Yaoundé"]
+    # Employés enregistrés, un par matricule, triés par nom
+    sal = d["filtres"]["salaries"]
+    assert [s["nom"] for s in sal] == sorted(s["nom"] for s in sal)
+    assert sorted(s["matricule"] for s in sal) == ["E1", "E2", "E3", "E4"]
+    # Rubriques exclues du TOTAL, dans l'ordre des colonnes
+    assert ABS in d["exclues"] and set(d["exclues"]) <= set(d["colonnes"])
+    assert d["exclues"] == [c for c in d["colonnes"] if c in d["exclues"]]
+    assert BR not in d["exclues"]
 
 
 def test_filtres(admin):
@@ -55,6 +64,8 @@ def test_filtres(admin):
     assert mats(q="e4") == [(2, "E4")]
     assert mats(q="bo") == [(1, "E2"), (2, "E2")]
     assert mats(q="_") == [] and mats(q="%") == []  # jokers SQL pris littéralement
+    assert mats(matricule="E2") == [(1, "E2"), (2, "E2")]
+    assert mats(matricule="e2") == [] and mats(matricule="E") == []  # égalité stricte
     vide = tableau(admin, annee=2025).json()
     assert vide["lignes"] == [] and vide["filtres"]["annees"] == [2026]
     assert tableau(admin, mois=13).status_code == 422
@@ -64,6 +75,8 @@ def test_perimetre_applique_dans_le_depot(admin, db):
     sav = charger_tableau(db, Scope(False, {"service": frozenset({"SAV PL"})}))
     assert {x["service"] for x in sav} == {"SAV PL"} and len(sav) == 3
     assert charger_tableau(db, Scope(False, {})) == []
+    sal = options_tableau(db, Scope(False, {"service": frozenset({"SAV PL"})}))["salaries"]
+    assert sorted(s["matricule"] for s in sal) == ["E1", "E4"]
 
 
 def test_total_coherent_avec_le_moteur(admin, db):
