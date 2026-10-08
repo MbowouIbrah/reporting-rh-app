@@ -14,6 +14,30 @@ test('401 puis refresh puis nouvel essai', async () => {
   expect(f.mock.calls[1][0]).toContain('/auth/refresh')
 })
 
+test('session restaurée au chargement : /auth/me en 401 passe par le refresh', async () => {
+  const f = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(json(401))
+    .mockResolvedValueOnce(json(200)) // refresh
+    .mockResolvedValueOnce(json(200, { id: 1 }))
+  expect(await api('/auth/me')).toEqual({ id: 1 })
+  expect(f.mock.calls[1][0]).toContain('/auth/refresh')
+})
+
+test('/auth/me sans session valide : 401 rendu à l’appelant, sans vider le cache', async () => {
+  const out = vi.fn()
+  setUnauthorizedHandler(out)
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401))
+  await expect(api('/auth/me')).rejects.toMatchObject({ status: 401 })
+  expect(out).not.toHaveBeenCalled()
+})
+
+test('identifiants refusés : pas de refresh', async () => {
+  const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401))
+  await expect(api('/auth/login', { method: 'POST' })).rejects.toMatchObject({ status: 401 })
+  expect(f).toHaveBeenCalledTimes(1)
+})
+
 test('deux 401 simultanés : un seul refresh', async () => {
   let refreshes = 0
   const vus = new Set<string>()

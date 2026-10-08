@@ -14,6 +14,9 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+// /auth/me reste éligible : c'est lui qui restaure la session après expiration du jeton d'accès.
+const SANS_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
+
 let refreshing: Promise<boolean> | null = null
 function refresh(): Promise<boolean> {
   refreshing ??= fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'same-origin' })
@@ -44,9 +47,10 @@ async function detail(r: Response): Promise<string> {
 export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const headers = init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json', ...init.headers } : init.headers
   const r = await fetch(`${BASE}${path}`, { credentials: 'same-origin', ...init, headers })
-  if (r.status === 401 && retry && !path.startsWith('/auth/')) {
+  if (r.status === 401 && retry && !SANS_REFRESH.includes(path)) {
     if (await refresh()) return api<T>(path, init, false)
-    onUnauthorized()
+    // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
+    if (!path.startsWith('/auth/')) onUnauthorized()
   }
   if (!r.ok) throw new ApiError(r.status, await detail(r))
   return (r.status === 204 ? undefined : await r.json()) as T
