@@ -43,5 +43,5 @@ Avant toute mise à jour : `deploy/scripts/sauvegarde.sh`, puis noter le commit 
 ## 7. Exploitation courante
 - Logs : `docker compose -f deploy/docker-compose.yml logs --tail 100 api`.
 - Santé : `GET /health` sur l'API (healthcheck Docker).
-- Verrou période : clôturer une période dans Admin avant diffusion ; une période verrouillée n'accepte plus d'import.
+- Pas de verrou de période : un mois reste modifiable (import, CA, budgets, paramètres datés). Avant diffusion, exporter le rapport ; toute modification ultérieure figure dans Admin > Journal.
 - Droits : toute lecture nominative et tout export sont audités (Admin > Journal).

@@ -1,5 +1,7 @@
 # Plan P6 : administration et saisie
 
+> Historique. La clôture et la réouverture de période décrites ici ont été retirées en 07e (routes, verrou `exiger_ouverte`, colonnes `statut`/`close_le`/`close_par`, migration 0007).
+
 Le backend couvre déjà utilisateurs, périmètres, clôture/réouverture et audit (`app/api/admin.py`, `app/api/periodes.py`). Le front n'a aucun écran d'administration. Les écrans utilisent le kit (`frontend/DESIGN.md`).
 
 ## Décisions

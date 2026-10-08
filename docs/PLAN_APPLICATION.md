@@ -6,7 +6,7 @@
 - Données en format long : situation_mensuelle x rubrique -> montant NUMERIC(18,3). Nouvelle rubrique ou exclusion = une ligne de référentiel (rubrique_regle datée).
 - KPI : module Python de fonctions pures sur agrégats SQL, calcul à la volée.
 - Import xlsx : staging -> validation par ligne -> rapport d'anomalies -> validation explicite -> lot annulable, idempotent (sha256 + période/matricule).
-- Clôture de période : réouverture tracée.
+- Pas de clôture de période (retirée en 07e) : un mois reste modifiable ; chaque écriture est tracée au journal d'audit (avant/après).
 - Auth : JWT local (code Academy), cookie httpOnly, claims OIDC. Keycloak/Cerbos non réutilisés (non en production) -> backlog.
 - Autorisation : authorize(principal, action, resource) + filtre de périmètre dans la couche dépôt.
 - Rôles : rh_admin (seul écrivain), lecteur_global (DRH, DOP), lecteur_perimetre (DOP/DPS Equipment, Dir. commercial VN). Nouvelle personne = nouvelle role_assignment.
@@ -27,7 +27,7 @@ periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situati
 | P4 | Moteur KPI + API rapports | L | Parité golden sur 18 périodes, invariants OK, couverture kpi/ >= 90 % |
 | P5 | Front : Résumé, Mensuel, Annuel, Individuel, Graphes | L | Playwright par rôle, filtres indépendants par page, conformité RESULTAT_ATTENDU.md |
 | P5b | Refonte UI (`docs/PLAN_REFONTE_UI.md`) : tokens, kit de composants, pages, accessibilité, captures avant/après | M (~6,5 j) | Présentation seule : valeurs et masquages inchangés, Playwright par rôle inchangé, Lighthouse accessibilité >= 95, validé par l'admin |
-| P6 | Admin et saisie : CRUD, CA, budgets, rubriques, utilisateurs, clôture, historique | M | Tout tracé ; période close refusée |
+| P6 | Admin et saisie : CRUD, CA, budgets, rubriques, utilisateurs, historique | M | Tout tracé (clôture retirée en 07e) |
 | P7 | Exports xlsx | S | = écran au FCFA près, filtré par périmètre |
 | P8 | Double run 2 mois réels Excel vs app | M | Écart nul ou documenté ; validation admin + DRH |
 | P9 | Mise en prod : sauvegarde/restauration testées, runbook, rollback, comptes, Excel archivé | S | |

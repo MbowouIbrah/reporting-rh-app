@@ -9,7 +9,7 @@ Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC(18,3)`, 
 | KPI | Définition | Règle « vide / zéro » |
 |---|---|---|
 | TOTAL CHARGES (ligne) | Somme des rubriques dont `inclus_total_charges` = vrai à la date de la période | Rubrique vide = 0 |
-| Rubriques exclues du total (à date d'effet) | Absences (nb), Salaire brut garantie, Primes sur ventes, Primes sur résultats, Productivité Ateliers | Modifiable : une règle datée, l'historique clos ne change pas |
+| Rubriques exclues du total (à date d'effet) | Absences (nb), Salaire brut garantie, Primes sur ventes, Primes sur résultats, Productivité Ateliers | Modifiable : une règle datée (date d'effet) ; tout changement est tracé au journal d'audit |
 | Masse salariale (MS) | Somme des TOTAL CHARGES sur le périmètre filtré et la période | 0 si aucune ligne, affiché « — » |
 | VARIATION | M − (M-1) | M-1 absent : « — » |
 | VAR % | (M − M-1) / M-1 | M-1 = 0 : « n/a » (l'Excel affichait 0, écart connu documenté) |
@@ -42,7 +42,7 @@ Annuel : N / N-1, cumul YTD, moyenne mensuelle, nb de mois saisis, ventilation p
 
 | Rôle | Qui | Périmètre | Écriture | Détail nominatif |
 |---|---|---|---|---|
-| `rh_admin` | Administrateur principal (1 personne) | Global | Oui : import, saisie, CA, budgets, référentiels, règles, utilisateurs, clôture | Oui |
+| `rh_admin` | Administrateur principal (1 personne) | Global | Oui : import, saisie, CA, budgets, référentiels, règles, utilisateurs | Oui |
 | `lecteur_global` | DRH, DOP | Global | Non | Oui |
 | `lecteur_perimetre` | DOP/DPS Equipment | Périmètre Equipment **[H]** | Non | Non, agrégats seulement **[H]** |
 | `lecteur_perimetre` | Directeur commercial VN | Périmètre Commerce VN **[H]** | Non | Non, agrégats seulement **[H]** |

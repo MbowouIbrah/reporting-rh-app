@@ -1,6 +1,6 @@
 # Parcours de fin de mois (plan 07)
 
-Écran « Fin de mois » (`/admin/cloture?periode=AAAA-MM&etape=…`), piloté par `GET /parcours?annee&mois`. Statuts calculés côté serveur depuis les tables existantes : aucune nouvelle table, aucune migration. Pas de clôture de mois : tout reste modifiable.
+Écran « Fin de mois » (`/admin/cloture?periode=AAAA-MM&etape=…`), piloté par `GET /parcours?annee&mois`. Statuts calculés côté serveur depuis les tables existantes : aucune nouvelle table, aucune migration. Pas de clôture de mois (retirée en 07e, migration 0007) : tout reste modifiable, le journal d'audit trace chaque écriture.
 
 ## Étapes (accès libre à toutes, retour arrière permanent)
 
