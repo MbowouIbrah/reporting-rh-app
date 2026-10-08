@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
 import ChoixSalarie from '../../components/ChoixSalarie'
 import Etat, { etatErreur } from '../../components/Etat'
-import { MOIS, valeurBrute } from '../../lib/format'
+import { largeurEntete, MOIS, valeurBrute } from '../../lib/format'
 
 // Lignes 1 et 2 de la feuille DONNEES (REPORTING_RH_V5.xlsx), reprises à l'identique.
 const TITRE = 'FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois'
@@ -72,23 +72,26 @@ export default function Donnees() {
             {d?.filtres.sites.map((s) => <option key={s}>{s}</option>)}
           </select>
         </label>
-        {/* Pas de <label> englobant : un clic sur une option rouvrirait la liste. */}
-        <div className="filtre">
-          <span aria-hidden="true">Employé</span>
-          <ChoixSalarie
-            salaries={d?.filtres.salaries ?? []}
-            valeur={filtres.matricule ?? ''}
-            onChange={(m) => changer({ matricule: m })}
-          />
+        {/* Employé et Réinitialiser forment un bloc insécable : le bouton reste sur la ligne du filtre. */}
+        <div className="filtres-fin">
+          {/* Pas de <label> englobant : un clic sur une option rouvrirait la liste. */}
+          <div className="filtre">
+            <span aria-hidden="true">Employé</span>
+            <ChoixSalarie
+              salaries={d?.filtres.salaries ?? []}
+              valeur={filtres.matricule ?? ''}
+              onChange={(m) => changer({ matricule: m })}
+            />
+          </div>
+          <button
+            type="button"
+            className="bouton bouton-lien"
+            onClick={() => setParams({}, { replace: true })}
+            disabled={!CLES.some((k) => params.has(k))}
+          >
+            Réinitialiser
+          </button>
         </div>
-        <button
-          type="button"
-          className="bouton bouton-lien"
-          onClick={() => setParams({}, { replace: true })}
-          disabled={!CLES.some((k) => params.has(k))}
-        >
-          Réinitialiser
-        </button>
       </div>
       {q.isLoading && <Etat type="chargement" />}
       {q.isError && <Etat type={etatErreur(q.error)} />}
@@ -106,16 +109,16 @@ export default function Donnees() {
                 <table className="dense">
                   <thead>
                     <tr>
-                      {FIXES.map((c, i) => <th key={c} scope="col" className={classeFixe(i)}>{c}</th>)}
-                      {comptees.map((c) => <th key={c} scope="col" className="num">{c}</th>)}
+                      {FIXES.map((c, i) => <th key={c} scope="col" className={classeFixe(i)} style={i < FIGEES.length ? undefined : { minWidth: largeurEntete(c) }}>{c}</th>)}
+                      {comptees.map((c) => <th key={c} scope="col" className="num" style={{ minWidth: largeurEntete(c) }}>{c}</th>)}
                       {horsTotal.map((c, i) => (
-                        <th key={c} scope="col" className={`num exclu${i === 0 ? ' exclu-debut' : ''}`}>
+                        <th key={c} scope="col" className={`num exclu${i === 0 ? ' exclu-debut' : ''}`} style={{ minWidth: largeurEntete(c) }}>
                           {c}
                           <span className="exclu-mention"> (exclu)</span>
                         </th>
                       ))}
-                      <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`}>{EXCLUSIONS}</th>
-                      <th scope="col" className="num total">{TOTAL}</th>
+                      <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`} style={{ minWidth: largeurEntete(EXCLUSIONS) }}>{EXCLUSIONS}</th>
+                      <th scope="col" className="num total" style={{ minWidth: largeurEntete(TOTAL) }}>{TOTAL}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -132,6 +135,10 @@ export default function Donnees() {
                         <td className="num total">{valeurBrute(l.total)}</td>
                       </tr>
                     ))}
+                    {/* Ligne de remplissage : le tableau occupe toute la hauteur du panneau, même avec peu de lignes. */}
+                    <tr className="reste" aria-hidden="true">
+                      {Array.from({ length: FIXES.length + comptees.length + horsTotal.length + 2 }, (_, i) => <td key={i} />)}
+                    </tr>
                   </tbody>
                 </table>
               </div>

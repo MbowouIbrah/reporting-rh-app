@@ -5,7 +5,7 @@ import type { Val } from '../api/types'
 import { Panneau } from '../components/BlocsRapport'
 import Etat, { etatErreur } from '../components/Etat'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, somme } from '../lib/format'
+import { cls, fcfa, largeurEntete, MOIS, somme } from '../lib/format'
 
 /** Les 12 postes de l'onglet Excel, dans l'ordre du fichier. */
 const COLONNES = [
@@ -123,60 +123,60 @@ export default function Individuel() {
           <table className="dense individuel">
             <thead>
               <tr>
-                <th scope="col">Mois</th>
+                <th scope="col" className="fige-g">Mois</th>
                 {rubriques.map((r) => (
-                  <th scope="col" key={r}>
+                  <th scope="col" key={r} style={{ minWidth: largeurEntete(r) }}>
                     {r}
                   </th>
                 ))}
-                <th scope="col">Total mensuel</th>
-                <th scope="col">Total budget</th>
+                <th scope="col" className="num fige-d1">Total mensuel</th>
+                <th scope="col" className="num fige-d2">Total budget</th>
               </tr>
             </thead>
             <tbody>
               {d.mois.map((m) => (
                 <Fragment key={m.mois}>
                   <tr className="groupe">
-                    <th scope="row">{MOIS[m.mois - 1]}</th>
+                    <th scope="row" className="fige-g">{MOIS[m.mois - 1]}</th>
                     {rubriques.map((r) => (
                       <td className={cls(val(m.montants?.[r]))} key={r}>
                         {fcfa(val(m.montants?.[r]))}
                       </td>
                     ))}
-                    <td className="num">{fcfa(totalMois(m))}</td>
-                    <td className="num">{fcfa(val(m.budget ?? undefined))}</td>
+                    <td className="num fige-d1">{fcfa(totalMois(m))}</td>
+                    <td className="num fige-d2">{fcfa(val(m.budget ?? undefined))}</td>
                   </tr>
                   <tr className="sous">
-                    <th scope="row">Staff</th>
+                    <th scope="row" className="fige-g">Staff</th>
                     {rubriques.map((r) => (
                       <td className="num" key={r}>
                         {m.staff?.[r] ?? 0}
                       </td>
                     ))}
-                    <td />
-                    <td />
+                    <td className="fige-d1" />
+                    <td className="fige-d2" />
                   </tr>
                 </Fragment>
               ))}
               <tr className="total">
-                <th scope="row">Total MS</th>
+                <th scope="row" className="fige-g">Total MS</th>
                 {rubriques.map((r) => (
                   <td className="num" key={r}>
                     {fcfa(totalRub(r))}
                   </td>
                 ))}
-                <td className="num">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
-                <td className="num">{fcfa(somme(d.mois.map((m) => m.budget ?? null)) ?? '0')}</td>
+                <td className="num fige-d1">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
+                <td className="num fige-d2">{fcfa(somme(d.mois.map((m) => m.budget ?? null)) ?? '0')}</td>
               </tr>
               <tr className="total">
-                <th scope="row">Total Staff</th>
+                <th scope="row" className="fige-g">Total Staff</th>
                 {rubriques.map((r) => (
                   <td className="num" key={r}>
                     {totalStaff(r)}
                   </td>
                 ))}
-                <td />
-                <td />
+                <td className="fige-d1" />
+                <td className="fige-d2" />
               </tr>
             </tbody>
           </table>

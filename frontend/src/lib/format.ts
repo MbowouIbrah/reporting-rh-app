@@ -59,3 +59,13 @@ export const montantValide = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
 
 /** Décimal du serveur sans zéros de fin, sans passer par un flottant ("1200.500" -> "1200.5"). */
 export const sansZerosFinaux = (v: string) => (v.includes('.') ? v.replace(/0+$/, '').replace(/\.$/, '') : v)
+
+/** Largeur d'un en-tête : deux lignes au plus, juste la place du plus long des deux segments, plus une légère marge. */
+export const largeurEntete = (t: string) => {
+  const mots = t.split(' ')
+  let meilleur = t.length
+  for (let i = 1; i < mots.length; i++) {
+    meilleur = Math.min(meilleur, Math.max(mots.slice(0, i).join(' ').length, mots.slice(i).join(' ').length))
+  }
+  return Math.round(meilleur * 9.6 + 14)
+}

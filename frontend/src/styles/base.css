@@ -433,10 +433,27 @@ table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { w
 table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }
 
 /* Administration : feuille DONNEES, en-têtes Excel en casse mixte sur plusieurs lignes */
-.donnees-excel .panneau table.dense thead th { text-transform: none; white-space: normal; vertical-align: bottom; min-width: 72px; text-align: left; }
+.donnees-excel .panneau table.dense thead th { white-space: normal; vertical-align: middle; text-align: left; text-wrap: balance; }
 .donnees-excel .panneau table.dense thead th.num { text-align: right; }
+/* Tableau aéré : en-tête sur une ligne, séparations nettes entre colonnes, remplit tout le panneau */
+.donnees-excel .panneau table.dense { height: 100%; width: auto; min-width: 0; border-collapse: separate; border-spacing: 0; }
+.donnees-excel .panneau table.dense th, .donnees-excel .panneau table.dense td { padding: 1px 3px; line-height: 1.4; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule); }
+.donnees-excel .panneau table.dense thead th { background: var(--navy); color: #fff; }
+.donnees-excel .panneau table.dense thead th { padding-block: 4px; line-height: 1.2; border-bottom: 1px solid var(--navy); border-right-color: rgba(255, 255, 255, .18); }
+.donnees-excel .panneau table.dense tbody tr:hover td:not(.fige) { background-color: var(--surface-hover); }
+.donnees-excel .panneau table.dense tr.reste { height: 100%; }
+.donnees-excel .panneau table.dense tr.reste td { padding: 0; border-bottom: 0; }
+.donnees-excel.rapport-excel .panneau table.dense tbody tr.reste:nth-child(n) td { background: var(--surface); }
+.donnees-excel.rapport-excel .panneau table.dense tbody tr:nth-child(even) td.fige { background: var(--rapport-zebre); }
+.donnees-excel .exclu-mention { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+/* Filtres : Employé et Réinitialiser restent toujours sur la même ligne */
+.filtres-fin { display: flex; flex: 1 1 360px; align-items: center; gap: var(--sp-2); min-width: 0; }
+.filtres-fin .filtre { flex: 1 1 auto; min-width: 0; }
+.rapport-excel .filtres .filtres-fin .choix-salarie { flex: 1; min-width: 0; }
+.rapport-excel .filtres .filtres-fin .choix-salarie input { width: 100%; max-width: 320px; }
+.filtres .bouton-lien { flex: none; white-space: nowrap; }
 /* Colonnes ANNÉE à Noms figées au défilement horizontal */
-.donnees-excel { --f1: 64px; --f2: 96px; --f3: 104px; --f4: 200px; }
+.donnees-excel { --f1: 62px; --f2: 96px; --f3: 104px; --f4: 190px; }
 .donnees-excel table.dense .fige { position: sticky; z-index: 1; overflow: hidden; text-overflow: ellipsis; }
 .donnees-excel .panneau table.dense tbody td.fige { background: var(--surface); }
 .donnees-excel .panneau table.dense tbody tr:hover td.fige { background: var(--surface-hover); }
@@ -444,7 +461,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .donnees-excel table.dense .fige-1 { left: 0; width: var(--f1); min-width: var(--f1); max-width: var(--f1); }
 .donnees-excel table.dense .fige-2 { left: var(--f1); width: var(--f2); min-width: var(--f2); max-width: var(--f2); }
 .donnees-excel table.dense .fige-3 { left: calc(var(--f1) + var(--f2)); width: var(--f3); min-width: var(--f3); max-width: var(--f3); }
-.donnees-excel table.dense .fige-4 { left: calc(var(--f1) + var(--f2) + var(--f3)); width: var(--f4); min-width: var(--f4); max-width: var(--f4); box-shadow: inset -1px 0 0 var(--rule-strong), 4px 0 6px -4px rgba(26, 31, 60, .25); }
+.donnees-excel table.dense .fige-4 { left: calc(var(--f1) + var(--f2) + var(--f3)); width: var(--f4); min-width: var(--f4); max-width: var(--f4); box-shadow: inset -1px 0 0 var(--rule-strong); }
 /* Téléphone : seule la colonne Noms reste figée, une fois ANNÉE à MATRICULE défilées */
 @media (max-width: 720px) {
   .donnees-excel { --f4: 140px; }
@@ -477,3 +494,47 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 }
 /* Mobile : champs à 16 px pour éviter le zoom automatique au focus (iOS) */
 @media (max-width: 720px) { input, select, textarea { font-size: var(--fs-base) !important; } }
+
+/* Barres de défilement fines et discrètes, partout */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--navy) 28%, transparent) transparent; }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--navy) 28%, transparent); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--navy) 50%, transparent); background-clip: content-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+}
+
+/* Reporting individuel : en-tête bleu sur une ligne, Mois à gauche et totaux à droite figés, rubriques défilantes */
+.individuel-excel { --d1: 150px; --d2: 136px; }
+.rapport-excel.individuel-excel .panneau table.individuel { width: auto; min-width: 0; }
+.rapport-excel.individuel-excel .panneau table.individuel thead th { background: var(--navy); color: #fff; white-space: normal; vertical-align: middle; line-height: 1.2; text-wrap: balance; }
+.rapport-excel.individuel-excel .panneau table.individuel thead th.fige-g { left: 0; z-index: 3; }
+.individuel-excel table.individuel .fige-d1, .individuel-excel table.individuel .fige-d2 { position: sticky; z-index: 1; text-align: right; background: var(--surface); }
+.individuel-excel table.individuel .fige-d1 { right: var(--d2); width: var(--d1); min-width: var(--d1); max-width: var(--d1); box-shadow: inset 1px 0 0 var(--rule-strong); }
+.individuel-excel table.individuel .fige-d2 { right: 0; width: var(--d2); min-width: var(--d2); max-width: var(--d2); }
+.rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d1, .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d2 { z-index: 3; background: var(--navy); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.groupe .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.groupe .fige-d2 { background: var(--rapport-groupe); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.sous .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.sous .fige-d2 { background: var(--paper); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.total .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.total .fige-d2 { background: var(--peche); }
+.rapport-excel.individuel-excel .panneau table.individuel { border-collapse: separate; border-spacing: 0; }
+.rapport-excel.individuel-excel .panneau table.individuel th, .rapport-excel.individuel-excel .panneau table.individuel td { border-right: 1px solid var(--rule-strong); }
+.rapport-excel.individuel-excel .panneau table.individuel thead th { border-right-color: rgba(255, 255, 255, .18); }
+.rapport-excel.individuel-excel .panneau table.individuel thead th.fige-g, .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d1, .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d2 { white-space: nowrap; max-width: none; }
+
+/* Navigation figée : le défilement d'un tableau ne fait jamais bouger la page, la barre d'application ni les filtres */
+html, body { overscroll-behavior: none; }
+.panneau-corps, .table-scroll, .choix-salarie [role='listbox'] { overscroll-behavior: contain; }
+@media (min-width: 1100px) { body:has(.layout-ecran .page-ecran) { overflow: hidden; } }
+@media (max-width: 1099px) {
+  .topbar { position: sticky; top: 0; z-index: calc(var(--z-sticky) + 10); }
+  .page-ecran.rapport-excel:not(.graphes-excel) .panneau-corps { max-height: 68dvh; overflow: auto; }
+  .page-ecran.rapport-excel:not(.graphes-excel) .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; }
+}
+
+/* DONNEES : colonne TOTAL CHARGES figée à droite */
+.donnees-excel table.dense .total { position: sticky; right: 0; z-index: 1; width: 150px; min-width: 150px; max-width: 150px; }
+.donnees-excel.rapport-excel .panneau table.dense tbody td.total { background: var(--surface); }
+.donnees-excel.rapport-excel .panneau table.dense tbody tr:nth-child(even) td.total { background: var(--rapport-zebre); }
+.donnees-excel.rapport-excel .panneau table.dense tbody tr.reste:nth-child(n) td.total { background: var(--surface); }
+.donnees-excel.page-ecran.rapport-excel .panneau table.dense thead th.total { position: sticky; top: 0; z-index: 3; }
