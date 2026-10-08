@@ -5,15 +5,27 @@ import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, pct, somme } from '../lib/format'
+import { cls, fcfa, MOIS, pct } from '../lib/format'
 
-function Case({ titre, valeur, note, children }: { titre: string; valeur: string; note?: ReactNode; children?: ReactNode }) {
+function Case({
+  titre,
+  valeur,
+  note,
+  devise = true,
+  children,
+}: {
+  titre: string
+  valeur: string
+  note?: ReactNode
+  devise?: boolean
+  children?: ReactNode
+}) {
   return (
     <div className="tuile case">
       <span className="micro">{titre}</span>
       <strong>
         {valeur}
-        {valeur !== '—' && <span className="devise"> FCFA</span>}
+        {devise && valeur !== '—' && <span className="devise"> FCFA</span>}
       </strong>
       {children}
       {note && <span className="note">{note}</span>}
@@ -30,8 +42,7 @@ export default function Resume() {
   const a = ann.data
   const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
-  const ca = a && somme(a.serie_n.map((l) => l.ca ?? null))
-  const tauxMarge = ca && a?.marge_ytd != null && a.marge_ytd !== 'n/a' && Number(ca) !== 0 ? Number(a.marge_ytd) / Number(ca) : null
+  const nbMois = (n: number | undefined) => (n ? `${n} mois saisi${n > 1 ? 's' : ''}` : 'aucun mois saisi')
 
   return (
     <section className="page-ecran page-etroite resume-excel">
@@ -56,24 +67,29 @@ export default function Resume() {
         <>
           {aCa && (
             <div className="cases">
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(ca)} note="à saisir dans le suivi mensuel" />
-              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note="à saisir dans le suivi mensuel" />
-              <Case titre="TAUX DE MARGE" valeur={tauxMarge === null ? '—' : pct(String(tauxMarge))} note="calculé : marge / CA" />
-              <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} note="masse salariale" />
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} note={`cumul · ${nbMois(a.nb_mois_marge)}`} />
+              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note={`CA − masse salariale · ${nbMois(a.nb_mois_marge)}`} />
+              <Case
+                titre="TAUX DE MARGE"
+                valeur={a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}
+                devise={false}
+                note="marge / CA"
+              />
+              <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} note={`masse salariale · ${nbMois(a.cumul_ytd.nb_mois)}`} />
             </div>
           )}
           <div className="cases">
-            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)}>
+            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`}>
               <Variation v={a.cumul_ytd.var_pct} vs="vs N-1" />
             </Case>
-            <Case titre="COMMISSIONS" valeur={montrer(somme(a.serie_n.map((l) => l.commissions)))} note="cumul de l’année" />
-            <Case titre="PRIMES PRODUCTIVITÉ" valeur={montrer(somme(a.serie_n.map((l) => l.primes)))} note="cumul de l’année" />
-            <Case titre="MASSE SALARIALE N-1" valeur={montrer(a.cumul_ytd.m1)} note="même période" />
+            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
+            <Case titre="PRIMES PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
+            <Case titre="MASSE SALARIALE N-1" valeur={montrer(a.cumul_ytd.m1)} note={`même période · ${nbMois(a.cumul_ytd.nb_mois_n1)}`} />
           </div>
           {aCa && (
             <p className="regle">
-              Règle : CA et Marge sont saisis manuellement dans le tableau ci-dessous. Tant qu’ils ne le sont pas, les
-              tuiles restent vides.
+              Le CA est saisi chaque mois par l’administration RH (Fin de mois) ; la marge en est déduite. Un mois sans CA
+              reste vide.
             </p>
           )}
         </>

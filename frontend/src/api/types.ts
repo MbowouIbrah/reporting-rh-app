@@ -115,6 +115,10 @@ export interface Annuel {
   cumul_annee_n1: Dec | null
   marge_ytd?: Val
   nb_mois_marge?: number
+  ca_ytd?: Val
+  taux_marge_ytd?: Val
+  commissions_ytd: Dec | null
+  primes_ytd: Dec | null
   a_type_charge: Mensuel['a_type_charge']
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']

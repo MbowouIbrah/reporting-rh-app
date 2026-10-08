@@ -112,7 +112,12 @@ export default function Individuel() {
       )}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && <Etat type="chargement" />}
-      {q.error && <Etat type={etatErreur(q.error)} />}
+      {q.error &&
+        (matricule && etatErreur(q.error) === '404' ? (
+          <Etat type="404" titre="Matricule introuvable" aide="Cet employé n’a aucune donnée cette année dans votre périmètre." />
+        ) : (
+          <Etat type={etatErreur(q.error)} />
+        ))}
       {d && (
         <Panneau titre="Reporting individuel">
           <table className="dense individuel">

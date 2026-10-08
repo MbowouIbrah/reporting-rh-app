@@ -388,6 +388,10 @@ def annuel(
     c1, nb1, moy1, _ = cumul(n1)
     avec_ca = [m for m in ok if n[m].ca is not None]
     marge_ytd = sum((n[m].ca - n[m].ms for m in avec_ca), ZERO) if avec_ca else None
+    ca_ytd = sum((n[m].ca for m in avec_ca), ZERO) if avec_ca else None
+    ms_avec_ca = sum((n[m].ms for m in avec_ca), ZERO)
+    commissions_ytd = sum((n[m].rubrique(COMMISSION) for m in ok), ZERO) if nb else None
+    primes_ytd = sum((n[m].rubrique(r) for m in ok for r in PRIMES), ZERO) if nb else None
 
     def ms_service(pds, mois_ok):
         out = defaultdict(lambda: ZERO)
@@ -410,6 +414,10 @@ def annuel(
         "moyenne_mensuelle": cell(moy, moy1),
         "marge_ytd": marge_ytd,
         "nb_mois_marge": len(avec_ca),
+        "ca_ytd": ca_ytd,
+        "taux_marge_ytd": f.taux_marge(ca_ytd, ms_avec_ca) if avec_ca else None,
+        "commissions_ytd": commissions_ytd,
+        "primes_ytd": primes_ytd,
         "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
         "par_service": [
             {"service": s, **cell(s_n.get(s, ZERO) if nb else None,

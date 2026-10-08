@@ -20,9 +20,12 @@ interface Props {
   type: TypeEtat
   /** Action proposée dans l'état d'erreur (ex. relancer la requête). */
   onRetry?: () => void
+  /** Texte propre à la page, à la place du texte générique de l'état. */
+  titre?: string
+  aide?: string
 }
 
-export default function Etat({ type, onRetry }: Props) {
+export default function Etat({ type, onRetry, titre, aide }: Props) {
   if (type === 'chargement') {
     return (
       <div className="etat" role="status" aria-live="polite">
@@ -35,8 +38,8 @@ export default function Etat({ type, onRetry }: Props) {
   }
   return (
     <div className={`etat etat-${type}`} role="alert">
-      <strong>{TEXTE[type]}</strong>
-      {AIDE[type] && <span className="note">{AIDE[type]}</span>}
+      <strong>{titre ?? TEXTE[type]}</strong>
+      {(aide ?? AIDE[type]) && <span className="note">{aide ?? AIDE[type]}</span>}
       {type === 'erreur' && onRetry && (
         <button type="button" className="bouton bouton-secondaire" onClick={onRetry}>
           Réessayer

@@ -112,6 +112,8 @@ def test_annuel_global(charge):
     assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
     assert D(r["moyenne_mensuelle"]["m"]) == D("5350.25")
     assert D(r["marge_ytd"]) == D("10000") - D("7000.5") and r["nb_mois_marge"] == 1
+    assert D(r["ca_ytd"]) == D("10000") and D(r["taux_marge_ytd"]) == D("2999.5") / D("10000")
+    assert D(r["commissions_ytd"]) >= 0 and D(r["primes_ytd"]) >= D("999")
     assert r["cumul_ytd"]["m1"] is None
 
 
@@ -155,6 +157,9 @@ def test_individuel_hors_perimetre_nominatif(charge, make_client, db):
     c = make_client(EQUIP)
     assert get(c, "individuel", annee=2026, matricule="E1").status_code == 200
     assert get(c, "individuel", annee=2026, matricule="E3").status_code == 404  # Administration
+    r = get(c, "individuel/tous", annee=2026, matricule="E3")
+    assert r.status_code == 404 and "nom" not in r.json()  # pas de fuite du nom
+    assert get(c, "individuel/tous", annee=2026, matricule="E1").json()["nom"]
 
 
 def test_filtres_et_salaries(charge, make_client):
@@ -171,6 +176,7 @@ def test_annuel_serie_sans_marge_pour_perimetre(charge, make_client):
     equip = get(make_client(EQUIP), "annuel", annee=2026, mois=2).json()
     assert all("marge" not in x and "taux_marge" not in x for x in equip["serie_n"])
     assert "commissions" in equip["serie_n"][0] and "primes" in equip["serie_n"][0]
+    assert "ca_ytd" not in equip and "taux_marge_ytd" not in equip and "primes_ytd" in equip
     adm = get(charge, "annuel", annee=2026, mois=2).json()
     assert adm["serie_n"][0]["marge"] is not None
     sav = next(x for x in adm["par_service"] if x["service"] == "SAV PL")

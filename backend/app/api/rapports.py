@@ -16,7 +16,8 @@ from app.security.deps import current_principal
 from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
-CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge"}
+CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "ca_ytd",
+              "taux_marge_ytd"}
 
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -225,6 +226,8 @@ def individuel_tous(
             "total": sum((pd.total(L) for L in lignes), zero),
             "budget": None if budget is None else budget * len(lignes),
         })
+    if sal is not None and not any(x["present"] for x in mois):
+        raise HTTPException(404, "Matricule introuvable")  # hors périmètre : rien ne fuit
     audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id if sal else None, None,
                  {"annee": annee, "tous": sal is None})
     db.commit()
