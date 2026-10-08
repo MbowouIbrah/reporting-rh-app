@@ -13,6 +13,7 @@ Dérivé de ce qui est livré (refonte R1 à R4). Source des valeurs : `src/styl
 - Sémantique : `--success|warning|error|info` et variantes `-soft`.
 - Données (graphes) : `--data-1..6` (bleu, sarcelle, orange, violet, vert, gris), >= 3:1 sur blanc.
 - Échelles : espacement `--sp-1..7` (4 à 48), rayons, ombres `--shadow-1..3`, z-index, durées, typo fluide `--fs-*` (KPI : `--fs-kpi`), graisses 400/500/600.
+- Typographie : toute taille passe par un token `--fs-*`, jamais de px en dur ni de taille indexée sur la hauteur d'écran ; plancher 12 px. Rôles : `xs` 12 libellés, en-têtes de colonnes, notes ; `sm` 13 cellules de tableaux, texte secondaire ; `md` 14 texte courant (corps), contrôles, navigation, titres de panneaux ; `base` 16 titres de section ; `lg` titres de bandeau ; `xl` valeurs de tuiles ; `2xl` titres de page. Champs à 16 px sous 720 px (pas de zoom iOS).
 - Grille : `--page-max` 1280 px, marges `--page-gutter` fluides.
 
 ## Composants (`src/components/`)

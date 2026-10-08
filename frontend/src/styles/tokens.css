@@ -54,8 +54,12 @@
   --font-display: 'Space Grotesk', 'DM Sans', sans-serif;
   --font-body: 'DM Sans', -apple-system, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Échelle unique, plancher 12 px : xs libellés, en-têtes de colonnes, notes ; sm cellules de tableaux, texte secondaire ;
+     md texte courant, contrôles, navigation, titres de panneaux ; base titres de section ; lg titres de bandeau ;
+     xl valeurs de tuiles ; 2xl titres de page ; kpi chiffre clé. Aucune taille en dur ni indexée sur la hauteur d'écran. */
   --fs-xs: 0.75rem;
   --fs-sm: 0.8125rem;
+  --fs-md: 0.875rem;
   --fs-base: 1rem;
   --fs-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
   --fs-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
