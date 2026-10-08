@@ -49,7 +49,8 @@ test('filtres indépendants entre pages', async ({ page }) => {
   await page.getByLabel('Mois').selectOption('1')
   await expect(page).toHaveURL(/mois=1/)
   await page.getByRole('link', { name: 'Annuel' }).click()
-  await expect(page.getByLabel('Mois')).toHaveValue('2')
+  await expect(page).toHaveURL(/annuel$/)
+  await expect(page.getByRole('link', { name: /Exporter/ })).toHaveAttribute('href', /mois=2/)
 })
 
 test('access token supprimé : rattrapé par le refresh', async ({ page, context }) => {

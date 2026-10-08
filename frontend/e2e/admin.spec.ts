@@ -24,6 +24,19 @@ test('admin : navigation limitée aux trois onglets', async ({ page }) => {
   await expect(nav.getByRole('link')).toHaveCount(3)
 })
 
+test('fin de mois : ouvrir un mois puis saisir le CA', async ({ page }) => {
+  await connecter(page, 'admin@exemple.invalid')
+  await page.goto('admin/cloture?periode=2033-07&etape=ca')
+  await expect(page.getByRole('heading', { name: 'Fin de mois', level: 2 })).toBeVisible()
+  await page.getByRole('button', { name: /^Ouvrir juillet 2033/i }).click()
+  const champ = page.getByLabel('Chiffre d’affaires', { exact: true })
+  await expect(champ).toBeVisible()
+  await champ.fill('1234567.5')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  await page.reload()
+  await expect(page.getByLabel('Chiffre d’affaires', { exact: true })).toHaveValue(/1234567/)
+})
+
 test('journal : filtre par entité et diff d’un événement', async ({ page }) => {
   await connecter(page, 'admin@exemple.invalid')
   await page.goto('admin/journal')

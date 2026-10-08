@@ -31,7 +31,7 @@ await page.getByLabel('Adresse e-mail').fill('admin@exemple.invalid')
 await page.getByLabel('Mot de passe').fill(PW)
 await page.getByRole('button', { name: 'Se connecter' }).click()
 await page.getByRole('navigation', { name: 'Rapports' }).waitFor()
-for (const p of ['periodes', 'utilisateurs', 'perimetres', 'referentiels', 'budgets', 'parametrage', 'journal']) {
+for (const p of ['cloture?etape=mois', 'cloture?etape=donnees', 'cloture?etape=controles', 'cloture?etape=ca', 'cloture?etape=budgets', 'utilisateurs', 'perimetres', 'referentiels', 'parametrage', 'journal']) {
   await page.goto(`${BASE}admin/${p}`)
   await audit(`admin/${p}`)
 }

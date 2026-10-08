@@ -26,16 +26,10 @@ function useEcriture<V>(fn: (v: V) => Promise<PeriodeAdmin>) {
   })
 }
 
-const post = (path: string, body?: unknown) =>
-  api<PeriodeAdmin>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined })
-
 export const useSaisirCa = () =>
   useEcriture(({ id, valeur }: { id: number; valeur: string | null }) =>
     api<PeriodeAdmin>(`/periodes/${id}/ca`, { method: 'PUT', body: JSON.stringify({ valeur }) }),
   )
-export const useCloturer = () => useEcriture((id: number) => post(`/periodes/${id}/cloturer`))
-export const useRouvrir = () =>
-  useEcriture(({ id, motif }: { id: number; motif: string }) => post(`/periodes/${id}/rouvrir`, { motif }))
 
 // ---- utilisateurs et périmètres ----
 export interface RoleAdmin {
