@@ -81,6 +81,7 @@ def test_annuel_identique_a_l_ecran(charge):
     syn = lignes(wb["Synthèse"])
     assert D(str(syn["Moyenne mensuelle"][0])) == D(ecran["moyenne_mensuelle"]["m"])
     assert D(str(syn["Marge cumulée"][0])) == D(ecran["marge_ytd"])
+    assert syn["Mois avec marge saisie"][0] == ecran["nb_mois_marge"]
 
 
 def test_perimetre_et_marge_respectes(make_client, charge):

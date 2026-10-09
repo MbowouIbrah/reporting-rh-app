@@ -19,8 +19,9 @@ def L(sid, service="SAV PL", site="Douala", act="Front office", ctr="CDI", **m):
                  {noms.get(k, k.replace("_", " ")): D(v) for k, v in m.items()})
 
 
-def pd(*lignes, ca=None):
-    return PeriodeData(tuple(lignes), EXCL, None if ca is None else D(ca))
+def pd(*lignes, ca=None, marge=None):
+    return PeriodeData(tuple(lignes), EXCL, ca=None if ca is None else D(ca),
+                       marge=None if marge is None else D(marge))
 
 
 # ---------- formules ----------
@@ -44,9 +45,10 @@ def test_absenteisme_budget_marge():
     assert f.ecart_budget(D(2_000_000), D(1_800_000)) == (D(200000), D(200000) / D(1_800_000))
     assert f.ecart_budget(D(1), D(0)) == (D(1), f.NA)
     assert f.ecart_budget(None, D(1)) == (None, None)
-    assert f.marge(D(100), D(60)) == 40 and f.marge(None, D(60)) is None  # jamais 0 sans CA
-    assert f.taux_marge(D(100), D(60)) == D("0.4")
+    assert f.taux_marge(D(100), D(40)) == D("0.4")  # marge saisie / CA
+    assert f.taux_marge(D(100), D(-20)) == D("-0.2")
     assert f.taux_marge(D(0), D(60)) == f.NA and f.taux_marge(None, D(1)) is None
+    assert f.taux_marge(D(100), None) is None  # jamais 0 sans marge saisie
     assert f.moyenne(D(90), 3) == 30 and f.moyenne(D(0), 0) is None
 
 
@@ -58,7 +60,7 @@ def test_total_charges_exclut_les_rubriques_exclues_et_vide_vaut_zero():
 
 def test_mensuel_valeurs_et_absence_de_m1():
     cur = pd(L(1, Brut_Réel=1000, Absences_nb=2), L(2, ctr="CDD", Brut_Réel=500, Absences_nb=1),
-             ca=2000)
+             ca=2000, marge=500)
     r = mensuel(cur, None, REFS, Params())
     s = r["synthese"]
     assert s["ms"]["m"] == 1500 and s["ms"]["m1"] is None and s["ms"]["var"] is None
@@ -75,6 +77,11 @@ def test_mensuel_valeurs_et_absence_de_m1():
 def test_mensuel_sans_ca_marge_vide_jamais_zero():
     s = mensuel(pd(L(1, Brut_Réel=10)), None, REFS, Params())["synthese"]
     assert s["ca"] is None and s["marge"] is None and s["taux_marge"] is None
+
+
+def test_mensuel_ca_sans_marge_saisie_reste_vide():
+    s = mensuel(pd(L(1, Brut_Réel=10), ca=100), None, REFS, Params())["synthese"]
+    assert s["ca"] == 100 and s["marge"] is None and s["taux_marge"] is None
 
 
 def test_mensuel_mouvements_effectif():
@@ -132,17 +139,22 @@ def test_regle_datee_changeant_le_total():
 
 # ---------- annuel / individuel ----------
 def test_annuel_cumul_moyenne_nb_mois_et_marge_ytd():
-    n = {1: pd(L(1, Brut_Réel=100), ca=300), 2: pd(L(1, Brut_Réel=200)),
-         4: pd(L(1, Brut_Réel=300), ca=500)}
+    n = {1: pd(L(1, Brut_Réel=100), ca=300, marge=200), 2: pd(L(1, Brut_Réel=200)),
+         3: pd(ca=50),  # CA saisi sans paie : compte dans le CA, pas dans la MS
+         4: pd(L(1, Brut_Réel=300), ca=500, marge=-100)}
     n1 = {1: pd(L(1, Brut_Réel=50)), 2: pd(L(1, Brut_Réel=50))}
     r = annuel(n, n1, 4, REFS, Params())
     assert r["cumul_ytd"]["m"] == 600 and r["cumul_ytd"]["nb_mois"] == 3
     assert r["cumul_ytd"]["m1"] == 100 and r["cumul_ytd"]["nb_mois_n1"] == 2
     assert r["moyenne_mensuelle"]["m"] == 200
-    assert r["marge_ytd"] == (300 - 100) + (500 - 300) and r["nb_mois_marge"] == 2
-    assert r["serie_n"][2]["ms"] is None and r["serie_n"][3]["ms"] == 300  # mars vide
+    assert r["marge_ytd"] == 200 - 100 and r["nb_mois_marge"] == 2
+    assert r["ca_ytd"] == 850 and r["nb_mois_ca"] == 3
+    assert r["taux_marge_ytd"] == D(100) / D(800)  # mêmes mois que les marges
+    assert r["serie_n"][2]["ms"] is None and r["serie_n"][3]["ms"] == 300  # mars sans paie
+    assert r["serie_n"][2]["ca"] == 50 and r["serie_n"][2]["marge"] is None
+    assert r["serie_n"][3]["taux_marge"] == D(-100) / D(500)
     r2 = annuel(n, n1, 2, REFS, Params())
-    assert r2["cumul_ytd"]["m"] == 300 and r2["marge_ytd"] == 200
+    assert r2["cumul_ytd"]["m"] == 300 and r2["marge_ytd"] == 200 and r2["nb_mois_ca"] == 1
 
 
 def test_annuel_blocs_coherents_avec_le_cumul():

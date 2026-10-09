@@ -19,6 +19,10 @@ def test_montee_et_descente(tmp_path, monkeypatch):
     assert any("mois" in c["sqltext"] for c in insp.get_check_constraints("periode"))
     assert TABLES <= set(inspect(create_engine(url)).get_table_names())
     assert TABLES3 <= set(inspect(create_engine(url)).get_table_names())
+    assert "marge" in {c["name"] for c in insp.get_columns("ca_periode")}
+    command.downgrade(cfg, "0007")
+    cols = {c["name"] for c in inspect(create_engine(url)).get_columns("ca_periode")}
+    assert "marge" not in cols and "valeur" in cols
     command.downgrade(cfg, "0001")
     assert not TABLES & set(inspect(create_engine(url)).get_table_names())
     command.upgrade(cfg, "head")

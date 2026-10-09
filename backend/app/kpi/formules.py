@@ -51,14 +51,11 @@ def ecart_budget(m: Decimal | None, bud: Decimal | None) -> tuple[Val, Val]:
     return ecart, (NA if bud == 0 else ecart / bud)
 
 
-def marge(ca: Decimal | None, ms: Decimal | None) -> Decimal | None:
-    return None if ca is None or ms is None else ca - ms
-
-
-def taux_marge(ca: Decimal | None, ms: Decimal | None) -> Val:
-    if ca is None or ms is None:
+def taux_marge(ca: Decimal | None, marge: Decimal | None) -> Val:
+    """Marge saisie / CA saisi."""
+    if ca is None or marge is None:
         return None
-    return NA if ca == 0 else (ca - ms) / ca
+    return NA if ca == 0 else marge / ca
 
 
 def moyenne(cumul: Decimal, nb_mois: int) -> Decimal | None:

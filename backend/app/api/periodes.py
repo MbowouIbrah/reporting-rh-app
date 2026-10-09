@@ -17,25 +17,62 @@ from app.models.pilotage import CaPeriode
 from app.models.referentiel import RefAlias, Rubrique
 from app.security import audit
 from app.security.deps import current_principal
-from app.security.policy import Principal, authorize
+from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(tags=["periodes"])
+MARGE_SANS_CA = "Une marge ne peut pas être saisie sans chiffre d'affaires"
 
 
-def _ca(db: Session, pid: int) -> str | None:
-    v = db.scalar(select(CaPeriode.valeur).where(CaPeriode.periode_id == pid))
+def _txt(v) -> str | None:
     return None if v is None else format(Decimal(str(v)), "f")
 
 
 def _periode(p: Periode, db: Session) -> dict:
-    return {"id": p.id, "annee": p.annee, "mois": p.mois, "ca": _ca(db, p.id)}
+    saisie = db.get(CaPeriode, p.id)
+    return {"id": p.id, "annee": p.annee, "mois": p.mois,
+            "ca": _txt(saisie.valeur) if saisie else None,
+            "marge": _txt(saisie.marge) if saisie else None}
+
+
+def periode_ou_ouvrir(db: Session, p: Principal, annee: int, mois: int) -> Periode:
+    """Période du mois, ouverte (et tracée) si elle n'existe pas encore."""
+    per = db.scalar(select(Periode).where(Periode.annee == annee, Periode.mois == mois))
+    if per is None:
+        authorize(p, "periode:write")  # même droit que POST /periodes
+        per = Periode(annee=annee, mois=mois)
+        db.add(per)
+        db.flush()
+        audit.record(db, p.user_id, "ouverture", "periode", per.id, None, _periode(per, db))
+    return per
+
+
+def ecrire_ca_marge(db: Session, p: Principal, per: Periode,
+                    ca: Decimal | None, marge: Decimal | None) -> None:
+    """Remplace CA et marge du mois (None = effacé), avec trace d'audit. Pas de commit."""
+    if ca is None and marge is not None:
+        raise HTTPException(422, MARGE_SANS_CA)
+    avant = _periode(per, db)
+    ligne = db.get(CaPeriode, per.id)
+    if ca is None:
+        if ligne is not None:
+            db.delete(ligne)
+    elif ligne is None:
+        db.add(CaPeriode(periode_id=per.id, valeur=ca, marge=marge))
+    else:
+        ligne.valeur, ligne.marge = ca, marge
+    db.flush()
+    apres = _periode(per, db)
+    if apres != avant:  # un envoi sans changement ne laisse pas de trace vide
+        audit.record(db, p.user_id, "saisie_ca", "periode", per.id, avant, apres)
 
 
 @router.get("/periodes")
 def liste(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "import:read")
     rows = db.scalars(select(Periode).order_by(Periode.annee, Periode.mois))
-    return [_periode(x, db) for x in rows]
+    marge = is_allowed(p, "marge:read")  # CA et marge : même règle que les rapports
+    return [{k: v for k, v in _periode(x, db).items() if marge or k not in ("ca", "marge")}
+            for x in rows]
 
 
 class Mois(BaseModel):
@@ -74,20 +111,13 @@ def saisir_ca(
     pid: int, body: Ca, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     authorize(p, "saisie:write")
+    authorize(p, "marge:read")
     per = _get(db, pid)
-    avant = _periode(per, db)
     ligne = db.get(CaPeriode, pid)
-    if body.valeur is None or not body.valeur.strip():
-        if ligne is not None:
-            db.delete(ligne)
-    else:
-        v = parse_montant(body.valeur)
-        if ligne is None:
-            db.add(CaPeriode(periode_id=pid, valeur=v))
-        else:
-            ligne.valeur = v
-    db.flush()
-    audit.record(db, p.user_id, "saisie_ca", "periode", pid, avant, _periode(per, db))
+    vide = body.valeur is None or not body.valeur.strip()
+    # la marge déjà saisie est conservée avec le CA, effacée avec lui
+    ecrire_ca_marge(db, p, per, None if vide else parse_montant(body.valeur),
+                    ligne.marge if ligne and not vide else None)
     db.commit()
     return _periode(per, db)
 

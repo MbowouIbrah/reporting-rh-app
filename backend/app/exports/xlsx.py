@@ -132,6 +132,7 @@ def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None) -> byte
     ]
     if "marge_ytd" in r:
         lignes.append(["Marge cumulée", r["marge_ytd"]])
+        lignes.append(["Mois avec marge saisie", r["nb_mois_marge"]])
     _feuille(wb, "Synthèse", ["Indicateur", str(annee)], lignes)
     _blocs(wb, r, str(ref_annee or annee - 1), str(annee))
     return _sortie(wb)

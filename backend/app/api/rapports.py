@@ -16,7 +16,7 @@ from app.security.deps import current_principal
 from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
-CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "ca_ytd",
+CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
               "taux_marge_ytd"}
 
 

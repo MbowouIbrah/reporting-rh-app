@@ -50,21 +50,6 @@ def test_refus(charge, make_client, db):
     assert put(charge, 9999, [ligne]).status_code == 404
 
 
-def test_copie(charge, db):
-    pid, sav, _, _, brut, _ = ids(db)
-    fev = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 2))
-    assert charge.post(f"{API}/budgets/{fev}/copie", json={"depuis": pid}).status_code == 422
-    put(charge, pid, [{"axe": "service", "cible_id": sav, "valeur": "900"}])
-    put(charge, fev, [{"axe": "rubrique", "cible_id": brut, "valeur": "5"}])
-    r = charge.post(f"{API}/budgets/{fev}/copie", json={"depuis": pid})
-    assert r.status_code == 200
-    svc = [x["valeur"] for x in r.json()["lignes"]["service"] if x["cible_id"] == sav]
-    assert svc == ["900.000"]
-    assert all(x["valeur"] is None for x in r.json()["lignes"]["rubrique"])  # remplacement
-    assert charge.post(f"{API}/budgets/{fev}/copie", json={"depuis": fev}).status_code == 422
-    assert charge.post(f"{API}/budgets/{fev}/copie", json={"depuis": 9999}).status_code == 404
-
-
 def test_rapport_ecarts_et_perimetre(charge, make_client, db):
     pid, sav, vn, yde, brut, _ = ids(db)
     put(charge, pid, [{"axe": "rubrique", "cible_id": brut, "valeur": "5000"},

@@ -49,7 +49,7 @@ def parcours(
                 _etape("donnees", "Données de paie", "a_faire",
                        "Importez le fichier de paie du mois"),
                 _etape("controles", "Contrôles", "a_faire", "Après les données de paie"),
-                _etape("ca", "Chiffre d’affaires", "reportable", "Saisissable dès l’ouverture"),
+                _etape("ca", "CA et marge", "reportable", "Saisissables dès l’ouverture"),
                 _etape("budgets", "Budgets", "facultatif", "Saisissables dès l’ouverture"),
             ],
         }
@@ -86,7 +86,15 @@ def parcours(
             f"{len(ecarts)} écart(s) bloquant(s)" if ecarts else "Tous les contrôles sont bons",
         )
 
-    ca = db.scalar(select(CaPeriode.valeur).where(CaPeriode.periode_id == per.id))
+    saisie = db.get(CaPeriode, per.id)
+    ca = None if saisie is None else saisie.valeur
+    marge = None if saisie is None else saisie.marge
+    if ca is None:
+        etape_ca = _etape("ca", "CA et marge", "reportable", "À saisir quand ils sont connus")
+    elif marge is None:
+        etape_ca = _etape("ca", "CA et marge", "reportable", "CA saisi · marge à saisir")
+    else:
+        etape_ca = _etape("ca", "CA et marge", "fait", "CA et marge saisis")
     nb_budgets = db.scalar(
         select(func.count()).select_from(Budget).where(Budget.periode_id == per.id)
     )
@@ -99,8 +107,7 @@ def parcours(
             _etape("mois", "Mois", "fait", "Mois ouvert"),
             donnees,
             controles,
-            _etape("ca", "Chiffre d’affaires", "fait" if ca is not None else "reportable",
-                   "CA saisi" if ca is not None else "À saisir quand il est connu"),
+            etape_ca,
             _etape("budgets", "Budgets", "fait" if nb_budgets else "facultatif",
                    f"{nb_budgets} ligne(s) de budget" if nb_budgets else "Facultatif"),
         ],

@@ -24,9 +24,10 @@ Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC(18,3)`, 
 | Budget | Budget mensuel par employé (600 000) × effectif, plus budgets saisis par rubrique/service/site | Non saisi : « — » |
 | Écart / Budget | M − Budget ; % = écart / budget | |
 | Chiffre d'affaires (CA) | Saisi par période (global) | Non saisi : vide |
-| Marge | CA − MS | Vide si CA absent (jamais 0) |
-| Taux de marge | Marge / CA | Vide si CA absent |
-| Marge YTD | Cumul sur les seuls mois où un CA est saisi | |
+| Marge | Saisie par période avec le CA (comme dans l'Excel, décision 08c) ; peut être négative, refusée sans CA. Les marges antérieures à 08c (CA × paramètre) ne sont pas reprises : à ressaisir | Non saisie : vide (jamais 0) |
+| Taux de marge | Marge / CA | Vide si CA ou marge absent ; CA 0 : « n/a » |
+| CA YTD | Cumul sur les mois où un CA est saisi | |
+| Marge YTD | Cumul sur les mois où une marge est saisie ; taux YTD = Σ marges / Σ CA de ces mêmes mois | |
 | Cumul YTD | Somme janvier → mois sélectionné | |
 | Moyenne mensuelle | Cumul / nombre de mois saisis | |
 | Nb de mois saisis | Périodes contenant au moins une ligne (obligatoire à côté de tout cumul) | |

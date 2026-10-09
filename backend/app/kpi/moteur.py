@@ -40,6 +40,7 @@ class PeriodeData:
     lignes: tuple[Ligne, ...]
     exclues: frozenset[str] = frozenset()  # rubriques hors TOTAL CHARGES à la date de la période
     ca: Decimal | None = None
+    marge: Decimal | None = None  # saisie avec le CA
 
     def total(self, ligne: Ligne) -> Decimal:
         return total_ligne(ligne.montants, self.exclues)
@@ -89,6 +90,11 @@ def _ok(pd: PeriodeData | None) -> PeriodeData | None:
     return pd if pd is not None and pd.lignes else None
 
 
+def _ca_marge(pd: PeriodeData | None) -> dict:
+    ca, marge = (pd.ca, pd.marge) if pd else (None, None)
+    return {"ca": ca, "marge": marge, "taux_marge": f.taux_marge(ca, marge)}
+
+
 def cell(m: Decimal | None, m1: Decimal | None) -> dict:
     return {"m1": m1, "m": m, "var": f.variation(m, m1), "var_pct": f.variation_pct(m, m1)}
 
@@ -116,7 +122,6 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     absences = cur.rubrique(ABSENCES)
     bud = f.budget(eff, params.budget_employe)
     ecart, ecart_pct = f.ecart_budget(ms, bud)
-    marge_ = f.marge(cur.ca, ms)
     exclus = sum((cur.rubrique(r) for r in cur.exclues if r != ABSENCES), ZERO)
 
     synthese = {
@@ -129,8 +134,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "absences": cell(absences, prev.rubrique(ABSENCES) if prev else None),
         "taux_absenteisme": f.taux_absenteisme(absences, eff, params.jours_ouvres),
         "ca": cur.ca,
-        "marge": marge_,
-        "taux_marge": f.taux_marge(cur.ca, ms),
+        "marge": cur.marge,
+        "taux_marge": f.taux_marge(cur.ca, cur.marge),
         "exclus": exclus,
         "remuneration_globale": ms + exclus,
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
@@ -381,12 +386,11 @@ def annuel(
                  "ms": pds[m].ms if _ok(pds.get(m)) else None,
                  "effectif": len(pds[m].ids) if _ok(pds.get(m)) else None,
                  "absences": pds[m].rubrique(ABSENCES) if _ok(pds.get(m)) else None,
-                 "ca": pds[m].ca if _ok(pds.get(m)) else None,
                  "commissions": pds[m].rubrique(COMMISSION) if _ok(pds.get(m)) else None,
                  "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
                  if _ok(pds.get(m)) else None,
-                 "marge": f.marge(pds[m].ca, pds[m].ms) if _ok(pds.get(m)) else None,
-                 "taux_marge": f.taux_marge(pds[m].ca, pds[m].ms) if _ok(pds.get(m)) else None}
+                 # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
+                 **_ca_marge(pds.get(m))}
                 for m in range(1, 13)]
 
     def cumul(pds):
@@ -396,10 +400,12 @@ def annuel(
 
     c, nb, moy, ok = cumul(n)
     c1, nb1, moy1, _ = cumul(n1)
-    avec_ca = [m for m in ok if n[m].ca is not None]
-    marge_ytd = sum((n[m].ca - n[m].ms for m in avec_ca), ZERO) if avec_ca else None
+    avec_ca = [m for m in sorted(n) if m <= mois and n[m].ca is not None]
+    avec_marge = [m for m in avec_ca if n[m].marge is not None]
     ca_ytd = sum((n[m].ca for m in avec_ca), ZERO) if avec_ca else None
-    ms_avec_ca = sum((n[m].ms for m in avec_ca), ZERO)
+    marge_ytd = sum((n[m].marge for m in avec_marge), ZERO) if avec_marge else None
+    # taux sur les seuls mois où CA et marge sont saisis
+    ca_avec_marge = sum((n[m].ca for m in avec_marge), ZERO) if avec_marge else None
     commissions_ytd = sum((n[m].rubrique(COMMISSION) for m in ok), ZERO) if nb else None
     primes_ytd = sum((n[m].rubrique(r) for m in ok for r in PRIMES), ZERO) if nb else None
 
@@ -423,9 +429,10 @@ def annuel(
                       "nb_mois_n1": nb1},
         "moyenne_mensuelle": cell(moy, moy1),
         "marge_ytd": marge_ytd,
-        "nb_mois_marge": len(avec_ca),
+        "nb_mois_marge": len(avec_marge),
+        "nb_mois_ca": len(avec_ca),
         "ca_ytd": ca_ytd,
-        "taux_marge_ytd": f.taux_marge(ca_ytd, ms_avec_ca) if avec_ca else None,
+        "taux_marge_ytd": f.taux_marge(ca_avec_marge, marge_ytd),
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
         "cumul_annee_n1": complet1 if avec_donnees(n1) else None,

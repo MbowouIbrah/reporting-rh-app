@@ -97,11 +97,17 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
               .where(Montant.situation_id.in_([r[0] for r in rows])))
         for sid, rub, val in db.execute(mq):
             montants[sid][rub] = Decimal(str(val))
-    ca = db.scalar(select(CaPeriode.valeur).where(CaPeriode.periode_id == periode.id))
+    saisie = db.get(CaPeriode, periode.id)
     lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}))
                    for sid, sal, srv, site, act, ctr in rows)
     return PeriodeData(lignes, exclues_a_date(db, annee, mois),
-                       None if ca is None else Decimal(str(ca)))
+                       ca=_dec(saisie.valeur) if saisie else None,
+                       marge=_dec(saisie.marge) if saisie else None)
+
+
+def _dec(v) -> Decimal | None:
+    """SQLite renvoie des float pour NUMERIC."""
+    return None if v is None else Decimal(str(v))
 
 
 def rubriques_exclues(db: Session) -> frozenset[str]:
@@ -190,7 +196,9 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None) -> Pe
     lignes = tuple(L for L in pd.lignes
                    if (not service or L.service == service) and (not site or L.site == site))
     # Le CA est global : il n'existe pas pour un service ou un site, donc ni marge ni taux.
-    return PeriodeData(lignes, pd.exclues, None if (service or site) else pd.ca)
+    global_ = not (service or site)
+    return PeriodeData(lignes, pd.exclues, ca=pd.ca if global_ else None,
+                       marge=pd.marge if global_ else None)
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:

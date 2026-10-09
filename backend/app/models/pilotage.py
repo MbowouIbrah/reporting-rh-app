@@ -20,12 +20,13 @@ class Parametre(Base):
 
 
 class CaPeriode(Base):
-    """Chiffre d'affaires global saisi pour une période. Absent = pas de ligne."""
+    """Chiffre d'affaires et marge saisis pour une période. Absent = pas de ligne."""
 
     __tablename__ = "ca_periode"
 
     periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"), primary_key=True)
     valeur: Mapped[Decimal] = mapped_column(Numeric(18, 3))
+    marge: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
 
 
 class Budget(Base):

@@ -37,7 +37,7 @@ def charge(make_client, db):
     assert lot["statut"] == "pret", lot
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
     pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
-    db.add(CaPeriode(periode_id=pid, valeur=D("10000")))
+    db.add(CaPeriode(periode_id=pid, valeur=D("10000"), marge=D("2500")))
     db.commit()
     return c
 
@@ -111,7 +111,7 @@ def test_filtre_utilisateur_restreint(charge):
 def test_ca_global_absent_sous_filtre(charge):
     # Le CA n'existe pas par service ou site : pas de marge filtrée (CA global - MS partielle).
     a = get(charge, "annuel", annee=2026, mois=2, service="SAV PL").json()
-    assert a["marge_ytd"] is None and a["nb_mois_marge"] == 0
+    assert a["marge_ytd"] is None and a["nb_mois_marge"] == 0 and a["nb_mois_ca"] == 0
     a = get(charge, "annuel", annee=2026, mois=2, site="Yaoundé").json()
     assert a["marge_ytd"] is None
 
@@ -126,8 +126,9 @@ def test_annuel_global(charge):
     r = get(charge, "annuel", annee=2026, mois=2).json()
     assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
     assert D(r["moyenne_mensuelle"]["m"]) == D("5350.25")
-    assert D(r["marge_ytd"]) == D("10000") - D("7000.5") and r["nb_mois_marge"] == 1
-    assert D(r["ca_ytd"]) == D("10000") and D(r["taux_marge_ytd"]) == D("2999.5") / D("10000")
+    # marge saisie (plus calculée CA − MS)
+    assert D(r["marge_ytd"]) == D("2500") and r["nb_mois_marge"] == 1 and r["nb_mois_ca"] == 1
+    assert D(r["ca_ytd"]) == D("10000") and D(r["taux_marge_ytd"]) == D("0.25")
     assert D(r["commissions_ytd"]) >= 0 and D(r["primes_ytd"]) >= D("999")
     assert r["cumul_ytd"]["m1"] is None
 

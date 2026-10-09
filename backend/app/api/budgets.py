@@ -1,4 +1,8 @@
-"""Budgets mensuels par rubrique, service et site (saisie, lecture, copie d'un mois)."""
+"""Budgets mensuels par rubrique, service et site (saisie, lecture).
+
+Pas de copie d'un mois sur l'autre : les budgets précédents ne sont proposés qu'en
+pré-remplissage (GET /pilotage, champ `reprise`).
+"""
 
 from decimal import Decimal
 from typing import Literal
@@ -78,58 +82,43 @@ def saisir(
 ):
     authorize(p, "saisie:write")
     per = _periode(db, pid)
-    cles = [(x.axe, x.cible_id) for x in body.lignes]
+    ecrire_budgets(db, p, pid, valider_lignes(db, body.lignes))
+    db.commit()
+    return _vue(db, per)
+
+
+def valider_lignes(db: Session, lignes: list[LigneIn]) -> list[tuple[LigneIn, Decimal | None]]:
+    """Contrôle toutes les lignes avant toute écriture : (ligne, montant ou None si effacé)."""
+    cles = [(x.axe, x.cible_id) for x in lignes]
     if len(set(cles)) != len(cles):
         raise HTTPException(422, "Cible en double")
-    avant = _valeurs(db, pid)
-    for x in body.lignes:
+    out = []
+    for x in lignes:
         cible = db.get(MODELES[x.axe], x.cible_id)
         if cible is None:
             raise HTTPException(422, "Cible inconnue")
         if x.axe == "rubrique" and cible.unite != "FCFA":
             raise HTTPException(422, "Budget possible sur une rubrique en FCFA uniquement")
+        vide = x.valeur is None or not x.valeur.strip()
+        out.append((x, None if vide else parse_montant(x.valeur)))
+    return out
+
+
+def ecrire_budgets(db: Session, p: Principal, pid: int,
+                   valides: list[tuple[LigneIn, Decimal | None]]) -> None:
+    """Écrit les lignes validées (None = effacée), avec trace d'audit. Pas de commit."""
+    avant = _valeurs(db, pid)
+    for x, v in valides:
         ligne = db.scalar(select(Budget).where(
             Budget.periode_id == pid, Budget.axe == x.axe, Budget.cible_id == x.cible_id))
-        if x.valeur is None or not x.valeur.strip():
+        if v is None:
             if ligne is not None:
                 db.delete(ligne)
-            continue
-        v = parse_montant(x.valeur)
-        if ligne is None:
+        elif ligne is None:
             db.add(Budget(periode_id=pid, axe=x.axe, cible_id=x.cible_id, valeur=v))
         else:
             ligne.valeur = v
     db.flush()
-    audit.record(db, p.user_id, "saisie_budget", "periode", pid, avant, _valeurs(db, pid))
-    db.commit()
-    return _vue(db, per)
-
-
-class Copie(BaseModel):
-    depuis: int
-
-
-@router.post("/budgets/{pid}/copie")
-def copier(
-    pid: int, body: Copie, p: Principal = Depends(current_principal),
-    db: Session = Depends(get_db),
-):
-    authorize(p, "saisie:write")
-    per = _periode(db, pid)
-    if body.depuis == pid:
-        raise HTTPException(422, "Source identique à la cible")
-    _periode(db, body.depuis)
-    source = list(db.scalars(select(Budget).where(Budget.periode_id == body.depuis)))
-    if not source:
-        raise HTTPException(422, "Aucun budget à copier sur la période source")
-    avant = _valeurs(db, pid)
-    for b in db.scalars(select(Budget).where(Budget.periode_id == pid)):
-        db.delete(b)
-    db.flush()
-    for b in source:
-        db.add(Budget(periode_id=pid, axe=b.axe, cible_id=b.cible_id, valeur=b.valeur))
-    db.flush()
-    audit.record(db, p.user_id, "copie_budget", "periode", pid, avant,
-                 {**_valeurs(db, pid), "depuis": body.depuis})
-    db.commit()
-    return _vue(db, per)
+    apres = _valeurs(db, pid)
+    if apres != avant:  # un envoi sans changement ne laisse pas de trace vide
+        audit.record(db, p.user_id, "saisie_budget", "periode", pid, avant, apres)
