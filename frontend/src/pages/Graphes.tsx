@@ -14,6 +14,8 @@ const C3 = 'var(--data-3)'
 const GRILLE = 'var(--rule)'
 const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Absences (jours)', 'Effectif moyen par type de contrat']
 const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
+// Transition courte d'une valeur à l'autre (1,5 s par défaut pour une courbe : trop lent au changement de filtre).
+const ANIM = { animationDuration: 450, animationEasing: 'ease-out' } as const
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
@@ -38,7 +40,6 @@ export default function Graphes() {
     placeholderData: keepPreviousData,
   })
   const erreur = ann.error
-  const maj = ann.isPlaceholderData
 
   const serie = ann.data?.serie_n.map((m) => ({
     mois: MOIS_COURTS[m.mois - 1],
@@ -53,7 +54,9 @@ export default function Graphes() {
     .filter((c) => c.effectif > 0)
 
   return (
-    <section className={`page-ecran page-etroite rapport-excel graphes-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
+    // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
+    // et glissent vers les nouvelles valeurs à leur arrivée.
+    <section className="page-ecran page-etroite rapport-excel graphes-excel">
       <h2 className="bandeau-titre">GRAPHES D’ÉVOLUTION</h2>
       {f.filtres && (
         <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} partage={f.partage} onChange={f.set} />
@@ -77,7 +80,7 @@ export default function Graphes() {
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
                 <YAxis domain={['auto', 'auto']} tickFormatter={(v) => fcfa(v)} width={90} {...AXE} />
                 <Tooltip formatter={(v) => fcfa(Number(v))} />
-                <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} />
+                <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} {...ANIM} />
               </LineChart>
             </Carte>
             <Carte titre={TITRES[1]}>
@@ -86,7 +89,7 @@ export default function Graphes() {
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
                 <YAxis allowDecimals={false} {...AXE} />
                 <Tooltip />
-                <Bar dataKey="effectif" name="Effectif" fill={C2} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="effectif" name="Effectif" fill={C2} radius={[3, 3, 0, 0]} {...ANIM} />
               </BarChart>
             </Carte>
             <Carte titre={TITRES[2]}>
@@ -95,7 +98,7 @@ export default function Graphes() {
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
                 <YAxis {...AXE} />
                 <Tooltip />
-                <Bar dataKey="absences" name="Absences" fill={C3} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="absences" name="Absences" fill={C3} radius={[3, 3, 0, 0]} {...ANIM} />
               </BarChart>
             </Carte>
           </>
@@ -107,7 +110,7 @@ export default function Graphes() {
               <XAxis dataKey="contrat" {...AXE} />
               <YAxis {...AXE} />
               <Tooltip />
-              <Bar dataKey="effectif" name="Effectif moyen" fill={C1} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="effectif" name="Effectif moyen" fill={C1} radius={[3, 3, 0, 0]} {...ANIM} />
             </BarChart>
           </Carte>
         )}
