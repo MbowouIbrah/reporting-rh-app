@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { apresEcriture, enregistrerCaMarge, type Pilotage } from '../../../api/pilotage'
 import { Bouton, Carte, ChampMontant } from '../../../components/Kit'
-import { montantSigneValide, montantValide, pct, sansEspaces, valeurBrute } from '../../../lib/format'
+import { enMilli, fcfa, montantSigneValide, montantValide, pct, sansEspaces, valeurBrute } from '../../../lib/format'
 
 const INVALIDE = 'Montant invalide : chiffres, virgule et 3 décimales au plus.'
 
@@ -21,6 +21,19 @@ export default function CarteCaMarge({ vue, periode }: { vue: Pilotage; periode:
     ? INVALIDE
     : !margeVide && caVide ? 'Saisissez le CA du mois avant la marge.' : null
   const modifie = ca !== initial.ca || marge !== initial.marge
+  // Points d'attention, non bloquants : relus avant d'enregistrer, comme à la vérification des données.
+  const alertes: string[] = []
+  if (modifie && !errCa && !errMarge && !caVide) {
+    const dec = (v: string) => enMilli(sansEspaces(v).replace(',', '.'))
+    const vCa = dec(ca), vMarge = margeVide ? null : dec(marge)
+    if (vMarge != null && vMarge > vCa) alertes.push('La marge dépasse le CA : taux de marge supérieur à 100 %.')
+    if (vCa === 0n) alertes.push('CA à zéro : laisser vide s’il n’est pas encore connu.')
+    const avant = vue.ca == null ? null : enMilli(vue.ca)
+    if (avant != null && avant > 0n && ca !== initial.ca) {
+      const d = vCa - avant
+      if ((d < 0n ? -d : d) * 2n > avant) alertes.push(`Écart de plus de 50 % sur le CA enregistré (${fcfa(vue.ca)} FCFA) : un zéro en trop ou en moins ?`)
+    }
+  }
   const changer = (set: (v: string) => void) => (v: string) => { set(v); setEnvoi({ cours: false }) }
 
   const enregistrer = async () => {
@@ -43,6 +56,9 @@ export default function CarteCaMarge({ vue, periode }: { vue: Pilotage; periode:
         <ChampMontant label="Chiffre d’affaires" valeur={ca} onChange={changer(setCa)} erreur={errCa} />
         <ChampMontant label="Marge" valeur={marge} onChange={changer(setMarge)} erreur={errMarge} />
       </div>
+      {alertes.length > 0 && (
+        <ul className="pilotage-alertes" aria-label="Points d’attention">{alertes.map((a) => <li key={a}>{a}</li>)}</ul>
+      )}
       <p className="pilotage-taux">
         <span>Taux de marge enregistré</span>
         <strong>{vue.taux_marge == null ? '—' : pct(vue.taux_marge)}</strong>

@@ -1,6 +1,7 @@
 const PARCOURS = {
   grille: ['Choix du mois', 'Employés concernés', 'Saisie des montants', 'Vérification et enregistrement'],
   fichier: ['Choix du fichier', 'Vérification et enregistrement'],
+  budgets: ['Choix du mois', 'Saisie des budgets', 'Vérification et enregistrement'],
 }
 
 /** Fil d'étapes : où l'on est, ce qui est fait, ce qui reste. */

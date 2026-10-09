@@ -561,6 +561,7 @@ html, body { overscroll-behavior: none; }
 .saisie-sous-bandeau { margin: var(--sp-5) 0 0; font-size: var(--fs-base); font-weight: 800; color: var(--ink); }
 .pilotage-champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-3); }
 .pilotage-champs .champ { margin: 0; }
+.pilotage-alertes { margin: 0; padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + 1em); background: var(--warning-soft); border-left: 3px solid var(--warning); color: var(--warning); font-size: var(--fs-sm); display: grid; gap: 2px; }
 .pilotage-taux { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); margin: 0; padding-top: var(--sp-2); border-top: 1px solid var(--rule); font-size: var(--fs-sm); color: var(--muted); }
 .pilotage-taux strong { font-size: var(--fs-lg); color: var(--navy); font-variant-numeric: tabular-nums; }
 .pilotage-resume { list-style: none; margin: 0; padding: 0; }
@@ -570,8 +571,11 @@ html, body { overscroll-behavior: none; }
 .saisie-carte-action .champ-erreur, .saisie-carte-action .note { margin: 0; }
 /* Budgets : trois tableaux côte à côte, chacun à sa taille ; en-tête et TOTAL figés quand il défile */
 .saisie-budgets { --hachure: repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--red-deep) 9%, transparent) 5px 7px); }
-.budgets-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); grid-template-rows: minmax(0, 1fr); gap: var(--sp-4); align-items: start; flex: 0 1 auto; min-height: 0; }
-.budgets-grille > .panneau { max-height: 100%; }
+.budgets-grille { display: grid; grid-template-columns: repeat(var(--nb-col, 1), minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: var(--sp-4); align-items: start; flex: 0 1 auto; min-height: 0; }
+.budgets-colonne { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 0; max-height: 100%; }
+.budgets-colonne > .panneau { flex: 0 1 auto; min-height: 0; }
+@media (max-width: 760px) { .budgets-grille { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; } }
+.saisie-points { margin: 0; padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + 1em); display: grid; gap: 2px; font-size: var(--fs-md); }
 .saisie-budgets .panneau table.budgets { width: 100%; }
 .rapport-excel.saisie-budgets .panneau table.budgets thead th { position: sticky; top: 0; z-index: 1; background: var(--navy); color: #fff; text-align: left; }
 .rapport-excel.saisie-budgets .panneau table.budgets thead th.num { text-align: right; }

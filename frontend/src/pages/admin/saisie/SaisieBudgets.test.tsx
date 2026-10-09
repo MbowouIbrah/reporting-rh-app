@@ -18,6 +18,7 @@ const VUE: Pilotage = {
 
 let corps: unknown
 function rendu(onRetour = vi.fn()) {
+  corps = undefined
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (_u, init) => {
     corps = JSON.parse(String(init!.body))
     return new Response(JSON.stringify({ ...VUE, periode_id: 4, reprise: null }))
@@ -54,19 +55,30 @@ test('reprise du mois précédent en pré-remplissage, exclues hors total, envoi
   fireEvent.change(transport, { target: { value: '12 FCFA' } })
   expect(transport.closest('td')).toHaveClass('ko')
   expect(total(rub)).toHaveTextContent('—') // total inconnu, pas faux
-  const enregistrer = screen.getByRole('button', { name: 'Enregistrer les budgets' })
-  expect(enregistrer).toBeDisabled()
+  const verifier = screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' })
+  expect(verifier).toBeDisabled()
   fireEvent.change(transport, { target: { value: '2 000,5' } })
   expect(total(rub)).toHaveTextContent(/^3\s001$/)
 
-  fireEvent.click(enregistrer)
+  // Vérification : synthèse et points d'attention avant tout envoi.
+  fireEvent.click(verifier)
+  expect(screen.getByRole('heading', { name: 'VÉRIFICATION AVANT ENREGISTREMENT — BUDGETS FÉVRIER 2026' })).toBeInTheDocument()
+  expect(corps).toBeUndefined()
+  expect(screen.getByText(/Totaux différents selon la répartition/)).toBeInTheDocument()
+  expect(screen.queryByText(/Budgets manquants/)).toBeNull() // services tous vides : pas un oubli de ligne
+  // Retour à la saisie : les montants tapés sont conservés.
+  fireEvent.click(screen.getByRole('button', { name: 'Retour : Saisie des budgets' }))
+  expect(screen.getByRole('textbox', { name: 'Budget Transport (types de charge)' })).toHaveValue('2 000,5')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Vérifier avant d’enregistrer' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer 4 budgets' }))
   await screen.findByText('Budgets enregistrés.')
   expect(corps).toEqual({
     annee: 2026, mois: 2,
     lignes: [
       { axe: 'rubrique', cible_id: 1, valeur: '1000' },
       { axe: 'rubrique', cible_id: 2, valeur: '50' },
-      { axe: 'rubrique', cible_id: 3, valeur: '2000,5' },
+      { axe: 'rubrique', cible_id: 3, valeur: '2000.5' },
       { axe: 'site', cible_id: 1, valeur: '2500000' },
     ],
   })

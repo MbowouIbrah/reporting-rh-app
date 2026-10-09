@@ -120,7 +120,11 @@ test('pilotage d’un mois sans paie : CA, marge et budgets ouvrent le mois', as
   const sites = page.getByRole('table', { name: /sites/ })
   await sites.getByRole('textbox').first().fill('12 000 000')
   await expect(sites.locator('tfoot td')).toHaveText(/12\s000\s000/)
-  await page.getByRole('button', { name: 'Enregistrer les budgets' }).click()
+  await page.screenshot({ path: 'test-results/saisie-budgets-grille.png' })
+  await page.getByRole('button', { name: 'Vérifier avant d’enregistrer' }).click()
+  await expect(page.getByRole('heading', { name: /VÉRIFICATION AVANT ENREGISTREMENT — BUDGETS OCTOBRE 2026/ })).toBeVisible()
+  await page.screenshot({ path: 'test-results/saisie-budgets-verif.png' })
+  await page.getByRole('button', { name: 'Enregistrer 1 budget' }).click()
   await expect(page.getByText('Budgets enregistrés.')).toBeVisible()
   await page.screenshot({ path: 'test-results/saisie-budgets.png' })
 

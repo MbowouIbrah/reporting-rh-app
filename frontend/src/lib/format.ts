@@ -44,16 +44,20 @@ export const entier = (v: number | null | undefined) => (v == null ? '—' : esp
 export const isNeg = (v: Val | undefined) => v != null && v !== 'n/a' && Number(v) < 0
 export const cls = (v: Val | undefined) => (isNeg(v) ? 'num neg' : 'num')
 
+/** Décimal ("-1200.5") en millièmes entiers, pour comparer ou additionner sans flottant. */
+export function enMilli(v: string): bigint {
+  const [e, d = ''] = v.split('.')
+  const milli = BigInt(e.replace('-', '') || '0') * 1000n + BigInt(d.padEnd(3, '0').slice(0, 3))
+  return e.startsWith('-') ? -milli : milli
+}
+
 /** Somme de montants décimaux (3 décimales) en entiers, sans flottant. null si aucune valeur. */
 export function somme(valeurs: Val[]): string | null {
   let total = 0n
   let n = 0
   for (const v of valeurs) {
     if (v === null || v === 'n/a') continue
-    const [e, d = ''] = v.split('.')
-    const neg = e.startsWith('-')
-    const milli = BigInt(e.replace('-', '') || '0') * 1000n + BigInt(d.padEnd(3, '0').slice(0, 3))
-    total += neg ? -milli : milli
+    total += enMilli(v)
     n += 1
   }
   if (n === 0) return null
