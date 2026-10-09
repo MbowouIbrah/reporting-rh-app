@@ -64,6 +64,12 @@ export function somme(valeurs: Val[]): string | null {
 /** Montant saisi : chiffres, virgule ou point, 3 décimales au plus (NUMERIC(18,3)). */
 export const montantValide = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
 
+/** Montant tapé ou collé sans ses séparateurs de milliers (espaces, espaces insécables). */
+export const sansEspaces = (v: string) => v.replace(/[\s  ]/g, '')
+
+/** Montant pouvant être négatif (une marge), séparateurs de milliers tolérés. */
+export const montantSigneValide = (v: string) => /^-?\d+([.,]\d{0,3})?$/.test(sansEspaces(v))
+
 /** Décimal du serveur sans zéros de fin, sans passer par un flottant ("1200.500" -> "1200.5"). */
 export const sansZerosFinaux = (v: string) => (v.includes('.') ? v.replace(/0+$/, '').replace(/\.$/, '') : v)
 

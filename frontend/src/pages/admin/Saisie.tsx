@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Download } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePilotage } from '../../api/pilotage'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Carte, ChoixFichier } from '../../components/Kit'
@@ -9,6 +10,9 @@ import { MOIS } from '../../lib/format'
 import type { Ligne } from '../../lib/grille'
 import ApercuLot from './saisie/ApercuLot'
 import BarreParcours from './saisie/BarreParcours'
+import CarteBudgets from './saisie/CarteBudgets'
+import CarteCaMarge from './saisie/CarteCaMarge'
+import SaisieBudgets from './saisie/SaisieBudgets'
 import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } from './saisie/brouillon'
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
@@ -21,6 +25,7 @@ type Etape =
   | { e: 'grille'; lignes: Ligne[]; brouillonId: string }
   | { e: 'fichier'; fichier: File }
   | { e: 'apercu'; lot: Lot; depuis: 'grille' | 'fichier' }
+  | { e: 'budgets' }
 
 const suivant = (a: number, m: number) => (m === 12 ? [a + 1, 1] : [a, m + 1])
 
@@ -40,6 +45,8 @@ export default function Saisie() {
   const fichierRef = useRef<HTMLInputElement>(null)
 
   const prepa = usePreparation(annee, mois, etape.e === 'choix' || etape.e === 'grille')
+  const pilotage = usePilotage(annee, mois, etape.e === 'depart' || etape.e === 'budgets')
+  const periode = `${MOIS[mois - 1]} ${annee}`
   const cle = cleBrouillon(annee, mois)
   const [brouillon, setBrouillon] = useState(() => lireBrouillon(cle))
 
@@ -57,7 +64,6 @@ export default function Saisie() {
 
   if (etape.e === 'depart') {
     const annees = Array.from({ length: 5 }, (_, i) => auj.getFullYear() - 3 + i)
-    const periode = `${MOIS[mois - 1]} ${annee}`
     return (
       <section className="page-ecran rapport-excel saisie-depart">
         <BarreParcours libelle="Administration" vers="/admin" />
@@ -104,8 +110,22 @@ export default function Saisie() {
             </ol>
           </Carte>
         </div>
+        <h3 className="saisie-sous-bandeau">PILOTAGE DE {periode.toUpperCase()}</h3>
+        {pilotage.data ? (
+          <div className="saisie-cartes">
+            <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
+            <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
+          </div>
+        ) : (
+          <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+        )}
       </section>
     )
+  }
+
+  if (etape.e === 'budgets') {
+    if (!pilotage.data) return <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+    return <SaisieBudgets key={periode} vue={pilotage.data} periode={periode} onRetour={() => setEtape({ e: 'depart' })} />
   }
 
   if (etape.e === 'fichier') {

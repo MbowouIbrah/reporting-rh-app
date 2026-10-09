@@ -109,8 +109,8 @@ export default function Resume() {
         <>
           {aCa && (
             <div className="cases">
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} note={`cumul · ${nbMois(a.nb_mois_marge)}`} />
-              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note={`CA − masse salariale · ${nbMois(a.nb_mois_marge)}`} />
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} note={`cumul · ${nbMois(a.nb_mois_ca)}`} />
+              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note={`saisie · ${nbMois(a.nb_mois_marge)}`} />
               <Case
                 titre="TAUX DE MARGE"
                 valeur={a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}
@@ -130,8 +130,8 @@ export default function Resume() {
           </div>
           {aCa && (
             <p className="regle">
-              Le CA est saisi chaque mois par l’administration RH ; la marge en est déduite. Un mois sans CA
-              reste vide.
+              Le CA et la marge sont saisis chaque mois par l’administration RH. Un mois non saisi reste
+              vide ; le taux de marge ne porte que sur les mois où les deux sont connus.
             </p>
           )}
         </>

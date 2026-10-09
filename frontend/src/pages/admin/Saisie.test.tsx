@@ -28,6 +28,13 @@ const APERCU = {
   ],
 }
 
+const vide = { rubrique: [], service: [], site: [] }
+const PILOTAGE = {
+  annee: 2026, mois: 2, periode_id: null, ca: null, marge: null, taux_marge: null,
+  budgets: { ...vide, service: [{ cible_id: 1, libelle: 'SAV PL', actif: true, exclue: false, valeur: '300.000' }] },
+  totaux: { rubrique: null, service: '300.000', site: null }, reprise: null,
+}
+
 const appels: { url: string; corps?: unknown }[] = []
 let anomalies: unknown[] = []
 function rendu() {
@@ -48,6 +55,8 @@ function rendu() {
     if (url.includes('/donnees/lots')) return new Response(JSON.stringify(LOT), { status: 201 })
     if (url.includes('/apercu')) return new Response(JSON.stringify(APERCU))
     if (url.includes('/valider')) return new Response(JSON.stringify({ ...LOT, statut: 'valide' }))
+    if (url.includes('/pilotage/ca-marge')) return new Response(JSON.stringify({ ...PILOTAGE, periode_id: 4, ca: '1000000.000', marge: '-50000.000', taux_marge: '-0.05' }))
+    if (url.includes('/pilotage')) return new Response(JSON.stringify(PILOTAGE))
     return new Response('{}')
   })
   render(
@@ -119,6 +128,34 @@ test('mois proposé, cases, grille avec collage Excel, aperçu et choix « garde
   expect(valider.corps).toEqual({ garder: [{ annee: 2026, mois: 2, matricule: 'E2' }] })
   // Brouillon local effacé une fois enregistré.
   expect(localStorage.getItem('saisie:2026-02')).toBeNull()
+})
+
+test('pilotage du mois : CA et marge saisis ensemble, résumé des budgets', async () => {
+  rendu()
+  expect(await screen.findByRole('heading', { name: 'PILOTAGE DE FÉVRIER 2026' })).toBeInTheDocument()
+  const ca = await screen.findByRole('textbox', { name: 'Chiffre d’affaires' })
+  const marge = screen.getByRole('textbox', { name: 'Marge' })
+  const enregistrer = screen.getByRole('button', { name: 'Enregistrer le CA et la marge' })
+  expect(enregistrer).toBeDisabled() // rien de modifié
+  // Marge sans CA : refusée avant tout envoi.
+  fireEvent.change(marge, { target: { value: '-50 000' } })
+  expect(screen.getByText('Saisissez le CA du mois avant la marge.')).toBeInTheDocument()
+  expect(enregistrer).toBeDisabled()
+  fireEvent.change(ca, { target: { value: '-1' } })
+  expect(screen.getByText(/Le CA ne peut pas être négatif/)).toBeInTheDocument()
+  fireEvent.change(ca, { target: { value: '1 000 000' } })
+  fireEvent.click(enregistrer)
+  await screen.findByText('Enregistré.')
+  const envoi = appels.find((a) => a.url.includes('/pilotage/ca-marge'))!
+  expect(envoi.corps).toEqual({ annee: 2026, mois: 2, ca: '1000000', marge: '-50000' })
+  // Taux calculé par le serveur ; champs remis au format affiché.
+  expect(screen.getByText('Taux de marge enregistré').nextSibling).toHaveTextContent(/-5,0\s%/)
+  expect(ca).toHaveValue('1 000 000')
+  // Budgets : nombre saisi et total par axe.
+  const services = screen.getByText('Services').closest('li')!
+  expect(services).toHaveTextContent(/1 sur 1/)
+  expect(services).toHaveTextContent(/300\sFCFA/)
+  expect(screen.getByRole('button', { name: 'Saisir les budgets de Février 2026 →' })).toBeInTheDocument()
 })
 
 test('erreur signalée par le serveur : cellule en rouge, message, enregistrement bloqué', async () => {

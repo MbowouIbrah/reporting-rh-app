@@ -100,6 +100,35 @@ test('lignes ajoutées : nom proche d’un employé connu signalé, employé san
   await expect(page.getByText(/Enregistrement annulé/)).toBeVisible()
 })
 
+test('pilotage d’un mois sans paie : CA, marge et budgets ouvrent le mois', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await connecter(page, 'admin@exemple.invalid')
+  await page.goto('admin/saisie')
+  await page.getByLabel('Mois').selectOption('Octobre')
+  await page.getByLabel('Année').selectOption('2026')
+  await expect(page.getByRole('heading', { name: 'PILOTAGE DE OCTOBRE 2026' })).toBeVisible()
+
+  await page.getByRole('textbox', { name: 'Chiffre d’affaires' }).fill('1 000 000')
+  await page.getByRole('textbox', { name: 'Marge' }).fill('-250 000')
+  await page.getByRole('button', { name: 'Enregistrer le CA et la marge' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Enregistré.' })).toBeVisible()
+  await expect(page.locator('.pilotage-taux strong')).toHaveText(/-25,0\s%/)
+  await page.screenshot({ path: 'test-results/saisie-pilotage.png', fullPage: true })
+
+  await page.getByRole('button', { name: 'Saisir les budgets de Octobre 2026 →' }).click()
+  await expect(page.getByRole('heading', { name: 'BUDGETS — OCTOBRE 2026' })).toBeVisible()
+  const sites = page.getByRole('table', { name: /sites/ })
+  await sites.getByRole('textbox').first().fill('12 000 000')
+  await expect(sites.locator('tfoot td')).toHaveText(/12\s000\s000/)
+  await page.getByRole('button', { name: 'Enregistrer les budgets' }).click()
+  await expect(page.getByText('Budgets enregistrés.')).toBeVisible()
+  await page.screenshot({ path: 'test-results/saisie-budgets.png' })
+
+  await page.getByRole('button', { name: 'Retour : Choix du mois' }).click()
+  const resume = page.getByText('Sites', { exact: true }).locator('xpath=..')
+  await expect(resume).toContainText(/12\s000\s000\sFCFA/)
+})
+
 test('départ : deux façons de faire, retour en haut à gauche ; grille triable et filtrable', async ({ page }) => {
   await connecter(page, 'admin@exemple.invalid')
   await page.goto('admin')

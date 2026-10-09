@@ -114,6 +114,7 @@ export interface Annuel {
   cumul_annee_n1: Dec | null
   marge_ytd?: Val
   nb_mois_marge?: number
+  nb_mois_ca?: number
   ca_ytd?: Val
   taux_marge_ytd?: Val
   commissions_ytd: Dec | null
