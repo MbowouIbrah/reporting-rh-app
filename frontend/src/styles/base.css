@@ -451,6 +451,8 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .donnees-excel .panneau table.dense tr.reste { height: 100%; }
 .donnees-excel .panneau table.dense tr.reste td { padding: 0; border-bottom: 0; }
 .donnees-excel.rapport-excel .panneau table.dense tbody tr.reste:nth-child(n) td { background: var(--surface); }
+/* Rendu fenêtré : hauteur des lignes non rendues, sans bordure ni survol. */
+.donnees-excel.rapport-excel .panneau table.dense tbody tr.espace:nth-child(n) > td { padding: 0; border: 0; background: var(--surface); }
 .donnees-excel.rapport-excel .panneau table.dense tbody tr:nth-child(even) td.fige { background: var(--rapport-zebre); }
 .donnees-excel .exclu-mention { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 /* Filtres : Employé et Réinitialiser restent toujours sur la même ligne */

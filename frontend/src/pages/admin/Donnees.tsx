@@ -3,6 +3,7 @@ import { useStructure, useTableau, type FiltresTableau, type LigneTableau } from
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import ChoixSalarie from '../../components/ChoixSalarie'
 import Etat, { etatErreur } from '../../components/Etat'
+import { useFenetre } from '../../hooks/useFenetre'
 import { usePartage } from '../../hooks/useFiltres'
 import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../lib/format'
 import BandeauEnregistre from './saisie/Enregistre'
@@ -32,6 +33,15 @@ function LignesSquelette({ lignes, classes }: { lignes: number; classes: (string
   ))
 }
 
+/** Hauteur des lignes non rendues (avant la fenêtre) : tbody à part, l'alternance des lignes rendues reste juste. */
+function Espace({ hauteur, colonnes }: { hauteur: number; colonnes: number }) {
+  return (
+    <tbody aria-hidden="true">
+      <tr className="espace"><td colSpan={colonnes} style={{ height: hauteur }} /></tr>
+    </tbody>
+  )
+}
+
 export default function Donnees() {
   // Filtres partagés avec les pages de reporting : « Toutes » / « Tous » retire la valeur partagée.
   const { partage, set: changer } = usePartage()
@@ -44,6 +54,8 @@ export default function Donnees() {
   const charge = q.isLoading || q.isPlaceholderData
   // Aucune ligne à habiller (premier chargement, ou tableau précédent vide) : lignes vides en squelette.
   const squelette = q.isLoading || (q.isPlaceholderData && !d?.lignes.length)
+  // Des milliers de lignes × une trentaine de colonnes : seules celles proches de la zone visible sont rendues.
+  const { ref, debut, fin, avant, apres } = useFenetre(squelette ? 0 : d?.lignes.length ?? 0)
 
   // Rubriques comptées d'abord, puis celles exclues du total, regroupées juste avant le TOTAL.
   const exclues = new Set(st?.exclues)
@@ -122,7 +134,7 @@ export default function Donnees() {
             <Etat type="vide" />
           ) : (
             <div className="panneau">
-              <div className="panneau-corps" tabIndex={0} role="region" aria-label="Lignes de la feuille DONNEES">
+              <div ref={ref} className="panneau-corps" tabIndex={0} role="region" aria-label="Lignes de la feuille DONNEES">
                 <table className="dense">
                   <thead>
                     <tr>
@@ -142,9 +154,10 @@ export default function Donnees() {
                       )}
                     </tr>
                   </thead>
-                  <tbody>
+                  {avant > 0 && <Espace hauteur={avant} colonnes={classes.length} />}
+                  <tbody className="fenetre">
                     {squelette && <LignesSquelette lignes={10} classes={classes} />}
-                    {!squelette && d?.lignes.map((l) => (
+                    {!squelette && d?.lignes.slice(debut, fin).map((l) => (
                       <tr key={`${l.annee}-${l.mois}-${l.matricule}`}>
                         {texte(l).map((v, i) => (
                           <td key={FIXES[i]} className={classes[i]} title={i === 3 ? String(v) : undefined}>{v}</td>
@@ -157,6 +170,9 @@ export default function Donnees() {
                         <td className="num total">{valeurBrute(l.total)}</td>
                       </tr>
                     ))}
+                  </tbody>
+                  <tbody>
+                    {apres > 0 && <tr className="espace" aria-hidden="true"><td colSpan={classes.length} style={{ height: apres }} /></tr>}
                     {/* Ligne de remplissage : le tableau occupe toute la hauteur du panneau, même avec peu de lignes. */}
                     <tr className="reste" aria-hidden="true">
                       {classes.map((_, i) => <td key={i} />)}
