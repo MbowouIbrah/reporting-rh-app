@@ -11,10 +11,17 @@ Serveur Academy, réseau Docker `edge`, base sans port publié. Commandes depuis
 6. Retirer `ADMIN_PASSWORD` de `deploy/.env`, puis `docker compose -f deploy/docker-compose.yml up -d api`.
 
 ## 2. Comptes
+Pas d'écran de gestion des comptes : console serveur, `C="docker compose -f deploy/docker-compose.yml exec api python -m app.comptes"`.
 - Premier compte : rh_admin créé par le seed (étape 1.3).
-- Les autres comptes : page Admin > Utilisateurs (rôle `lecteur_global`, `lecteur_perimetre` + périmètre, droit nominatif). Modèle d'attribution : DRH et DOP en `lecteur_global`, DPS Equipment en `lecteur_perimetre` Equipment, directeur commercial en `lecteur_perimetre` Commerce VN.
-- Mots de passe : 12 caractères minimum, communiqués hors e-mail ; chaque création/modification est tracée dans Admin > Journal.
-- Départ d'un utilisateur : désactiver le compte (ne pas supprimer, pour garder l'audit).
+- Les autres comptes (mot de passe demandé au clavier, jamais en argument) :
+  - `$C perimetres` : codes disponibles (`equipment`, `commerce_vn`) ;
+  - `$C creer drh@exemple.invalid --nom "DRH" --role lecteur_global` ;
+  - `$C creer dps@exemple.invalid --nom "DPS Equipment" --role lecteur_perimetre --perimetre equipment`.
+- Modèle d'attribution : DRH et DOP en `lecteur_global`, DPS Equipment en `lecteur_perimetre` Equipment, directeur commercial en `lecteur_perimetre` Commerce VN. `--nominatif` ouvre le reporting individuel à un `lecteur_perimetre` (`lecteur_global` l'a d'office).
+- `$C lister`, `$C role EMAIL --role ...`, `$C mot-de-passe EMAIL`, `$C desactiver EMAIL` / `$C activer EMAIL`.
+- Mots de passe : 12 caractères minimum, communiqués hors e-mail. Il reste toujours au moins un rh_admin actif (refus sinon).
+- Départ d'un utilisateur : `desactiver` (ne pas supprimer, pour garder l'audit).
+- Journal : `$C journal [--entite utilisateur] [--limite 50] [--detail]` ; « console » = action faite par cet outil.
 
 ## 3. Sauvegarde
 - `deploy/scripts/sauvegarde.sh` : `pg_dump -Fc` dans `deploy/backups/` (variable `BACKUP_DIR`), rotation 30 jours (`RETENTION_JOURS`).
@@ -43,5 +50,6 @@ Avant toute mise à jour : `deploy/scripts/sauvegarde.sh`, puis noter le commit 
 ## 7. Exploitation courante
 - Logs : `docker compose -f deploy/docker-compose.yml logs --tail 100 api`.
 - Santé : `GET /health` sur l'API (healthcheck Docker).
-- Pas de verrou de période : un mois reste modifiable (import, CA, budgets, paramètres datés). Avant diffusion, exporter le rapport ; toute modification ultérieure figure dans Admin > Journal.
-- Droits : toute lecture nominative et tout export sont audités (Admin > Journal).
+- Saisie du mois : page Administration > « Renseigner des données » (lignes de paie, import Excel, CA et marge, budgets). Un mois s'ouvre au premier enregistrement.
+- Pas de verrou de période : un mois reste modifiable. Avant diffusion, exporter le rapport ; toute modification ultérieure figure au journal (`$C journal --detail`).
+- Droits : toute lecture nominative et tout export sont audités (même journal).
