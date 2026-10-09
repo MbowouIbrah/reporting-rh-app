@@ -15,7 +15,7 @@
 - Nouveau dépôt reporting-rh-app (backend/, frontend/, deploy/, backlog.md, golden/).
 
 ## Modèle de données
-periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situation_mensuelle, rubrique, rubrique_regle, montant, chiffre_affaires, budget, parametre, perimetre, perimetre_regle, utilisateur, role_assignment, lot_import, staging_ligne, import_anomalie, audit_event.
+periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situation_mensuelle, rubrique, rubrique_regle, montant, ca_periode (CA + marge saisie), budget, parametre, perimetre, perimetre_regle, utilisateur, role_assignment, lot_import, staging_ligne, import_anomalie, audit_event.
 
 ## Phases
 | # | Phase | Taille | Acceptation clé |
@@ -27,7 +27,7 @@ periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situati
 | P4 | Moteur KPI + API rapports | L | Parité golden sur 18 périodes, invariants OK, couverture kpi/ >= 90 % |
 | P5 | Front : Résumé, Mensuel, Annuel, Individuel, Graphes | L | Playwright par rôle, filtres indépendants par page, conformité RESULTAT_ATTENDU.md |
 | P5b | Refonte UI (`docs/PLAN_REFONTE_UI.md`) : tokens, kit de composants, pages, accessibilité, captures avant/après | M (~6,5 j) | Présentation seule : valeurs et masquages inchangés, Playwright par rôle inchangé, Lighthouse accessibilité >= 95, validé par l'admin |
-| P6 | Admin et saisie : CRUD, CA, budgets, rubriques, utilisateurs, historique | M | Tout tracé (clôture retirée en 07e) |
+| P6 | Admin et saisie : CRUD, CA et marge, budgets (08c : pilotage du mois dans « Renseigner des données »), rubriques, utilisateurs, historique | M | Tout tracé (clôture retirée en 07e) |
 | P7 | Exports xlsx | S | = écran au FCFA près, filtré par périmètre |
 | P8 | Double run 2 mois réels Excel vs app | M | Écart nul ou documenté ; validation admin + DRH |
 | P9 | Mise en prod : sauvegarde/restauration testées, runbook, rollback, comptes, Excel archivé | S | |
