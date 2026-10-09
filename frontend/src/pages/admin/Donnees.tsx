@@ -1,11 +1,14 @@
-import { useSearchParams } from 'react-router-dom'
-import { useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
+import { Link } from 'react-router-dom'
+import { useStructure, useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
+import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import ChoixSalarie from '../../components/ChoixSalarie'
 import Etat, { etatErreur } from '../../components/Etat'
-import { largeurEntete, MOIS, valeurBrute } from '../../lib/format'
+import { usePartage } from '../../hooks/useFiltres'
+import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../lib/format'
+import BandeauEnregistre from './saisie/Enregistre'
 
 // Lignes 1 et 2 de la feuille DONNEES (REPORTING_RH_V5.xlsx), reprises à l'identique.
-const TITRE = 'FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois'
+const TITRE = 'ADMINISTRATION DES DONNÉES'
 const CONSIGNE =
   'Saisir ANNÉE (ex. 2025), MOIS (nom dans la liste) et MATRICULE (clé unique, ex. EMP001). Ajouter les nouveaux mois à la suite. Le TOTAL se calcule seul.'
 // Les quatre premières colonnes (ANNÉE à Noms) restent figées au défilement horizontal.
@@ -16,29 +19,46 @@ const TOTAL = 'TOTAL CHARGES (FCFA)'
 const CLES = ['annee', 'mois', 'service', 'site', 'matricule'] as const
 
 const texte = (l: LigneTableau) => [
-  l.annee, MOIS[l.mois - 1], l.matricule, l.nom, l.poste ?? '', l.type_contrat, l.activite, l.site, l.service,
+  l.annee, MOIS[l.mois - 1], matriculeAffiche(l.matricule), l.nom, l.poste ?? '', l.type_contrat, l.activite, l.site, l.service,
 ]
 const classeFixe = (i: number) => (i < FIGEES.length ? `fige fige-${i + 1}` : undefined)
 
-export default function Donnees() {
-  const [params, setParams] = useSearchParams()
-  const filtres: FiltresTableau = Object.fromEntries(CLES.map((k) => [k, params.get(k) ?? undefined]))
-  const q = useTableau(filtres)
-  const d = q.data
+/** Premier chargement : lignes vides sous l'en-tête complet ; le squelette commun (aria-busy) les habille. */
+function LignesSquelette({ lignes, classes }: { lignes: number; classes: (string | undefined)[] }) {
+  return Array.from({ length: lignes }, (_, l) => (
+    <tr key={l} aria-hidden="true">
+      {classes.map((c, i) => <td key={i} className={c} />)}
+    </tr>
+  ))
+}
 
-  const changer = (patch: FiltresTableau) =>
-    setParams((p) => {
-      for (const [k, v] of Object.entries(patch)) (v ? p.set(k, v) : p.delete(k))
-      return p
-    }, { replace: true })
+export default function Donnees() {
+  // Filtres partagés avec les pages de reporting : « Toutes » / « Tous » retire la valeur partagée.
+  const { partage, set: changer } = usePartage()
+  const filtres: FiltresTableau = Object.fromEntries(CLES.map((k) => [k, partage[k]]))
+  const q = useTableau(filtres)
+  const s = useStructure()
+  const d = q.data
+  // En-tête et filtres : ceux des lignes affichées, sinon la structure seule (premier chargement).
+  const st = d ?? s.data
+  const charge = q.isLoading || q.isPlaceholderData
+  // Aucune ligne à habiller (premier chargement, ou tableau précédent vide) : lignes vides en squelette.
+  const squelette = q.isLoading || (q.isPlaceholderData && !d?.lignes.length)
 
   // Rubriques comptées d'abord, puis celles exclues du total, regroupées juste avant le TOTAL.
-  const exclues = new Set(d?.exclues)
-  const comptees = d?.colonnes.filter((c) => !exclues.has(c)) ?? []
-  const horsTotal = d?.colonnes.filter((c) => exclues.has(c)) ?? []
+  const exclues = new Set(st?.exclues)
+  const comptees = st?.colonnes.filter((c) => !exclues.has(c)) ?? []
+  const horsTotal = st?.colonnes.filter((c) => exclues.has(c)) ?? []
+  const classes = [
+    // Colonnes fixes : texte issu des données (squelette « var ») ; les quatre premières restent figées.
+    ...FIXES.map((_, i) => (i < FIGEES.length ? `${classeFixe(i)} var` : 'var')),
+    ...comptees.map(() => 'num'),
+    ...horsTotal.map((_, i) => `num exclu${i === 0 ? ' exclu-debut' : ''}`),
+    ...(st ? [`num exclu${horsTotal.length ? '' : ' exclu-debut'}`, 'num total'] : []),
+  ]
 
   return (
-    <section className="page-ecran rapport-excel donnees-excel">
+    <section className="page-ecran rapport-excel donnees-excel" aria-busy={charge || undefined}>
       <h2 className="bandeau-titre">{TITRE}</h2>
       <p className="regle">{CONSIGNE}</p>
       <div className="filtres" role="group" aria-label="Filtres">
@@ -46,7 +66,7 @@ export default function Donnees() {
           Année
           <select value={filtres.annee ?? ''} onChange={(e) => changer({ annee: e.target.value })}>
             <option value="">Toutes</option>
-            {d?.filtres.annees.map((a) => <option key={a}>{a}</option>)}
+            {st?.filtres.annees.map((a) => <option key={a}>{a}</option>)}
           </select>
         </label>
         <label>
@@ -62,14 +82,14 @@ export default function Donnees() {
           Service
           <select value={filtres.service ?? ''} onChange={(e) => changer({ service: e.target.value })}>
             <option value="">Tous</option>
-            {d?.filtres.services.map((s) => <option key={s}>{s}</option>)}
+            {st?.filtres.services.map((s) => <option key={s}>{s}</option>)}
           </select>
         </label>
         <label>
           Site
           <select value={filtres.site ?? ''} onChange={(e) => changer({ site: e.target.value })}>
             <option value="">Tous</option>
-            {d?.filtres.sites.map((s) => <option key={s}>{s}</option>)}
+            {st?.filtres.sites.map((s) => <option key={s}>{s}</option>)}
           </select>
         </label>
         {/* Employé et Réinitialiser forment un bloc insécable : le bouton reste sur la ligne du filtre. */}
@@ -78,30 +98,27 @@ export default function Donnees() {
           <div className="filtre">
             <span aria-hidden="true">Employé</span>
             <ChoixSalarie
-              salaries={d?.filtres.salaries ?? []}
+              salaries={st?.filtres.salaries ?? []}
               valeur={filtres.matricule ?? ''}
               onChange={(m) => changer({ matricule: m })}
             />
           </div>
-          <button
-            type="button"
-            className="bouton bouton-lien"
-            onClick={() => setParams({}, { replace: true })}
-            disabled={!CLES.some((k) => params.has(k))}
-          >
-            Réinitialiser
-          </button>
+          <BoutonReinitialiser
+            actif={CLES.some((k) => partage[k])}
+            onClick={() => changer(Object.fromEntries(CLES.map((k) => [k, undefined])))}
+          />
         </div>
       </div>
-      {q.isLoading && <Etat type="chargement" />}
+      <BandeauEnregistre />
       {q.isError && <Etat type={etatErreur(q.error)} />}
-      {d && (
+      {(d || q.isLoading) && (
         <>
-          <p className="bandeau" role="status">
-            {d.lignes.length} ligne{d.lignes.length > 1 ? 's' : ''}
+          <p className="bandeau">
+            <span className="val">{d ? `${d.lignes.length} ligne${d.lignes.length > 1 ? 's' : ''}` : '—'}</span>
             {horsTotal.length > 0 && <span className="legende-exclu">Colonnes hachurées : exclues du TOTAL</span>}
+            <Link className="bouton bouton-primaire bandeau-action" to="/admin/saisie">Renseigner des données</Link>
           </p>
-          {d.lignes.length === 0 ? (
+          {d && d.lignes.length === 0 && !charge ? (
             <Etat type="vide" />
           ) : (
             <div className="panneau">
@@ -117,15 +134,20 @@ export default function Donnees() {
                           <span className="exclu-mention"> (exclu)</span>
                         </th>
                       ))}
-                      <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`} style={{ minWidth: largeurEntete(EXCLUSIONS) }}>{EXCLUSIONS}</th>
-                      <th scope="col" className="num total" style={{ minWidth: largeurEntete(TOTAL) }}>{TOTAL}</th>
+                      {st && (
+                        <>
+                          <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`} style={{ minWidth: largeurEntete(EXCLUSIONS) }}>{EXCLUSIONS}</th>
+                          <th scope="col" className="num total" style={{ minWidth: largeurEntete(TOTAL) }}>{TOTAL}</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {d.lignes.map((l) => (
+                    {squelette && <LignesSquelette lignes={10} classes={classes} />}
+                    {!squelette && d?.lignes.map((l) => (
                       <tr key={`${l.annee}-${l.mois}-${l.matricule}`}>
                         {texte(l).map((v, i) => (
-                          <td key={FIXES[i]} className={classeFixe(i)} title={i === 3 ? String(v) : undefined}>{v}</td>
+                          <td key={FIXES[i]} className={classes[i]} title={i === 3 ? String(v) : undefined}>{v}</td>
                         ))}
                         {comptees.map((c) => <td key={c} className="num">{valeurBrute(l.montants[c])}</td>)}
                         {horsTotal.map((c, i) => (
@@ -137,7 +159,7 @@ export default function Donnees() {
                     ))}
                     {/* Ligne de remplissage : le tableau occupe toute la hauteur du panneau, même avec peu de lignes. */}
                     <tr className="reste" aria-hidden="true">
-                      {Array.from({ length: FIXES.length + comptees.length + horsTotal.length + 2 }, (_, i) => <td key={i} />)}
+                      {classes.map((_, i) => <td key={i} />)}
                     </tr>
                   </tbody>
                 </table>

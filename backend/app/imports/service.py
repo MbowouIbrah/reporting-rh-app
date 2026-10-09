@@ -48,12 +48,14 @@ def charger_refs(db: Session) -> Refs:
     alias = {a.alias_norm: par_id[a.cible_id]
              for a in db.scalars(select(RefAlias).where(RefAlias.dimension == "rubrique"))
              if a.cible_id in par_id}
-    noms = {s.matricule_norm: norm(s.nom) for s in db.scalars(select(Salarie)) if s.nom}
+    salaries = list(db.scalars(select(Salarie)))
+    noms = {s.matricule_norm: norm(s.nom) for s in salaries if s.nom}
     return Refs(
         services=index("service", Service), activites=index("activite", Activite),
         sites=index("site", Site), contrats=index("type_contrat", TypeContrat),
         rubriques=[(r.libelle, r.unite) for r in rubs], rubrique_alias=alias,
         postes=set(index("poste", Poste)), noms_connus=noms,
+        annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
     )
 
 
@@ -135,7 +137,101 @@ def _ids(db: Session, model) -> dict[str, int]:
     return {r.libelle: r.id for r in db.scalars(select(model))}
 
 
-def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
+Cle = tuple[int, int, str]  # (année, mois, matricule casefold)
+
+
+def _cle(r: StagingLigne) -> Cle:
+    return (r.annee, r.mois, r.matricule.casefold())
+
+
+def _situations_existantes(db: Session, rows: list[StagingLigne]) -> dict[Cle, SituationMensuelle]:
+    """Situations déjà en base pour les clés (période, salarié) du lot."""
+    cles = {_cle(r) for r in rows}
+    if not cles:
+        return {}
+    q = (select(Periode.annee, Periode.mois, Salarie.matricule_norm, SituationMensuelle)
+         .join(Periode, Periode.id == SituationMensuelle.periode_id)
+         .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
+         .where(Periode.annee.in_({c[0] for c in cles}), Periode.mois.in_({c[1] for c in cles}),
+                Salarie.matricule_norm.in_({c[2] for c in cles})))
+    return {(a, m, k): s for a, m, k, s in db.execute(q) if (a, m, k) in cles}
+
+
+ATTRS_APERCU = (("poste", "Poste", Poste, "poste_id"), ("type_contrat", "Type Contrat", TypeContrat,
+                "type_contrat_id"), ("activite", "Activité", Activite, "activite_id"),
+                ("site", "Site", Site, "site_id"), ("service", "Service", Service, "service_id"))
+
+
+def apercu(db: Session, lot_id: int) -> dict:
+    """Différences entre le lot et la base, sans écriture : ce que la validation changerait."""
+    from app.kpi.chargement import exclues_a_date
+    from app.kpi.moteur import total_ligne
+
+    lot = _get_lot(db, lot_id)
+    rows = list(db.scalars(select(StagingLigne).where(StagingLigne.lot_id == lot.id)
+                           .order_by(StagingLigne.num_ligne)))
+    existantes = _situations_existantes(db, rows)
+    rub = {r.id: r.libelle for r in db.scalars(select(Rubrique))}
+    lib = {a: {r.id: r.libelle for r in db.scalars(select(m))} for a, _c, m, _f in ATTRS_APERCU}
+    connus = set(db.scalars(select(Salarie.matricule_norm)))
+    exclues = {p: exclues_a_date(db, *p) for p in {(r.annee, r.mois) for r in rows}}
+    lignes, compte = [], {"nouvelle": 0, "modifiee": 0, "identique": 0}
+    for r in rows:
+        k = _cle(r)
+        apres = {n: Decimal(v) for n, v in r.donnees["montants"].items()}
+        ligne = {"annee": r.annee, "mois": r.mois, "matricule": r.matricule,
+                 "nom": r.donnees.get("nom"), "nouveau_salarie": k[2] not in connus,
+                 "total_apres": str(total_ligne(apres, exclues[k[:2]]))}
+        sit = existantes.get(k)
+        if sit is None:
+            ligne |= {"statut": "nouvelle", "total_avant": None, "changements": []}
+        else:
+            avant = {rub[rid]: v for rid, v in db.execute(
+                select(Montant.rubrique_id, Montant.valeur).where(Montant.situation_id == sit.id))}
+            chg = [{"colonne": col, "avant": lib[a].get(getattr(sit, f)), "apres": r.donnees.get(a)}
+                   for a, col, _m, f in ATTRS_APERCU
+                   if norm(lib[a].get(getattr(sit, f)) or "") != norm(r.donnees.get(a) or "")]
+            chg += [{"colonne": n, "avant": None if n not in avant else str(avant[n]),
+                     "apres": None if n not in apres else str(apres[n])}
+                    for n in [x for x in rub.values() if x in avant or x in apres]
+                    if avant.get(n) != apres.get(n)]
+            ligne |= {"statut": "modifiee" if chg else "identique",
+                      "total_avant": str(total_ligne(avant, exclues[k[:2]])), "changements": chg}
+        compte[ligne["statut"]] += 1
+        lignes.append(ligne)
+    nouveaux = {x["matricule"] for x in lignes if x["nouveau_salarie"]}
+    tous = {x["matricule"] for x in lignes}
+    absents = _absents_du_lot(db, {_cle(r) for r in rows}, {(r.annee, r.mois) for r in rows})
+    return {"lot": lot_dict(lot), **compte,
+            "effaces": sum(1 for x in lignes for c in x["changements"]
+                           if c["apres"] is None and c["avant"] is not None),
+            "nouveaux_salaries": sorted(nouveaux),
+            "employes": {"total": len(tous), "nouveaux": len(nouveaux), "existants": len(tous - nouveaux)},
+            "total_lot": str(sum((Decimal(x["total_apres"]) for x in lignes), Decimal(0))),
+            "absents": absents[:100], "nb_absents": len(absents),
+            "lignes": lignes}
+
+
+def _absents_du_lot(db: Session, presents: set[Cle], periodes: set[tuple[int, int]]) -> list[dict]:
+    """Employés présents le mois précédent, ni dans le lot ni déjà en base pour le mois (départ, oubli ?)."""
+    sortie = []
+    for a, m in sorted(periodes):
+        pa, pm = (a, m - 1) if m > 1 else (a - 1, 12)
+        deja_saisis = (select(SituationMensuelle.salarie_id)
+                       .join(Periode, Periode.id == SituationMensuelle.periode_id)
+                       .where(Periode.annee == a, Periode.mois == m))
+        q = (select(Salarie.matricule, Salarie.matricule_norm, Salarie.nom)
+             .join(SituationMensuelle, SituationMensuelle.salarie_id == Salarie.id)
+             .join(Periode, Periode.id == SituationMensuelle.periode_id)
+             .where(Periode.annee == pa, Periode.mois == pm, Salarie.id.not_in(deja_saisis))
+             .order_by(Salarie.nom))
+        sortie += [{"annee": a, "mois": m, "matricule": mat, "nom": nom}
+                   for mat, mn, nom in db.execute(q) if (a, m, mn) not in presents]
+    return sortie
+
+
+def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None = None) -> LotImport:
+    """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée)."""
     lot = _get_lot(db, lot_id, verrou=True)
     if lot.statut != "pret":
         raise HTTPException(409, f"Lot au statut « {lot.statut} » : validation impossible")
@@ -145,6 +241,22 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
     rows = list(db.scalars(select(StagingLigne).where(StagingLigne.lot_id == lot.id)))
     if not rows:
         raise HTTPException(409, "Lot vide")
+    ignorees = 0
+    if garder:
+        # les lignes ignorées sortent du staging : l'annulation compare toujours au staging restant
+        gardees = set(_situations_existantes(db, rows)) & {(a, m, k.casefold()) for a, m, k in garder}
+        ignorer = [r for r in rows if _cle(r) in gardees]
+        if ignorer:
+            db.execute(delete(StagingLigne).where(StagingLigne.id.in_([r.id for r in ignorer])))
+            rows = [r for r in rows if _cle(r) not in gardees]
+            ignorees = len(ignorer)
+            lot.stats = {**(lot.stats or {}), "ignorees": ignorees}
+    if not rows:
+        lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
+        audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
+                     {"situations": 0, "montants": 0, "remplacees": 0, "ignorees": ignorees})
+        db.commit()
+        return lot
 
     cles_periodes = {(r.annee, r.mois) for r in rows}
     periodes = {(p.annee, p.mois): p.id for p in db.scalars(select(Periode))}
@@ -224,7 +336,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
     lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
     audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                  {"situations": len(sits), "montants": len(montants),
-                  "remplacees": len(a_remplacer)})
+                  "remplacees": len(a_remplacer), "ignorees": ignorees})
     db.commit()
     return lot
 

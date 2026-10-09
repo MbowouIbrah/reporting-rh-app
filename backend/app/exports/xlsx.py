@@ -109,7 +109,7 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
     _feuille(wb, "5 Contrat", ["Contrat · activité", "Indicateur", prec, cour, *var], c)
 
 
-def mensuel(r: dict, annee: int, mois: int) -> bytes:
+def mensuel(r: dict, annee: int, mois: int, prec: str = "M-1") -> bytes:
     wb = Workbook()
     s = r["synthese"]
     bloquants = [c["controle"] for c in r["controles"] if c["bloquant"]]
@@ -119,11 +119,11 @@ def mensuel(r: dict, annee: int, mois: int) -> bytes:
         ["Taux de rotation", s["taux_rotation"]],
         ["Taux d'absentéisme", s["taux_absenteisme"]],
     ])
-    _blocs(wb, r, "M-1", "M")
+    _blocs(wb, r, prec, "M")
     return _sortie(wb)
 
 
-def annuel(r: dict, annee: int, mois: int) -> bytes:
+def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None) -> bytes:
     wb = Workbook()
     lignes = [
         ["Période", f"Cumul de janvier à {MOIS[mois - 1]} {annee}"],
@@ -133,5 +133,5 @@ def annuel(r: dict, annee: int, mois: int) -> bytes:
     if "marge_ytd" in r:
         lignes.append(["Marge cumulée", r["marge_ytd"]])
     _feuille(wb, "Synthèse", ["Indicateur", str(annee)], lignes)
-    _blocs(wb, r, str(annee - 1), str(annee))
+    _blocs(wb, r, str(ref_annee or annee - 1), str(annee))
     return _sortie(wb)

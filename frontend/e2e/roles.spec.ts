@@ -12,7 +12,7 @@ async function connecter(page: Page, email: string) {
 
 const onglets = (page: Page) => page.getByRole('navigation', { name: 'Rapports' }).getByRole('link')
 
-const BASE_ONGLETS = ['Résumé', 'Mensuel', 'Annuel', 'Graphes', 'Individuel']
+const BASE_ONGLETS = ['Résumé', 'Graphes', 'Annuel', 'Mensuel', 'Individuel']
 for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
   test(`${email} : onglets, marge visible, contrôles OK`, async ({ page }) => {
     await connecter(page, email)
@@ -22,13 +22,13 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
     await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
-    await expect(page.getByText('5. Nature de contrat')).toBeVisible()
+    await expect(page.getByText('4. Nature de contrat')).toBeVisible()
   })
 }
 
 test('lecteur de périmètre : ni Individuel, ni marge, services limités', async ({ page }) => {
   await connecter(page, 'dps.equipment@exemple.invalid')
-  await expect(onglets(page)).toHaveText(['Résumé', 'Mensuel', 'Annuel', 'Graphes'])
+  await expect(onglets(page)).toHaveText(['Résumé', 'Graphes', 'Annuel', 'Mensuel'])
   await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ })).toHaveCount(0)
   await page.getByRole('link', { name: 'Mensuel' }).click()
   const services = page.getByLabel('Service').locator('option')
@@ -66,6 +66,8 @@ test('fiche individuelle puis déconnexion', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Reporting individuel' })).toBeVisible()
   await page.getByLabel('Matricule').selectOption('E1')
   await expect(page.getByText('Employé retenu : Ann')).toBeVisible()
+  await page.getByRole('button', { name: 'Profil' }).click()
+  await expect(page.locator('#profil-menu').getByText('drh@exemple.invalid')).toBeVisible()
   await page.getByRole('button', { name: 'Déconnexion' }).click()
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible()
 })

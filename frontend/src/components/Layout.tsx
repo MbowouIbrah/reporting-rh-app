@@ -1,32 +1,33 @@
+import { BarChart3, CalendarDays, CalendarRange, Database, LayoutDashboard, UserRound } from 'lucide-react'
+import { useIsFetching } from '@tanstack/react-query'
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ROLES } from '../lib/roles'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import Fond from './Fond'
+import MenuProfil from './MenuProfil'
 
 const ONGLETS = [
-  { to: '/resume', label: 'Résumé' },
-  { to: '/mensuel', label: 'Mensuel' },
-  { to: '/annuel', label: 'Annuel' },
-  { to: '/graphes', label: 'Graphes' },
-  { to: '/individuel', label: 'Individuel', perm: 'nominatif:read' },
-  { to: '/admin', label: 'Administration', perm: 'saisie:write' },
+  { to: '/resume', label: 'Résumé', Icone: LayoutDashboard },
+  { to: '/graphes', label: 'Graphes', Icone: BarChart3 },
+  { to: '/annuel', label: 'Annuel', Icone: CalendarRange },
+  { to: '/mensuel', label: 'Mensuel', Icone: CalendarDays },
+  { to: '/individuel', label: 'Individuel', perm: 'nominatif:read', Icone: UserRound },
+  { to: '/admin', label: 'Administration', perm: 'saisie:write', Icone: Database },
 ]
 
 export default function Layout() {
-  const { me, can, logout } = useAuth()
-  const navigate = useNavigate()
+  const { can } = useAuth()
   const [ouvert, setOuvert] = useState(false)
-  const role = me?.roles[0]?.role
+  const occupe = useIsFetching() > 0
   return (
     <div className="app layout-ecran">
+      <Fond />
       <header className="topbar">
        <div className="topbar-inner">
-        <div className="marque">
-          <span className="micro">CFAO · Ressources humaines</span>
-          <h1>
-            Reporting <span className="accent">RH</span>
-          </h1>
-        </div>
+        <NavLink to="/resume" className="marque" aria-label="Reporting RH, accueil">
+          <span className="marque-logo"><img src={`${import.meta.env.BASE_URL}images/cfao_academy.png`} alt="" /></span>
+          <h1>Reporting RH</h1>
+        </NavLink>
         <button
           type="button"
           className="menu-toggle"
@@ -39,27 +40,16 @@ export default function Layout() {
         <nav id="nav-rapports" aria-label="Rapports" className={ouvert ? 'ouvert' : undefined} onClick={() => setOuvert(false)}>
           {ONGLETS.filter((o) => !o.perm || can(o.perm)).map((o) => (
             <NavLink key={o.to} to={o.to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <o.Icone aria-hidden="true" size={16} strokeWidth={2} />
               {o.label}
             </NavLink>
           ))}
         </nav>
-        <div className="user">
-          <span className="user-id">
-            <span className="user-email">{me?.email}</span>
-            {role && <span className="badge badge-neutre">{ROLES[role as keyof typeof ROLES]?.libelle ?? role}</span>}
-          </span>
-          <button
-            className="btn-link"
-            onClick={async () => {
-              await logout()
-              navigate('/login')
-            }}
-          >
-            Déconnexion
-          </button>
-        </div>
+        <MenuProfil />
        </div>
       </header>
+      {/* Le squelette est visuel (aria-busy, peu restitué) : annonce polie pour les lecteurs d'écran. */}
+      <span className="sr-only" role="status" aria-live="polite">{occupe ? 'Chargement…' : ''}</span>
       <main className="page">
         <Outlet />
       </main>

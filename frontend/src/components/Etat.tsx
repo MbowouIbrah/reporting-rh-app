@@ -23,16 +23,37 @@ interface Props {
   /** Texte propre à la page, à la place du texte générique de l'état. */
   titre?: string
   aide?: string
+  /** Chargement : en-têtes connus d'avance (texte statique), sinon une rangée d'en-tête vide. */
+  colonnes?: string[]
+  lignes?: number
 }
 
-export default function Etat({ type, onRetry, titre, aide }: Props) {
+/** Premier chargement : la structure du tableau est déjà là, seules les cellules sont en squelette. */
+export function TableauSquelette({ colonnes, lignes = 8 }: { colonnes: (string | number)[]; lignes?: number }) {
+  return (
+    <div className="panneau" aria-busy="true">
+      <div className="panneau-corps">
+        <table className="dense tableau-squelette">
+          <thead>
+            <tr>{colonnes.map((c, i) => <th key={i} scope="col" className={i ? 'num' : undefined}>{typeof c === 'string' ? c : ''}</th>)}</tr>
+          </thead>
+          <tbody aria-hidden="true">
+            {Array.from({ length: lignes }, (_, l) => (
+              <tr key={l}>{colonnes.map((_, i) => <td key={i} className={i ? 'num' : 'var'} />)}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: Props) {
   if (type === 'chargement') {
     return (
-      <div className="etat" role="status" aria-live="polite">
-        <div className="squelette" aria-hidden="true">
-          <span /> <span /> <span />
-        </div>
-        <span className="sr-only">{TEXTE[type]}</span>
+      // L'annonce « Chargement… » est faite une seule fois par Layout (requête en cours).
+      <div className="etat-chargement">
+        <TableauSquelette colonnes={colonnes ?? [0, 1, 2, 3, 4, 5]} lignes={lignes} />
       </div>
     )
   }

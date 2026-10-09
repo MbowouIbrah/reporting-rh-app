@@ -147,3 +147,45 @@ def test_v4_reel_1398_lignes_0_bloquant():
     assert st["lignes"] == 1398 and st["salaries"] == 90 and st["periodes"] == 18
     assert not [a for a in anos if a.gravite == BLOQUANT], [a for a in anos if a.gravite == BLOQUANT][:5]
     assert time.time() - t < 30
+
+
+def test_noms_proches_sans_tenir_compte_des_espaces_ni_de_l_ordre():
+    ann = {"emp001": ("EMP001", "Jean Dupont"), "emp009": ("EMP009", "Awa Ngono")}
+    connus = {"emp001": "jean dupont", "emp009": "awa ngono"}
+    # même matricule, faute de frappe : proche ; espaces parasites et casse : aucune alerte
+    _, ens, _, _ = run([ligne(Noms="Jean Dupond")], postes={"p"}, noms_connus=connus, annuaire=ann)
+    assert (2, "Noms", "NOM_PROCHE") in ens
+    _, ens, _, _ = run([ligne(Noms="  JEAN   dupont ")], postes={"p"}, noms_connus=connus, annuaire=ann)
+    assert not any(c == "Noms" for _, c, _ in ens)
+    # nom sans rapport : incohérent
+    _, ens, _, _ = run([ligne(Noms="Zoe Martin")], postes={"p"}, noms_connus=connus, annuaire=ann)
+    assert (2, "Noms", "NOM_INCOHERENT") in ens
+
+
+def test_nouveau_matricule_dont_le_nom_existe_deja():
+    ann = {"emp009": ("EMP009", "Awa Ngono")}
+    _, ens, anos, _ = run([ligne(MATRICULE="EMP090", Noms="Ngono  Awa")], postes={"p"},
+                          noms_connus={"emp009": "awa ngono"}, annuaire=ann)
+    assert (2, "Noms", "NOM_SIMILAIRE") in ens
+    assert "EMP009" in next(a.message for a in anos if a.code == "NOM_SIMILAIRE")
+    _, ens, _, _ = run([ligne(MATRICULE="EMP090", Noms="Paul Biya")], postes={"p"},
+                       noms_connus={"emp009": "awa ngono"}, annuaire=ann)
+    assert not any(code == "NOM_SIMILAIRE" for *_, code in ens)
+
+
+def test_employe_sans_matricule_identifie_par_son_nom():
+    # nom nettoyé : retrouve la fiche existante ; inconnu : identifiant technique stable
+    ann = {"sm-abc": ("SM-ABC", "Awa Ngono")}
+    L, ens, _, _ = run([ligne(MATRICULE=None, Noms="  AWA  ngono ")], postes={"p"},
+                       noms_connus={"sm-abc": "awa ngono"}, annuaire=ann)
+    assert L[0].matricule == "SM-ABC" and not any(c == "MATRICULE" for _, c, _ in ens)
+    L1, _, _, _ = run([ligne(MATRICULE=None, Noms="Paul Biya")], postes={"p"})
+    L2, _, _, _ = run([ligne(MATRICULE=None, Noms="paul  BIYA")], postes={"p"})
+    assert L1[0].matricule.startswith("SM-") and L1[0].matricule == L2[0].matricule
+    # ni matricule ni nom : bloquant ; homonymes : bloquant
+    _, ens, _, _ = run([ligne(MATRICULE=None, Noms=None)], postes={"p"})
+    assert (2, "MATRICULE", "VALEUR_MANQUANTE") in ens
+    _, ens, _, _ = run([ligne(MATRICULE=None, Noms="Awa Ngono")], postes={"p"},
+                       noms_connus={"e1": "awa ngono", "e2": "awa ngono"},
+                       annuaire={"e1": ("E1", "Awa Ngono"), "e2": ("E2", "Awa Ngono")})
+    assert (2, "MATRICULE", "NOM_HOMONYME") in ens

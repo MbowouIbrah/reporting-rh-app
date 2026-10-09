@@ -1,4 +1,7 @@
+import io
+
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import func, select
 
 from app.models.auth import AuditEvent
@@ -86,7 +89,9 @@ def test_lot_rejete_non_validable_et_anomalies_localisees(make_client, db):
     anos = c.get(f"{API}/imports/{lot['id']}/anomalies?gravite=bloquant").json()
     assert [(a["ligne"], a["colonne"], a["code"]) for a in anos] == [
         (2, "Service", "REFERENTIEL_INCONNU")]
-    assert c.get(f"{API}/imports/{lot['id']}/rapport.xlsx").status_code == 200
+    r = c.get(f"{API}/imports/{lot['id']}/rapport.xlsx")
+    assert r.status_code == 200
+    assert load_workbook(io.BytesIO(r.content))["ANOMALIES"].auto_filter.ref.startswith("A1:F")
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 409
     assert nb_sit(db) == 0
 

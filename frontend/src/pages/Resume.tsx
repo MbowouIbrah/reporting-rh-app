@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { getAnnuel } from '../api/rapports'
 import type { Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
+import BoutonReinitialiser from '../components/BoutonReinitialiser'
+import { ChoixComparaison } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, fcfa, MOIS, pct } from '../lib/format'
@@ -34,10 +36,17 @@ function Case({
 }
 
 export default function Resume() {
-  const f = useFiltres()
+  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
   // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi ; service/site ne s'appliquent pas (CA global).
-  const base = f.filtres && { annee: f.filtres.annee, mois: f.filtres.mois }
-  const ann = useQuery({ queryKey: ['annuel', base], queryFn: () => getAnnuel(base!), enabled: !!base })
+  const base = f.filtres && { annee: f.filtres.annee, mois: f.filtres.mois, ref_annee: f.filtres.ref_annee }
+  const ann = useQuery({
+    queryKey: ['annuel', base],
+    queryFn: () => getAnnuel(base!),
+    enabled: !!base,
+    placeholderData: keepPreviousData,
+  })
+  const maj = ann.isPlaceholderData
+  const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : 'N-1'
   const erreur = ann.error
   const a = ann.data
   const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
@@ -45,23 +54,56 @@ export default function Resume() {
   const nbMois = (n: number | undefined) => (n ? `${n} mois saisi${n > 1 ? 's' : ''}` : 'aucun mois saisi')
 
   return (
-    <section className="page-ecran page-etroite resume-excel">
-      <h2 className="bandeau-titre">RÉSUMÉ — Indicateurs de pilotage</h2>
+    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}`} aria-busy={maj || ann.isLoading || undefined}>
+      <h2 className="bandeau-titre">RÉSUMÉ DES INDICATEURS</h2>
       {f.filtres && (
         <div className="filtre-annee">
           <label className="selecteur-annee">
             <span className="filtre-annee-label">Année</span>
-            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value, mois: undefined })}>
+            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value })}>
               {f.annees.map((an) => (
                 <option key={an}>{an}</option>
               ))}
             </select>
           </label>
-          <em className="comparaison">Comparé à la même période de {f.filtres.annee - 1}</em>
+          <span className="selecteur-annee">
+            <ChoixComparaison mode="annee" filtres={f.filtres} annees={f.annees} onChange={f.set} />
+            <BoutonReinitialiser
+              actif={!!(f.partage.annee || f.partage.cmp_annee)}
+              onClick={() => f.set({ annee: undefined, cmp_annee: undefined })}
+            />
+          </span>
         </div>
       )}
       {f.vide && <Etat type="vide" />}
-      {ann.isLoading && <Etat type="chargement" />}
+      {ann.isLoading && (
+        // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
+        <>
+          <div className="cases">
+            {['MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PRODUCTIVITÉ', `MASSE SALARIALE ${n1}`].map((t) => (
+              <Case key={t} titre={t} valeur="—" devise={false} note="—" />
+            ))}
+          </div>
+          <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
+          <div className="table-scroll">
+            <table className="dense suivi">
+              <thead>
+                <tr>{['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.'].map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+              </thead>
+              <tbody aria-hidden="true">
+                {MOIS.map((m) => (
+                  <tr key={m}>
+                    <th scope="row">{m}</th>
+                    <td className="num" />
+                    <td className="num" />
+                    <td className="num" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
       {erreur && <Etat type={etatErreur(erreur)} />}
       {a && (
         <>
@@ -80,11 +122,11 @@ export default function Resume() {
           )}
           <div className="cases">
             <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`}>
-              <Variation v={a.cumul_ytd.var_pct} vs="vs N-1" />
+              <Variation v={a.cumul_ytd.var_pct} vs={`vs ${n1}`} />
             </Case>
             <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
             <Case titre="PRIMES PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
-            <Case titre="MASSE SALARIALE N-1" valeur={montrer(a.cumul_ytd.m1)} note={`même période · ${nbMois(a.cumul_ytd.nb_mois_n1)}`} />
+            <Case titre={`MASSE SALARIALE ${n1}`} valeur={montrer(a.cumul_ytd.m1)} note={`même période · ${nbMois(a.cumul_ytd.nb_mois_n1)}`} />
           </div>
           {aCa && (
             <p className="regle">

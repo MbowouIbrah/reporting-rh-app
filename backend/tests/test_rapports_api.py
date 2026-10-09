@@ -62,6 +62,21 @@ def test_mensuel_global_exact_en_chaines(charge):
     assert all(not c["bloquant"] for c in r["controles"])
 
 
+def test_comparaison_choisie(charge):
+    # Mensuel : février comparé à février lui-même au lieu de janvier (défaut M-1)
+    r = get(charge, "mensuel", annee=2026, mois=2, ref_annee=2026, ref_mois=2).json()
+    assert D(r["synthese"]["ms"]["m1"]) == D("3700")
+    # Période de comparaison sans données : colonne de référence vide, pas d'erreur
+    r = get(charge, "mensuel", annee=2026, mois=2, ref_annee=2024, ref_mois=5).json()
+    assert r["synthese"]["ms"]["m1"] is None
+    # Annuel : comparé à 2026 au lieu de 2025
+    a = get(charge, "annuel", annee=2026, mois=2, ref_annee=2026).json()
+    assert D(a["cumul_ytd"]["m1"]) == D("10700.5")
+    ex = charge.get(f"{API}/rapports/mensuel/export",
+                    params={"annee": 2026, "mois": 2, "ref_annee": 2026, "ref_mois": 1})
+    assert ex.status_code == 200 and ex.headers["content-type"] == XLSX
+
+
 def test_marge_visible_admin_et_drh_seulement(charge, make_client):
     for who, visible in ((ADMIN, True), (DRH, True), (EQUIP, False), (VN, False)):
         s = get(make_client(who), "mensuel", annee=2026, mois=1)

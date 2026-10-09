@@ -96,13 +96,21 @@ def salaries(
                   key=lambda x: x["matricule"])
 
 
-def _mensuel(db, p, annee, mois, service, site) -> dict:
+def _reference(annee, mois, ref_annee, ref_mois) -> tuple[int, int]:
+    """Période de comparaison du mensuel : celle choisie, sinon le mois précédent."""
+    if ref_annee is None or ref_mois is None:
+        return ch.precedente(annee, mois)
+    return ref_annee, ref_mois
+
+
+def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
     cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site)
     if cur is None or not cur.lignes:
         raise HTTPException(404, "Aucune donnée pour cette période")
-    prev = ch.filtrer(ch.charger_periode(db, scope, *ch.precedente(annee, mois)), service, site)
+    ref = _reference(annee, mois, ref_annee, ref_mois)
+    prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site)
     res = moteur.mensuel(cur, prev, ch.charger_refs(db), ch.charger_params(db, annee, mois),
                          ch.charger_budgets(db, scope, annee, mois, service, site))
     return _sortie(p, res)
@@ -114,10 +122,12 @@ def mensuel(
     mois: int = Query(ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
+    ref_annee: int | None = Query(None, ge=2000, le=2100),
+    ref_mois: int | None = Query(None, ge=1, le=12),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    return _mensuel(db, p, annee, mois, service, site)
+    return _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois)
 
 
 @router.get("/mensuel/export")
@@ -126,17 +136,22 @@ def mensuel_export(
     mois: int = Query(ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
+    ref_annee: int | None = Query(None, ge=2000, le=2100),
+    ref_mois: int | None = Query(None, ge=1, le=12),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    res = _mensuel(db, p, annee, mois, service, site)
+    res = _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois)
     audit.record(db, p.user_id, "export", "rapport_mensuel", f"{annee}-{mois:02d}", None,
                  {"service": service, "site": site})
     db.commit()
-    return _xlsx(xlsx.mensuel(res, annee, mois), f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
+    choisie = ref_annee is not None and ref_mois is not None
+    prec = f"{xlsx.MOIS[ref_mois - 1]} {ref_annee}" if choisie else "M-1"
+    return _xlsx(xlsx.mensuel(res, annee, mois, prec),
+                 f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
 
 
-def _annuel(db, p, annee, mois, service, site) -> dict:
+def _annuel(db, p, annee, mois, service, site, ref_annee=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
 
@@ -153,7 +168,7 @@ def _annuel(db, p, annee, mois, service, site) -> dict:
         raise HTTPException(404, "Aucune donnée pour cette année")
     budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site)
                for m in moteur.avec_donnees(n, mois)}
-    res = moteur.annuel(n, annee_pds(annee - 1), mois, ch.charger_refs(db),
+    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, ch.charger_refs(db),
                         ch.charger_params(db, annee, mois), budgets)
     return _sortie(p, res)
 
@@ -164,10 +179,11 @@ def annuel(
     mois: int = Query(12, ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
+    ref_annee: int | None = Query(None, ge=2000, le=2100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    return _annuel(db, p, annee, mois, service, site)
+    return _annuel(db, p, annee, mois, service, site, ref_annee)
 
 
 @router.get("/annuel/export")
@@ -176,14 +192,15 @@ def annuel_export(
     mois: int = Query(12, ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
+    ref_annee: int | None = Query(None, ge=2000, le=2100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    res = _annuel(db, p, annee, mois, service, site)
+    res = _annuel(db, p, annee, mois, service, site, ref_annee)
     audit.record(db, p.user_id, "export", "rapport_annuel", f"{annee}-{mois:02d}", None,
                  {"service": service, "site": site})
     db.commit()
-    return _xlsx(xlsx.annuel(res, annee, mois), f"reporting-annuel-{annee}.xlsx")
+    return _xlsx(xlsx.annuel(res, annee, mois, ref_annee), f"reporting-annuel-{annee}.xlsx")
 
 
 @router.get("/individuel/tous")

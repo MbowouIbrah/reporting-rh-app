@@ -50,15 +50,20 @@
   --rapport-saisi: var(--warning-soft);
   --rapport-saisi-bord: var(--warning);
 
+  /* Habillage portail (aligné sur l'application Suivi de formation) : surfaces translucides sur fond photo voilé */
+  --verre: rgba(255, 255, 255, 0.82);
+  --verre-plein: rgba(255, 255, 255, 0.96);
+  --anneau-focus: 0 0 0 3px rgba(228, 0, 43, 0.1);
+
   /* Typographie */
-  --font-display: 'Space Grotesk', 'DM Sans', sans-serif;
+  --font-display: 'DM Sans', -apple-system, system-ui, sans-serif;
   --font-body: 'DM Sans', -apple-system, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   /* Échelle unique, plancher 12 px : xs libellés, en-têtes de colonnes, notes ; sm cellules de tableaux, texte secondaire ;
      md texte courant, contrôles, navigation, titres de panneaux ; base titres de section ; lg titres de bandeau ;
      xl valeurs de tuiles ; 2xl titres de page ; kpi chiffre clé. Aucune taille en dur ni indexée sur la hauteur d'écran. */
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.8125rem;
+  --fs-xs: max(12px, 0.75rem);
+  --fs-sm: max(12.5px, 0.8125rem);
   --fs-md: 0.875rem;
   --fs-base: 1rem;
   --fs-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);

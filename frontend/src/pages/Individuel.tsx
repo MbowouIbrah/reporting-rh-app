@@ -1,11 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { Fragment, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { Fragment, useLayoutEffect, useRef } from 'react'
 import { getIndividuelTous, getSalaries } from '../api/rapports'
-import type { Val } from '../api/types'
+import type { IndividuelTous, Val } from '../api/types'
 import { Panneau } from '../components/BlocsRapport'
+import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../components/Etat'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, largeurEntete, MOIS, somme } from '../lib/format'
+import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { plafonner } from '../lib/plafond'
 
 /** Les 12 postes de l'onglet Excel, dans l'ordre du fichier. */
 const COLONNES = [
@@ -23,10 +25,16 @@ const COLONNES = [
   'Formation',
 ]
 
+const MODELE_VIDE: IndividuelTous = {
+  annee: 0, matricule: null, nom: null, rubriques: COLONNES,
+  mois: MOIS.map((_, i) => ({ mois: i + 1, present: false })),
+}
+
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
-  const f = useFiltres()
-  const [matricule, setMatricule] = useState('')
+  const f = useFiltres({ avecMois: false })
+  const matricule = f.partage.matricule ?? ''
+  const setMatricule = (m: string) => f.set({ matricule: m })
   const annee = f.filtres?.annee
   const service = f.filtres?.service
   const site = f.filtres?.site
@@ -39,8 +47,12 @@ export default function Individuel() {
     queryKey: ['individuel-tous', annee, matricule, service, site],
     queryFn: () => getIndividuelTous({ annee: annee!, matricule, service, site }),
     enabled: annee !== undefined,
+    placeholderData: keepPreviousData,
   })
-  const d = q.data
+  // Premier chargement : le vrai tableau (colonnes et mois sont statiques) avec des valeurs vides,
+  // que le squelette commun masque ; seules les valeurs chargent.
+  const maj = q.isPlaceholderData || q.isLoading
+  const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
   const rubriques = COLONNES
   const totalMois = (m: NonNullable<typeof d>['mois'][number]) =>
     somme(rubriques.map((r) => m.montants?.[r] ?? null)) ?? '0'
@@ -48,8 +60,17 @@ export default function Individuel() {
   const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
   const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
 
+  // Le tableau s'étire sur la hauteur restante, sans dépasser la hauteur de ligne plafonnée
+  const zone = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const poser = () => zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
+    poser()
+    window.addEventListener('resize', poser)
+    return () => window.removeEventListener('resize', poser)
+  })
+
   return (
-    <section className="page-ecran page-etroite rapport-excel individuel-excel">
+    <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
       <h2 className="bandeau-titre">REPORTING INDIVIDUEL</h2>
       {f.filtres && (
         <div className="filtres" role="group" aria-label="Filtres">
@@ -59,7 +80,7 @@ export default function Individuel() {
               <option value="">(Tous)</option>
               {salaries.data?.map((s) => (
                 <option key={s.matricule} value={s.matricule}>
-                  {s.matricule} — {s.nom}
+                  {matriculeAffiche(s.matricule) ? `${matriculeAffiche(s.matricule)} — ` : ''}{s.nom}
                 </option>
               ))}
             </select>
@@ -95,23 +116,26 @@ export default function Individuel() {
           </label>
           <label>
             Année
-            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value, mois: undefined })}>
+            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value })}>
               {f.annees.map((a) => (
                 <option key={a}>{a}</option>
               ))}
             </select>
           </label>
+          <BoutonReinitialiser
+            actif={(['matricule', 'site', 'service', 'annee'] as const).some((k) => f.partage[k])}
+            onClick={() => f.set({ matricule: undefined, site: undefined, service: undefined, annee: undefined })}
+          />
         </div>
       )}
       {d && (
         <p className="note note-entete">
           {d.matricule
-            ? `Employé retenu : ${d.nom} (${d.matricule})`
-            : 'Aucun employé sélectionné — les listes ci-dessus restent toutes ouvertes.'}
+            ? <>Employé retenu : <span className="val">{d.nom}{matriculeAffiche(d.matricule) ? ` (${matriculeAffiche(d.matricule)})` : ''}</span></>
+            : q.isLoading ? <span className="val">—</span> : 'Aucun employé sélectionné — les listes ci-dessus restent toutes ouvertes.'}
         </p>
       )}
       {f.vide && <Etat type="vide" />}
-      {q.isLoading && <Etat type="chargement" />}
       {q.error &&
         (matricule && etatErreur(q.error) === '404' ? (
           <Etat type="404" titre="Matricule introuvable" aide="Cet employé n’a aucune donnée cette année dans votre périmètre." />
@@ -119,7 +143,7 @@ export default function Individuel() {
           <Etat type={etatErreur(q.error)} />
         ))}
       {d && (
-        <Panneau titre="Reporting individuel">
+        <Panneau titre="Reporting individuel" sansTitre>
           <table className="dense individuel">
             <thead>
               <tr>

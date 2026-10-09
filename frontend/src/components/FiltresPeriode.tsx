@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 import type { FiltresPage } from '../api/rapports'
-import { MOIS } from '../lib/format'
+import type { Periode } from '../api/types'
+import type { ClePartagee, Partage } from '../lib/filtresPartages'
+import { MOIS, MOIS_COURTS } from '../lib/format'
+import BoutonReinitialiser from './BoutonReinitialiser'
+
+type Patch = Record<string, string | number | undefined>
 
 interface Props {
   filtres: FiltresPage
@@ -8,17 +13,82 @@ interface Props {
   services?: string[]
   sites?: string[]
   avecMois?: boolean
+  /** Sélecteur « Comparer à » : une année (annuel) ou une période (mensuel). */
+  comparaison?: 'annee' | 'periode'
+  periodes?: Periode[]
   /** Champs supplémentaires, alignés sur la même ligne que les filtres. */
   children?: ReactNode
-  onChange: (patch: Record<string, string | number | undefined>) => void
+  onChange: (patch: Patch) => void
+  /** Valeurs choisies (filtres partagés) : seules elles rendent Réinitialiser actif. */
+  partage: Partage
 }
 
-export default function FiltresPeriode({ filtres, annees, services, sites, avecMois = true, children, onChange }: Props) {
+/** Période précédant (annee, mois) : M-1, décembre de l'année d'avant en janvier. */
+export const moisPrecedent = (annee: number, mois: number) =>
+  mois === 1 ? { annee: annee - 1, mois: 12 } : { annee, mois: mois - 1 }
+
+/** Libellé de la colonne de comparaison des tableaux : M-1 / N-1 par défaut, sinon la période choisie. */
+export function libelleComparaison(f: FiltresPage, mode: 'annee' | 'periode') {
+  if (mode === 'annee') return `${f.ref_annee ?? f.annee - 1}`
+  return f.ref_annee && f.ref_mois ? `${MOIS_COURTS[f.ref_mois - 1]} ${f.ref_annee}` : 'M-1'
+}
+
+export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onChange }: {
+  mode: 'annee' | 'periode'
+  filtres: FiltresPage
+  annees: number[]
+  periodes?: Periode[]
+  onChange: (patch: Patch) => void
+}) {
+  if (mode === 'annee') {
+    const autres = annees.filter((a) => a !== f.annee && a !== f.annee - 1).sort((a, b) => b - a)
+    return (
+      <label>
+        Comparer à
+        <select value={f.ref_annee ?? ''} onChange={(e) => onChange({ cmp_annee: e.target.value })}>
+          <option value="">{f.annee - 1} (N-1)</option>
+          {autres.map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+  const prec = moisPrecedent(f.annee, f.mois)
+  const cle = (p: Periode) => `${p.annee}-${String(p.mois).padStart(2, '0')}`
+  const exclues = new Set([cle(f), cle(prec)])
+  const autres = periodes.filter((p) => !exclues.has(cle(p))).sort((a, b) => cle(b).localeCompare(cle(a)))
+  const valeur = f.ref_annee && f.ref_mois ? cle({ annee: f.ref_annee, mois: f.ref_mois }) : ''
+  return (
+    <label>
+      Comparer à
+      <select value={valeur} onChange={(e) => onChange({ cmp_periode: e.target.value })}>
+        <option value="">{MOIS[prec.mois - 1]} {prec.annee} (M-1)</option>
+        {autres.map((p) => (
+          <option key={cle(p)} value={cle(p)}>{MOIS[p.mois - 1]} {p.annee}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+export default function FiltresPeriode({
+  filtres, annees, services, sites, avecMois = true, comparaison, periodes, children, onChange,
+  partage,
+}: Props) {
+  // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, N-1/M-1, tous).
+  const cles: ClePartagee[] = [
+    'annee',
+    ...(avecMois ? (['mois'] as const) : []),
+    ...(comparaison === 'annee' ? (['cmp_annee'] as const) : comparaison === 'periode' ? (['cmp_periode'] as const) : []),
+    ...(services ? (['service'] as const) : []),
+    ...(sites ? (['site'] as const) : []),
+  ]
   return (
     <div className="filtres" role="group" aria-label="Filtres">
       <label>
         Année
-        <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value, mois: undefined })}>
+        <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value })}>
           {annees.map((a) => (
             <option key={a}>{a}</option>
           ))}
@@ -35,6 +105,9 @@ export default function FiltresPeriode({ filtres, annees, services, sites, avecM
             ))}
           </select>
         </label>
+      )}
+      {comparaison && (
+        <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />
       )}
       {services && (
         <label>
@@ -58,15 +131,10 @@ export default function FiltresPeriode({ filtres, annees, services, sites, avecM
           </select>
         </label>
       )}
-      {(filtres.service || filtres.site) && (
-        <button
-          type="button"
-          className="bouton bouton-lien"
-          onClick={() => onChange({ service: undefined, site: undefined })}
-        >
-          Réinitialiser
-        </button>
-      )}
+      <BoutonReinitialiser
+        actif={cles.some((k) => partage[k])}
+        onClick={() => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))}
+      />
       {children}
     </div>
   )

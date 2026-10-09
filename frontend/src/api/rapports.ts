@@ -6,6 +6,9 @@ export interface FiltresPage {
   mois: number
   service?: string
   site?: string
+  /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */
+  ref_annee?: number
+  ref_mois?: number
 }
 
 export const qs = (o: Record<string, string | number | undefined>) => {

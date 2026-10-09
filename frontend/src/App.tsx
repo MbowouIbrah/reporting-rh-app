@@ -1,12 +1,12 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
-import Etat from './components/Etat'
 import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Donnees from './pages/admin/Donnees'
+import Saisie from './pages/admin/Saisie'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 
@@ -29,7 +29,8 @@ export default function App() {
         <Route
           path="/graphes"
           element={
-            <Suspense fallback={<Etat type="chargement" />}>
+            // Le temps du chargement du code, rien : la page dessine ensuite sa propre structure.
+            <Suspense fallback={null}>
               <Graphes />
             </Suspense>
           }
@@ -47,6 +48,14 @@ export default function App() {
           element={
             <RequireAuth perm="saisie:write">
               <Donnees />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/saisie"
+          element={
+            <RequireAuth perm="saisie:write">
+              <Saisie />
             </RequireAuth>
           }
         />

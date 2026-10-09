@@ -19,6 +19,11 @@ def entete(ws, ligne: int, titres: list[str]) -> None:
         ws.column_dimensions[get_column_letter(i)].width = max(14, len(t) + 4)
 
 
+def filtre(ws, ligne: int, nb_colonnes: int, derniere: int) -> None:
+    """Flèches de filtre et tri sur l'en-tête, étendues aux lignes à remplir."""
+    ws.auto_filter.ref = f"A{ligne}:{get_column_letter(nb_colonnes)}{max(derniere, ligne + 1)}"
+
+
 def listes(wb: Workbook, colonnes: dict[str, list[str]]) -> dict[str, str]:
     """Feuille LISTES masquée : une colonne par référentiel, renvoie les plages pour validation."""
     ws = wb.create_sheet("LISTES")
@@ -55,6 +60,7 @@ def modele_employes(refs: dict[str, list[str]], exemples: list[list] | None = No
     for col, nom in ((3, "Poste"), (4, "Type Contrat"), (5, "Activité"), (6, "Site"), (7, "Service"),
                      (8, "Actif")):
         liste_deroulante(ws, plages[nom], col, 4, 500)
+    filtre(ws, 3, len(EMPLOYES_ENTETES), 500)
     ws.freeze_panes = "A4"
     out = io.BytesIO()
     wb.save(out)
@@ -90,6 +96,7 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
     derniere = max(500, len(lignes) + 3)
     for col, nom in ((5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):
         liste_deroulante(ws, plages[nom], col, 4, derniere)
+    filtre(ws, 3, len(ATTRIBUTS) + len(rubriques), derniere)
     ws.freeze_panes = "E4"
     out = io.BytesIO()
     wb.save(out)

@@ -1,4 +1,6 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ArrowDown } from 'lucide-react'
+import { plafonner } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
 
 export interface PanneauSnap {
@@ -37,6 +39,43 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
     return () => obs.disconnect()
   }, [sections.length])
 
+  // Molette : un geste = une section (l'accrochage seul ramène au départ sur un petit cran),
+  // sauf si le tableau survolé peut encore défiler dans ce sens
+  useEffect(() => {
+    const racine = zone.current
+    if (!racine) return
+    let verrou = 0
+    const surMolette = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) < 4 || racine.scrollHeight <= racine.clientHeight) return
+      const bas = e.deltaY > 0
+      const corps = (e.target as HTMLElement).closest('.panneau-corps')
+      if (corps && (bas ? corps.scrollTop + corps.clientHeight < corps.scrollHeight - 1 : corps.scrollTop > 0)) return
+      e.preventDefault()
+      if (Date.now() < verrou) return
+      const liste = [...racine.querySelectorAll<HTMLElement>('.snap-section')]
+      const courant = liste.reduce((m, s, i) => (Math.abs(s.offsetTop - racine.scrollTop) < Math.abs(liste[m].offsetTop - racine.scrollTop) ? i : m), 0)
+      const cible = liste[courant + (bas ? 1 : -1)]
+      if (!cible) return
+      verrou = Date.now() + 700
+      aller(cible.id)
+    }
+    racine.addEventListener('wheel', surMolette, { passive: false })
+    return () => racine.removeEventListener('wheel', surMolette)
+  }, [])
+
+  // Tableaux empilés : chacun grandit au prorata de ses lignes, pour une hauteur de ligne commune,
+  // sans dépasser la hauteur de ligne plafonnée
+  useLayoutEffect(() => {
+    const poser = () =>
+      zone.current?.querySelectorAll<HTMLElement>('.snap-section .panneau').forEach((p) => {
+        p.style.flexGrow = String(p.querySelectorAll('tbody tr').length || 1)
+        plafonner(p)
+      })
+    poser()
+    window.addEventListener('resize', poser)
+    return () => window.removeEventListener('resize', poser)
+  })
+
   function aller(id: string) {
     const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     document.getElementById(id)?.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'start' })
@@ -45,7 +84,7 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
   return (
     <div className="snap-zone">
       <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label="Tableaux du rapport">
-        {sections.map((s) => (
+        {sections.map((s, i) => (
           <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
             {s.panneaux.map((pn) =>
               Array.isArray(pn) ? (
@@ -61,6 +100,12 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
                   {pn.contenu}
                 </Panneau>
               ),
+            )}
+            {sections[i + 1] && (
+              <button type="button" className="snap-suite" onClick={() => aller(sections[i + 1].id)}>
+                {sections[i + 1].titre}
+                <ArrowDown aria-hidden="true" />
+              </button>
             )}
           </div>
         ))}

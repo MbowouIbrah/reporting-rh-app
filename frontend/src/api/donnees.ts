@@ -1,4 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { api, queryRetry } from './client'
 import { qs } from './rapports'
 
@@ -19,14 +21,33 @@ export interface LigneTableau {
   exclusions: string
 }
 
-export interface Tableau {
+export interface Structure {
   /** Rubriques dans l'ordre des colonnes de la feuille. */
   colonnes: string[]
   /** Rubriques exclues du TOTAL, dans l'ordre des colonnes. */
   exclues: string[]
   /** Valeurs des filtres, limitées au périmètre ; employés triés par nom. */
   filtres: { annees: number[]; services: string[]; sites: string[]; salaries: { matricule: string; nom: string }[] }
+}
+
+export interface Tableau extends Structure {
   lignes: LigneTableau[]
+}
+
+/** En-tête et filtres seuls : arrivent avant les lignes, la structure du tableau est posée d'emblée. */
+export function useStructure() {
+  const q = useQuery({
+    queryKey: ['donnees', 'structure'],
+    queryFn: () => api<Structure>('/donnees/structure'),
+    staleTime: 60_000,
+    retry: queryRetry,
+    // Au rechargement : toutes les colonnes du tableau tout de suite, revalidées ensuite.
+    placeholderData: () => lireCache<Structure>('donnees-structure'),
+  })
+  useEffect(() => {
+    if (!q.isPlaceholderData && q.data) ecrireCache('donnees-structure', q.data)
+  }, [q.data, q.isPlaceholderData])
+  return q
 }
 
 export interface FiltresTableau {

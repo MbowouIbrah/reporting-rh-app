@@ -4,6 +4,7 @@ from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -81,6 +82,8 @@ def rapport(lot_id: int, p: Principal = Depends(current_principal), db: Session 
     ws.append(["Ligne", "Colonne", "Code", "Gravité", "Valeur", "Message"])
     for a in anos:
         ws.append([a.num_ligne, a.colonne, a.code, a.gravite, a.valeur, a.message])
+    ws.auto_filter.ref = f"A1:F{max(2, ws.max_row)}"
+    ws.freeze_panes = "A2"
     ws2 = wb.create_sheet("SYNTHESE")
     for k, v in (lot.stats or {}).items():
         ws2.append([k, str(v)])
@@ -98,10 +101,29 @@ def rapport(lot_id: int, p: Principal = Depends(current_principal), db: Session 
     )
 
 
+@router.get("/{lot_id}/apercu")
+def apercu(lot_id: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Effet de la validation : lignes nouvelles, modifiées (avant -> après), identiques."""
+    authorize(p, "import:read")
+    return service.apercu(db, lot_id)
+
+
+class Cle(BaseModel):
+    annee: int
+    mois: int
+    matricule: str
+
+
+class ValidationIn(BaseModel):
+    garder: list[Cle] = []  # lignes déjà en base à conserver telles quelles
+
+
 @router.post("/{lot_id}/valider")
-def valider(lot_id: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+def valider(lot_id: int, corps: ValidationIn | None = None,
+            p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "import:write")
-    return service.lot_dict(service.valider_lot(db, p.user_id, lot_id))
+    garder = {(c.annee, c.mois, c.matricule.strip()) for c in corps.garder} if corps else None
+    return service.lot_dict(service.valider_lot(db, p.user_id, lot_id, garder))
 
 
 @router.post("/{lot_id}/annuler")

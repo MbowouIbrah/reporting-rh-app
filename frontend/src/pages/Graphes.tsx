@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { getAnnuel, getMensuel } from '../api/rapports'
+import { getAnnuel } from '../api/rapports'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
@@ -12,7 +12,8 @@ const C1 = 'var(--data-1)'
 const C2 = 'var(--data-2)'
 const C3 = 'var(--data-3)'
 const GRILLE = 'var(--rule)'
-const AXE = { tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
+const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Absences (jours)', 'Effectif moyen par type de contrat']
+const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
@@ -28,10 +29,16 @@ function Carte({ titre, children }: { titre: string; children: ReactNode }) {
 }
 
 export default function Graphes() {
-  const f = useFiltres()
-  const ann = useQuery({ queryKey: ['annuel', f.filtres], queryFn: () => getAnnuel(f.filtres!), enabled: !!f.filtres })
-  const men = useQuery({ queryKey: ['mensuel', f.filtres], queryFn: () => getMensuel(f.filtres!), enabled: !!f.filtres })
-  const erreur = ann.error ?? men.error
+  // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
+  const f = useFiltres({ avecMois: false })
+  const ann = useQuery({
+    queryKey: ['annuel', f.filtres],
+    queryFn: () => getAnnuel(f.filtres!),
+    enabled: !!f.filtres,
+    placeholderData: keepPreviousData,
+  })
+  const erreur = ann.error
+  const maj = ann.isPlaceholderData
 
   const serie = ann.data?.serie_n.map((m) => ({
     mois: MOIS_COURTS[m.mois - 1],
@@ -39,21 +46,32 @@ export default function Graphes() {
     effectif: m.effectif,
     absences: m.absences === null ? null : Number(m.absences),
   }))
-  const contrats = men.data?.d_contrat.effectifs.map((c) => ({ contrat: c.contrat, effectif: Number(c.m) }))
+  // Effectif moyen mensuel sur les mois saisis, par nature de contrat (le dernier mois seul peut
+  // être incomplet : une saisie en cours fausserait l'image de l'année)
+  const contrats = ann.data?.d_contrat.effectifs
+    .map((c) => ({ contrat: c.contrat, effectif: c.m === null ? 0 : Math.round(Number(c.m) * 10) / 10 }))
+    .filter((c) => c.effectif > 0)
 
   return (
-    <section className="page-ecran page-etroite rapport-excel graphes-excel">
-      <h2 className="bandeau-titre">GRAPHES — Évolution sur l’année</h2>
+    <section className={`page-ecran page-etroite rapport-excel graphes-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
+      <h2 className="bandeau-titre">GRAPHES D’ÉVOLUTION</h2>
       {f.filtres && (
-        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set} />
+        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {(ann.isLoading || men.isLoading) && <Etat type="chargement" />}
       {erreur && <Etat type={etatErreur(erreur)} />}
-      <div className="graphes">
+      {/* Un seul conteneur : au premier chargement les quatre cartes ont déjà leur taille définitive. */}
+      <div className="graphes" aria-busy={ann.isLoading || undefined}>
+        {ann.isLoading &&
+          TITRES.map((t) => (
+            <figure key={t} className="graphe">
+              <figcaption>{t}</figcaption>
+              <div className="graphe-zone" />
+            </figure>
+          ))}
         {serie && (
           <>
-            <Carte titre="Masse salariale mensuelle (FCFA)">
+            <Carte titre={TITRES[0]}>
               <LineChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
@@ -62,7 +80,7 @@ export default function Graphes() {
                 <Line dataKey="ms" name="Masse salariale" stroke={C1} strokeWidth={2} connectNulls={false} />
               </LineChart>
             </Carte>
-            <Carte titre="Effectif">
+            <Carte titre={TITRES[1]}>
               <BarChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
@@ -71,7 +89,7 @@ export default function Graphes() {
                 <Bar dataKey="effectif" name="Effectif" fill={C2} radius={[3, 3, 0, 0]} />
               </BarChart>
             </Carte>
-            <Carte titre="Absences (jours)">
+            <Carte titre={TITRES[2]}>
               <BarChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis dataKey="mois" interval={0} padding={{ left: 12, right: 16 }} {...AXE} />
@@ -82,14 +100,14 @@ export default function Graphes() {
             </Carte>
           </>
         )}
-        {contrats && (
-          <Carte titre="Effectif par type de contrat">
+        {contrats && contrats.length > 0 && (
+          <Carte titre={TITRES[3]}>
             <BarChart data={contrats}>
               <CartesianGrid stroke={GRILLE} vertical={false} />
               <XAxis dataKey="contrat" {...AXE} />
-              <YAxis allowDecimals={false} {...AXE} />
+              <YAxis {...AXE} />
               <Tooltip />
-              <Bar dataKey="effectif" name="Effectif" fill={C1} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="effectif" name="Effectif moyen" fill={C1} radius={[3, 3, 0, 0]} />
             </BarChart>
           </Carte>
         )}

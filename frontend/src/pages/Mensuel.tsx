@@ -1,41 +1,53 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { getMensuel } from '../api/rapports'
 import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
-import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
+import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
 import { entier, pct } from '../lib/format'
 
-const LIB = { prec: 'M-1', cour: 'M' }
-
 export default function Mensuel() {
-  const f = useFiltres()
+  const f = useFiltres({ comparaison: 'periode' })
   const q = useQuery({
     queryKey: ['mensuel', f.filtres],
     queryFn: () => getMensuel(f.filtres!),
     enabled: !!f.filtres,
+    placeholderData: keepPreviousData,
   })
+  const maj = q.isPlaceholderData
 
   return (
-    <section className="page-ecran rapport-excel">
-      <h2 className="bandeau-titre">REPORTING MENSUEL — Charges RH par période</h2>
+    <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
+      <h2 className="bandeau-titre">REPORTING MENSUEL</h2>
       {f.filtres && (
-        <FiltresPeriode filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
+        <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} partage={f.partage} onChange={f.set}>
           {q.data && <LienExport rapport="mensuel" filtres={f.filtres} />}
         </FiltresPeriode>
       )}
       {f.vide && <Etat type="vide" />}
-      {q.isLoading && <Etat type="chargement" />}
+      {q.isLoading && f.filtres && (
+        <RapportSquelette
+          lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: 'M' }}
+          bandeau={
+            <>
+              <span>Contrôles de cohérence : <strong className="val">—</strong></span>
+              <span>Effectif fin de mois : <strong className="val">—</strong></span>
+              <span>Rotation : <strong className="val">—</strong></span>
+              <span>Absentéisme : <strong className="val">—</strong></span>
+            </>
+          }
+        />
+      )}
       {q.error && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && <Contenu d={q.data} />}
+      {q.data && f.filtres && <Contenu d={q.data} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: 'M' }} />}
     </section>
   )
 }
 
-function Contenu({ d }: { d: MensuelData }) {
+function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string } }) {
   const s = d.synthese
   const bloquants = d.controles.filter((c) => c.bloquant)
   return (
@@ -46,9 +58,9 @@ function Contenu({ d }: { d: MensuelData }) {
             ? `Contrôles en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`
             : 'Contrôles de cohérence : OK'}
         </span>
-        <span>Effectif fin de mois : <strong>{entier(s.effectif.fin)}</strong></span>
-        <span>Rotation : <strong>{pct(s.taux_rotation)}</strong></span>
-        <span>Absentéisme : <strong>{pct(s.taux_absenteisme)}</strong></span>
+        <span>Effectif fin de mois : <strong className="val">{entier(s.effectif.fin)}</strong></span>
+        <span>Rotation : <strong className="val">{pct(s.taux_rotation)}</strong></span>
+        <span>Absentéisme : <strong className="val">{pct(s.taux_absenteisme)}</strong></span>
       </p>
       <SnapSections
         sections={[
@@ -57,26 +69,30 @@ function Contenu({ d }: { d: MensuelData }) {
             titre: 'Reporting global',
             panneaux: [
               [
-                { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={LIB} /> },
-                { titre: 'Charges exclues du total', contenu: <TypesExclus d={d} lib={LIB} /> },
-              ],
-            ],
-          },
-          {
-            id: 's-services',
-            titre: 'Services, effectifs et contrats',
-            panneaux: [
-              [
-                { titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={LIB} /> },
-                { titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
-                { titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={LIB} /> },
+                { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={lib} /> },
+                { titre: 'Charges exclues du total', contenu: <TypesExclus d={d} lib={lib} /> },
               ],
             ],
           },
           {
             id: 's-sites',
-            titre: 'Sites',
-            panneaux: [{ titre: '3. Répartition par site', contenu: <Sites d={d} lib={LIB} /> }],
+            titre: 'Répartition par site',
+            panneaux: [{ titre: '2. Répartition par site', contenu: <Sites d={d} lib={lib} /> }],
+          },
+          {
+            id: 's-services',
+            titre: 'Répartition par service et activité',
+            panneaux: [{ titre: '3. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> }],
+          },
+          {
+            id: 's-contrats',
+            titre: 'Répartition par type de contrat et effectif',
+            panneaux: [
+              [
+                { titre: '4. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
+                { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+              ],
+            ],
           },
         ]}
       />

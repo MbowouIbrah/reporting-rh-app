@@ -3,6 +3,8 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { ApiError, setUnauthorizedHandler } from '../api/client'
 import { getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
 import type { Me } from '../api/types'
+import { viderCache } from '../lib/cacheSession'
+import { viderPartage } from '../lib/filtresPartages'
 
 interface Auth {
   me: Me | null
@@ -17,6 +19,26 @@ const Ctx = createContext<Auth | null>(null)
 const sansSession = (e: unknown) =>
   e instanceof ApiError && e.status === 401 ? null : Promise.reject(e)
 
+// Profil de la session (nom, rôle, droits ; aucun jeton) gardé le temps de l'onglet : au rechargement,
+// la page et sa structure s'affichent tout de suite pendant que /auth/me revalide la session.
+// Les droits ne servent qu'à l'affichage : le serveur contrôle chaque requête.
+const PROFIL = 'reporting-rh:profil'
+function lireProfil(): Me | undefined {
+  try {
+    return JSON.parse(sessionStorage.getItem(PROFIL) ?? 'null') ?? undefined
+  } catch {
+    return undefined
+  }
+}
+function ecrireProfil(me: Me | null) {
+  try {
+    if (me) sessionStorage.setItem(PROFIL, JSON.stringify(me))
+    else sessionStorage.removeItem(PROFIL)
+  } catch {
+    /* stockage indisponible : le rechargement attend /auth/me */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
   const q = useQuery({
@@ -24,11 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: () => getMe().catch(sansSession),
     staleTime: Infinity,
     retry: false,
+    placeholderData: lireProfil,
   })
   const me = q.data ?? null
 
   useEffect(() => {
+    if (!q.isPlaceholderData && q.status === 'success') ecrireProfil(q.data)
+  }, [q.data, q.isPlaceholderData, q.status])
+
+  useEffect(() => {
     setUnauthorizedHandler(() => {
+      viderCache()
       qc.clear()
       qc.setQueryData(['me'], null)
     })
@@ -36,12 +64,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      qc.setQueryData(['me'], await apiLogin(email, password))
+      const me = await apiLogin(email, password)
+      viderCache()
+      qc.setQueryData(['me'], me)
     },
     [qc],
   )
   const logout = useCallback(async () => {
     await apiLogout().catch(() => {})
+    // Le prochain utilisateur de l'onglet ne doit pas hériter du service ou de l'employé choisis.
+    viderPartage()
+    ecrireProfil(null)
+    viderCache()
     qc.clear()
     qc.setQueryData(['me'], null)
   }, [qc])

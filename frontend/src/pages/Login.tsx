@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
+import Fond from '../components/Fond'
 
 export default function Login() {
   const { login } = useAuth()
@@ -37,11 +38,14 @@ export default function Login() {
 
   return (
     <main className="login-page">
+      <Fond />
       <form className="login-card" onSubmit={onSubmit} noValidate>
-        <span className="micro">CFAO · Ressources humaines</span>
-        <h1>
-          Reporting <span className="accent">RH</span>
-        </h1>
+        <div className="login-marque">
+          <img className="login-logo" src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
+          <h1>
+            Reporting <span className="accent">RH</span>
+          </h1>
+        </div>
         {error && (
           <div role="alert" className="alert">
             {error}

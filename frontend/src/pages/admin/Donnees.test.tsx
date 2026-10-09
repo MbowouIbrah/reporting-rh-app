@@ -55,7 +55,7 @@ test('en-têtes de DONNEES, rubriques exclues regroupées juste avant le TOTAL',
     'ANNÉE', 'MOIS', 'MATRICULE', 'Noms', 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service',
     'Brut Réel', 'Absences (nb) (exclu)', 'Total exclusions (technique)', 'TOTAL CHARGES (FCFA)',
   ])
-  expect(screen.getByRole('heading', { name: /FEUILLE DE DONNÉES CENTRALE/ })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeInTheDocument()
   expect(screen.getByText(/^Saisir ANNÉE \(ex\. 2025\)/)).toBeInTheDocument()
   const cellules = screen.getAllByRole('cell')
   expect(cellules[9].textContent).toMatch(/^1\s000,5$/)
@@ -101,7 +101,8 @@ test('un filtre part dans la requête, Réinitialiser les retire tous', async ()
   await waitFor(() => expect(tableau().at(-1)).toMatch(/mois=2/))
   fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
   await waitFor(() => expect(tableau().at(-1)).toMatch(/\/donnees\/tableau\?$/))
-  expect(screen.getByRole('button', { name: 'Réinitialiser' })).toBeDisabled()
+  // Toujours à sa place, inactif quand plus rien n'est filtré.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Réinitialiser' })).toBeDisabled())
 })
 
 test('sans droit de saisie : accès refusé', async () => {

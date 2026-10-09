@@ -44,16 +44,33 @@ async function detail(r: Response): Promise<string> {
   }
 }
 
-export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+async function requete(path: string, init: RequestInit, retry: boolean): Promise<Response> {
   const headers = init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json', ...init.headers } : init.headers
   const r = await fetch(`${BASE}${path}`, { credentials: 'same-origin', ...init, headers })
   if (r.status === 401 && retry && !SANS_REFRESH.includes(path)) {
-    if (await refresh()) return api<T>(path, init, false)
+    if (await refresh()) return requete(path, init, false)
     // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
     if (!path.startsWith('/auth/')) onUnauthorized()
   }
   if (!r.ok) throw new ApiError(r.status, await detail(r))
+  return r
+}
+
+export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+  const r = await requete(path, init, retry)
   return (r.status === 204 ? undefined : await r.json()) as T
+}
+
+/** Fichier produit par l'API (requête POST, donc pas de simple lien) : enregistré sous `nom`. */
+export async function telecharger(path: string, init: RequestInit, nom: string): Promise<void> {
+  const url = URL.createObjectURL(await (await requete(path, init, true)).blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nom
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url))
 }
 
 export const queryRetry = (n: number, e: unknown) =>

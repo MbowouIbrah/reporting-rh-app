@@ -39,6 +39,7 @@ def test_modele_telechargeable(make_client):
     assert r.status_code == 200
     wb = load_workbook(io.BytesIO(r.content))
     assert wb["EMPLOYES"]["A3"].value == "Matricule" and wb["LISTES"].sheet_state == "hidden"
+    assert wb["EMPLOYES"].auto_filter.ref == "A3:H500"
 
 
 def test_import_simulation_puis_reel(make_client):

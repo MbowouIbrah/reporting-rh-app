@@ -1,22 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
-import { getAnnuel } from '../api/rapports'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { type FiltresPage, getAnnuel } from '../api/rapports'
 import type { Annuel as AnnuelData } from '../api/types'
-import { AnalyseEffectifs, Contrats, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
+import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import LienExport from '../components/LienExport'
 import { useFiltres } from '../hooks/useFiltres'
 import { entier, fcfa, MOIS } from '../lib/format'
 
-function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: number }) {
-  const lib = { prec: `${annee - 1}`, cour: `${annee}` }
+function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
+  const { annee, mois } = f
+  const lib = { prec: libelleComparaison(f, 'annee'), cour: `${annee}` }
   return (
     <>
       <p className="bandeau ok">
         <span>Cumul de janvier à {MOIS[mois - 1].toLowerCase()} {annee}</span>
-        <span>Moyenne mensuelle : <strong>{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
-        {d.marge_ytd !== undefined && <span>Marge cumulée : <strong>{fcfa(d.marge_ytd)}</strong></span>}
+        <span>Moyenne mensuelle : <strong className="val">{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
+        {d.marge_ytd !== undefined && <span>Marge cumulée : <strong className="val">{fcfa(d.marge_ytd)}</strong></span>}
       </p>
       <SnapSections
         sections={[
@@ -31,20 +32,24 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
             ],
           },
           {
-            id: 's-services',
-            titre: 'Services, effectifs et contrats',
-            panneaux: [
-              [
-                { titre: '2. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> },
-                { titre: '4. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
-                { titre: '5. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
-              ],
-            ],
+            id: 's-sites',
+            titre: 'Répartition par site',
+            panneaux: [{ titre: '2. Répartition par site', contenu: <Sites d={d} lib={lib} /> }],
           },
           {
-            id: 's-sites',
-            titre: 'Sites',
-            panneaux: [{ titre: '3. Répartition par site', contenu: <Sites d={d} lib={lib} /> }],
+            id: 's-services',
+            titre: 'Répartition par service et activité',
+            panneaux: [{ titre: '3. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> }],
+          },
+          {
+            id: 's-contrats',
+            titre: 'Répartition par type de contrat et effectif',
+            panneaux: [
+              [
+                { titre: '4. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
+                { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+              ],
+            ],
           },
         ]}
       />
@@ -53,24 +58,37 @@ function Contenu({ d, annee, mois }: { d: AnnuelData; annee: number; mois: numbe
 }
 
 export default function Annuel() {
-  const f = useFiltres()
+  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
   const q = useQuery({
     queryKey: ['annuel', f.filtres],
     queryFn: () => getAnnuel(f.filtres!),
     enabled: !!f.filtres,
+    placeholderData: keepPreviousData,
   })
+  const maj = q.isPlaceholderData
   return (
-    <section className="page-ecran rapport-excel">
-      <h2 className="bandeau-titre">COMPARATIF ANNUEL — Charges RH sur l’année</h2>
+    <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
+      <h2 className="bandeau-titre">REPORTING ANNUEL</h2>
       {f.filtres && (
-        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} onChange={f.set}>
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} partage={f.partage} onChange={f.set}>
           {q.data && <LienExport rapport="annuel" filtres={f.filtres} />}
         </FiltresPeriode>
       )}
       {f.vide && <Etat type="vide" />}
-      {q.isLoading && <Etat type="chargement" />}
+      {q.isLoading && f.filtres && (
+        <RapportSquelette
+          lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: `${f.filtres.annee}` }}
+          bandeau={
+            <>
+              <span>Cumul de janvier à {MOIS[f.filtres.mois - 1].toLowerCase()} {f.filtres.annee}</span>
+              <span>Moyenne mensuelle : <strong className="val">—</strong></span>
+              <span>Marge cumulée : <strong className="val">—</strong></span>
+            </>
+          }
+        />
+      )}
       {q.error && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && <Contenu d={q.data} annee={f.filtres.annee} mois={f.filtres.mois} />}
+      {q.data && f.filtres && <Contenu d={q.data} f={f.filtres} />}
     </section>
   )
 }

@@ -1,0 +1,77 @@
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { ApiError, queryRetry } from '../../../api/client'
+import { envoyerFichier, lireAnomalies, urlRapport, type Lot } from '../../../api/saisie'
+import Etat from '../../../components/Etat'
+import { ChoixFichier } from '../../../components/Kit'
+import BarreParcours from './BarreParcours'
+import Etapes from './Etapes'
+import PointsAttention from './PointsAttention'
+
+const ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+interface Props {
+  fichier: File
+  onLot: (lot: Lot) => void
+  onAutre: (f: File | undefined) => void
+  onRetour: () => void
+}
+
+/** Analyse d'un fichier : prêt -> aperçu ; refusé -> erreurs à corriger dans Excel, rapport téléchargeable. */
+export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Props) {
+  const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string }>({})
+  const input = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let actif = true
+    setEtat({})
+    envoyerFichier(fichier)
+      .then((lot) => {
+        if (!actif) return
+        if (lot.statut === 'pret') onLot(lot)
+        else setEtat({ lot })
+      })
+      .catch((e) => {
+        if (!actif) return
+        const deja = e instanceof ApiError && e.status === 409
+        setEtat({ erreur: deja ? 'Ce fichier a déjà été importé et enregistré.' : e instanceof Error ? e.message : 'Fichier illisible.' })
+      })
+    return () => { actif = false }
+  }, [fichier, onLot])
+
+  const lot = etat.lot
+  const anomalies = useQuery({
+    queryKey: ['saisie', 'anomalies', lot?.id],
+    queryFn: () => lireAnomalies(lot!.id),
+    enabled: !!lot,
+    retry: queryRetry,
+  })
+
+  return (
+    <section className="page-ecran rapport-excel saisie-apercu">
+      <BarreParcours libelle="Renseigner des données" onRetour={onRetour}>
+        <Etapes parcours="fichier" actuelle={0} />
+      </BarreParcours>
+      <h2 className="bandeau-titre">{lot || etat.erreur ? 'FICHIER REFUSÉ' : 'ANALYSE DU FICHIER'} — {fichier.name}</h2>
+      {!lot && !etat.erreur && <Etat type="chargement" />}
+      {(lot || etat.erreur) && (
+        <p className="bandeau ko" role="alert">
+          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger dans Excel, puis importez-le de nouveau. Rien n’a été enregistré.`}
+        </p>
+      )}
+      {lot && (
+        <div className="panneau">
+          <div className="panneau-corps" role="region" aria-label="Erreurs du fichier">
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne />}
+          </div>
+        </div>
+      )}
+      <div className="saisie-pied">
+        {lot &&<a className="bouton bouton-lien" href={urlRapport(lot.id)} download>Télécharger le rapport d’erreurs (xlsx)</a>}
+        {(lot || etat.erreur) && <ChoixFichier libelle="Choisir un autre fichier" accept={ACCEPT} inputRef={input} onFichier={onAutre} />}
+      </div>
+    </section>
+  )
+}
+
+export { ACCEPT }

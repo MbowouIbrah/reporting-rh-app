@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef, useState } from 'react'
+import { matriculeAffiche } from '../lib/format'
 
 export interface Salarie {
   matricule: string
@@ -7,7 +8,7 @@ export interface Salarie {
 
 const TOUS = { matricule: '', nom: 'Tous' }
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-const libelle = (s: Salarie) => (s.matricule ? `${s.nom} (${s.matricule})` : s.nom)
+const libelle = (s: Salarie) => (matriculeAffiche(s.matricule) ? `${s.nom} (${matriculeAffiche(s.matricule)})` : s.nom)
 
 /** Liste déroulante des employés (nom et matricule liés), avec recherche sur l'un ou l'autre. */
 export default function ChoixSalarie({
@@ -107,7 +108,7 @@ export default function ChoixSalarie({
               onClick={() => choisir(s)}
             >
               <span>{s.nom}</span>
-              {s.matricule && <span className="choix-mat">{s.matricule}</span>}
+              {matriculeAffiche(s.matricule) && <span className="choix-mat">{matriculeAffiche(s.matricule)}</span>}
             </li>
           ))}
         </ul>

@@ -43,6 +43,7 @@ def test_modele_mensuel_aller_retour(make_client):
     ws = wb["DONNEES"]
     en = [x.value for x in ws[3]]
     assert en[:3] == ["ANNÉE", "MOIS", "MATRICULE"] and BR in en
+    assert ws.auto_filter.ref.startswith("A3:") and ws.auto_filter.ref.endswith("500")
     assert ws["A4"].value == 2026 and ws["B4"].value == "Février" and ws["C4"].value == "E1"
     ws.cell(4, en.index(BR) + 1, 1234)
     out = io.BytesIO()

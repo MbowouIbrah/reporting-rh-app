@@ -3,12 +3,15 @@
 Fonction pure : aucune lecture en base, aucun float dans les montants.
 """
 
+import hashlib
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from itertools import combinations
 
 from app.imports.lecture import Feuille, norm
+from app.imports.similarite import SEUIL_NOM_PROCHE, SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
 
 BLOQUANT, AVERT = "bloquant", "avertissement"
 MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet",
@@ -34,6 +37,7 @@ class Refs:
     rubrique_alias: dict[str, str] = field(default_factory=dict)  # norm -> libellé canonique
     postes: set[str] = field(default_factory=set)  # normalisés
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
+    annuaire: dict[str, tuple[str, str]] = field(default_factory=dict)  # matricule casefold -> (matricule, nom)
 
 
 @dataclass
@@ -60,6 +64,31 @@ class Ligne:
     type_contrat: str | None = None
     montants: dict[str, Decimal] = field(default_factory=dict)
     bloquant: bool = False
+
+
+PREFIXE_SANS_MATRICULE = "SM-"
+
+
+def est_sans_matricule(matricule: str | None) -> bool:
+    return bool(matricule) and matricule.startswith(PREFIXE_SANS_MATRICULE)
+
+
+def matricule_sans_matricule(nom: str, refs: "Refs") -> tuple[str, list[str]]:
+    """Identifiant d'un employé sans matricule, déduit de son nom : (matricule, homonymes en cas d'ambiguïté).
+
+    Un employé déjà connu sous ce nom (nom nettoyé : espaces, casse, accents) est retrouvé ; sinon un
+    identifiant technique stable est dérivé du nom, pour que les mois suivants retombent sur la même fiche."""
+    cle = norm(nom)
+    connus = [m for m, n in refs.noms_connus.items() if n == cle]
+    if len(connus) == 1:
+        return refs.annuaire.get(connus[0], (connus[0], ""))[0], []
+    if len(connus) > 1:
+        return "", sorted(refs.annuaire.get(m, (m, ""))[0] for m in connus)
+    return PREFIXE_SANS_MATRICULE + hashlib.sha1(cle.encode()).hexdigest()[:12].upper(), []
+
+
+def _qui(matricule: str) -> str:
+    return "sans matricule" if est_sans_matricule(matricule) else f"matricule {matricule}"
 
 
 def texte(v):
@@ -166,8 +195,17 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         mat_brut = g("MATRICULE")
         mat = texte(mat_brut)
         if not mat:
-            add(num, "MATRICULE", "VALEUR_MANQUANTE", BLOQUANT, mat_brut, "Obligatoire.")
-            mat = None
+            nom_seul = texte(g("Noms"))
+            if not nom_seul:
+                add(num, "MATRICULE", "VALEUR_MANQUANTE", BLOQUANT, mat_brut,
+                    "Matricule ou nom obligatoire (un employé sans matricule est identifié par son nom).")
+                mat = None
+            else:
+                mat, homonymes = matricule_sans_matricule(nom_seul, refs)
+                if homonymes:
+                    add(num, "MATRICULE", "NOM_HOMONYME", BLOQUANT, nom_seul,
+                        f"Plusieurs employés portent ce nom ({', '.join(homonymes)}) : indiquer le matricule.")
+                    mat = None
         else:
             if isinstance(mat_brut, (int, float)) and not isinstance(mat_brut, bool):
                 add(num, "MATRICULE", "MATRICULE_NUMERIQUE", AVERT, mat_brut,
@@ -198,7 +236,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             cles[(L.annee, L.mois, mat.casefold())].append(num)
             par_matricule[mat.casefold()].append((num, norm(L.nom or ""), {
                 "Service": L.service, "Site": L.site, "Type Contrat": L.type_contrat,
-                "Activité": L.activite}))
+                "Activité": L.activite}, L.nom or "", mat))
 
         for nom, unite in refs.rubriques:
             v = g(nom)
@@ -245,8 +283,25 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         if connu:
             noms.add(connu)
         if len(noms) > 1:
-            add(occ[0][0], "Noms", "NOM_INCOHERENT", AVERT, mat,
-                "Plusieurs noms différents pour ce matricule.")
+            affiches = {o[1]: o[3] for o in occ if o[1]}
+            if connu:
+                affiches.setdefault(connu, refs.annuaire.get(mat, ("", connu))[1])
+            liste = " / ".join(f"« {affiches[n]} »" for n in sorted(affiches))
+            proches = all(similarite(a, b) >= SEUIL_NOM_PROCHE for a, b in combinations(sorted(noms), 2))
+            if proches:
+                add(occ[0][0], "Noms", "NOM_PROCHE", AVERT, occ[0][4],
+                    f"Noms très proches ({_qui(occ[0][4])}) : {liste}. Faute de frappe ?")
+            else:
+                add(occ[0][0], "Noms", "NOM_INCOHERENT", AVERT, occ[0][4],
+                    f"Noms différents ({_qui(occ[0][4])}) : {liste}.")
+        elif not connu and noms:
+            nom_norm = next(iter(noms))
+            trouve = plus_proche(next(o[3] for o in occ if o[1] == nom_norm), refs.annuaire, mat,
+                                 SEUIL_NOUVEAU_PROCHE)
+            if trouve:
+                add(occ[0][0], "Noms", "NOM_SIMILAIRE", AVERT, occ[0][4],
+                    f"Nouvel employé « {occ[0][3]} » ({_qui(occ[0][4])}), très proche de « {trouve[1]} » "
+                    f"({_qui(trouve[0])}). Matricule ou nom mal saisi ?")
         for champ in ("Service", "Site", "Type Contrat", "Activité"):
             vals = {o[2].get(champ) for o in occ if o[2].get(champ)}
             if len(vals) > 1:
