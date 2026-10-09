@@ -88,7 +88,8 @@ export default function SaisieBudgets({ vue, periode, onRetour }: { vue: Pilotag
       ? null
       : somme(comptees.map((x) => normal(valeurs[cle(axe, x.cible_id)])))
     return (
-      <div className="panneau" key={axe}>
+      // Les tableaux d'une colonne se partagent sa hauteur au prorata de leurs lignes (base.css, --lignes).
+      <div className="panneau" key={axe} style={{ '--lignes': hauteur(vue.budgets[axe]) } as CSSProperties}>
         <div className="panneau-corps">
           <table className="dense budgets">
             <caption className="sr-only">Budgets par {TITRES[axe].toLowerCase()}, {periode}</caption>
