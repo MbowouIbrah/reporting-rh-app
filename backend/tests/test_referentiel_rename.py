@@ -48,6 +48,13 @@ def test_renommage_refus(charge, make_client, db):
     absences = next(r["id"] for r in rub if r["libelle"] == "Absences (nb)")
     assert c.put(f"{API}/referentiels/rubrique/{absences}", json={"libelle": "X"}
                  ).status_code == 409
+    # colonne du reporting individuel : la renommer viderait la colonne
+    logement = next(r["id"] for r in rub if r["libelle"] == "Logement site déporté")
+    r = c.put(f"{API}/referentiels/rubrique/{logement}", json={"libelle": "Logement"})
+    assert r.status_code == 409 and "individuel" in r.json()["detail"]
+    formation = next(r["id"] for r in rub if r["libelle"] == "Formation")
+    assert c.put(f"{API}/referentiels/rubrique/{formation}", json={"libelle": "Formations"}
+                 ).status_code == 200
     assert c.put(f"{API}/referentiels/service/{b}", json={"actif": False}).status_code == 200
 
 

@@ -153,7 +153,8 @@ def test_individuel_tous(charge, make_client):
     j = get(make_client(DRH), "individuel/tous", annee=2026).json()
     assert len(j["mois"]) == 12 and j["matricule"] is None
     jan = j["mois"][0]
-    assert jan["present"] and jan["effectif"] == 3 and D(jan["total"]) == D("7000.5")
+    assert jan["present"] and jan["effectif"] == 3
+    assert D(jan["total"]) == 0  # Brut Réel n'est pas une colonne de l'individuel
     assert D(jan["budget"]) == D("1800000")
     assert not j["mois"][5]["present"]
     un = get(make_client(DRH), "individuel/tous", annee=2026, matricule="e1").json()
@@ -272,3 +273,27 @@ def test_filtre_employe_par_matricule(charge, make_client, db):
     c = make_client(EQUIP)
     assert get(c, "mensuel", annee=2026, mois=1, matricule="E1").status_code == 200
     assert get(c, "mensuel", annee=2026, mois=1, matricule="E3").status_code == 404
+
+
+def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
+    c = make_client(ADMIN)
+    lignes = [ligne(ANNÉE=2025, MATRICULE="E1", Noms="Ann", **{
+        "Salaire brut garantie": 500, "Commission": 100, "Primes sur ventes": 30,
+        "Primes sur résultats": 20, "Primes exceptionnelles": 7, "Logement site déporté": 0,
+        "Charges Patronales": 900, "Assurance Maladie": 80, BR: 5000})]
+    lot = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(lignes), XLSX)}).json()
+    assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
+    j = get(c, "individuel/tous", annee=2025).json()
+    assert j["rubriques"] == [
+        "Salaire brut garanti", "Commission", "Primes de productivité", "Bonus", "Primes sur ventes",
+        "Primes sur résultats", "Marge MAD + TVA", "Crédit téléphonique", "Frais de mission", "Primes exceptionnelles",
+        "Logement site déporté", "Carburant véhicule service"]
+    assert set(j["exclues"]) == {"Salaire brut garanti", "Primes de productivité",
+                                 "Primes sur ventes", "Primes sur résultats"}
+    jan = j["mois"][0]
+    assert D(jan["montants"]["Primes sur ventes"]) == 30 and jan["staff"]["Primes sur résultats"] == 1
+    assert D(jan["total"]) == 107  # Commission + Primes exceptionnelles, exclues et retirées hors
+    assert jan["deporte"] is False
+    db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "deporte"
+    db.commit()
+    assert get(c, "individuel/tous", annee=2025).json()["mois"][0]["deporte"] is True

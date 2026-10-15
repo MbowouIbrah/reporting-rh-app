@@ -169,6 +169,8 @@ export interface IndividuelTous {
   matricule: string | null
   nom: string | null
   rubriques: string[]
+  /** Colonnes exclues du total de ligne (hachurées, hors TOTAL MENSUEL). */
+  exclues?: string[]
   mois: {
     mois: number
     present: boolean
@@ -176,6 +178,8 @@ export interface IndividuelTous {
     montants?: Record<string, Val>
     staff?: Record<string, number>
     total?: Dec
+    /** Un site déporté figure dans le mois (sinon logement sans objet). */
+    deporte?: boolean
     budget?: Dec | null
   }[]
 }

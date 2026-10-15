@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api._commun import parse_montant
+from app.api.rapports import COLONNES_INDIVIDUEL
 from app.db.session import get_db
 from app.imports.regles import norm
 from app.imports.service import DIM_MODELS
@@ -250,6 +251,9 @@ def modifier_referentiel(
             raise HTTPException(422, "Libellé vide")
         if dimension == "rubrique" and ancien in {ABSENCES, COMMISSION, *PRIMES}:
             raise HTTPException(409, "Rubrique utilisée par le moteur KPI : renommage interdit")
+        if dimension == "rubrique" and any(ancien in rs for rs in COLONNES_INDIVIDUEL.values()):
+            raise HTTPException(409, "Rubrique affichée dans le reporting individuel : "
+                                     "renommage interdit")
         if db.scalar(select(model.id).where(model.libelle == nouveau, model.id != rid)):
             raise HTTPException(409, "Libellé déjà utilisé")
         pris = db.scalar(select(RefAlias).where(

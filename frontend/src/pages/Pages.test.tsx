@@ -18,7 +18,17 @@ function routes(avecMarge: boolean, perms: string[]) {
     if (url.includes('/auth/me')) return { id: 1, email: 'a@b.c', roles: [], permissions: perms }
     if (url.includes('/rapports/periodes')) return [{ annee: 2026, mois: 2 }]
     if (url.includes('/rapports/filtres')) return { services: [], sites: [], types_site: ['principal', 'agence'], postes: ['Chef atelier'] }
-    if (url.includes('/rapports/individuel/tous')) return { annee: 2026, matricule: null, nom: null, rubriques: ['Bonus'], mois: [{ mois: 1, present: false }] }
+    if (url.includes('/rapports/individuel/tous')) return {
+        annee: 2026, matricule: null, nom: null,
+        rubriques: ['Salaire brut garanti', 'Commission', 'Logement site déporté'],
+        exclues: ['Salaire brut garanti'],
+        mois: [
+          { mois: 1, present: true, effectif: 2, deporte: false, total: '150',
+            montants: { 'Salaire brut garanti': '900', Commission: '150', 'Logement site déporté': '0' },
+            staff: { 'Salaire brut garanti': 2, Commission: 1, 'Logement site déporté': 0 } },
+          { mois: 2, present: false },
+        ],
+      }
     if (url.includes('/rapports/salaries')) return [{ matricule: 'E1', nom: 'Ann' }]
     if (url.includes('/rapports/mensuel'))
       return {
@@ -93,6 +103,15 @@ test('Annuel : filtres type de site, poste et employé (employé réservé au no
 test('Individuel : tous les salariés par défaut', async () => {
   rendu(<Individuel />, '/individuel', ['report:read', 'nominatif:read'])
   expect(await screen.findByRole('region', { name: 'Reporting individuel' })).toBeInTheDocument()
+  await screen.findAllByText('150')
+  const entetes = screen.getAllByRole('columnheader').map((th) => th.textContent)
+  // colonne exclue regroupée juste avant le total
+  expect(entetes.slice(1, 4)).toEqual(['Commission', 'Logement site déporté', 'Salaire brut garanti'])
+  const janvier = screen.getByRole('rowheader', { name: 'Janvier' }).closest('tr')!
+  // logement sans objet hors site déporté, colonne exclue hachurée, total servi par le serveur
+  expect(janvier.cells[2]).toHaveTextContent('-')
+  expect(janvier.cells[3]).toHaveClass('exclu')
+  expect(janvier.cells[4]).toHaveTextContent('150')
 })
 
 test('Individuel : accès refusé sans nominatif:read', async () => {

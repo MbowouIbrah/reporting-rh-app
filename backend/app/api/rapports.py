@@ -20,6 +20,24 @@ router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
               "taux_marge_ytd"}
 
+# Colonnes du reporting individuel (RETOURS_PRESENTATION §4, docs/QUESTIONS_CLIENT.md A3, B1,
+# B2) et les rubriques de DONNEES qu'elles reprennent, une par colonne : « Autres primes » = primes
+# sur ventes et sur résultats, chacune dans sa colonne. « Primes exceptionnelles » = hors salaire.
+COLONNES_INDIVIDUEL: dict[str, tuple[str, ...]] = {
+    "Salaire brut garanti": ("Salaire brut garantie",),
+    "Commission": ("Commission",),
+    "Primes de productivité": ("Productivité Ateliers",),
+    "Bonus": ("Bonus",),
+    "Primes sur ventes": ("Primes sur ventes",),
+    "Primes sur résultats": ("Primes sur résultats",),
+    "Marge MAD + TVA": ("TVA & Marge MAD",),
+    "Crédit téléphonique": ("Crédit téléphonique",),
+    "Frais de mission": ("Frais de mission",),
+    "Primes exceptionnelles": ("Primes exceptionnelles",),
+    "Logement site déporté": ("Logement site déporté",),
+    "Carburant véhicule service": ("Carburant véhicule service",),
+}
+
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -254,7 +272,10 @@ def individuel_tous(
     db: Session = Depends(get_db),
 ):
     """Onglet REPORTING_RH_INDIVIDUEL : par mois, somme des montants de chaque rubrique sur les
-    salariés retenus (tous par défaut), effectif concerné par rubrique, total et budget."""
+    salariés retenus (tous par défaut), effectif concerné par colonne, total et budget.
+    Comme dans DONNEES, une colonne dont les rubriques sont exclues du total de ligne est signalée
+    (`exclues`) et le TOTAL MENSUEL ne somme que les colonnes comptées à la date du mois.
+    `deporte` indique si un site déporté figure dans le mois (logement sinon sans objet)."""
     authorize(p, "nominatif:read")
     scope = scope_for(db, p)
     sal = None
@@ -262,9 +283,15 @@ def individuel_tous(
         sal = db.scalar(select(Salarie).where(Salarie.matricule_norm == norm(matricule)))
         if sal is None:
             raise HTTPException(404, "Matricule introuvable")
-    refs = ch.charger_refs(db)
-    rubriques = list(refs.rubriques)
+    rubriques = list(COLONNES_INDIVIDUEL)
+    exclues = ch.rubriques_exclues(db)
     zero = Decimal(0)
+
+    def montant(L, col: str) -> Decimal:
+        return sum((L.montants.get(r, zero) for r in COLONNES_INDIVIDUEL[col]), zero)
+
+    def comptee(pd, col: str) -> bool:
+        return not all(r in pd.exclues for r in COLONNES_INDIVIDUEL[col])
     mois = []
     for m in range(1, 13):
         pd = ch.charger_periode(db, scope, annee, m)
@@ -279,10 +306,11 @@ def individuel_tous(
         budget = ch.charger_params(db, annee, m).budget_employe
         mois.append({
             "mois": m, "present": True, "effectif": len(lignes),
-            "montants": {r: sum((L.montants.get(r, zero) for L in lignes), zero)
-                         for r in rubriques},
-            "staff": {r: sum(1 for L in lignes if L.montants.get(r, zero) != 0) for r in rubriques},
-            "total": sum((pd.total(L) for L in lignes), zero),
+            "montants": {c: sum((montant(L, c) for L in lignes), zero) for c in rubriques},
+            "staff": {c: sum(1 for L in lignes if montant(L, c) != 0) for c in rubriques},
+            "total": sum((montant(L, c) for L in lignes for c in rubriques if comptee(pd, c)),
+                         zero),
+            "deporte": any(L.type_site == "deporte" for L in lignes),
             "budget": None if budget is None else budget * len(lignes),
         })
     if sal is not None and not any(x["present"] for x in mois):
@@ -291,7 +319,10 @@ def individuel_tous(
                  {"annee": annee, "tous": sal is None})
     db.commit()
     return jsonable({"annee": annee, "matricule": sal.matricule if sal else None,
-                     "nom": sal.nom if sal else None, "rubriques": rubriques, "mois": mois})
+                     "nom": sal.nom if sal else None, "rubriques": rubriques,
+                     "exclues": [c for c in rubriques
+                                 if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
+                     "mois": mois})
 
 
 @router.get("/individuel")

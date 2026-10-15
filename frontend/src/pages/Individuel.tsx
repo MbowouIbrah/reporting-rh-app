@@ -11,24 +11,26 @@ import { useSalaries } from '../hooks/useSalaries'
 import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { plafonner } from '../lib/plafond'
 
-/** Les 12 postes de l'onglet Excel, dans l'ordre du fichier. */
+/** Colonnes du reporting individuel, dans l'ordre demandé (servies aussi par l'API). */
 const COLONNES = [
-  'Crédit téléphonique',
-  'Brut Réel',
+  'Salaire brut garanti',
   'Commission',
-  'Charges Patronales',
+  'Primes de productivité',
+  'Bonus',
+  'Primes sur ventes',
+  'Primes sur résultats',
+  'Marge MAD + TVA',
+  'Crédit téléphonique',
   'Frais de mission',
-  'Salaire brut garantie',
   'Primes exceptionnelles',
   'Logement site déporté',
   'Carburant véhicule service',
-  'Assurance Maladie',
-  'TVA & Marge MAD',
-  'Formation',
 ]
+const LOGEMENT = 'Logement site déporté'
 
 const MODELE_VIDE: IndividuelTous = {
   annee: 0, matricule: null, nom: null, rubriques: COLONNES,
+  exclues: ['Salaire brut garanti', 'Primes de productivité', 'Primes sur ventes', 'Primes sur résultats'],
   mois: MOIS.map((_, i) => ({ mois: i + 1, present: false })),
 }
 
@@ -53,9 +55,18 @@ export default function Individuel() {
   // que le squelette commun masque ; seules les valeurs chargent.
   const maj = q.isPlaceholderData || q.isLoading
   const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
-  const rubriques = COLONNES
-  const totalMois = (m: NonNullable<typeof d>['mois'][number]) =>
-    somme(rubriques.map((r) => m.montants?.[r] ?? null)) ?? '0'
+  // Comme DONNEES (QUESTIONS_CLIENT B1) : colonnes comptées d'abord, puis celles exclues du total,
+  // hachurées et regroupées juste avant le TOTAL MENSUEL (servi par le serveur, sans elles).
+  const exclues = new Set(d?.exclues)
+  const toutes = d?.rubriques ?? COLONNES
+  const horsTotal = toutes.filter((c) => exclues.has(c))
+  const rubriques = [...toutes.filter((c) => !exclues.has(c)), ...horsTotal]
+  const classe = (r: string) => (exclues.has(r) ? ` exclu${r === horsTotal[0] ? ' exclu-debut' : ''}` : '')
+  type Mois = NonNullable<typeof d>['mois'][number]
+  const totalMois = (m: Mois) => m.total ?? '0'
+  // Logement site déporté : sans objet (« - ») quand aucun site déporté ne figure dans le mois.
+  const sansObjet = (r: string, m?: Mois) =>
+    r === LOGEMENT && (m ? m.present && !m.deporte : !(d?.mois ?? []).some((x) => x.deporte))
   const val = (v: Val | undefined) => v ?? '0'
   const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
   const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
@@ -139,7 +150,7 @@ export default function Individuel() {
               <tr>
                 <th scope="col" className="fige-g">Mois</th>
                 {rubriques.map((r) => (
-                  <th scope="col" key={r} style={{ minWidth: largeurEntete(r) }}>
+                  <th scope="col" key={r} className={classe(r).trim() || undefined} style={{ minWidth: Math.round(largeurEntete(r) * 0.68) }}>
                     {r}
                   </th>
                 ))}
@@ -153,8 +164,8 @@ export default function Individuel() {
                   <tr className="groupe">
                     <th scope="row" className="fige-g">{MOIS[m.mois - 1]}</th>
                     {rubriques.map((r) => (
-                      <td className={cls(val(m.montants?.[r]))} key={r}>
-                        {fcfa(val(m.montants?.[r]))}
+                      <td className={(sansObjet(r, m) ? 'num' : cls(val(m.montants?.[r]))) + classe(r)} key={r}>
+                        {sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
                       </td>
                     ))}
                     <td className="num fige-d1">{fcfa(totalMois(m))}</td>
@@ -163,8 +174,8 @@ export default function Individuel() {
                   <tr className="sous">
                     <th scope="row" className="fige-g">Staff</th>
                     {rubriques.map((r) => (
-                      <td className="num" key={r}>
-                        {m.staff?.[r] ?? 0}
+                      <td className={'num' + classe(r)} key={r}>
+                        {sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
                       </td>
                     ))}
                     <td className="fige-d1" />
@@ -175,8 +186,8 @@ export default function Individuel() {
               <tr className="total">
                 <th scope="row" className="fige-g">Total MS</th>
                 {rubriques.map((r) => (
-                  <td className="num" key={r}>
-                    {fcfa(totalRub(r))}
+                  <td className={'num' + classe(r)} key={r}>
+                    {sansObjet(r) ? '-' : fcfa(totalRub(r))}
                   </td>
                 ))}
                 <td className="num fige-d1">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
@@ -185,8 +196,8 @@ export default function Individuel() {
               <tr className="total">
                 <th scope="row" className="fige-g">Total Staff</th>
                 {rubriques.map((r) => (
-                  <td className="num" key={r}>
-                    {totalStaff(r)}
+                  <td className={'num' + classe(r)} key={r}>
+                    {sansObjet(r) ? '-' : totalStaff(r)}
                   </td>
                 ))}
                 <td className="fige-d1" />
@@ -198,7 +209,8 @@ export default function Individuel() {
       )}
       {d && (
         <p className="note">
-          Note : le TOTAL MENSUEL additionne les 12 postes affichés ci-dessus. La ligne « Brut Réel » du reporting global n’y figure pas.
+          Note : le TOTAL MENSUEL additionne les colonnes ci-dessus, hors{' '}
+          <span className="legende-exclu">colonnes hachurées, exclues du total comme dans DONNEES</span>.
         </p>
       )}
     </section>
