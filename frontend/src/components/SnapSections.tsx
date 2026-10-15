@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { plafonner } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
 
@@ -101,11 +101,18 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
                 </Panneau>
               ),
             )}
-            {sections[i + 1] && (
+            {sections[i + 1] ? (
               <button type="button" className="snap-suite" onClick={() => aller(sections[i + 1].id)}>
                 {sections[i + 1].titre}
                 <ArrowDown aria-hidden="true" />
               </button>
+            ) : (
+              i > 0 && (
+                <button type="button" className="snap-suite haut" onClick={() => aller(sections[0].id)}>
+                  Retour en haut
+                  <ArrowUp aria-hidden="true" />
+                </button>
+              )
             )}
           </div>
         ))}

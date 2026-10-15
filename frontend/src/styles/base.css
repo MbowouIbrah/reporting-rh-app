@@ -851,6 +851,8 @@ html, body { overscroll-behavior: none; }
 }
 @media (max-width: 1099px) { .snap-suite, table.dense .bourrage { display: none; } }
 @keyframes indice-suite { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 3px; } }
+@media (prefers-reduced-motion: no-preference) { .snap-suite.haut svg { animation-name: indice-haut; } }
+@keyframes indice-haut { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 -3px; } }
 @media (prefers-reduced-motion: reduce) { .snap-suite svg { animation: none; } }
 /* Écrans de faible hauteur : lignes resserrées pour tenir sur l'écran */
 @media (min-width: 1100px) and (max-height: 820px) {
