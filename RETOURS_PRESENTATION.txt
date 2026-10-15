@@ -1,0 +1,50 @@
+RETOURS DE LA PRÉSENTATION DU SAMEDI 10/10/2026 : MODIFICATIONS À EFFECTUER
+Base de départ : version présentée ce jour-là (commit 449d14f).
+Les notes « menu annuel / mensuel » signifient seulement que les points concernent ces deux menus.
+
+1. MENUS ANNUEL ET MENSUEL
+   [ ] Flèche de retour en haut sur le défilement vertical.
+   [ ] Filtre par site, et par type de site (voir point 3).
+   [ ] Effectifs par site détaillés en CDI / CDD / MAD, dépliables (menu déroulant).
+
+2. RÉSUMÉ (KPI)
+   [ ] Ajouter le pourcentage de MAD sur l'effectif global.
+   [ ] Ajouter CA / effectif front office, mis en avant en rouge (important) :
+       mesure la productivité globale, car le back office ne produit pas de chiffre d'affaires.
+   [ ] Supprimer la masse salariale de l'année N-1.
+   [ ] Remplacer la masse salariale par la masse salariale cumulée.
+   [ ] Ajouter le chiffre d'affaires cumulé.
+   [ ] Regrouper côte à côte : masse salariale, marge, taux de marge.
+
+3. SITES
+   [ ] Type de site : site principal, site agence, site déporté.
+   [ ] Pouvoir n'afficher que les sites déportés, ou que les sites normaux.
+
+4. REPORTING INDIVIDUEL
+   [ ] Colonnes, dans cet ordre :
+       Salaire brut garanti, Commission, Primes de productivité (rendement), Bonus,
+       Autres primes, Marge MAD + TVA, Crédit téléphonique, Frais de mission,
+       Primes exceptionnelles HS, Logement site déporté, Carburant véhicule service.
+   [ ] Retirer : charges patronales, assurance maladie.
+   [ ] « HS » = hors salaire (pas heures supplémentaires) : une seule colonne
+       « Primes exceptionnelles », aucune rubrique « heures supplémentaires ».
+   [ ] Référence = tableau DONNEES de l'administration : toutes les primes y figurent,
+       et ses colonnes indiquent ce qui est compris dans les totaux et ce qui en est exclu.
+       Les colonnes exclues ne font pas partie du total.
+   [ ] Logement site déporté : afficher « - » pour les autres sites (normal, toujours nul).
+   [ ] Ajouter un filtre par poste.
+   [ ] Un seul filtre employé : liste déroulante des noms et matricules, dans laquelle on
+       peut taper pour rechercher un nom ou un matricule.
+
+5. ADMINISTRATION
+   [ ] Ajout de sites, ajout d'employés.
+   [ ] Ajout de services et de sites déportés (liste déroulante).
+
+6. PLUS TARD (ne pas traiter maintenant)
+   [ ] Profil super administrateur (pour assurer la relève) : attribue les rôles et
+       permissions, ajoute, désactive ou supprime les utilisateurs.
+   [ ] Gestion des départements (BU) Motors et Equipments.
+
+7. TECHNIQUE (hors réunion)
+   [ ] Ajouter frontend/.dockerignore (node_modules, dist) : sans lui, l'image Docker
+       du front embarque les modules Node de Windows.
