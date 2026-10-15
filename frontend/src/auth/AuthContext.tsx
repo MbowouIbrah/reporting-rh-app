@@ -57,8 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       viderCache()
-      qc.clear()
+      // qc.clear() retirerait aussi ['me'] : son observateur ne verrait plus le null et la page resterait vide.
       qc.setQueryData(['me'], null)
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     })
   }, [qc])
 
