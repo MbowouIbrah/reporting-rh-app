@@ -138,12 +138,58 @@ def referentiel(
     authorize(p, "import:read")
     model = _modele(dimension)
     return {
-        "valeurs": [{"id": r.id, "libelle": r.libelle, "actif": r.actif,
-                     **({"type_site": r.type_site} if dimension == "site" else {})}
+        "valeurs": [_valeur(dimension, r)
                     for r in db.scalars(select(model).order_by(model.id))],
         "alias": [{"alias": a.alias_norm, "cible_id": a.cible_id}
                   for a in db.scalars(select(RefAlias).where(RefAlias.dimension == dimension))],
     }
+
+
+class RefIn(BaseModel):
+    libelle: str
+    type_site: str | None = None
+
+
+def _valeur(dimension: str, r) -> dict:
+    return {"id": r.id, "libelle": r.libelle, "actif": r.actif,
+            **({"type_site": r.type_site} if dimension == "site" else {})}
+
+
+@router.post("/referentiels/{dimension}", status_code=201)
+def creer_referentiel(
+    dimension: str, body: RefIn, p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Ajoute un service ou un site ; les autres dimensions naissent de l'import."""
+    authorize(p, "referentiel:write")
+    model = _modele(dimension)
+    if dimension not in ("service", "site"):
+        raise HTTPException(422, "Création possible pour les services et les sites seulement")
+    libelle = body.libelle.strip()
+    if not libelle:
+        raise HTTPException(422, "Libellé vide")
+    if body.type_site is not None and dimension != "site":
+        raise HTTPException(422, "Type de site invalide")
+    type_site = body.type_site or "principal"
+    if type_site not in TYPES_SITE:
+        raise HTTPException(422, "Type de site invalide")
+    cle = norm(libelle)
+    if any(norm(x) == cle for x in db.scalars(select(model.libelle))):
+        raise HTTPException(409, "Libellé déjà utilisé")
+    if db.scalar(select(RefAlias.id).where(
+            RefAlias.dimension == dimension, RefAlias.alias_norm == cle)):
+        raise HTTPException(409, "Libellé déjà utilisé comme alias d'une autre valeur")
+    extra = {"type_site": type_site} if dimension == "site" else {}
+    row = model(libelle=libelle, actif=True, **extra)
+    db.add(row)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Libellé déjà utilisé") from None
+    audit.record(db, p.user_id, "create", f"ref_{dimension}", row.id, None, _valeur(dimension, row))
+    db.commit()
+    return _valeur(dimension, row)
 
 
 class AliasIn(BaseModel):

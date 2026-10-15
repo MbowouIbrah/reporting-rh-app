@@ -66,3 +66,48 @@ def test_type_de_site_modifiable_et_valide(charge, db):
     sid_ = sid(db, "SAV PL")
     assert c.put(f"{API}/referentiels/service/{sid_}",
                  json={"type_site": "agence"}).status_code == 422
+
+
+def test_creation_site_avec_type_et_service(charge, db):
+    c = charge
+    r = c.post(f"{API}/referentiels/site", json={"libelle": "  Maroua ", "type_site": "agence"})
+    assert r.status_code == 201
+    assert r.json() == {"id": r.json()["id"], "libelle": "Maroua", "actif": True,
+                        "type_site": "agence"}
+    assert r.json() in c.get(f"{API}/referentiels/site").json()["valeurs"]  # même format que GET
+    d = c.post(f"{API}/referentiels/site", json={"libelle": "Bafoussam"}).json()
+    assert d["type_site"] == "principal"
+    s = c.post(f"{API}/referentiels/service", json={"libelle": "Qualité"})
+    assert s.status_code == 201 and "type_site" not in s.json() and s.json()["actif"] is True
+    assert s.json() in c.get(f"{API}/referentiels/service").json()["valeurs"]
+    db.expire_all()
+    assert db.get(Site, r.json()["id"]).type_site == "agence"
+    ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "create",
+                                             AuditEvent.entite == "ref_site")).all()
+    assert len(ev) == 2 and ev[0].avant is None and ev[0].apres["libelle"] == "Maroua"
+
+
+def test_creation_refus(charge, db, make_client):
+    c = charge
+    assert c.post(f"{API}/referentiels/service", json={"libelle": "Administration"}
+                  ).status_code == 409
+    # comparaison sans accents ni casse
+    assert c.post(f"{API}/referentiels/service", json={"libelle": "administration "}
+                  ).status_code == 409
+    # ancien libellé d'un renommage : alias d'une autre valeur
+    a = sid(db, "SAV PL")
+    assert c.put(f"{API}/referentiels/service/{a}", json={"libelle": "SAV Poids Lourds"}
+                 ).status_code == 200
+    r = c.post(f"{API}/referentiels/service", json={"libelle": "sav pl"})
+    assert r.status_code == 409 and "alias" in r.json()["detail"]
+    assert c.post(f"{API}/referentiels/service", json={"libelle": "   "}).status_code == 422
+    assert c.post(f"{API}/referentiels/site", json={"libelle": "X", "type_site": "zz"}
+                  ).status_code == 422
+    assert c.post(f"{API}/referentiels/service", json={"libelle": "X", "type_site": "agence"}
+                  ).status_code == 422
+    assert c.post(f"{API}/referentiels/rubrique", json={"libelle": "X"}).status_code == 422
+    assert c.post(f"{API}/referentiels/poste", json={"libelle": "X"}).status_code == 422
+    assert c.post(f"{API}/referentiels/inconnue", json={"libelle": "X"}).status_code == 404
+    lecteur = make_client("drh@exemple.invalid")
+    assert lecteur.post(f"{API}/referentiels/site", json={"libelle": "Nord"}).status_code == 403
+    assert db.scalar(select(Site.id).where(Site.libelle == "Nord")) is None

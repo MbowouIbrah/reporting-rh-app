@@ -95,6 +95,8 @@ export interface Mensuel {
     effectif: Cell
     /** Effectif du site par nature de contrat (CDI, CDD, MAD), dans l'ordre du référentiel. */
     effectif_contrat?: Record<string, Cell>
+    /** Masse salariale du site par nature de contrat, mêmes clés que effectif_contrat. */
+    ms_contrat?: Record<string, Cell>
   }[]
   d_contrat: {
     effectifs: ({ contrat: string } & Cell)[]

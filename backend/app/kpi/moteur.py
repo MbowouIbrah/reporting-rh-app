@@ -197,11 +197,18 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     def cell_eff(m, m1):
         return cell(None if m is None else Decimal(m), None if m1 is None else Decimal(m1))
 
+    def ms_site_contrat(pd, s, c):
+        if not pd:
+            return None
+        return sum((pd.total(L) for L in pd.lignes if L.site == s and L.contrat == c), ZERO)
+
     c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
                "effectif": cell_eff(*sites_eff[s]),
                "effectif_contrat": {c: cell_eff(eff_site_contrat(cur, s, c),
                                                 eff_site_contrat(prev, s, c))
-                                    for c in refs.contrats}} for s in refs.sites]
+                                    for c in refs.contrats},
+               "ms_contrat": {c: cell(ms_site_contrat(cur, s, c), ms_site_contrat(prev, s, c))
+                              for c in refs.contrats}} for s in refs.sites]
     ms_sites = sum((c["ms"]["m"] for c in c_site), ZERO)
 
     ctrl_contrats: list[dict] = []
@@ -345,7 +352,9 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                        for c in refs.contrats}
         c_site.append({"site": s, "ms": {**ms, **bud("site", s, ms["m"])},
                        "effectif": e,
-                       "effectif_contrat": par_contrat})
+                       "effectif_contrat": par_contrat,
+                       "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.site == s and L.contrat == c)
+                                      for c in refs.contrats}})
 
     def fin_an(pds, mois_ok, contrat) -> int | None:
         if not mois_ok:

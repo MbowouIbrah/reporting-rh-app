@@ -212,8 +212,10 @@ function ServiceBloc({ b, bande }: { b: Blocs['b_service_activite'][number]; ban
 }
 
 /** 2. Répartition par site, présentée comme la répartition par service : site fusionné sur ses lignes,
- *  masse salariale puis Staff (effectif) ; un clic sur la ligne Staff déplie l'effectif par nature de contrat. */
+ *  masse salariale puis Staff (effectif) ; un clic sur le bloc d'un site le déplie par nature de contrat
+ *  (masse salariale et Staff). Un seul site déplié à la fois. */
 export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
+  const [ouvert, setOuvert] = useState<string | null>(null)
   return (
     <table className="dense aligne double services">
       <thead>
@@ -231,54 +233,67 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
       </thead>
       <tbody>
         {d.c_site.map((r, n) => (
-          <SiteBloc key={r.site} r={r} bande={n % 2 === 1} />
+          <SiteBloc
+            key={r.site}
+            r={r}
+            bande={n % 2 === 1}
+            ouvert={ouvert === r.site}
+            basculer={() => setOuvert(ouvert === r.site ? null : r.site)}
+          />
         ))}
       </tbody>
     </table>
   )
 }
 
-function SiteBloc({ r, bande }: { r: Blocs['c_site'][number]; bande: boolean }) {
-  const [ouvert, setOuvert] = useState(false)
-  const contrats = Object.entries(r.effectif_contrat ?? {})
+function SiteBloc({ r, bande, ouvert, basculer }: {
+  r: Blocs['c_site'][number]; bande: boolean; ouvert: boolean; basculer: () => void
+}) {
+  const contrats = Object.keys(r.effectif_contrat ?? {})
   const fond = bande ? 'bande' : ''
-  const hauteur = 2 + (ouvert ? contrats.length : 0)
+  const hauteur = 2 + (ouvert ? 2 * contrats.length : 0)
   const depliable = contrats.length > 0
+  // Tout le bloc du site est cliquable : un clic sur n'importe laquelle de ses lignes le déplie ou le replie.
+  const clic = depliable ? basculer : undefined
+  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${fond}`.replace(/s+/g, ' ').trim()
   return (
     <>
-      <tr className={`debut-service ${fond}`.trim()}>
+      <tr className={classe('debut-service')} onClick={clic}>
         <th scope="rowgroup" rowSpan={hauteur} className="service">
-          {r.site}
+          {depliable ? (
+            <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail par contrat de ${r.site}`}>
+              <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {r.site}
+            </button>
+          ) : (
+            r.site
+          )}
         </th>
         <td>Masse salariale</td>
         <Valeurs c={r.ms} />
         <Budgets b={r.ms} rowSpan={hauteur} />
       </tr>
-      <tr
-        className={`staff ${depliable ? 'depliable' : ''} ${fond}`.replace(/\s+/g, ' ').trim()}
-        onClick={depliable ? () => setOuvert(!ouvert) : undefined}
-      >
-        <td>
-          {depliable ? (
-            <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail des effectifs de ${r.site}`}>
-              <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> Staff
-            </button>
-          ) : (
-            'Staff'
-          )}
-        </td>
+      <tr className={classe('staff')} onClick={clic}>
+        <td>Staff</td>
         <Valeurs c={r.effectif} />
       </tr>
       {ouvert &&
-        contrats.map(([contrat, e]) => (
-          <tr className={`staff detail-contrat ${fond}`.trim()} key={contrat}>
-            <td className="retrait">{contrat}</td>
-            <Valeurs c={e} />
-          </tr>
+        contrats.map((contrat) => (
+          <Fragment key={contrat}>
+            <tr className={classe('detail-contrat')} onClick={clic}>
+              <td className="retrait">{contrat}</td>
+              <Valeurs c={r.ms_contrat?.[contrat] ?? VIDE} />
+            </tr>
+            <tr className={classe('staff detail-contrat')} onClick={clic}>
+              <td className="retrait">Staff {contrat}</td>
+              <Valeurs c={r.effectif_contrat![contrat]} />
+            </tr>
+          </Fragment>
         ))}
     </>
   )
 }
+
+const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
 
 /** 5. Analyse des effectifs : total puis par nature de contrat. */
 export function AnalyseEffectifs({ d }: { d: Blocs }) {

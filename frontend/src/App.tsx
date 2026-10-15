@@ -6,6 +6,8 @@ import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Donnees from './pages/admin/Donnees'
+import Employes from './pages/admin/Employes'
+import Referentiels from './pages/admin/Referentiels'
 import Saisie from './pages/admin/Saisie'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
@@ -56,6 +58,22 @@ export default function App() {
           element={
             <RequireAuth perm="saisie:write">
               <Saisie />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/employes"
+          element={
+            <RequireAuth perm="saisie:write">
+              <Employes />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/referentiels"
+          element={
+            <RequireAuth perm="referentiel:write">
+              <Referentiels />
             </RequireAuth>
           }
         />

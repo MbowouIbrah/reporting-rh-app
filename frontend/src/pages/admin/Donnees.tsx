@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useStructure, useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
+import AdminNav from '../../components/AdminNav'
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import ChoixSalarie from '../../components/ChoixSalarie'
 import Etat, { etatErreur } from '../../components/Etat'
@@ -72,6 +73,7 @@ export default function Donnees() {
   return (
     <section className="page-ecran rapport-excel donnees-excel" aria-busy={charge || undefined}>
       <h2 className="bandeau-titre">{TITRE}</h2>
+      <AdminNav />
       <p className="regle">{CONSIGNE}</p>
       <div className="filtres" role="group" aria-label="Filtres">
         <label>

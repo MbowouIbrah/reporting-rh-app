@@ -162,7 +162,7 @@ table.dense tr.sous th { padding-left: var(--sp-5); font-weight: var(--fw-regula
 table.dense button.deplier { border: 0; background: none; padding: 0 var(--sp-1); font: inherit; color: inherit; cursor: pointer; border-radius: 0; }
 table.dense tr.detail-contrat td.retrait { padding-left: var(--sp-5); }
 table.dense tr.depliable { cursor: pointer; }
-.rapport-excel .panneau table.dense.services tbody tr.depliable:hover > td { background: var(--rapport-groupe); }
+table.dense button.deplier:hover, table.dense button.deplier:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-style: italic; }
 
 .graphes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
@@ -352,7 +352,7 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
-.rapport-excel .panneau table.services tr.staff td { color: var(--muted); }
+.rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
 /* Damier par service : chaque bloc (service, activités, budget fusionnés) forme une seule bande */
 .rapport-excel .panneau table.dense.services tbody tr:not(.total) > td, .rapport-excel .panneau table.dense.services tbody tr:not(.total) > th { background: var(--surface); }
 .rapport-excel .panneau table.dense.services tbody tr.bande > td, .rapport-excel .panneau table.dense.services tbody tr.bande > th { background: var(--rapport-zebre); }
@@ -983,3 +983,38 @@ table.tableau-squelette td { height: 2.1em; }
 @media (max-width: 720px) {
   .filtres-titre { flex-basis: 100%; border-right: 0; padding-right: 0; }
 }
+
+/* Administration : sous-onglets (rayon 8 px), formulaires et grilles à angles droits des écrans Employés et Référentiels */
+.admin-onglets { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
+.admin-onglets a { padding: 6px 16px; border: 1px solid var(--rule-strong); border-radius: var(--radius); background: var(--surface); color: var(--navy); font-size: var(--fs-md); font-weight: var(--fw-bold); text-decoration: none; }
+.admin-onglets a:hover { background: var(--surface-hover); }
+.admin-onglets a[aria-current='page'] { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+.admin-excel .panneau { flex: 0 1 auto; margin-bottom: var(--sp-3); }
+.admin-excel .panneau table.dense thead th { text-align: left; }
+.admin-excel .panneau table.dense tbody th[scope='row'] { text-align: left; font-weight: var(--fw-bold); color: var(--navy); }
+.admin-excel .panneau table.dense td.actions { text-align: right; white-space: nowrap; }
+.admin-excel .bouton:not(.bouton-lien) { height: 36px; padding-block: 0; font-size: var(--fs-md); }
+.admin-excel .bouton-lien { padding: 2px 8px; color: var(--navy); font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+.admin-excel .statut { color: var(--muted); font-weight: var(--fw-bold); }
+.admin-excel .statut-ok { color: var(--success); }
+.admin-excel .filtres input[type='search'] { width: 240px; }
+.admin-excel .filtres .admin-ajout { margin-left: auto; }
+.admin-excel .admin-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4); }
+.admin-excel .admin-form .champ { flex: 1 1 180px; max-width: 280px; min-width: 0; margin: 0; }
+.admin-excel .champ label { color: var(--navy); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.admin-excel :is(.champ input, .champ select, td select, .renommer input) { height: 36px; border: 1px solid var(--pointille); border-radius: 0; background: var(--paper); color: var(--brun); font: inherit; font-size: var(--fs-md); padding: 0 12px; }
+.admin-excel td select { height: 28px; font-size: var(--fs-sm); padding: 0 8px; }
+.admin-excel :is(input, select)[aria-invalid='true'] { border-color: var(--error); }
+.admin-excel .admin-contexte { flex-basis: 100%; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.admin-excel .admin-case { display: inline-flex; align-items: center; gap: var(--sp-2); height: 36px; margin-top: calc(var(--fs-xs) * 1.4 + var(--sp-1)); color: var(--navy); font-size: var(--fs-md); font-weight: 700; }
+.admin-excel .admin-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+/* Formulaire d'ajout court (Référentiels) : le bouton Ajouter reste sur la ligne des champs, aligné sur leur bas */
+.admin-excel .admin-actions.en-ligne { flex-basis: auto; align-self: flex-end; }
+.admin-excel .admin-erreur { flex-basis: 100%; }
+.admin-excel .admin-erreur-bloc { padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--rule); }
+.admin-excel .renommer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-width: 300px; font-weight: 400; }
+.admin-excel .renommer .bouton:not(.bouton-lien) { height: 30px; }
+.admin-excel .renommer p { flex-basis: 100%; margin: 0; white-space: normal; }
+.admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
+.admin-excel .admin-duo .panneau { margin-bottom: 0; }
+@media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } }

@@ -260,3 +260,15 @@ def test_annuel_effectif_par_contrat_et_site():
     vide = annuel(n, {}, 2, REFS, Params())
     assert next(c for c in vide["c_site"] if c["site"] == "Douala")["effectif_contrat"][
         "CDI"]["m1"] is None
+
+
+def test_masse_par_contrat_et_site_somme_au_site():
+    cur = pd(L(1), L(2, ctr="CDD"), L(3, site="Yaoundé"))
+    r = mensuel(cur, pd(L(1)), REFS, Params())
+    a = annuel({1: cur}, {1: pd(L(1))}, 1, REFS, Params())
+    for blocs in (r, a):
+        for c in blocs["c_site"]:
+            assert sum(v["m"] for v in c["ms_contrat"].values()) == c["ms"]["m"]
+    douala = next(c for c in r["c_site"] if c["site"] == "Douala")
+    assert douala["ms_contrat"]["MAD"]["m"] == 0
+    assert douala["ms_contrat"]["CDI"]["m1"] == douala["ms"]["m1"]
