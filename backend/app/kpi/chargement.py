@@ -22,9 +22,13 @@ from app.models.referentiel import (
 from app.repos.scope import Scope, apply_scope
 
 
-def charger_refs(db: Session) -> Refs:
+def charger_refs(db: Session, type_site: str | None = None) -> Refs:
+    """Référentiels actifs ; un type de site ne garde que les sites de ce type."""
     def libs(model):
-        return tuple(db.scalars(select(model.libelle).where(model.actif).order_by(model.id)))
+        q = select(model.libelle).where(model.actif).order_by(model.id)
+        if type_site and model is Site:
+            q = q.where(Site.type_site == type_site)
+        return tuple(db.scalars(q))
 
     rub = tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.actif).order_by(Rubrique.ordre)))
     return Refs(libs(Service), libs(Activite), libs(Site), libs(TypeContrat), rub)
@@ -42,9 +46,13 @@ def charger_params(db: Session, annee: int, mois: int) -> Params:
 
 
 def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
-                    service: str | None, site: str | None) -> Budgets:
+                    service: str | None, site: str | None, *, type_site: str | None = None,
+                    poste: str | None = None, salarie_id: int | None = None) -> Budgets:
     """Budgets de la période visibles pour ce périmètre et ces filtres : un budget n'est montré
-    que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global)."""
+    que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global).
+    Aucun budget pour un poste ou une personne ; un type de site ne garde que les budgets site."""
+    if poste or salarie_id is not None:
+        return Budgets()
     pid = db.scalar(select(Periode.id).where(Periode.annee == annee, Periode.mois == mois))
     if pid is None:
         return Budgets()
@@ -53,6 +61,8 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
         q = (select(model.libelle, Budget.valeur)
              .join(model, model.id == Budget.cible_id)
              .where(Budget.periode_id == pid, Budget.axe == axe, model.actif))
+        if type_site and model is Site:
+            q = q.where(Site.type_site == type_site)
         return {lib: Decimal(str(v)) for lib, v in db.execute(q)}
 
     def visible(vals: dict[str, Decimal], dim: str, autre: str | None, choisi: str | None):
@@ -62,9 +72,10 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
             vals = {k: v for k, v in vals.items() if k in scope.rules.get(dim, ())}
         return {k: v for k, v in vals.items() if choisi in (None, k)}
 
-    rubrique = lus("rubrique", Rubrique) if scope.unrestricted and not service and not site else {}
-    return Budgets(rubrique, visible(lus("service", Service), "service", site, service),
-                   visible(lus("site", Site), "site", service, site))
+    global_ = scope.unrestricted and not service and not site and not type_site
+    rubrique = lus("rubrique", Rubrique) if global_ else {}
+    services = {} if type_site else visible(lus("service", Service), "service", site, service)
+    return Budgets(rubrique, services, visible(lus("site", Site), "site", service, site))
 
 
 def exclues_a_date(db: Session, annee: int, mois: int) -> frozenset[str]:
@@ -82,11 +93,12 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
         return None
     q = apply_scope(
         select(SituationMensuelle.id, SituationMensuelle.salarie_id, Service.libelle,
-               Site.libelle, Activite.libelle, TypeContrat.libelle)
+               Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle)
         .join(Service, Service.id == SituationMensuelle.service_id)
         .join(Site, Site.id == SituationMensuelle.site_id)
         .join(Activite, Activite.id == SituationMensuelle.activite_id)
         .join(TypeContrat, TypeContrat.id == SituationMensuelle.type_contrat_id)
+        .outerjoin(Poste, Poste.id == SituationMensuelle.poste_id)
         .where(SituationMensuelle.periode_id == periode.id),
         scope, service=Service.libelle, site=Site.libelle)
     rows = db.execute(q).all()
@@ -98,8 +110,8 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
         for sid, rub, val in db.execute(mq):
             montants[sid][rub] = Decimal(str(val))
     saisie = db.get(CaPeriode, periode.id)
-    lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}))
-                   for sid, sal, srv, site, act, ctr in rows)
+    lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste)
+                   for sid, sal, srv, site, act, ctr, tsite, poste in rows)
     return PeriodeData(lignes, exclues_a_date(db, annee, mois),
                        ca=_dec(saisie.valeur) if saisie else None,
                        marge=_dec(saisie.marge) if saisie else None)
@@ -189,14 +201,20 @@ def options_tableau(db: Session, scope: Scope) -> dict:
             "salaries": [{"matricule": m, "nom": n} for m, n in salaries]}
 
 
-def filtrer(pd: PeriodeData | None, service: str | None, site: str | None) -> PeriodeData | None:
+def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
+            type_site: str | None = None, poste: str | None = None,
+            salarie_id: int | None = None) -> PeriodeData | None:
     """Filtre d'affichage choisi par l'utilisateur, appliqué après le périmètre (jamais en deçà)."""
     if pd is None:
         return None
     lignes = tuple(L for L in pd.lignes
-                   if (not service or L.service == service) and (not site or L.site == site))
-    # Le CA est global : il n'existe pas pour un service ou un site, donc ni marge ni taux.
-    global_ = not (service or site)
+                   if (not service or L.service == service) and (not site or L.site == site)
+                   and (not type_site or L.type_site == type_site)
+                   and (not poste or L.poste == poste)
+                   and (salarie_id is None or L.salarie_id == salarie_id))
+    # Le CA est global : il n'existe pas pour un service, un site, un type de site, un poste
+    # ou une personne, donc ni marge ni taux.
+    global_ = not (service or site or type_site or poste or salarie_id is not None)
     return PeriodeData(lignes, pd.exclues, ca=pd.ca if global_ else None,
                        marge=pd.marge if global_ else None)
 

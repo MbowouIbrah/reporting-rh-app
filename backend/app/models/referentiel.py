@@ -20,8 +20,16 @@ class Activite(_Ref, Base):
     __tablename__ = "activite"
 
 
+TYPES_SITE = ("principal", "agence", "deporte")
+
+
 class Site(_Ref, Base):
     __tablename__ = "site"
+    __table_args__ = (CheckConstraint("type_site IN ('principal','agence','deporte')",
+                                      name="ck_site_type_site"),)
+
+    type_site: Mapped[str] = mapped_column(String(20), default="principal",
+                                           server_default="principal")
 
 
 class TypeContrat(_Ref, Base):

@@ -159,6 +159,10 @@ table.dense tbody tr:hover td, table.dense tbody tr:hover th { background: var(-
 table.dense tr.total th, table.dense tr.total td { font-weight: var(--fw-bold); background: var(--paper-3); border-top: 2px solid var(--navy-3); }
 table.dense tr.groupe th, table.dense tr.groupe td { font-weight: var(--fw-bold); background: var(--paper-2); }
 table.dense tr.sous th { padding-left: var(--sp-5); font-weight: var(--fw-regular); }
+table.dense button.deplier { border: 0; background: none; padding: 0 var(--sp-1); font: inherit; color: inherit; cursor: pointer; border-radius: 0; }
+table.dense tr.detail-contrat td.retrait { padding-left: var(--sp-5); }
+table.dense tr.depliable { cursor: pointer; }
+.rapport-excel .panneau table.dense.services tbody tr.depliable:hover > td { background: var(--rapport-groupe); }
 table.dense tr.exclu th, table.dense tr.exclu td { color: var(--muted); font-style: italic; }
 
 .graphes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
@@ -231,7 +235,7 @@ table.dense td.num { text-align: right; }
 .panneau table.dense tbody th[scope='row'] { white-space: nowrap; }
 .grille-rapport { display: grid; gap: var(--sp-2); grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .grille-rapport .panneau { max-height: 70vh; }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .layout-ecran > .page:has(.page-ecran) { max-width: none; padding-bottom: var(--sp-2); }
   .page-ecran { display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .page-ecran > h2 { font-size: var(--fs-lg); margin-bottom: 2px; }
@@ -248,7 +252,7 @@ table.dense td.num { text-align: right; }
   .p-contrat { grid-column: 9 / span 4; }
 }
 @media (max-width: 1099px) { .grille-rapport > .panneau { grid-column: 1 / -1; } }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .layout-ecran:has(.page-ecran) { height: 100dvh; display: flex; flex-direction: column; }
   .layout-ecran:has(.page-ecran) > .page { flex: 1; min-height: 0; width: 100%; }
 }
@@ -267,7 +271,7 @@ table.dense td.num { text-align: right; }
 .resume-bas .table-scroll { order: 1; margin: 0; max-height: none; }
 .resume-bas table.dense { font-size: var(--fs-sm); }
 .resume-bas table.dense th, .resume-bas table.dense td { padding: 3px 8px; }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .resume-bas { flex: 1; min-height: 0; }
   .resume-bas .table-scroll { overflow: auto; min-height: 0; }
 }
@@ -310,7 +314,7 @@ table.dense td.num { text-align: right; }
 .filtre-annee .comparaison { margin-left: auto; }
 
 /* Résumé : occupe exactement la hauteur de l'écran sans défilement ; tailles proportionnelles à la hauteur, le tableau absorbe le reste */
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .resume-excel { padding-bottom: 0; --v: clamp(4px, 1.1vh, 14px); }
   .resume-excel .bandeau-titre { padding: calc(var(--v) * .6) 20px; margin-bottom: var(--v); font-size: var(--fs-lg); }
   .resume-excel h3.bandeau-titre { margin-top: var(--v); padding: calc(var(--v) * .4) 14px; font-size: var(--fs-md); }
@@ -357,7 +361,7 @@ table.dense td.num { text-align: right; }
 
 /* Mensuel et Annuel >= 1100 px : une section par écran, accrochage vertical, rail de navigation à droite */
 .rail { display: none; }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .rapport-excel { padding-bottom: 0; --v: clamp(4px, 1.1vh, 14px); }
   .rapport-excel .bandeau-titre { padding: calc(var(--v) * .6) 20px; margin-bottom: var(--v); font-size: var(--fs-lg); }
   .rapport-excel .filtres { margin-bottom: var(--v); }
@@ -389,18 +393,18 @@ table.dense td.num { text-align: right; }
 @media (prefers-reduced-motion: reduce) { .snap-scroll { scroll-behavior: auto; } .rail-puce, .rail-bulle { transition: none; } }
 
 /* Un écran = un ou plusieurs tableaux côte à côte */
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .rapport-excel .snap-section { display: grid; gap: var(--sp-3); grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .rapport-excel .snap-section > .panneau { align-self: start; max-height: 100%; min-width: 0; }
 }
 @media (max-width: 1099px) { .rapport-excel .snap-section { display: flex; flex-direction: column; gap: var(--sp-4); } }
 
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .rapport-excel .snap-colonne { display: flex; flex-direction: column; gap: var(--v); min-height: 0; min-width: 0; align-self: stretch; }
   .rapport-excel .snap-colonne > .panneau { flex: 0 1 auto; min-height: 0; max-height: none; }
 }
 @media (max-width: 1099px) { .rapport-excel .snap-colonne { display: flex; flex-direction: column; gap: var(--sp-4); } }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .rapport-excel .snap-colonne table.dense { font-size: var(--fs-sm); }
   .rapport-excel .snap-colonne table.dense th, .rapport-excel .snap-colonne table.dense td { padding-block: clamp(0px, .15vh, 2px); line-height: 1.25; }
   .rapport-excel .snap-colonne > .panneau > h3 { padding-block: calc(var(--v) * .4); }
@@ -412,7 +416,7 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-excel .graphe figcaption { background: var(--gris-section); color: var(--paper); font: 700 var(--fs-md)/1.2 var(--font-body); text-transform: uppercase; letter-spacing: .02em; padding: 7px 16px; margin: 0; }
 .graphes-excel .graphe-zone { padding: 8px; height: 240px; }
 .graphes-excel .details-donnees { margin-top: var(--sp-3); }
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .graphes-excel .graphes { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--v, 8px); margin: 0 0 var(--v, 8px); }
   .graphes-excel .graphe-zone { flex: 1; min-height: 0; height: auto; }
   .graphes-excel .details-donnees { display: none; }
@@ -594,7 +598,7 @@ html, body { overscroll-behavior: none; }
 .saisie-budgets .saisie-pied .champ-erreur { margin: 0; }
 /* Écran large : les colonnes occupent toute la hauteur, bas alignés ; dans une colonne, chaque tableau reçoit
    une part au prorata de ses lignes et les étire (même hauteur de ligne partout), plafonnée à --ligne-max. */
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   .budgets-grille { flex: 1 1 0; align-items: stretch; }
   .budgets-colonne > .panneau { flex: var(--lignes) 1 0; max-height: calc(var(--lignes) * var(--ligne-max)); }
   .saisie-budgets .panneau table.budgets { height: 100%; }
@@ -791,7 +795,7 @@ html, body { overscroll-behavior: none; }
 /* Tenue à l'écran (>= 1100 px), reprise de Suivi de formation : la taille racine suit la fenêtre
    (référence 1440 × 900 à 16 px, la dimension la plus contraignante l'emporte), les tailles en rem
    suivent ; lignes de tableau à hauteur fixe en rem (environ 28 px à la référence) */
-@media (min-width: 1100px) {
+@media (min-width: 1360px) {
   html { font-size: clamp(13px, min(100vw / 90, 100vh / 56.25), 19px); }
   /* Largeur utile proportionnelle à l'écran : 1280 px à la référence 1440, marges latérales constantes en proportion */
   :root { --ligne-pad: .4375rem; --page-max: max(1280px, 89vw); }
@@ -946,3 +950,36 @@ table.tableau-squelette td { height: 2.1em; }
 .bandeau-enregistre { align-items: center; }
 .bandeau-enregistre .bouton-lien { padding: 0; height: auto; text-decoration: underline; }
 .bandeau-fermer { margin-left: auto; border: 0; background: none; color: inherit; font-size: var(--fs-md); line-height: 1; padding: 2px 6px; cursor: pointer; }
+
+/* Barre de filtres des rapports, compacte : titre « Filtres », étiquette au-dessus du champ,
+   champs à la largeur de leur contenu, tout sur une ligne sur un écran courant. */
+.rapport-excel .filtres.filtres-rapport { align-items: end; gap: var(--sp-2); }
+.rapport-excel .filtres.filtres-rapport > :is(label, .filtre) {
+  display: grid; gap: 2px; margin-left: 0; font-size: 11px; letter-spacing: .06em;
+}
+.rapport-excel .filtres.filtres-rapport :is(select, input) {
+  height: 32px; min-width: 0; padding: 0 8px; font-size: var(--fs-sm);
+}
+.rapport-excel .filtres.filtres-rapport select { max-width: 125px; }
+.rapport-excel .filtres.filtres-rapport .choix-salarie input { width: 150px; }
+/* Réinitialiser et Exporter restent ensemble, calés à droite, même quand la barre passe à la ligne. */
+.filtres-actions { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; flex: none; }
+.rapport-excel .filtres.filtres-rapport .filtres-actions > :is(a.bouton, .reinitialiser) {
+  display: inline-flex; align-items: center; height: 32px; padding-block: 0; padding-inline: var(--sp-3); margin: 0; text-decoration: none;
+}
+/* Écran large : une seule ligne ; les champs cèdent un peu de largeur plutôt que de passer à la ligne. */
+@media (min-width: 1360px) {
+  .rapport-excel .filtres.filtres-rapport { flex-wrap: nowrap; }
+  .rapport-excel .filtres.filtres-rapport > :is(label, .filtre) { flex: none; white-space: nowrap; }
+  .rapport-excel .filtres.filtres-rapport > .souple { flex: 0 1 auto; min-width: 0; }
+  .rapport-excel .filtres.filtres-rapport > .souple :is(select, input) { width: 100%; min-width: 72px; }
+  .rapport-excel .filtres.filtres-rapport .choix-salarie { min-width: 0; }
+}
+.filtres-titre {
+  display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px;
+  padding-right: var(--sp-3); border-right: 1px solid var(--rule-strong);
+  color: var(--navy); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+}
+@media (max-width: 720px) {
+  .filtres-titre { flex-basis: 100%; border-right: 0; padding-right: 0; }
+}

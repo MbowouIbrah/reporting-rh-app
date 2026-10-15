@@ -17,7 +17,7 @@ function routes(avecMarge: boolean, perms: string[]) {
   return (url: string): unknown => {
     if (url.includes('/auth/me')) return { id: 1, email: 'a@b.c', roles: [], permissions: perms }
     if (url.includes('/rapports/periodes')) return [{ annee: 2026, mois: 2 }]
-    if (url.includes('/rapports/filtres')) return { services: [], sites: [] }
+    if (url.includes('/rapports/filtres')) return { services: [], sites: [], types_site: ['principal', 'agence'], postes: ['Chef atelier'] }
     if (url.includes('/rapports/individuel/tous')) return { annee: 2026, matricule: null, nom: null, rubriques: ['Bonus'], mois: [{ mois: 1, present: false }] }
     if (url.includes('/rapports/salaries')) return [{ matricule: 'E1', nom: 'Ann' }]
     if (url.includes('/rapports/mensuel'))
@@ -77,6 +77,17 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
 test('Annuel : affiche la moyenne mensuelle', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
   expect(await screen.findByText(/Moyenne mensuelle/)).toBeInTheDocument()
+})
+
+test('Annuel : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {
+  const { unmount } = rendu(<Annuel />, '/annuel', ['report:read', 'nominatif:read'])
+  expect(await screen.findByRole('combobox', { name: 'Employé' })).toBeInTheDocument()
+  expect(await screen.findByLabelText('Type de site')).toHaveTextContent('Agence')
+  expect(await screen.findByLabelText('Poste')).toHaveTextContent('Chef atelier')
+  unmount()
+  rendu(<Annuel />, '/annuel', ['report:read'])
+  expect(await screen.findByLabelText('Type de site')).toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: 'Employé' })).toBeNull()
 })
 
 test('Individuel : tous les salariés par défaut', async () => {

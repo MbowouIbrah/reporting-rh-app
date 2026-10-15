@@ -99,10 +99,10 @@ test('un filtre part dans la requête, Réinitialiser les retire tous', async ()
   expect(tableau().at(-1)).toContain('service=SAV+PL')
   fireEvent.change(screen.getByLabelText('Mois'), { target: { value: '2' } })
   await waitFor(() => expect(tableau().at(-1)).toMatch(/mois=2/))
-  fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser les filtres' }))
   await waitFor(() => expect(tableau().at(-1)).toMatch(/\/donnees\/tableau\?$/))
   // Toujours à sa place, inactif quand plus rien n'est filtré.
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Réinitialiser' })).toBeDisabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Réinitialiser les filtres' })).toBeDisabled())
 })
 
 test('sans droit de saisie : accès refusé', async () => {

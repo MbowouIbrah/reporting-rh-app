@@ -4,8 +4,9 @@ import pytest
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent
-from app.models.donnees import Periode
+from app.models.donnees import Periode, Salarie, SituationMensuelle
 from app.models.pilotage import CaPeriode
+from app.models.referentiel import Poste, Site
 from tests.test_import_regles import ligne, xlsx
 
 API = "/api/v1"
@@ -207,3 +208,67 @@ def test_mensuel_bloc_d_indicateurs_et_permissions(charge, make_client):
     assert not any(c["bloquant"] for c in r["controles"])
     me = make_client(EQUIP).get(f"{API}/auth/me").json()
     assert "report:read" in me["permissions"] and "nominatif:read" not in me["permissions"]
+
+
+def test_filtre_type_de_site(charge, db):
+    # Douala (E1, E4) passe en agence ; Yaounde reste principal
+    db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "agence"
+    db.commit()
+    f = get(charge, "filtres", annee=2026).json()
+    assert f["types_site"] == ["agence", "principal"]
+    assert f["type_par_site"]["Douala"] == "agence"
+    r = get(charge, "mensuel", annee=2026, mois=1, type_site="agence").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("1000.5") and r["synthese"]["effectif"]["fin"] == 1
+    assert r["synthese"]["ca"] is None  # pas de CA par type de site
+    assert [c["site"] for c in r["c_site"]] == ["Douala"]  # autres types masqués
+    r = get(charge, "mensuel", annee=2026, mois=1, type_site="principal").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("6000") and r["synthese"]["effectif"]["fin"] == 2
+    a = get(charge, "annuel", annee=2026, mois=2, type_site="agence").json()
+    assert a["marge_ytd"] is None and [c["site"] for c in a["c_site"]] == ["Douala"]
+    assert get(charge, "mensuel", annee=2026, mois=1, type_site="inconnu").status_code == 422
+    ex = get(charge, "mensuel/export", annee=2026, mois=1, type_site="agence")
+    assert ex.status_code == 200 and ex.headers["content-type"].startswith(
+        "application/vnd.openxmlformats")
+    ex = get(charge, "annuel/export", annee=2026, mois=2, type_site="agence")
+    assert ex.status_code == 200
+    t = get(charge, "individuel/tous", annee=2026, type_site="agence").json()
+    assert t["mois"][0]["effectif"] == 1
+
+
+def test_filtre_poste(charge, db):
+    chef = Poste(libelle="Chef atelier")
+    db.add(chef)
+    db.flush()
+    e4 = db.scalar(select(Salarie.id).where(Salarie.matricule == "E4"))
+    for s in db.scalars(select(SituationMensuelle).where(SituationMensuelle.salarie_id == e4)):
+        s.poste_id = chef.id
+    db.commit()
+    assert "Chef atelier" in get(charge, "filtres", annee=2026).json()["postes"]
+    r = get(charge, "mensuel", annee=2026, mois=2, poste="Chef atelier").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("500") and r["synthese"]["effectif"]["fin"] == 1
+    assert r["synthese"]["ca"] is None
+    assert r["synthese"]["ms"]["budget"] is None  # pas de budget pour un poste
+    assert get(charge, "mensuel", annee=2026, mois=1, poste="Chef atelier").status_code == 404
+    t = get(charge, "individuel/tous", annee=2026, poste="Chef atelier").json()
+    assert not t["mois"][0]["present"] and t["mois"][1]["effectif"] == 1
+
+
+def test_filtre_employe_par_matricule(charge, make_client, db):
+    r = get(charge, "mensuel", annee=2026, mois=1, matricule="E1").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("1000.5") and r["synthese"]["effectif"]["fin"] == 1
+    a = get(charge, "annuel", annee=2026, mois=2, matricule="e1").json()
+    assert D(a["cumul_ytd"]["m"]) == D("2100.5")
+    assert get(charge, "annuel/export", annee=2026, mois=2, matricule="E1").status_code == 200
+    assert get(charge, "mensuel", annee=2026, mois=1, matricule="ZZ9").status_code == 404
+    # sans droit nominatif : refuse
+    assert get(make_client(EQUIP), "mensuel", annee=2026, mois=1, matricule="E1").status_code == 403
+    # avec le drapeau nominatif mais hors perimetre : rien ne fuit
+    from app.models.auth import RoleAssignment, Utilisateur
+
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == EQUIP))
+    ra = db.scalar(select(RoleAssignment).where(RoleAssignment.utilisateur_id == u.id))
+    ra.nominatif = True
+    db.commit()
+    c = make_client(EQUIP)
+    assert get(c, "mensuel", annee=2026, mois=1, matricule="E1").status_code == 200
+    assert get(c, "mensuel", annee=2026, mois=1, matricule="E3").status_code == 404

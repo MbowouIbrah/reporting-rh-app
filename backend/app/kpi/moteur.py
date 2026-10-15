@@ -33,6 +33,8 @@ class Ligne:
     activite: str
     contrat: str
     montants: dict[str, Decimal] = field(default_factory=dict)  # libellé rubrique -> valeur
+    type_site: str = "principal"
+    poste: str | None = None
 
 
 @dataclass(frozen=True)
@@ -186,8 +188,20 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     sites_eff = {s: (len({L.salarie_id for L in cur.lignes if L.site == s}),
                      len({L.salarie_id for L in prev.lignes if L.site == s}) if prev else None)
                  for s in refs.sites}
+
+    def eff_site_contrat(pd, s, c):
+        if not pd:
+            return None
+        return len({L.salarie_id for L in pd.lignes if L.site == s and L.contrat == c})
+
+    def cell_eff(m, m1):
+        return cell(None if m is None else Decimal(m), None if m1 is None else Decimal(m1))
+
     c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
-               "effectif": {"m": sites_eff[s][0], "m1": sites_eff[s][1]}} for s in refs.sites]
+               "effectif": cell_eff(*sites_eff[s]),
+               "effectif_contrat": {c: cell_eff(eff_site_contrat(cur, s, c),
+                                                eff_site_contrat(prev, s, c))
+                                    for c in refs.contrats}} for s in refs.sites]
     ms_sites = sum((c["ms"]["m"] for c in c_site), ZERO)
 
     ctrl_contrats: list[dict] = []
@@ -327,8 +341,11 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
     for s in refs.sites:
         ms = cell_ms(lambda L, s=s: L.site == s)
         e = cell_eff(lambda L, s=s: L.site == s)
+        par_contrat = {c: cell_eff(lambda L, s=s, c=c: L.site == s and L.contrat == c)
+                       for c in refs.contrats}
         c_site.append({"site": s, "ms": {**ms, **bud("site", s, ms["m"])},
-                       "effectif": {"m": e["m"], "m1": e["m1"]}})
+                       "effectif": e,
+                       "effectif_contrat": par_contrat})
 
     def fin_an(pds, mois_ok, contrat) -> int | None:
         if not mois_ok:

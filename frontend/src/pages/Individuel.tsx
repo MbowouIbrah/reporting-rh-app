@@ -1,11 +1,13 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Fragment, useLayoutEffect, useRef } from 'react'
-import { getIndividuelTous, getSalaries } from '../api/rapports'
+import { getIndividuelTous } from '../api/rapports'
 import type { IndividuelTous, Val } from '../api/types'
 import { Panneau } from '../components/BlocsRapport'
 import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../components/Etat'
+import { ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
+import { useSalaries } from '../hooks/useSalaries'
 import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { plafonner } from '../lib/plafond'
 
@@ -38,14 +40,12 @@ export default function Individuel() {
   const annee = f.filtres?.annee
   const service = f.filtres?.service
   const site = f.filtres?.site
-  const salaries = useQuery({
-    queryKey: ['salaries', annee],
-    queryFn: () => getSalaries(annee!),
-    enabled: annee !== undefined,
-  })
+  const typeSite = f.filtres?.type_site
+  const poste = f.filtres?.poste
+  const salaries = useSalaries(annee)
   const q = useQuery({
-    queryKey: ['individuel-tous', annee, matricule, service, site],
-    queryFn: () => getIndividuelTous({ annee: annee!, matricule, service, site }),
+    queryKey: ['individuel-tous', annee, matricule, service, site, typeSite, poste],
+    queryFn: () => getIndividuelTous({ annee: annee!, matricule, service, site, type_site: typeSite, poste }),
     enabled: annee !== undefined,
     placeholderData: keepPreviousData,
   })
@@ -73,29 +73,12 @@ export default function Individuel() {
     <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
       <h2 className="bandeau-titre">REPORTING INDIVIDUEL</h2>
       {f.filtres && (
-        <div className="filtres" role="group" aria-label="Filtres">
-          <label>
-            Matricule
-            <select value={matricule} onChange={(e) => setMatricule(e.target.value)}>
-              <option value="">(Tous)</option>
-              {salaries.data?.map((s) => (
-                <option key={s.matricule} value={s.matricule}>
-                  {matriculeAffiche(s.matricule) ? `${matriculeAffiche(s.matricule)} — ` : ''}{s.nom}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Nom
-            <select value={matricule} onChange={(e) => setMatricule(e.target.value)}>
-              <option value="">(Tous)</option>
-              {salaries.data?.map((s) => (
-                <option key={s.matricule} value={s.matricule}>
-                  {s.nom}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
+          <TitreFiltres />
+          <ChoixEmploye salaries={salaries ?? []} valeur={matricule} onChange={setMatricule} />
+          {f.typesSite.length > 0 && (
+            <ChoixTypeSite valeur={typeSite ?? ''} types={f.typesSite} tous="(Tous)" onChange={(v) => f.set({ type_site: v })} />
+          )}
           <label>
             Site
             <select value={site ?? ''} onChange={(e) => f.set({ site: e.target.value })}>
@@ -114,6 +97,9 @@ export default function Individuel() {
               ))}
             </select>
           </label>
+          {f.postes.length > 0 && (
+            <ChoixPoste valeur={poste ?? ''} postes={f.postes} tous="(Tous)" onChange={(v) => f.set({ poste: v })} />
+          )}
           <label>
             Année
             <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value })}>
@@ -122,10 +108,14 @@ export default function Individuel() {
               ))}
             </select>
           </label>
-          <BoutonReinitialiser
-            actif={(['matricule', 'site', 'service', 'annee'] as const).some((k) => f.partage[k])}
-            onClick={() => f.set({ matricule: undefined, site: undefined, service: undefined, annee: undefined })}
-          />
+          <div className="filtres-actions">
+            <BoutonReinitialiser
+              actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee'] as const).some((k) => f.partage[k])}
+              onClick={() =>
+                f.set({ matricule: undefined, site: undefined, service: undefined, type_site: undefined, poste: undefined, annee: undefined })
+              }
+            />
+          </div>
         </div>
       )}
       {d && (

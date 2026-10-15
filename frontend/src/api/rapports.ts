@@ -6,6 +6,10 @@ export interface FiltresPage {
   mois: number
   service?: string
   site?: string
+  type_site?: string
+  poste?: string
+  /** Employé (réservé à nominatif:read). */
+  matricule?: string
   /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */
   ref_annee?: number
   ref_mois?: number
@@ -29,7 +33,14 @@ export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({
 export const getIndividuel = (annee: number, matricule: string) =>
   api<Individuel>(`/rapports/individuel${qs({ annee, matricule })}`)
 
-export const getIndividuelTous = (p: { annee: number; matricule?: string; service?: string; site?: string }) =>
+export const getIndividuelTous = (p: {
+  annee: number
+  matricule?: string
+  service?: string
+  site?: string
+  type_site?: string
+  poste?: string
+}) =>
   api<IndividuelTous>(`/rapports/individuel/tous${qs(p)}`)
 
 /** Lien de téléchargement xlsx : mêmes filtres que l'écran, authentifié par le cookie. */

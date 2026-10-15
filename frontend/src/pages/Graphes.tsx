@@ -5,6 +5,7 @@ import { getAnnuel } from '../api/rapports'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
+import { useSalaries } from '../hooks/useSalaries'
 import { fcfa, MOIS_COURTS } from '../lib/format'
 
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
@@ -33,6 +34,7 @@ function Carte({ titre, children }: { titre: string; children: ReactNode }) {
 export default function Graphes() {
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false })
+  const salaries = useSalaries(f.filtres?.annee)
   const ann = useQuery({
     queryKey: ['annuel', f.filtres],
     queryFn: () => getAnnuel(f.filtres!),
@@ -59,7 +61,7 @@ export default function Graphes() {
     <section className="page-ecran page-etroite rapport-excel graphes-excel">
       <h2 className="bandeau-titre">GRAPHES D’ÉVOLUTION</h2>
       {f.filtres && (
-        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} />}

@@ -1,5 +1,5 @@
-import { Fragment, type ReactNode } from 'react'
-import type { Budget, Cell, Mensuel, Val } from '../api/types'
+import { Fragment, type ReactNode, useState } from 'react'
+import type { Budget, Cell, Mensuel } from '../api/types'
 import { cls, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
@@ -9,7 +9,6 @@ export interface Libelles {
   cour: string
 }
 
-const nonNul = (v: string | null) => v !== null && Number(v) !== 0
 
 export function Panneau({ titre, className, id, sansTitre, children }: { titre: string; className?: string; id?: string; sansTitre?: boolean; children: ReactNode }) {
   return (
@@ -61,7 +60,6 @@ function Ligne({ label, cell, budget, className }: { label: ReactNode; cell: Cel
   )
 }
 
-const num = (v: number | string | null | undefined) => (v == null ? '—' : fcfa(v))
 
 // Grille commune des tableaux : un libellé puis sept colonnes de chiffres ; un tableau plus court
 // complète sa ligne par une cellule vide pour garder ses colonnes alignées sur les autres.
@@ -169,11 +167,9 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
         </tr>
       </thead>
       <tbody>
-        {d.b_service_activite
-          .filter((b) => nonNul(b.total.m) || nonNul(b.total.m1))
-          .map((b, n) => (
-            <ServiceBloc key={b.service} b={b} bande={n % 2 === 1} />
-          ))}
+        {d.b_service_activite.map((b, n) => (
+          <ServiceBloc key={b.service} b={b} bande={n % 2 === 1} />
+        ))}
         {total && (
           <tr className="total">
             <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
@@ -193,7 +189,7 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
 
 /** Le damier alterne par service (bande), pas par ligne : les cellules fusionnées suivent leur bloc. */
 function ServiceBloc({ b, bande }: { b: Blocs['b_service_activite'][number]; bande: boolean }) {
-  const activites = b.activites.filter((a) => nonNul(a.m) || nonNul(a.m1))
+  const activites = b.activites
   const fond = bande ? 'bande' : ''
   return activites.map((a, i) => (
     <Fragment key={a.activite}>
@@ -215,14 +211,15 @@ function ServiceBloc({ b, bande }: { b: Blocs['b_service_activite'][number]; ban
   ))
 }
 
-/** 2. Répartition par site : une ligne MS et une ligne Eff par site. */
+/** 2. Répartition par site, présentée comme la répartition par service : site fusionné sur ses lignes,
+ *  masse salariale puis Staff (effectif) ; un clic sur la ligne Staff déplie l'effectif par nature de contrat. */
 export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
   return (
-    <table className="dense aligne double">
+    <table className="dense aligne double services">
       <thead>
         <tr>
           <th scope="col">Site</th>
-          <th scope="col">Rubrique</th>
+          <th scope="col">Indicateur</th>
           <th scope="col">{lib.prec}</th>
           <th scope="col">{lib.cour}</th>
           <th scope="col">Variation</th>
@@ -233,35 +230,52 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
         </tr>
       </thead>
       <tbody>
-        {d.c_site.map((r) => (
-          <SiteLignes key={r.site} r={r} />
+        {d.c_site.map((r, n) => (
+          <SiteBloc key={r.site} r={r} bande={n % 2 === 1} />
         ))}
       </tbody>
     </table>
   )
 }
 
-function SiteLignes({ r }: { r: Blocs['c_site'][number] }) {
+function SiteBloc({ r, bande }: { r: Blocs['c_site'][number]; bande: boolean }) {
+  const [ouvert, setOuvert] = useState(false)
+  const contrats = Object.entries(r.effectif_contrat ?? {})
+  const fond = bande ? 'bande' : ''
+  const hauteur = 2 + (ouvert ? contrats.length : 0)
+  const depliable = contrats.length > 0
   return (
     <>
-      <tr className="groupe">
-        <th scope="row">{r.site}</th>
-        <td>MS</td>
-        <td className="num">{fcfa(r.ms.m1)}</td>
-        <td className="num">{fcfa(r.ms.m)}</td>
-        <td className={cls(r.ms.var)}>{fcfa(r.ms.var)}</td>
-        <td className={cls(r.ms.var_pct)}>{pct(r.ms.var_pct)}</td>
-        <td className="num">{fcfa(r.ms.budget ?? null)}</td>
-        <td className={cls(r.ms.ecart ?? null)}>{fcfa(r.ms.ecart ?? null)}</td>
-        <td className={cls(r.ms.ecart_pct ?? null)}>{pct(r.ms.ecart_pct ?? null)}</td>
+      <tr className={`debut-service ${fond}`.trim()}>
+        <th scope="rowgroup" rowSpan={hauteur} className="service">
+          {r.site}
+        </th>
+        <td>Masse salariale</td>
+        <Valeurs c={r.ms} />
+        <Budgets b={r.ms} rowSpan={hauteur} />
       </tr>
-      <tr className="sous">
-        <th scope="row" />
-        <td>Eff</td>
-        <td className="num">{num(r.effectif.m1)}</td>
-        <td className="num">{num(r.effectif.m)}</td>
-        <td colSpan={5} />
+      <tr
+        className={`staff ${depliable ? 'depliable' : ''} ${fond}`.replace(/\s+/g, ' ').trim()}
+        onClick={depliable ? () => setOuvert(!ouvert) : undefined}
+      >
+        <td>
+          {depliable ? (
+            <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail des effectifs de ${r.site}`}>
+              <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> Staff
+            </button>
+          ) : (
+            'Staff'
+          )}
+        </td>
+        <Valeurs c={r.effectif} />
       </tr>
+      {ouvert &&
+        contrats.map(([contrat, e]) => (
+          <tr className={`staff detail-contrat ${fond}`.trim()} key={contrat}>
+            <td className="retrait">{contrat}</td>
+            <Valeurs c={e} />
+          </tr>
+        ))}
     </>
   )
 }
@@ -306,19 +320,17 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
   )
 }
 
-/** 4. Nature de contrat × activité : masse salariale et effectifs. */
+/** 4. Nature de contrat × activité, présentée comme la répartition par service : contrat fusionné sur ses
+ *  activités, une ligne Staff (effectif) sous chaque activité, puis total et effectif global. */
 export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
-  const lignes = d.d_contrat.ventilation.filter(
-    (v) => nonNul(v.ms.m) || nonNul(v.ms.m1) || nonNul(v.effectif.m) || nonNul(v.effectif.m1),
-  )
+  const contrats = [...new Set(d.d_contrat.ventilation.map((v) => v.contrat))]
   return (
-    <table className="dense aligne double">
+    <table className="dense aligne double services">
       <thead>
         <tr>
-          <th scope="col">Contrat · activité</th>
-          <th scope="col" className="libelle">Indicateur</th>
-          <Bourrage n={3} tete />
+          <th scope="col">Contrat</th>
+          <th scope="col">Activité</th>
           <th scope="col">{lib.prec}</th>
           <th scope="col">{lib.cour}</th>
           <th scope="col">Variation</th>
@@ -326,31 +338,41 @@ export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
         </tr>
       </thead>
       <tbody>
-        {lignes.map((v) => (
-          <ContratLignes key={`${v.contrat}-${v.activite}`} titre={`${v.contrat} · ${v.activite}`} ms={v.ms} eff={v.effectif} />
+        {contrats.map((c, n) => (
+          <ContratBloc key={c} contrat={c} lignes={d.d_contrat.ventilation.filter((v) => v.contrat === c)} bande={n % 2 === 1} />
         ))}
-        {total && <ContratLignes titre="TOTAL GÉNÉRAL" ms={total} eff={d.d_contrat.total} total />}
+        {total && (
+          <tr className="total">
+            <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
+            <Valeurs c={total} />
+          </tr>
+        )}
+        <tr className="staff">
+          <th scope="row" colSpan={2}>Effectif global</th>
+          <Valeurs c={d.d_contrat.total} />
+        </tr>
       </tbody>
     </table>
   )
 }
 
-function ContratLignes({ titre, ms, eff, total }: { titre: string; ms: Cell; eff: Cell; total?: boolean }) {
-  const l = (indic: string, c: Cell, premiere: boolean) => (
-    <tr className={total ? 'total' : premiere ? 'groupe' : 'sous'}>
-      <th scope="row">{premiere ? titre : ''}</th>
-      <td>{indic}</td>
-      <Bourrage n={3} />
-      <td className="num">{fcfa(c.m1)}</td>
-      <td className="num">{fcfa(c.m)}</td>
-      <td className={cls(c.var)}>{fcfa(c.var)}</td>
-      <td className={cls(c.var_pct)}>{pct(c.var_pct as Val)}</td>
-    </tr>
-  )
-  return (
-    <>
-      {l('Masse salariale', ms, true)}
-      {l('Effectifs', eff, false)}
-    </>
-  )
+function ContratBloc({ contrat, lignes, bande }: { contrat: string; lignes: Blocs['d_contrat']['ventilation']; bande: boolean }) {
+  const fond = bande ? 'bande' : ''
+  return lignes.map((v, i) => (
+    <Fragment key={v.activite}>
+      <tr className={`${i === 0 ? 'debut-service ' : ''}${fond}`.trim() || undefined}>
+        {i === 0 && (
+          <th scope="rowgroup" rowSpan={lignes.length * 2} className="service">
+            {contrat}
+          </th>
+        )}
+        <td>{v.activite}</td>
+        <Valeurs c={v.ms} />
+      </tr>
+      <tr className={`staff ${fond}`.trim()}>
+        <td>Staff</td>
+        <Valeurs c={v.effectif} />
+      </tr>
+    </Fragment>
+  ))
 }

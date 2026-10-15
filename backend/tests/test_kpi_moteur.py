@@ -230,3 +230,33 @@ def test_budgets_blocs_abc():
     assert sites["Yaoundé"]["ecart"] == 250 and sites["Douala"]["ecart_pct"] is None
     # le total reste la formule budget_employe x effectif, jamais la somme des budgets saisis
     assert a["TOTAL CHARGES"]["budget"] == 1_200_000
+
+
+def test_mensuel_effectif_par_contrat_et_site():
+    cur = pd(L(1), L(2, ctr="CDD"), L(3, site="Yaoundé"))
+    prev = pd(L(1), L(4, ctr="MAD", site="Yaoundé"))
+    r = mensuel(cur, prev, REFS, Params())
+    par_site = {c["site"]: {k: {"m": v["m"], "m1": v["m1"]} for k, v in c["effectif_contrat"].items()}
+                for c in r["c_site"]}
+    assert par_site["Douala"] == {"CDI": {"m": 1, "m1": 1}, "CDD": {"m": 1, "m1": 0},
+                                  "MAD": {"m": 0, "m1": 0}}
+    assert par_site["Yaoundé"]["CDI"] == {"m": 1, "m1": 0}
+    assert par_site["Yaoundé"]["MAD"] == {"m": 0, "m1": 1}
+    sans = mensuel(cur, None, REFS, Params())
+    cdi = sans["c_site"][0]["effectif_contrat"]["CDI"]
+    assert (cdi["m"], cdi["m1"], cdi["var"]) == (1, None, None)
+
+
+def test_annuel_effectif_par_contrat_et_site():
+    n = {1: pd(L(1), L(2, ctr="CDD")), 2: pd(L(1))}
+    n1 = {1: pd(L(1), L(5, ctr="CDD"))}
+    r = annuel(n, n1, 2, REFS, Params())
+    douala = next(c for c in r["c_site"] if c["site"] == "Douala")
+    ec = {k: {"m": v["m"], "m1": v["m1"]} for k, v in douala["effectif_contrat"].items()}
+    assert ec["CDI"] == {"m": D(1), "m1": D(1)}
+    assert ec["CDD"] == {"m": D("0.5"), "m1": D(1)}
+    assert ec["MAD"] == {"m": D(0), "m1": D(0)}
+    assert douala["effectif"]["m"] == D("1.5")
+    vide = annuel(n, {}, 2, REFS, Params())
+    assert next(c for c in vide["c_site"] if c["site"] == "Douala")["effectif_contrat"][
+        "CDI"]["m1"] is None

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -80,7 +81,10 @@ def filtres(
     authorize(p, "report:read")
     lignes = list(_lignes_annee(db, p, annee))
     return {"services": sorted({L.service for L in lignes}),
-            "sites": sorted({L.site for L in lignes})}
+            "sites": sorted({L.site for L in lignes}),
+            "types_site": sorted({L.type_site for L in lignes}),
+            "type_par_site": {L.site: L.type_site for L in lignes},
+            "postes": sorted({L.poste for L in lignes if L.poste})}
 
 
 @router.get("/salaries")
@@ -103,16 +107,33 @@ def _reference(annee, mois, ref_annee, ref_mois) -> tuple[int, int]:
     return ref_annee, ref_mois
 
 
-def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None) -> dict:
+def _salarie_id(db: Session, p: Principal, matricule: str | None) -> int | None:
+    """Filtre « employé » des rapports : nominatif, donc soumis au droit de lecture nominative."""
+    if not matricule:
+        return None
+    authorize(p, "nominatif:read")
+    sal = db.scalar(select(Salarie).where(Salarie.matricule_norm == norm(matricule)))
+    if sal is None:
+        raise HTTPException(404, "Matricule introuvable")
+    return sal.id
+
+
+def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
+             type_site=None, poste=None, matricule=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
-    cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site)
+    crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule)}
+    cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site, **crit)
     if cur is None or not cur.lignes:
         raise HTTPException(404, "Aucune donnée pour cette période")
     ref = _reference(annee, mois, ref_annee, ref_mois)
-    prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site)
-    res = moteur.mensuel(cur, prev, ch.charger_refs(db), ch.charger_params(db, annee, mois),
-                         ch.charger_budgets(db, scope, annee, mois, service, site))
+    prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site, **crit)
+    params = ch.charger_params(db, annee, mois)
+    if poste or crit["salarie_id"] is not None:
+        # pas de budget pour un poste ou une personne : seulement pour un effectif d'ensemble
+        params = replace(params, budget_employe=None)
+    res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site), params,
+                         ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
     return _sortie(p, res)
 
 
@@ -124,10 +145,14 @@ def mensuel(
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
     ref_mois: int | None = Query(None, ge=1, le=12),
+    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
+    poste: str | None = Query(None, max_length=200),
+    matricule: str | None = Query(None, max_length=30),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    return _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois)
+    return _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
+                    matricule)
 
 
 @router.get("/mensuel/export")
@@ -138,12 +163,17 @@ def mensuel_export(
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
     ref_mois: int | None = Query(None, ge=1, le=12),
+    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
+    poste: str | None = Query(None, max_length=200),
+    matricule: str | None = Query(None, max_length=30),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    res = _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois)
+    res = _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
+                   matricule)
     audit.record(db, p.user_id, "export", "rapport_mensuel", f"{annee}-{mois:02d}", None,
-                 {"service": service, "site": site})
+                 {"service": service, "site": site, "type_site": type_site, "poste": poste,
+                  "matricule": matricule})
     db.commit()
     choisie = ref_annee is not None and ref_mois is not None
     prec = f"{xlsx.MOIS[ref_mois - 1]} {ref_annee}" if choisie else "M-1"
@@ -151,14 +181,16 @@ def mensuel_export(
                  f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
 
 
-def _annuel(db, p, annee, mois, service, site, ref_annee=None) -> dict:
+def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
+            matricule=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
+    crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule)}
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
         out = {}
         for m in range(1, 13):
-            pd = ch.filtrer(ch.charger_periode(db, scope, a, m), service, site)
+            pd = ch.filtrer(ch.charger_periode(db, scope, a, m), service, site, **crit)
             if pd is not None:
                 out[m] = pd
         return out
@@ -166,9 +198,9 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None) -> dict:
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
-    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site)
+    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site, **crit)
                for m in moteur.avec_donnees(n, mois)}
-    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, ch.charger_refs(db),
+    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, ch.charger_refs(db, type_site),
                         ch.charger_params(db, annee, mois), budgets)
     return _sortie(p, res)
 
@@ -180,10 +212,13 @@ def annuel(
     service: str | None = None,
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
+    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
+    poste: str | None = Query(None, max_length=200),
+    matricule: str | None = Query(None, max_length=30),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    return _annuel(db, p, annee, mois, service, site, ref_annee)
+    return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule)
 
 
 @router.get("/annuel/export")
@@ -193,12 +228,16 @@ def annuel_export(
     service: str | None = None,
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
+    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
+    poste: str | None = Query(None, max_length=200),
+    matricule: str | None = Query(None, max_length=30),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    res = _annuel(db, p, annee, mois, service, site, ref_annee)
+    res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule)
     audit.record(db, p.user_id, "export", "rapport_annuel", f"{annee}-{mois:02d}", None,
-                 {"service": service, "site": site})
+                 {"service": service, "site": site, "type_site": type_site, "poste": poste,
+                  "matricule": matricule})
     db.commit()
     return _xlsx(xlsx.annuel(res, annee, mois, ref_annee), f"reporting-annuel-{annee}.xlsx")
 
@@ -209,6 +248,8 @@ def individuel_tous(
     matricule: str | None = Query(None, max_length=30),
     service: str | None = Query(None, max_length=100),
     site: str | None = Query(None, max_length=100),
+    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
+    poste: str | None = Query(None, max_length=200),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -230,7 +271,8 @@ def individuel_tous(
         lignes = [] if pd is None else [
             L for L in pd.lignes
             if (sal is None or L.salarie_id == sal.id)
-            and (not service or L.service == service) and (not site or L.site == site)]
+            and (not service or L.service == service) and (not site or L.site == site)
+            and (not type_site or L.type_site == type_site) and (not poste or L.poste == poste)]
         if pd is None or not lignes:
             mois.append({"mois": m, "present": False})
             continue

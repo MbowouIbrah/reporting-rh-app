@@ -81,7 +81,7 @@ export default function ChoixEmployes({ prepa, selection, brouillon, onValider, 
           Rechercher
           <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Nom ou matricule" />
         </label>
-        <BoutonReinitialiser actif={recherche !== ''} onClick={() => setRecherche('')} />
+        <BoutonReinitialiser actif={recherche !== ''} onClick={() => setRecherche('')} libelle="Effacer la recherche" />
         <Bouton variante="secondaire" onClick={() => basculer(tous, true)}>Tout cocher</Bouton>
         <Bouton variante="secondaire" onClick={() => basculer(tous, false)}>Tout décocher</Bouton>
         <span className="saisie-compte" role="status">{choisis.length} / {prepa.salaries.length} sélectionné{choisis.length > 1 ? 's' : ''}</span>

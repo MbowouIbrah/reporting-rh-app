@@ -28,9 +28,14 @@ export interface Periode {
   mois: number
 }
 
+
 export interface Filtres {
   services: string[]
   sites: string[]
+  types_site?: string[]
+  /** Type de chaque site proposé : la liste Site suit le type de site choisi. */
+  type_par_site?: Record<string, string>
+  postes?: string[]
 }
 
 export interface Salarie {
@@ -84,7 +89,13 @@ export interface Mensuel {
     effectif: Cell
     activites: ({ activite: string; effectif: Cell } & Cell)[]
   }[]
-  c_site: { site: string; ms: Cell & Budget; effectif: { m: number | string | null; m1: number | string | null } }[]
+  c_site: {
+    site: string
+    ms: Cell & Budget
+    effectif: Cell
+    /** Effectif du site par nature de contrat (CDI, CDD, MAD), dans l'ordre du référentiel. */
+    effectif_contrat?: Record<string, Cell>
+  }[]
   d_contrat: {
     effectifs: ({ contrat: string } & Cell)[]
     indicateurs: Indicateurs[]

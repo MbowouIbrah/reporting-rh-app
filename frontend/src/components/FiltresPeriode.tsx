@@ -1,6 +1,8 @@
+import { ListFilter } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { FiltresPage } from '../api/rapports'
 import type { Periode } from '../api/types'
+import ChoixSalarie, { type Salarie } from './ChoixSalarie'
 import type { ClePartagee, Partage } from '../lib/filtresPartages'
 import { MOIS, MOIS_COURTS } from '../lib/format'
 import BoutonReinitialiser from './BoutonReinitialiser'
@@ -12,6 +14,11 @@ interface Props {
   annees: number[]
   services?: string[]
   sites?: string[]
+  /** Types de site présents dans les données. */
+  typesSite?: string[]
+  postes?: string[]
+  /** Employés proposés ; absent sans le droit nominatif : le filtre « Employé » n'est pas affiché. */
+  salaries?: Salarie[]
   avecMois?: boolean
   /** Sélecteur « Comparer à » : une année (annuel) ou une période (mensuel). */
   comparaison?: 'annee' | 'periode'
@@ -72,10 +79,80 @@ export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onCh
   )
 }
 
+export const LIBELLE_TYPE_SITE: Record<string, string> = {
+  principal: 'Principal',
+  agence: 'Agence',
+  deporte: 'Déporté',
+}
+
+export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange }: {
+  valeur: string
+  types: string[]
+  tous?: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <label>
+      Type de site
+      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{tous}</option>
+        {types.map((t) => (
+          <option key={t} value={t}>{LIBELLE_TYPE_SITE[t] ?? t}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+export function ChoixPoste({ valeur, postes, tous = 'Tous', onChange }: {
+  valeur: string
+  postes: string[]
+  tous?: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <label className="souple">
+      Poste
+      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{tous}</option>
+        {postes.map((s) => (
+          <option key={s}>{s}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Titre de la barre : dit au premier coup d'œil que ce qui suit sont des filtres. */
+export function TitreFiltres() {
+  return (
+    <span className="filtres-titre">
+      <ListFilter size={14} aria-hidden="true" />
+      Filtres
+    </span>
+  )
+}
+
+/** Pas de <label> englobant : un clic sur une option rouvrirait la liste. */
+export function ChoixEmploye({ salaries, valeur, onChange }: {
+  salaries: Salarie[]
+  valeur: string
+  onChange: (matricule: string) => void
+}) {
+  return (
+    <div className="filtre souple">
+      <span aria-hidden="true">Employé</span>
+      <ChoixSalarie salaries={salaries} valeur={valeur} onChange={onChange} />
+    </div>
+  )
+}
+
 export default function FiltresPeriode({
-  filtres, annees, services, sites, avecMois = true, comparaison, periodes, children, onChange,
-  partage,
+  filtres, annees, services, sites, typesSite, postes, salaries, avecMois = true, comparaison, periodes,
+  children, onChange, partage,
 }: Props) {
+  const avecType = !!typesSite?.length
+  const avecPoste = !!postes?.length
   // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, N-1/M-1, tous).
   const cles: ClePartagee[] = [
     'annee',
@@ -83,9 +160,13 @@ export default function FiltresPeriode({
     ...(comparaison === 'annee' ? (['cmp_annee'] as const) : comparaison === 'periode' ? (['cmp_periode'] as const) : []),
     ...(services ? (['service'] as const) : []),
     ...(sites ? (['site'] as const) : []),
+    ...(avecType ? (['type_site'] as const) : []),
+    ...(avecPoste ? (['poste'] as const) : []),
+    ...(salaries ? (['matricule'] as const) : []),
   ]
   return (
-    <div className="filtres" role="group" aria-label="Filtres">
+    <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
+      <TitreFiltres />
       <label>
         Année
         <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value })}>
@@ -110,7 +191,7 @@ export default function FiltresPeriode({
         <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />
       )}
       {services && (
-        <label>
+        <label className="souple">
           Service
           <select value={filtres.service ?? ''} onChange={(e) => onChange({ service: e.target.value })}>
             <option value="">Tous</option>
@@ -120,8 +201,11 @@ export default function FiltresPeriode({
           </select>
         </label>
       )}
+      {avecType && (
+        <ChoixTypeSite valeur={filtres.type_site ?? ''} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
+      )}
       {sites && (
-        <label>
+        <label className="souple">
           Site
           <select value={filtres.site ?? ''} onChange={(e) => onChange({ site: e.target.value })}>
             <option value="">Tous</option>
@@ -131,11 +215,17 @@ export default function FiltresPeriode({
           </select>
         </label>
       )}
-      <BoutonReinitialiser
-        actif={cles.some((k) => partage[k])}
-        onClick={() => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))}
-      />
-      {children}
+      {avecPoste && <ChoixPoste valeur={filtres.poste ?? ''} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
+      {salaries && (
+        <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
+      )}
+      <div className="filtres-actions">
+        <BoutonReinitialiser
+          actif={cles.some((k) => partage[k])}
+          onClick={() => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))}
+        />
+        {children}
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent, PerimetreRegle
-from app.models.referentiel import Service
+from app.models.referentiel import Service, Site
 from tests import test_rapports_api as rapports
 from tests.test_import_api import XLSX
 from tests.test_import_regles import ligne, xlsx
@@ -49,3 +49,20 @@ def test_renommage_refus(charge, make_client, db):
     assert c.put(f"{API}/referentiels/rubrique/{absences}", json={"libelle": "X"}
                  ).status_code == 409
     assert c.put(f"{API}/referentiels/service/{b}", json={"actif": False}).status_code == 200
+
+
+def test_type_de_site_modifiable_et_valide(charge, db):
+    c = charge
+    sites = c.get(f"{API}/referentiels/site").json()["valeurs"]
+    assert {s["type_site"] for s in sites} == {"principal"}
+    rid = db.scalar(select(Site.id).where(Site.libelle == "Douala"))
+    r = c.put(f"{API}/referentiels/site/{rid}", json={"type_site": "deporte"})
+    assert r.status_code == 200 and r.json()["type_site"] == "deporte"
+    db.expire_all()
+    assert db.get(Site, rid).type_site == "deporte"
+    ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "update")).all()[-1]
+    assert "deporte" in str(ev.apres) and "principal" in str(ev.avant)
+    assert c.put(f"{API}/referentiels/site/{rid}", json={"type_site": "x"}).status_code == 422
+    sid_ = sid(db, "SAV PL")
+    assert c.put(f"{API}/referentiels/service/{sid_}",
+                 json={"type_site": "agence"}).status_code == 422

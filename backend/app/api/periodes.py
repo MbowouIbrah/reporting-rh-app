@@ -14,7 +14,7 @@ from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
 from app.models.auth import PerimetreRegle
 from app.models.donnees import Periode
 from app.models.pilotage import CaPeriode
-from app.models.referentiel import RefAlias, Rubrique
+from app.models.referentiel import TYPES_SITE, RefAlias, Rubrique
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize, is_allowed
@@ -138,7 +138,8 @@ def referentiel(
     authorize(p, "import:read")
     model = _modele(dimension)
     return {
-        "valeurs": [{"id": r.id, "libelle": r.libelle, "actif": r.actif}
+        "valeurs": [{"id": r.id, "libelle": r.libelle, "actif": r.actif,
+                     **({"type_site": r.type_site} if dimension == "site" else {})}
                     for r in db.scalars(select(model).order_by(model.id))],
         "alias": [{"alias": a.alias_norm, "cible_id": a.cible_id}
                   for a in db.scalars(select(RefAlias).where(RefAlias.dimension == dimension))],
@@ -175,6 +176,7 @@ def ajouter_alias(
 class RefPatch(BaseModel):
     libelle: str | None = None
     actif: bool | None = None
+    type_site: str | None = None
 
 
 @router.put("/referentiels/{dimension}/{rid}")
@@ -189,7 +191,11 @@ def modifier_referentiel(
     row = db.get(model, rid)
     if row is None:
         raise HTTPException(404, "Valeur introuvable")
+    if body.type_site is not None and (dimension != "site" or body.type_site not in TYPES_SITE):
+        raise HTTPException(422, "Type de site invalide")
     avant = {"libelle": row.libelle, "actif": row.actif}
+    if dimension == "site":
+        avant["type_site"] = row.type_site
     ancien = row.libelle
     nouveau = body.libelle.strip() if body.libelle is not None else ancien
     renomme = nouveau != ancien
@@ -212,6 +218,8 @@ def modifier_referentiel(
         return {"perimetres_maj": len({r.perimetre_id for r in regles})}
     if body.actif is not None:
         row.actif = body.actif
+    if body.type_site is not None:
+        row.type_site = body.type_site
     if renomme:
         row.libelle = nouveau
         for r in regles:
@@ -223,9 +231,10 @@ def modifier_referentiel(
                 RefAlias.dimension == dimension, RefAlias.alias_norm == norm(ancien))):
             db.add(RefAlias(dimension=dimension, alias_norm=norm(ancien), cible_id=rid))
     db.flush()
-    audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant,
-                 {"libelle": row.libelle, "actif": row.actif,
-                  "perimetres_maj": len({r.perimetre_id for r in regles})})
+    apres = {"libelle": row.libelle, "actif": row.actif,
+             "perimetres_maj": len({r.perimetre_id for r in regles})}
+    if dimension == "site":
+        apres["type_site"] = row.type_site
+    audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant, apres)
     db.commit()
-    return {"id": rid, "libelle": row.libelle, "actif": row.actif,
-            "perimetres_maj": len({r.perimetre_id for r in regles})}
+    return {"id": rid, **apres}

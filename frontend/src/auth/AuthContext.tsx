@@ -87,6 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
+/** Droit de l'utilisateur connecté ; faux hors AuthProvider (hooks partagés, tests). */
+export function usePeut(perm: string): boolean {
+  return useContext(Ctx)?.can(perm) ?? false
+}
+
 export function useAuth(): Auth {
   const v = useContext(Ctx)
   if (!v) throw new Error('AuthProvider manquant')

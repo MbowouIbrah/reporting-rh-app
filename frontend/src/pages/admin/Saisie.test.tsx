@@ -210,7 +210,7 @@ test('grille triée et filtrée : saisie et collage portent sur les lignes affic
   fireEvent(brutAnn, createEvent.paste(brutAnn, { clipboardData: { getData: () => '7\n8\n' } }))
   expect(brutAnn).toHaveValue('7')
   expect(ordre()).toEqual(['Brut Réel, Ann', 'Brut Réel, ligne 2'])
-  fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Réinitialiser les filtres' }))
   expect(screen.getByRole('textbox', { name: 'Brut Réel, Bob' })).toHaveValue('500')
   expect(screen.getByRole('textbox', { name: 'Brut Réel, ligne 3' })).toHaveValue('8')
 })

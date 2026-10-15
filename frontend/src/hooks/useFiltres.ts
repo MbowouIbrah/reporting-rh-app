@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { queryRetry } from '../api/client'
+import { usePeut } from '../auth/AuthContext'
 import { type FiltresPage, getFiltres, getPeriodes } from '../api/rapports'
 import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
@@ -76,6 +77,7 @@ interface Options {
 /** Filtres des pages de reporting. Défaut : dernière période disponible dans le périmètre de l'utilisateur. */
 export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
   const { partage: p, set } = usePartage()
+  const nominatif = usePeut('nominatif:read')
   const periodes = useQuery({
     queryKey: ['periodes'],
     queryFn: getPeriodes,
@@ -110,17 +112,33 @@ export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
     mois,
     service: p.service,
     site: p.site,
+    type_site: p.type_site,
+    poste: p.poste,
+    // Un matricule partagé (lien, autre page) n'est transmis qu'avec le droit nominatif : sinon 403.
+    matricule: nominatif ? p.matricule : undefined,
     ...ref,
+  }
+
+  // Site et type de site sont liés : la liste Site ne garde que les sites du type choisi, et un
+  // nouveau type efface un site qui n'en fait pas partie.
+  const typeParSite = options.data?.type_par_site ?? {}
+  const sites = (options.data?.sites ?? []).filter((s) => !p.type_site || typeParSite[s] === p.type_site)
+  function setLie(patch: Patch) {
+    const t = patch.type_site
+    if (t && !('site' in patch) && p.site && typeParSite[p.site] !== t) set({ ...patch, site: undefined })
+    else set(patch)
   }
 
   return {
     filtres,
-    set,
+    set: setLie,
     partage: p,
     periodes: periodes.data ?? [],
     annees: [...new Set(periodes.data?.map((x) => x.annee))],
     services: options.data?.services ?? [],
-    sites: options.data?.sites ?? [],
+    sites,
+    typesSite: options.data?.types_site ?? [],
+    postes: options.data?.postes ?? [],
     pret: !periodes.isLoading,
     vide: !periodes.isLoading && !derniere,
     erreur: periodes.error,
