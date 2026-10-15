@@ -296,6 +296,8 @@ table.dense td.num { text-align: right; }
 .cases .case .devise { font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
 .cases .case .note { font-style: italic; font-size: var(--fs-xs); color: var(--muted); }
 .cases .case .variation { text-align: right; font-size: var(--fs-xs); }
+.cases .case .second { text-align: right; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
+.cases .case .second-libelle { font-size: var(--fs-xs); color: var(--muted); }
 .regle { background: var(--paper-3); color: var(--muted); font-style: italic; font-size: var(--fs-xs); padding: 8px 14px; margin: 0; }
 .suivi thead th { background: var(--gris-etiq); color: var(--muted); font-size: var(--fs-xs); text-align: right; }
 .suivi thead th:first-child { text-align: left; }
@@ -807,9 +809,10 @@ html, body { overscroll-behavior: none; }
   .resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur' 'note variation'; align-items: center; column-gap: var(--sp-3); row-gap: 0; min-height: 0; padding: .375rem .75rem; }
   .resume-excel .cases .case .micro { grid-area: titre; }
   .resume-excel .cases .case strong { grid-area: valeur; font-size: var(--fs-lg); line-height: 1.2; }
-  .resume-excel .cases .case:not(:has(.variation)) .note { grid-column: 1 / -1; }
+  .resume-excel .cases .case:not(:has(.variation, .second)) .note { grid-column: 1 / -1; }
   .resume-excel .cases .case .note { grid-area: note; }
-  .resume-excel .cases .case .variation { grid-area: variation; }
+  .resume-excel .cases .case .variation, .resume-excel .cases .case .second { grid-area: variation; }
+  .resume-excel .cases .case .second-libelle { grid-area: note; }
   .resume-excel .regle { margin-bottom: 0; }
   /* Le tableau occupe toute la hauteur restante, les 12 mois se partagent l'espace à parts égales */
   .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(13 * var(--ligne-max)); }

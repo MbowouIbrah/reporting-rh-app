@@ -175,6 +175,21 @@ def test_annuel_blocs_coherents_avec_le_cumul():
     assert tot["absences"] == 3
 
 
+def test_annuel_resume_n1_part_mad_et_ca_par_effectif():
+    n = {1: pd(L(1, Commission=10), L(2, ctr="MAD"), ca=600),
+         2: pd(L(1, Commission=20, Productivité_Ateliers=5), L(2, ctr="MAD"), L(3, ctr="MAD"), ca=300)}
+    n1 = {1: pd(L(1, Commission=40), ca=200), 3: pd(L(1), ca=999)}  # mars N-1 hors période
+    r = annuel(n, n1, 2, REFS, Params())
+    assert (r["ca_cumul"]["m"], r["ca_cumul"]["m1"], r["ca_cumul"]["var_pct"]) == (900, 200, D("3.5"))
+    assert (r["commissions_cumul"]["m"], r["commissions_cumul"]["m1"]) == (30, 40)
+    assert (r["primes_cumul"]["m"], r["primes_cumul"]["m1"]) == (5, 0)
+    assert r["effectif_moyen"]["m"] == D("2.5") and r["effectif_moyen"]["m1"] == 1
+    assert r["taux_mad"] == D("1.5") / D("2.5")
+    assert r["ca_par_effectif"]["m"] == D(900) / D("2.5") and r["ca_par_effectif"]["m1"] == 200
+    vide = annuel({}, {}, 2, REFS, Params())
+    assert vide["taux_mad"] is None and vide["ca_par_effectif"]["m"] is None
+
+
 def test_annuel_sans_n1():
     r = annuel({1: pd(L(1, Brut_Réel=10))}, {}, 12, REFS, Params())
     assert r["cumul_ytd"]["m1"] is None and r["moyenne_mensuelle"]["m1"] is None

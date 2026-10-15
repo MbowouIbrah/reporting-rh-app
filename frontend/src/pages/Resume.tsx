@@ -12,14 +12,15 @@ import { cls, fcfa, MOIS, pct } from '../lib/format'
 function Case({
   titre,
   valeur,
-  note,
   devise = true,
+  libelle2,
   children,
 }: {
   titre: string
   valeur: string
-  note?: ReactNode
   devise?: boolean
+  /** Libellé de l'élément secondaire, à gauche sous le titre ; sa valeur (children) sous la valeur. */
+  libelle2?: string
   children?: ReactNode
 }) {
   return (
@@ -29,8 +30,8 @@ function Case({
         {valeur}
         {devise && valeur !== '—' && <span className="devise"> FCFA</span>}
       </strong>
+      {libelle2 && <span className="second-libelle">{libelle2}</span>}
       {children}
-      {note && <span className="note">{note}</span>}
     </div>
   )
 }
@@ -51,7 +52,6 @@ export default function Resume() {
   const a = ann.data
   const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
-  const nbMois = (n: number | undefined) => (n ? `${n} mois saisi${n > 1 ? 's' : ''}` : 'aucun mois saisi')
 
   return (
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}`} aria-busy={maj || ann.isLoading || undefined}>
@@ -79,11 +79,13 @@ export default function Resume() {
       {ann.isLoading && (
         // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
         <>
-          <div className="cases">
-            {['MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PRODUCTIVITÉ', `MASSE SALARIALE ${n1}`].map((t) => (
-              <Case key={t} titre={t} valeur="—" devise={false} note="—" />
-            ))}
-          </div>
+          {[['COMMISSIONS', 'MASSE SALARIALE', 'EFFECTIF MOYEN'], ['PRIMES DE PRODUCTIVITÉ', 'MOYENNE MENSUELLE']].map((ligne) => (
+            <div key={ligne[0]} className="cases">
+              {ligne.map((t) => (
+                <Case key={t} titre={t} valeur="—" devise={false} />
+              ))}
+            </div>
+          ))}
           <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
           <div className="table-scroll">
             <table className="dense suivi">
@@ -107,26 +109,42 @@ export default function Resume() {
       {erreur && <Etat type={etatErreur(erreur)} />}
       {a && (
         <>
-          {aCa && (
-            <div className="cases">
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} note={`cumul · ${nbMois(a.nb_mois_ca)}`} />
-              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} note={`saisie · ${nbMois(a.nb_mois_marge)}`} />
-              <Case
-                titre="TAUX DE MARGE"
-                valeur={a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}
-                devise={false}
-                note="marge / CA"
-              />
-              <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} note={`masse salariale · ${nbMois(a.cumul_ytd.nb_mois)}`} />
-            </div>
-          )}
+          {/* Lecture par colonne (retour du 15/10) : CA puis marge, commissions puis primes, masse salariale
+              puis moyenne, effectifs puis CA / effectif. Pas de rappel « n mois saisis » : déjà connu. */}
           <div className="cases">
-            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`}>
-              <Variation v={a.cumul_ytd.var_pct} vs={`vs ${n1}`} />
+            {aCa && (
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} libelle2={`Par rapport à ${n1}`}>
+                <Variation v={a.ca_cumul?.var_pct} vs="" />
+              </Case>
+            )}
+            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} libelle2={`Par rapport à ${n1}`}>
+              <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
-            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
-            <Case titre="PRIMES PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} note={`cumul · ${nbMois(a.cumul_ytd.nb_mois)}`} />
-            <Case titre={`MASSE SALARIALE ${n1}`} valeur={montrer(a.cumul_ytd.m1)} note={`même période · ${nbMois(a.cumul_ytd.nb_mois_n1)}`} />
+            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)} libelle2={`Par rapport à ${n1}`}>
+              <Variation v={a.cumul_ytd.var_pct} vs="" />
+            </Case>
+            <Case titre="EFFECTIF MOYEN" valeur={montrer(a.effectif_moyen.m)} devise={false} libelle2="Part des MAD">
+              <span className="second">{a.taux_mad == null ? '—' : pct(a.taux_mad)}</span>
+            </Case>
+          </div>
+          <div className="cases">
+            {aCa && (
+              // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
+              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} libelle2="Taux de marge">
+                <span className="second">{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</span>
+              </Case>
+            )}
+            <Case titre="PRIMES DE PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} libelle2={`Par rapport à ${n1}`}>
+              <Variation v={a.primes_cumul.var_pct} vs="" />
+            </Case>
+            <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} libelle2={`Par rapport à ${n1}`}>
+              <Variation v={a.moyenne_mensuelle.var_pct} vs="" />
+            </Case>
+            {aCa && (
+              <Case titre="CA PAR SALARIÉ" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Par rapport à ${n1}`}>
+                <Variation v={a.ca_par_effectif?.var_pct} vs="" />
+              </Case>
+            )}
           </div>
           {aCa && (
             <p className="regle">

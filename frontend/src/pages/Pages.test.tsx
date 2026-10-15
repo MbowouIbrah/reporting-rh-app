@@ -44,6 +44,8 @@ function routes(avecMarge: boolean, perms: string[]) {
         serie_n: serie.map((s) => (avecMarge ? { ...s, ca: null, marge: null, taux_marge: null } : s)),
         serie_n1: serie, cumul_ytd: { ...cell('2000'), nb_mois: 2, nb_mois_n1: 2 },
         moyenne_mensuelle: cell('1000'), cumul_annee_n1: null, par_service: [],
+        commissions_cumul: cell('10'), primes_cumul: cell('5'), effectif_moyen: cell('4'), taux_mad: '0.25',
+        ...(avecMarge ? { ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
       }
@@ -75,6 +77,18 @@ test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   const tuile = (await screen.findByText('MARGE', { selector: '.micro' })).closest('.tuile')!
   expect(tuile).toHaveTextContent('—')
   expect(tuile).not.toHaveTextContent('0')
+  expect(tuile).toHaveTextContent(/Taux de marge\s*—/)
+  expect(tuile).not.toHaveTextContent('vs')
+  expect(screen.getByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeInTheDocument()
+  expect(screen.queryByText(/MASSE SALARIALE \d{4}/)).toBeNull()
+})
+
+test('Résumé : effectif moyen avec la part des MAD en second plan', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  const tuile = (await screen.findByText(/25,0/, { selector: '.second' })).closest('.tuile')!
+  expect(tuile).toHaveTextContent(/EFFECTIF MOYEN4Part des MAD25,0/)
+  expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
+  expect(screen.queryByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeNull()
 })
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {

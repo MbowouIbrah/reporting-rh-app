@@ -447,6 +447,16 @@ def annuel(
     s_n1 = ms_service(n1, ok1)
     complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
+    # Résumé : cumuls N-1 sur la même période, part des MAD et CA par effectif moyen global
+    # (docs/QUESTIONS_CLIENT.md C1, C3).
+    avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]
+    ca1 = sum((n1[m].ca for m in avec_ca1), ZERO) if avec_ca1 else None
+    eff = blocs["effectif_global"]
+    mad = next((e for e in blocs["d_contrat"]["effectifs"] if e["contrat"] == "MAD"), None)
+
+    def ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
+        return None if a is None or not b else a / b
+
     return {
         **blocs,
         "serie_n": serie(n),
@@ -461,6 +471,15 @@ def annuel(
         "taux_marge_ytd": f.taux_marge(ca_avec_marge, marge_ytd),
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
+        "ca_cumul": cell(ca_ytd, ca1),
+        "commissions_cumul": cell(commissions_ytd,
+                                  sum((n1[m].rubrique(COMMISSION) for m in ok1), ZERO)
+                                  if ok1 else None),
+        "primes_cumul": cell(primes_ytd, sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES), ZERO)
+                             if ok1 else None),
+        "effectif_moyen": eff,
+        "taux_mad": ratio(mad["m"] if mad else ZERO, eff["m"]),
+        "ca_par_effectif": cell(ratio(ca_ytd, eff["m"]), ratio(ca1, eff["m1"])),
         "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
         "par_service": [
             {"service": s, **cell(s_n.get(s, ZERO) if nb else None,

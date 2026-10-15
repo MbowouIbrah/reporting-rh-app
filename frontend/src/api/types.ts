@@ -132,6 +132,12 @@ export interface Annuel {
   taux_marge_ytd?: Val
   commissions_ytd: Dec | null
   primes_ytd: Dec | null
+  ca_cumul?: Cell
+  commissions_cumul: Cell
+  primes_cumul: Cell
+  effectif_moyen: Cell
+  taux_mad: Val
+  ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']
