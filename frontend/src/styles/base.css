@@ -360,9 +360,14 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.dense tr.total th, .rapport-excel .panneau table.dense tr.total td { background: var(--peche); color: var(--brun); border-top: 1px solid var(--pointille); }
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rapport-excel .panneau table.services th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); padding-left: calc(12px + var(--sp-1)); padding-right: 2px; }
+.rapport-excel .panneau table.services th.service.detail .detail-libelle { display: inline-flex; align-items: baseline; font-size: 0.62rem; color: var(--navy); }
+.rapport-excel .panneau table.services th.service.detail .detail-libelle::before { content: "↳"; display: inline-block; width: var(--decale-detail, 1rem); font-size: .8rem; line-height: 1; }
+.rapport-excel .panneau table.services th.service.ouvert { border-left: 3px solid var(--navy); }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
+.rapport-excel .panneau table.services tbody tr.total.staff:nth-child(n) > * { background: var(--peche); opacity: 1; color: var(--muted); font-weight: var(--fw-regular); }
 /* Damier par service : chaque bloc (service, activités, budget fusionnés) forme une seule bande */
 .rapport-excel .panneau table.dense.services tbody tr:not(.total) > td, .rapport-excel .panneau table.dense.services tbody tr:not(.total) > th { background: var(--surface); }
 .rapport-excel .panneau table.dense.services tbody tr.bande > td, .rapport-excel .panneau table.dense.services tbody tr.bande > th { background: var(--rapport-zebre); }

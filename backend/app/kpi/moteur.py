@@ -103,6 +103,15 @@ def cell(m: Decimal | None, m1: Decimal | None) -> dict:
     return {"m1": m1, "m": m, "var": f.variation(m, m1), "var_pct": f.variation_pct(m, m1)}
 
 
+def _somme(cells: list[dict], budget: bool = False) -> dict:
+    """Ligne TOTAL GÉNÉRAL d'un tableau : somme des lignes affichées, variations recalculées."""
+    def tot(k):
+        vals = [c[k] for c in cells if c[k] is not None]
+        return sum(vals, ZERO) if vals else None
+    m, m1 = tot("m"), tot("m1")
+    return {**cell(m, m1), **(_bud(m, tot("budget")) if budget else {})}
+
+
 def _par(pd: PeriodeData | None, cle, mesure) -> dict:
     out: dict = defaultdict(lambda: ZERO)
     for L in pd.lignes if pd else ():
@@ -183,6 +192,11 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                     Decimal(len({L.salarie_id for L in sub1.lignes if L.activite == n}))
                     if sub1 else None)}
                 for n, c in _cells(sub, sub1, refs.activites, lambda L: L.activite, total)],
+            "ms_contrat": dict(_cells(sub, sub1, refs.contrats, lambda L: L.contrat, total)),
+            "effectif_contrat": {c: cell(
+                Decimal(len({L.salarie_id for L in sub.lignes if L.contrat == c})),
+                Decimal(len({L.salarie_id for L in sub1.lignes if L.contrat == c}))
+                if sub1 else None) for c in refs.contrats},
         })
     ms_services = sum((b["total"]["m"] for b in b_service), ZERO)
 
@@ -212,6 +226,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                "ms_contrat": {c: cell(ms_site_contrat(cur, s, c), ms_site_contrat(prev, s, c))
                               for c in refs.contrats}} for s in refs.sites]
     ms_sites = sum((c["ms"]["m"] for c in c_site), ZERO)
+    c_site_total = {"ms": _somme([c["ms"] for c in c_site], budget=True),
+                    "effectif": _somme([c["effectif"] for c in c_site])}
 
     ctrl_contrats: list[dict] = []
 
@@ -278,6 +294,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             **_bud(ms_a, bud)}],
         "b_service_activite": b_service,
         "c_site": c_site,
+        "c_site_total": c_site_total,
         "d_contrat": {"effectifs": d_eff, "indicateurs": d_indic,
                       "total": cell(Decimal(eff), None if eff1 is None else Decimal(eff1)),
                       "ventilation": ventilation},
@@ -344,6 +361,10 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                 {"activite": a, **cell_ms(lambda L, s=s, a=a: L.service == s and L.activite == a),
                  "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a)}
                 for a in refs.activites],
+            "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.service == s and L.contrat == c)
+                           for c in refs.contrats},
+            "effectif_contrat": {c: cell_eff(lambda L, s=s, c=c: L.service == s and L.contrat == c)
+                                 for c in refs.contrats},
         })
 
     c_site = []
@@ -395,6 +416,8 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
         "a_type_charge": a_type,
         "b_service_activite": b_service,
         "c_site": c_site,
+        "c_site_total": {"ms": _somme([c["ms"] for c in c_site], budget=True),
+                         "effectif": _somme([c["effectif"] for c in c_site])},
         "d_contrat": {"indicateurs": d_indic, "ventilation": ventilation,
                       "effectifs": [{"contrat": c, **cell_eff(lambda L, c=c: L.contrat == c)}
                                     for c in refs.contrats],

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import type { Cell } from '../api/types'
-import { type Blocs, Sites } from './BlocsRapport'
+import { type Blocs, ServicesActivites, Sites } from './BlocsRapport'
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
@@ -49,4 +49,31 @@ test('un seul site déplié à la fois', () => {
   expect(douala).toHaveAttribute('aria-expanded', 'false')
   expect(yaounde).toHaveAttribute('aria-expanded', 'true')
   expect(screen.getAllByText('CDI')).toHaveLength(1)
+})
+
+test('répartition par site : ligne TOTAL GÉNÉRAL en masse salariale et Staff', () => {
+  const avecTotal = { ...d, c_site_total: { ms: { m1: '20', m: '24', var: '4', var_pct: '0.2' }, effectif: { m: '10', m1: '8', var: '2', var_pct: '0.25' } } } as unknown as Blocs
+  render(<Sites d={avecTotal} lib={{ prec: 'M-1', cour: 'M' }} />)
+  const total = screen.getByText('TOTAL GÉNÉRAL').closest('tr')!
+  expect(total).toHaveTextContent(/Masse salariale.*20.*24/)
+  expect(total.nextElementSibling).toHaveTextContent(/Staff.*8.*10/)
+})
+
+test('répartition par service : dépliage par contrat', () => {
+  const svc = {
+    a_type_charge: [],
+    d_contrat: { total: cell },
+    b_service_activite: [{
+      service: 'SAV PL', total: cell, effectif: cell,
+      activites: [{ activite: 'Atelier', ...cell, effectif: cell }],
+      ms_contrat: { CDI: { m: '700', m1: '600', var: '100', var_pct: '0.1667' } },
+      effectif_contrat: { CDI: { m: '3', m1: '2', var: '1', var_pct: '0.5' } },
+    }],
+  } as unknown as Blocs
+  render(<ServicesActivites d={svc} lib={{ prec: 'M-1', cour: 'M' }} />)
+  const bouton = screen.getByRole('button', { name: 'Détail par contrat de SAV PL' })
+  expect(screen.queryByText('Staff CDI')).toBeNull()
+  fireEvent.click(bouton)
+  expect(screen.getByText('CDI').closest('tr')).toHaveTextContent(/600.*700/)
+  expect(screen.getByText('Staff CDI').closest('tr')).toHaveTextContent(/2.*3/)
 })

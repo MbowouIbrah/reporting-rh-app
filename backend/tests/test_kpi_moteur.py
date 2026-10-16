@@ -326,3 +326,15 @@ def test_annuel_serie_frais_mission_remuneration_et_contrats():
     assert s[0]["remuneration"] == 180 + 20  # TOTAL CHARGES + exclusions hors absences
     assert s[0]["effectif_contrat"] == {"CDI": 1, "CDD": 0, "MAD": 1}
     assert s[1]["frais_mission"] is None and s[1]["effectif_contrat"] is None
+
+
+def test_total_sites_et_services_par_contrat():
+    cur = pd(L(1, Brut_Réel=100), L(2, service="Commerce VN", site="Yaoundé", act="Back Office",
+                                    ctr="MAD", Brut_Réel=40))
+    r = mensuel(cur, pd(L(1, Brut_Réel=80)), REFS, Params())
+    t = r["c_site_total"]
+    assert (t["ms"]["m"], t["ms"]["m1"], t["ms"]["var"]) == (140, 80, 60)
+    assert (t["effectif"]["m"], t["effectif"]["m1"]) == (2, 1)
+    vn = next(b for b in r["b_service_activite"] if b["service"] == "Commerce VN")
+    assert {c: v["m"] for c, v in vn["ms_contrat"].items()} == {"CDI": 0, "CDD": 0, "MAD": 40}
+    assert {c: v["m"] for c, v in vn["effectif_contrat"].items()} == {"CDI": 0, "CDD": 0, "MAD": 1}

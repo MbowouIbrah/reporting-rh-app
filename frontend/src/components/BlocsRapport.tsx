@@ -3,7 +3,7 @@ import type { Budget, Cell, Mensuel } from '../api/types'
 import { cls, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
-export type Blocs = Pick<Mensuel, 'a_type_charge' | 'b_service_activite' | 'c_site' | 'd_contrat'>
+export type Blocs = Pick<Mensuel, 'a_type_charge' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
 export interface Libelles {
   prec: string
   cour: string
@@ -148,9 +148,11 @@ const Budgets = ({ b, rowSpan }: { b: Budget; rowSpan?: number }) => (
 )
 
 /** 3. Répartition par service et activité, présentée comme l'onglet Excel : service fusionné sur ses activités,
- *  une ligne Staff (effectif) sous chaque activité, budget fusionné par service, puis total et effectif global. */
+ *  une ligne Staff (effectif) sous chaque activité, budget fusionné par service, puis total et effectif global.
+ *  Un clic sur le bloc d'un service le déplie par nature de contrat, comme les sites. */
 export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
+  const [ouvert, setOuvert] = useState<string | null>(null)
   return (
     <table className="dense aligne double services">
       <thead>
@@ -168,7 +170,13 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
       </thead>
       <tbody>
         {d.b_service_activite.map((b, n) => (
-          <ServiceBloc key={b.service} b={b} bande={n % 2 === 1} />
+          <ServiceBloc
+            key={b.service}
+            b={b}
+            bande={n % 2 === 1}
+            ouvert={ouvert === b.service}
+            basculer={() => setOuvert(ouvert === b.service ? null : b.service)}
+          />
         ))}
         {total && (
           <tr className="total">
@@ -188,27 +196,57 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
 }
 
 /** Le damier alterne par service (bande), pas par ligne : les cellules fusionnées suivent leur bloc. */
-function ServiceBloc({ b, bande }: { b: Blocs['b_service_activite'][number]; bande: boolean }) {
+function ServiceBloc({ b, bande, ouvert, basculer }: {
+  b: Blocs['b_service_activite'][number]; bande: boolean; ouvert: boolean; basculer: () => void
+}) {
   const activites = b.activites
-  const fond = bande ? 'bande' : ''
-  return activites.map((a, i) => (
-    <Fragment key={a.activite}>
-      <tr className={`${i === 0 ? 'debut-service ' : ''}${fond}`.trim() || undefined}>
-        {i === 0 && (
-          <th scope="rowgroup" rowSpan={activites.length * 2} className="service">
-            {b.service}
-          </th>
-        )}
-        <td>{a.activite}</td>
-        <Valeurs c={a} />
-        {i === 0 && <Budgets b={b.total} rowSpan={activites.length * 2} />}
-      </tr>
-      <tr className={`staff ${fond}`.trim()}>
-        <td>Staff</td>
-        <Valeurs c={a.effectif} />
-      </tr>
-    </Fragment>
-  ))
+  const contrats = Object.keys(b.effectif_contrat ?? {})
+  const depliable = contrats.length > 0
+  const hauteur = activites.length * 2 + (ouvert ? 2 * contrats.length : 0)
+  const clic = depliable ? basculer : undefined
+  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${bande ? 'bande' : ''}`.replace(/\s+/g, ' ').trim() || undefined
+  return (
+    <>
+      {activites.map((a, i) => (
+        <Fragment key={a.activite}>
+          <tr className={classe(i === 0 ? 'debut-service' : '')} onClick={clic}>
+            {i === 0 && (
+              <th scope="rowgroup" rowSpan={activites.length * 2} className={ouvert ? 'service ouvert' : 'service'}>
+                {depliable ? (
+                  <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail par contrat de ${b.service}`}>
+                    <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {b.service}
+                  </button>
+                ) : (
+                  b.service
+                )}
+              </th>
+            )}
+            <td>{a.activite}</td>
+            <Valeurs c={a} />
+            {i === 0 && <Budgets b={b.total} rowSpan={hauteur} />}
+          </tr>
+          <tr className={classe('staff')} onClick={clic}>
+            <td>Staff</td>
+            <Valeurs c={a.effectif} />
+          </tr>
+        </Fragment>
+      ))}
+      {ouvert &&
+        contrats.map((contrat, i) => (
+          <Fragment key={contrat}>
+            <tr className={classe('detail-contrat')} onClick={clic}>
+              {i === 0 && <EnteteDetail libelle="Détail par type de contrat" lignes={2 * contrats.length} />}
+              <td className="retrait">{contrat}</td>
+              <Valeurs c={b.ms_contrat?.[contrat] ?? VIDE} />
+            </tr>
+            <tr className={classe('staff detail-contrat')} onClick={clic}>
+              <td className="retrait">Staff {contrat}</td>
+              <Valeurs c={b.effectif_contrat![contrat]} />
+            </tr>
+          </Fragment>
+        ))}
+    </>
+  )
 }
 
 /** 2. Répartition par site, présentée comme la répartition par service : site fusionné sur ses lignes,
@@ -241,6 +279,20 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
             basculer={() => setOuvert(ouvert === r.site ? null : r.site)}
           />
         ))}
+        {d.c_site_total && (
+          <>
+            <tr className="total">
+              <th scope="row" rowSpan={2}>TOTAL GÉNÉRAL</th>
+              <td>Masse salariale</td>
+              <Valeurs c={d.c_site_total.ms} />
+              <Budgets b={d.c_site_total.ms} rowSpan={2} />
+            </tr>
+            <tr className="total staff">
+              <td>Staff</td>
+              <Valeurs c={d.c_site_total.effectif} />
+            </tr>
+          </>
+        )}
       </tbody>
     </table>
   )
@@ -255,11 +307,11 @@ function SiteBloc({ r, bande, ouvert, basculer }: {
   const depliable = contrats.length > 0
   // Tout le bloc du site est cliquable : un clic sur n'importe laquelle de ses lignes le déplie ou le replie.
   const clic = depliable ? basculer : undefined
-  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${fond}`.replace(/s+/g, ' ').trim()
+  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${fond}`.replace(/\s+/g, ' ').trim()
   return (
     <>
       <tr className={classe('debut-service')} onClick={clic}>
-        <th scope="rowgroup" rowSpan={hauteur} className="service">
+        <th scope="rowgroup" rowSpan={2} className={ouvert ? 'service ouvert' : 'service'}>
           {depliable ? (
             <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail par contrat de ${r.site}`}>
               <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {r.site}
@@ -277,9 +329,10 @@ function SiteBloc({ r, bande, ouvert, basculer }: {
         <Valeurs c={r.effectif} />
       </tr>
       {ouvert &&
-        contrats.map((contrat) => (
+        contrats.map((contrat, i) => (
           <Fragment key={contrat}>
             <tr className={classe('detail-contrat')} onClick={clic}>
+              {i === 0 && <EnteteDetail libelle="Détail par type de contrat" lignes={2 * contrats.length} />}
               <td className="retrait">{contrat}</td>
               <Valeurs c={r.ms_contrat?.[contrat] ?? VIDE} />
             </tr>
@@ -292,6 +345,13 @@ function SiteBloc({ r, bande, ouvert, basculer }: {
     </>
   )
 }
+
+/** Cellule de la première colonne qui couvre le détail par contrat d'un site ou d'un service déplié. */
+const EnteteDetail = ({ libelle, lignes }: { libelle: string; lignes: number }) => (
+  <th scope="rowgroup" rowSpan={lignes} className="service detail">
+    <span className="detail-libelle">{libelle}</span>
+  </th>
+)
 
 const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
 

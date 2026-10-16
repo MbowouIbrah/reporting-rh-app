@@ -89,6 +89,9 @@ export interface Mensuel {
     total: Cell & Budget
     effectif: Cell
     activites: ({ activite: string; effectif: Cell } & Cell)[]
+    /** Masse salariale et effectif du service par nature de contrat (CDI, CDD, MAD). */
+    ms_contrat?: Record<string, Cell>
+    effectif_contrat?: Record<string, Cell>
   }[]
   c_site: {
     site: string
@@ -99,6 +102,8 @@ export interface Mensuel {
     /** Masse salariale du site par nature de contrat, mêmes clés que effectif_contrat. */
     ms_contrat?: Record<string, Cell>
   }[]
+  /** TOTAL GÉNÉRAL de la répartition par site : somme des sites affichés. */
+  c_site_total?: { ms: Cell & Budget; effectif: Cell }
   d_contrat: {
     effectifs: ({ contrat: string } & Cell)[]
     indicateurs: Indicateurs[]
@@ -155,6 +160,7 @@ export interface Annuel {
   a_type_charge: Mensuel['a_type_charge']
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']
+  c_site_total?: Mensuel['c_site_total']
   d_contrat: Mensuel['d_contrat']
   par_service: ({
     service: string
