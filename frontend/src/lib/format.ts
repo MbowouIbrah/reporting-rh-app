@@ -17,10 +17,10 @@ export const matriculeAffiche = (m: string | null | undefined) => (m && !m.start
 
 export const MOIS_COURTS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
-/** Montant en FCFA. null -> « — », 'n/a' -> « n/a ». Number() sert à l'affichage seulement. */
+/** Montant en FCFA. null (absent) et 'n/a' (non calculable) -> « — ». Number() sert à l'affichage seulement. */
 export function fcfa(v: Val | number | undefined): string {
   if (v === null || v === undefined) return '—'
-  if (v === 'n/a') return 'n/a'
+  if (v === 'n/a') return '—'
   return espacer(NF.format(Number(v)))
 }
 
@@ -35,7 +35,7 @@ export function valeurBrute(v: string | undefined): string {
 /** Pourcentage : l'API renvoie un ratio (0,05 = 5 %). */
 export function pct(v: Val | undefined): string {
   if (v === null || v === undefined) return '—'
-  if (v === 'n/a') return 'n/a'
+  if (v === 'n/a') return '—'
   return `${espacer(NF1.format(Number(v) * 100))}${SEP}%`
 }
 

@@ -16,7 +16,7 @@ interface Props {
 /** Variation lisible sans la couleur : flèche, signe et texte. */
 export function Variation({ v, vs = 'vs M-1' }: { v: Cell['var_pct'] | undefined; vs?: string }) {
   if (v === null || v === undefined) return <span className="variation">— {vs}</span>
-  if (v === 'n/a') return <span className="variation">n/a {vs}</span>
+  if (v === 'n/a') return <span className="variation" title="Non calculable : la référence est nulle">— {vs}</span>
   const n = Number(v)
   const etat = n === 0 ? 'stable' : isNeg(v) ? 'baisse' : 'hausse'
   const signe = n > 0 ? '+' : ''

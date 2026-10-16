@@ -104,7 +104,7 @@ export default function Graphes() {
     <section className="page-ecran page-etroite rapport-excel graphes-excel">
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} />}

@@ -184,22 +184,39 @@ def test_annuel_resume_n1_part_mad_et_ca_par_effectif():
     assert (r["commissions_cumul"]["m"], r["commissions_cumul"]["m1"]) == (30, 40)
     assert (r["primes_cumul"]["m"], r["primes_cumul"]["m1"]) == (5, 0)
     assert r["effectif_moyen"]["m"] == D("2.5") and r["effectif_moyen"]["m1"] == 1
-    assert r["taux_mad"] == D("1.5") / D("2.5")
     assert r["ca_par_effectif"]["m"] == D(900) / D("2.5") and r["ca_par_effectif"]["m1"] == 200
+    # effectif de fin : février N contre février N-1 (absent)
+    assert r["mois_fin"] == 2 and r["effectif_fin"]["m"] == 3 and r["effectif_fin"]["m1"] is None
+    mad = r["effectif_fin_contrat"]["MAD"]
+    assert mad["m"] == 2 and mad["part"] == D(2) / D(3)
     vide = annuel({}, {}, 2, REFS, Params())
-    assert vide["taux_mad"] is None and vide["ca_par_effectif"]["m"] is None
+    assert vide["effectif_fin"]["m"] is None and vide["ca_par_effectif"]["m"] is None
 
 
-def test_annuel_mad_sites_deportes():
+def test_annuel_mad_sites_deportes_effectif_de_fin():
     dep = {"type_site": "deporte"}
     n = {1: pd(L(1, ctr="MAD"), Ligne(2, "SAV PL", "Dimon", "Front office", "MAD", **dep)),
          2: pd(L(1, ctr="MAD"), Ligne(2, "SAV PL", "Dimon", "Front office", "MAD", **dep),
                Ligne(3, "SAV PL", "Dimon", "Front office", "MAD", **dep),
                Ligne(4, "SAV PL", "Dimon", "Front office", "CDI", **dep))}
-    r = annuel(n, {}, 2, REFS, Params())
-    assert r["mad_deportes"]["m"] == D("1.5") and r["effectif_mad"] == D("2.5")
-    assert r["taux_mad_deportes"] == D("1.5") / D("2.5")
-    assert annuel({}, {}, 2, REFS, Params())["taux_mad_deportes"] is None
+    n1 = {2: pd(L(1, ctr="MAD"))}
+    r = annuel(n, n1, 2, REFS, Params())
+    assert (r["mad_fin"]["m"], r["mad_fin"]["m1"]) == (3, 1)
+    assert r["mad_deportes_fin"]["m"] == 2 and r["mad_deportes_fin"]["part"] == D(2) / D(3)
+    assert annuel({}, {}, 2, REFS, Params())["mad_deportes_fin"]["part"] is None
+
+
+def test_annuel_masse_par_contrat_frais_et_logement():
+    n = {1: pd(L(1, Brut_Réel=300, Frais_de_mission=20), L(2, ctr="CDD", Brut_Réel=100)),
+         2: pd(L(1, Brut_Réel=300, **{"Logement site déporté": 5}))}
+    n1 = {1: pd(L(1, Brut_Réel=200))}
+    r = annuel(n, n1, 2, REFS, Params())
+    cdi, cdd = r["ms_contrat"]["CDI"], r["ms_contrat"]["CDD"]
+    assert (cdi["m"], cdi["m1"], cdd["m"], cdd["m1"]) == (625, 200, 100, 0)
+    assert sum(r["ms_contrat"][c]["m"] for c in REFS.contrats) == r["cumul_ytd"]["m"]
+    assert cdd["part"] == D(100) / D(725)
+    assert r["frais_mission_ytd"] == 20 and r["logement_ytd"] == 5
+    assert r["serie_n"][1]["logement"] == 5 and r["serie_n"][0]["frais_mission"] == 20
 
 
 def test_annuel_sans_n1():

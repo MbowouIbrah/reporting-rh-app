@@ -3,32 +3,36 @@ import type { ReactNode } from 'react'
 import { getAnnuel } from '../api/rapports'
 import type { Cell, Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import BoutonReinitialiser from '../components/BoutonReinitialiser'
-import { ChoixComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, pct, SEP, valeurBrute } from '../lib/format'
+import { cls, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
 
 const NF2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 })
+/** Bulles : une division par zéro est dite en clair, la case reste « — ». */
+const NC = 'Non calculable'
 const vide = (v: Val | undefined): v is null | undefined | 'n/a' => v == null || v === 'n/a'
 /** Montant exact de l'API (3 décimales au plus), sans passer par un flottant. */
 const exact = (v: Val | undefined) => {
-  if (vide(v)) return v === 'n/a' ? 'n/a' : '—'
+  if (vide(v)) return v === 'n/a' ? NC : '—'
   const [e, d] = v.split('.')
   return `${valeurBrute(d ? `${e}.${d.slice(0, 3)}` : e)}${SEP}FCFA`
 }
 /** Effectifs moyens et taux : affichage seulement, deux décimales. */
-const dec = (v: Val | undefined) => (vide(v) ? (v ?? '—') : NF2.format(Number(v)).replace(/ /g, SEP))
-const taux = (v: Val | undefined) => (vide(v) ? (v ?? '—') : `${dec(String(Number(v) * 100))}${SEP}%`)
+const dec = (v: Val | undefined) => (vide(v) ? (v === 'n/a' ? NC : '—') : NF2.format(Number(v)).replace(/ /g, SEP))
+const taux = (v: Val | undefined) => (vide(v) ? (v === 'n/a' ? NC : '—') : `${dec(String(Number(v) * 100))}${SEP}%`)
 const comparaison = (c: Cell | undefined, an: string, n1: string): Detail => [
   [an, exact(c?.m)],
   [n1, exact(c?.m1)],
   ['Écart', exact(c?.var)],
   ['Évolution', taux(c?.var_pct)],
 ]
+/** Une ligne de bulle par type de contrat : valeur et part du total. */
+const parContrat = (d: Record<string, Cell & { part: Val }> | undefined, fmt: (v: Val | undefined) => string): Detail =>
+  Object.entries(d ?? {}).map(([c, x]) => [c, `${fmt(x.m)} (${taux(x.part)})`])
 
 function Case({
   titre,
@@ -72,8 +76,18 @@ function Case({
 
 export default function Resume() {
   const f = useFiltres({ avecMois: false, comparaison: 'annee' })
-  // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi ; service/site ne s'appliquent pas (CA global).
-  const base = f.filtres && { annee: f.filtres.annee, mois: f.filtres.mois, ref_annee: f.filtres.ref_annee }
+  // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi. Poste et employé ne s'appliquent pas ici.
+  const base = f.filtres && {
+    annee: f.filtres.annee,
+    mois: f.filtres.mois,
+    ref_annee: f.filtres.ref_annee,
+    service: f.filtres.service,
+    site: f.filtres.site,
+    type_site: f.filtres.type_site,
+    activite: f.filtres.activite,
+  }
+  // CA et marge n'existent qu'au global : masqués dès qu'un filtre restreint les salariés.
+  const filtre = !!(base && (base.service || base.site || base.type_site || base.activite))
   const ann = useQuery({
     queryKey: ['annuel', base],
     queryFn: () => getAnnuel(base!),
@@ -85,36 +99,25 @@ export default function Resume() {
   const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : 'N-1'
   const erreur = ann.error
   const a = ann.data
-  const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
+  const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && !filtre
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
+  const moisFin = a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
+  const colonnes = [
+    'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
+    'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
+  ]
 
   return (
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}`} aria-busy={maj || ann.isLoading || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
-        <div className="filtre-annee">
-          <label className="selecteur-annee">
-            <span className="filtre-annee-label">Année</span>
-            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value })}>
-              {f.annees.map((an) => (
-                <option key={an}>{an}</option>
-              ))}
-            </select>
-          </label>
-          <span className="selecteur-annee">
-            <ChoixComparaison mode="annee" filtres={f.filtres} annees={f.annees} onChange={f.set} />
-            <BoutonReinitialiser
-              actif={!!(f.partage.annee || f.partage.cmp_annee)}
-              onClick={() => f.set({ annee: undefined, cmp_annee: undefined })}
-            />
-          </span>
-        </div>
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {ann.isLoading && (
         // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
         <>
-          {[['COMMISSIONS', 'MASSE SALARIALE', 'EFFECTIF MOYEN'], ['PRIMES DE PRODUCTIVITÉ', 'MAD SITES DÉPORTÉS']].map((ligne) => (
+          {[['COMMISSIONS', 'MASSE SALARIALE', 'MAD GLOBAUX'], ['PRIMES DE PRODUCTIVITÉ', 'EFFECTIF GLOBAL']].map((ligne) => (
             <div key={ligne[0]} className="cases">
               {ligne.map((t) => (
                 <Case key={t} titre={t} valeur="—" devise={false} />
@@ -125,15 +128,13 @@ export default function Resume() {
           <div className="table-scroll">
             <table className="dense suivi">
               <thead>
-                <tr>{['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.'].map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+                <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
               </thead>
               <tbody aria-hidden="true">
                 {MOIS.map((m) => (
                   <tr key={m}>
                     <th scope="row">{m}</th>
-                    <td className="num" />
-                    <td className="num" />
-                    <td className="num" />
+                    {colonnes.slice(1).map((c) => <td key={c} className="num" />)}
                   </tr>
                 ))}
               </tbody>
@@ -144,35 +145,40 @@ export default function Resume() {
       {erreur && <Etat type={etatErreur(erreur)} />}
       {a && (
         <>
-          {/* Lecture par colonne (retour du 15/10) : CA puis marge, commissions puis primes, masse salariale
-              puis MAD des sites déportés, effectifs puis CA / effectif. Pas de rappel « n mois saisis » : déjà connu. */}
+          {/* Disposition du 16/10 : CA, commissions, masse salariale, MAD ; puis marge, primes,
+              effectif global, CA par salarié. Effectifs = fin du dernier mois saisi. */}
           <div className="cases">
             {aCa && (
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
               </Case>
             )}
-            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
+            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
               <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
             <Case
               titre="MASSE SALARIALE"
               valeur={fcfa(a.cumul_ytd.m)}
-              libelle2={`Par rapport à ${n1}`}
-              detail={[...comparaison(a.cumul_ytd, an, n1), ['Mois saisis', `${a.cumul_ytd.nb_mois}`]]}
+              libelle2={`Évolution par rapport à ${n1}`}
+              detail={parContrat(a.ms_contrat, exact)}
             >
               <Variation v={a.cumul_ytd.var_pct} vs="" />
             </Case>
-            <Case titre="EFFECTIF MOYEN" valeur={montrer(a.effectif_moyen.m)} devise={false}
-              libelle2="Part des MAD"
+            <Case titre="MAD GLOBAUX" valeur={montrer(a.mad_fin.m)} devise={false}
+              libelle2="Pourcentage MAD sites déportés"
               detail={[
-                ['Effectif moyen', dec(a.effectif_moyen.m)],
-                ['dont MAD', dec(a.effectif_mad)],
-                ['Part des MAD', taux(a.taux_mad)],
-                [`Effectif moyen ${n1}`, dec(a.effectif_moyen.m1)],
+                [`MAD globaux ${moisFin} ${an}`, dec(a.mad_fin.m)],
+                [`MAD globaux ${moisFin} ${n1}`, dec(a.mad_fin.m1)],
+                ['MAD sites déportés', dec(a.mad_deportes_fin.m)],
+                ['Part des MAD globaux', taux(a.mad_deportes_fin.part)],
+                [`MAD sites déportés ${moisFin} ${n1}`, dec(a.mad_deportes_fin.m1)],
               ]}
             >
-              <span className="second">{a.taux_mad == null ? '—' : pct(a.taux_mad)}</span>
+              <span className="second">
+                {a.mad_deportes_fin.m == null
+                  ? '—'
+                  : `${dec(a.mad_deportes_fin.m)} · ${a.mad_deportes_fin.part == null ? '—' : pct(a.mad_deportes_fin.part)}`}
+              </span>
             </Case>
           </div>
           <div className="cases">
@@ -189,25 +195,17 @@ export default function Resume() {
                 <span className="second">{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</span>
               </Case>
             )}
-            <Case titre="PRIMES DE PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
+            <Case titre="PRIMES DE PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
-            <Case
-              titre="MAD SITES DÉPORTÉS"
-              valeur={montrer(a.mad_deportes?.m)}
-              devise={false}
-              libelle2="Part des MAD globaux"
-              detail={[
-                ['MAD sites déportés', dec(a.mad_deportes?.m)],
-                ['MAD globaux', dec(a.effectif_mad)],
-                ['Part des sites déportés', taux(a.taux_mad_deportes)],
-                [`MAD sites déportés ${n1}`, dec(a.mad_deportes?.m1)],
-              ]}
+            <Case titre="EFFECTIF GLOBAL" valeur={montrer(a.effectif_fin.m)} devise={false}
+              libelle2={`Évolution par rapport à ${moisFin} ${n1}`}
+              detail={parContrat(a.effectif_fin_contrat, dec)}
             >
-              <span className="second">{a.taux_mad_deportes == null ? '—' : pct(a.taux_mad_deportes)}</span>
+              <Variation v={a.effectif_fin.var_pct} vs="" />
             </Case>
             {aCa && (
-              <Case titre="CA PAR SALARIÉ" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Par rapport à ${n1}`}
+              <Case titre="CA PAR SALARIÉ" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
                 detail={[
                   ...comparaison(a.ca_par_effectif, an, n1),
                   ['CA cumulé', exact(a.ca_ytd)],
@@ -224,6 +222,12 @@ export default function Resume() {
               vide ; le taux de marge ne porte que sur les mois où les deux sont connus.
             </p>
           )}
+          {filtre && (
+            <p className="regle">
+              Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne s’affichent pas
+              quand un service, un site, un type de site ou une activité est choisi.
+            </p>
+          )}
         </>
       )}
       {a && (
@@ -232,29 +236,36 @@ export default function Resume() {
           <div className="table-scroll">
             <table className="dense suivi">
               <thead>
-                <tr>
-                  <th scope="col">MOIS</th>
-                  {aCa && <th scope="col">CA</th>}
-                  <th scope="col">MASSE SALARIALE</th>
-                  {aCa && <th scope="col">MARGE</th>}
-                  {aCa && <th scope="col">% MARGE</th>}
-                  <th scope="col">COMMISSIONS</th>
-                  <th scope="col">PRIMES PROD.</th>
-                </tr>
+                <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
               </thead>
               <tbody>
                 {a.serie_n.map((l) => (
                   <tr key={l.mois}>
                     <th scope="row">{MOIS[l.mois - 1]}</th>
                     {aCa && <td className="num saisi">{montrer(l.ca)}</td>}
-                    <td className="num">{fcfa(l.ms)}</td>
                     {aCa && <td className={`${cls(l.marge)} saisi`}>{montrer(l.marge)}</td>}
                     {aCa && <td className={cls(l.taux_marge)}>{l.taux_marge == null ? '—' : pct(l.taux_marge)}</td>}
+                    <td className="num">{fcfa(l.ms)}</td>
                     <td className="num">{fcfa(l.commissions)}</td>
                     <td className="num">{fcfa(l.primes)}</td>
+                    <td className="num">{fcfa(l.frais_mission)}</td>
+                    <td className="num">{fcfa(l.logement)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row">TOTAL</th>
+                  {aCa && <td className="num">{montrer(a.ca_ytd)}</td>}
+                  {aCa && <td className={cls(a.marge_ytd)}>{montrer(a.marge_ytd)}</td>}
+                  {aCa && <td className={cls(a.taux_marge_ytd)}>{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</td>}
+                  <td className="num">{fcfa(a.cumul_ytd.m)}</td>
+                  <td className="num">{fcfa(a.commissions_ytd)}</td>
+                  <td className="num">{fcfa(a.primes_ytd)}</td>
+                  <td className="num">{fcfa(a.frais_mission_ytd)}</td>
+                  <td className="num">{fcfa(a.logement_ytd)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </>

@@ -12,6 +12,7 @@ from app.kpi import formules as f
 ABSENCES = "Absences (nb)"
 COMMISSION = "Commission"
 FRAIS_MISSION = "Frais de mission"
+LOGEMENT = "Logement site déporté"
 PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
 ZERO = Decimal(0)
 
@@ -399,7 +400,6 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                                     for c in refs.contrats],
                       "total": cell_eff(lambda L: True)},
         "effectif_global": cell_eff(lambda L: True),
-        "mad_deportes": cell_eff(lambda L: L.contrat == "MAD" and L.type_site == "deporte"),
         "nb_mois_absences": nb,
     }
 
@@ -425,6 +425,7 @@ def annuel(
                  "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
                  if _ok(pds.get(m)) else None,
                  "frais_mission": pds[m].rubrique(FRAIS_MISSION) if _ok(pds.get(m)) else None,
+                 "logement": pds[m].rubrique(LOGEMENT) if _ok(pds.get(m)) else None,
                  "remuneration": remuneration(pds[m]) if _ok(pds.get(m)) else None,
                  "effectif_contrat": par_contrat(pds[m]) if _ok(pds.get(m)) else None,
                  # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
@@ -464,10 +465,32 @@ def annuel(
     avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]
     ca1 = sum((n1[m].ca for m in avec_ca1), ZERO) if avec_ca1 else None
     eff = blocs["effectif_global"]
-    mad = next((e for e in blocs["d_contrat"]["effectifs"] if e["contrat"] == "MAD"), None)
 
     def ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
         return None if a is None or not b else a / b
+
+    # Résumé : effectif de fin = dernier mois saisi, comparé au même mois N-1 (retours du 16/10).
+    der = ok[-1] if ok else None
+    fin, fin1 = (n[der] if der else None), (_ok(n1.get(der)) if der else None)
+
+    def eff_fin(pred) -> dict:
+        def compte(pd):
+            return Decimal(len({L.salarie_id for L in pd.lignes if pred(L)})) if pd else None
+        return cell(compte(fin), compte(fin1))
+
+    def avec_part(c: dict, total: dict) -> dict:
+        return {**c, "part": ratio(c["m"], total["m"])}
+
+    eff_fin_total = eff_fin(lambda L: True)
+    mad_fin = eff_fin(lambda L: L.contrat == "MAD")
+    ms_total = {"m": c if nb else None}
+
+    def ms_contrat(pds, mois_ok, contrat) -> Decimal | None:
+        return sum((pds[m].total(L) for m in mois_ok for L in pds[m].lignes
+                    if L.contrat == contrat), ZERO) if mois_ok else None
+
+    def cumul_rub(nom: str) -> Decimal | None:
+        return sum((n[m].rubrique(nom) for m in ok), ZERO) if nb else None
 
     return {
         **blocs,
@@ -490,11 +513,19 @@ def annuel(
                                   if ok1 else None),
         "primes_cumul": cell(primes_ytd, sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES), ZERO)
                              if ok1 else None),
+        "frais_mission_ytd": cumul_rub(FRAIS_MISSION),
+        "logement_ytd": cumul_rub(LOGEMENT),
         "effectif_moyen": eff,
-        "taux_mad": ratio(mad["m"] if mad else ZERO, eff["m"]),
-        "effectif_mad": mad["m"] if mad else None,
-        # MAD affectés aux sites déportés / MAD globaux (effectifs moyens)
-        "taux_mad_deportes": ratio(blocs["mad_deportes"]["m"], mad["m"] if mad else None),
+        "mois_fin": der,
+        "effectif_fin": eff_fin_total,
+        "effectif_fin_contrat": {ct: avec_part(eff_fin(lambda L, ct=ct: L.contrat == ct),
+                                               eff_fin_total) for ct in refs.contrats},
+        # MAD affectés aux sites déportés, part des MAD globaux (effectif de fin)
+        "mad_fin": mad_fin,
+        "mad_deportes_fin": avec_part(
+            eff_fin(lambda L: L.contrat == "MAD" and L.type_site == "deporte"), mad_fin),
+        "ms_contrat": {ct: avec_part(cell(ms_contrat(n, ok, ct), ms_contrat(n1, ok1, ct)),
+                                     ms_total) for ct in refs.contrats},
         "ca_par_effectif": cell(ratio(ca_ytd, eff["m"]), ratio(ca1, eff["m1"])),
         "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
         "par_service": [

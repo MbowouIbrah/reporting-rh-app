@@ -44,8 +44,11 @@ function routes(avecMarge: boolean, perms: string[]) {
         serie_n: serie.map((s) => (avecMarge ? { ...s, ca: null, marge: null, taux_marge: null } : s)),
         serie_n1: serie, cumul_ytd: { ...cell('2000'), nb_mois: 2, nb_mois_n1: 2 },
         moyenne_mensuelle: cell('1000'), cumul_annee_n1: null, par_service: [],
-        commissions_cumul: cell('10'), primes_cumul: cell('5'), effectif_moyen: cell('4'), taux_mad: '0.25',
-        effectif_mad: '1', mad_deportes: cell('0.5'), taux_mad_deportes: '0.5',
+        commissions_cumul: cell('10'), primes_cumul: cell('5'), effectif_moyen: cell('4'),
+        frais_mission_ytd: '7', logement_ytd: '3', mois_fin: 2, effectif_fin: cell('4'),
+        effectif_fin_contrat: { CDI: { ...cell('3'), part: '0.75' }, MAD: { ...cell('1'), part: '0.25' } },
+        mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
+        ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
         ...(avecMarge ? { ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
@@ -84,20 +87,33 @@ test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   expect(screen.queryByText(/MASSE SALARIALE \d{4}/)).toBeNull()
 })
 
-test('Résumé : effectif moyen avec la part des MAD en second plan', async () => {
+test('Résumé : effectif global de fin, évolution et répartition par contrat en bulle', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
-  const tuile = (await screen.findByText(/25,0/, { selector: '.second' })).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/EFFECTIF MOYEN4Part des MAD25,0/)
+  const tuile = (await screen.findByText('Évolution par rapport à Fév 2025')).closest('.tuile')!
+  expect(tuile).toHaveTextContent(/EFFECTIF GLOBAL4Évolution par rapport à Fév 2025/)
+  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
+  expect(tuile.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Effectif fin/)
   expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
   expect(screen.queryByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeNull()
 })
 
-test('Résumé : MAD des sites déportés et part des MAD globaux, détail exact en bulle', async () => {
+test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salariale par contrat', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
-  const tuile = (await screen.findByText('Part des MAD globaux')).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/MAD SITES DÉPORTÉS\S*Part des MAD globaux50,0/)
-  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés0,5MAD globaux1/)
+  const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
+  expect(tuile).toHaveTextContent(/MAD GLOBAUX2Pourcentage MAD sites déportés1 · 50,0/)
+  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
+  const ms = screen.getByText('MASSE SALARIALE', { selector: '.micro' }).closest('.tuile')!
+  expect(ms.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)
+  expect(ms.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Écart|Mois saisis/)
   expect(screen.queryByText(/MOYENNE MENSUELLE/)).toBeNull()
+})
+
+test('Résumé : tableau avec frais de mission, logement et ligne de total', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  await screen.findByText('TOTAL')
+  const entetes = [...document.querySelectorAll('.suivi thead th')].map((t) => t.textContent)
+  expect(entetes).toEqual(['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.', 'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ'])
+  expect(document.querySelector('.suivi tfoot')).toHaveTextContent(/TOTAL.*7.*3/)
 })
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {

@@ -236,6 +236,18 @@ def test_filtre_type_de_site(charge, db):
     assert t["mois"][0]["effectif"] == 1
 
 
+def test_filtre_activite(charge):
+    acts = get(charge, "filtres", annee=2026).json()["activites"]
+    assert acts
+    total = get(charge, "mensuel", annee=2026, mois=1).json()["synthese"]["effectif"]["fin"]
+    fins = [get(charge, "mensuel", annee=2026, mois=1, activite=a).json()["synthese"]["effectif"]["fin"]
+            for a in acts]
+    assert sum(fins) == total  # chaque salarié a une seule activité
+    a = get(charge, "annuel", annee=2026, mois=2, activite=acts[0]).json()
+    assert a["ca_ytd"] is None and a["marge_ytd"] is None  # CA global seulement
+    assert get(charge, "annuel/export", annee=2026, mois=2, activite=acts[0]).status_code == 200
+
+
 def test_filtre_poste(charge, db):
     chef = Poste(libelle="Chef atelier")
     db.add(chef)

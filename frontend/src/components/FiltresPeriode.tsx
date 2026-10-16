@@ -17,6 +17,7 @@ interface Props {
   /** Types de site présents dans les données. */
   typesSite?: string[]
   postes?: string[]
+  activites?: string[]
   /** Employés proposés ; absent sans le droit nominatif : le filtre « Employé » n'est pas affiché. */
   salaries?: Salarie[]
   avecMois?: boolean
@@ -148,11 +149,12 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 }
 
 export default function FiltresPeriode({
-  filtres, annees, services, sites, typesSite, postes, salaries, avecMois = true, comparaison, periodes,
+  filtres, annees, services, sites, typesSite, postes, activites, salaries, avecMois = true, comparaison, periodes,
   children, onChange, partage,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
+  const avecActivite = !!activites?.length
   // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, N-1/M-1, tous).
   const cles: ClePartagee[] = [
     'annee',
@@ -161,6 +163,7 @@ export default function FiltresPeriode({
     ...(services ? (['service'] as const) : []),
     ...(sites ? (['site'] as const) : []),
     ...(avecType ? (['type_site'] as const) : []),
+    ...(avecActivite ? (['activite'] as const) : []),
     ...(avecPoste ? (['poste'] as const) : []),
     ...(salaries ? (['matricule'] as const) : []),
   ]
@@ -210,6 +213,17 @@ export default function FiltresPeriode({
           <select value={filtres.site ?? ''} onChange={(e) => onChange({ site: e.target.value })}>
             <option value="">Tous</option>
             {sites.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {avecActivite && (
+        <label className="souple">
+          Activité
+          <select value={filtres.activite ?? ''} onChange={(e) => onChange({ activite: e.target.value })}>
+            <option value="">Toutes</option>
+            {activites!.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>

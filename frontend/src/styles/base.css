@@ -239,10 +239,10 @@ table.dense td.num { text-align: right; }
   .layout-ecran > .page:has(.page-ecran) { max-width: none; padding-bottom: var(--sp-2); }
   .page-ecran { display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .page-ecran > h2 { font-size: var(--fs-lg); margin-bottom: 2px; }
-  .page-ecran .filtres { margin-bottom: var(--sp-1); padding: 0; position: static; align-items: center; gap: var(--sp-1) var(--sp-3); }
+  .page-ecran .filtres { margin-bottom: var(--sp-3); padding: 0; position: static; align-items: center; gap: var(--sp-2) var(--sp-3); }
   .page-ecran .filtres label { display: flex; align-items: center; gap: var(--sp-2); }
   .layout-ecran:has(.page-ecran) > .page { padding-top: var(--sp-2); }
-  .page-ecran .filtres select, .page-ecran .filtres input, .page-ecran .filtres > a.bouton { height: 32px; }
+  .page-ecran .filtres select, .page-ecran .filtres input, .page-ecran .filtres > a.bouton { height: 38px; }
   .grille-rapport { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
   .grille-rapport .panneau { max-height: none; }
   .p-global { grid-column: 1 / span 7; }
@@ -310,6 +310,7 @@ table.dense td.num { text-align: right; }
 .suivi thead th:first-child { text-align: left; }
 .suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
+.suivi tfoot :is(th, td) { background: var(--gris-etiq); border-top: 1px solid var(--rule-strong); font-weight: 700; color: var(--navy); }
 .suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: var(--rapport-zebre); }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
 /* Résumé : filtre d'année */
@@ -813,7 +814,8 @@ html, body { overscroll-behavior: none; }
   .resume-excel .cases .case:not(:has(.variation, .second)) .note { grid-column: 1 / -1; }
   .resume-excel .cases .case .note { grid-area: note; }
   .resume-excel .cases .case .variation, .resume-excel .cases .case .second { grid-area: variation; }
-  .resume-excel .cases .case .second-libelle { grid-area: note; }
+  /* Le libellé passe sous la valeur (large montant) : seule la place de l'évolution lui est réservée */
+  .resume-excel .cases .case .second-libelle { grid-row: 2; grid-column: 1 / -1; padding-right: 5.5em; }
 }
 
 /* Tenue à l'écran (>= 1100 px), reprise de Suivi de formation : la taille racine suit la fenêtre

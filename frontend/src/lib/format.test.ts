@@ -3,7 +3,8 @@ import { cls, fcfa, pct, valeurBrute } from './format'
 test('fcfa : séparateur, absent et n/a', () => {
   expect(fcfa('1234567')).toBe('1\u00a0234\u00a0567')
   expect(fcfa(null)).toBe('—')
-  expect(fcfa('n/a')).toBe('n/a')
+  expect(fcfa('n/a')).toBe('—')
+  expect(pct('n/a')).toBe('—')
 })
 
 test('pct : multiplie le ratio par 100', () => {

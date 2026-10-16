@@ -114,6 +114,7 @@ export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
     site: p.site,
     type_site: p.type_site,
     poste: p.poste,
+    activite: p.activite,
     // Un matricule partagé (lien, autre page) n'est transmis qu'avec le droit nominatif : sinon 403.
     matricule: nominatif ? p.matricule : undefined,
     ...ref,
@@ -139,6 +140,7 @@ export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
     sites,
     typesSite: options.data?.types_site ?? [],
     postes: options.data?.postes ?? [],
+    activites: options.data?.activites ?? [],
     pret: !periodes.isLoading,
     vide: !periodes.isLoading && !derniere,
     erreur: periodes.error,

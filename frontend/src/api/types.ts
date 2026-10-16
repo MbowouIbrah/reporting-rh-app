@@ -36,6 +36,7 @@ export interface Filtres {
   /** Type de chaque site proposé : la liste Site suit le type de site choisi. */
   type_par_site?: Record<string, string>
   postes?: string[]
+  activites?: string[]
 }
 
 export interface Salarie {
@@ -115,6 +116,7 @@ export interface SerieMois {
   commissions: Dec | null
   primes: Dec | null
   frais_mission: Dec | null
+  logement: Dec | null
   remuneration: Dec | null
   effectif_contrat: Record<string, number> | null
   ca?: Val
@@ -138,11 +140,16 @@ export interface Annuel {
   ca_cumul?: Cell
   commissions_cumul: Cell
   primes_cumul: Cell
+  frais_mission_ytd: Dec | null
+  logement_ytd: Dec | null
   effectif_moyen: Cell
-  taux_mad: Val
-  effectif_mad: Val
-  mad_deportes?: Cell
-  taux_mad_deportes: Val
+  /** Dernier mois saisi de la période : base de l'effectif de fin. */
+  mois_fin: number | null
+  effectif_fin: Cell
+  effectif_fin_contrat: Record<string, Cell & { part: Val }>
+  mad_fin: Cell
+  mad_deportes_fin: Cell & { part: Val }
+  ms_contrat: Record<string, Cell & { part: Val }>
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
