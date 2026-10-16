@@ -13,11 +13,22 @@ import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 
 const Graphes = lazy(() => import('./pages/Graphes'))
+const Rapport = lazy(() => import('./pages/Rapport'))
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route
+        path="/rapport"
+        element={
+          <RequireAuth>
+            <Suspense fallback={null}>
+              <Rapport />
+            </Suspense>
+          </RequireAuth>
+        }
+      />
       <Route
         element={
           <RequireAuth>

@@ -3,7 +3,6 @@ import { getMensuel } from '../api/rapports'
 import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
-import LienExport from '../components/LienExport'
 import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
@@ -25,9 +24,7 @@ export default function Mensuel() {
     <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
       <h2 className="bandeau-titre">REPORTING MENSUEL</h2>
       {f.filtres && (
-        <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set}>
-          {q.data && <LienExport rapport="mensuel" filtres={f.filtres} />}
-        </FiltresPeriode>
+        <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && f.filtres && (

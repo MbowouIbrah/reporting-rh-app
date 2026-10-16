@@ -5,7 +5,6 @@ import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites,
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
-import LienExport from '../components/LienExport'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS } from '../lib/format'
@@ -72,9 +71,7 @@ export default function Annuel() {
     <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
       <h2 className="bandeau-titre">REPORTING ANNUEL</h2>
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set}>
-          {q.data && <LienExport rapport="annuel" filtres={f.filtres} />}
-        </FiltresPeriode>
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && f.filtres && (

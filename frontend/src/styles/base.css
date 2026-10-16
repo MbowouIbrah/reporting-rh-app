@@ -1023,3 +1023,52 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
 @media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } }
+
+/* Export PDF : bouton de la barre, choix des parties */
+.topbar .export-pdf { margin-left: auto; flex: none; }
+.topbar .export-pdf + .profil { margin-left: var(--sp-2); }
+.export-bouton { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 var(--sp-3); border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--navy); font-weight: 600; font-size: var(--fs-sm); cursor: pointer; }
+.export-bouton:hover { background: rgba(0, 0, 0, 0.04); }
+.export-bouton:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.export-aide { margin-bottom: var(--sp-2); }
+.export-choix { border: 0; display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.export-choix label { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
+@media (max-width: 720px) { .topbar .export-pdf { margin-left: auto; } }
+
+/* Rapport PDF (route /rapport) : les pages l'une sous l'autre, hauteur naturelle, sans commandes */
+.rapport-pdf { max-width: 1120px; margin: 0 auto; padding: var(--sp-4); background: var(--paper); min-height: 100dvh; }
+.rapport-outils { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); }
+.rapport-outils .bouton { display: inline-flex; align-items: center; gap: 6px; }
+.rapport-entete { display: flex; align-items: center; gap: var(--sp-3); padding-bottom: var(--sp-3); margin-bottom: var(--sp-4); border-bottom: 2px solid var(--navy); }
+.rapport-entete img { height: 40px; }
+.rapport-entete h1 { font-size: var(--fs-xl); color: var(--navy); }
+.rapport-entete p { color: var(--muted); font-size: var(--fs-sm); }
+.rapport-pdf :is(.filtres, .filtre-annee, .rail, .snap-suite, .details-donnees) { display: none !important; }
+.rapport-pdf .panneau table.dense { width: 100%; }
+.rapport-pdf .resume-excel :is(.suivi, .suivi table, .suivi tr) { height: auto !important; }
+.rapport-pdf .resume-excel .suivi :is(th, td) { padding-block: 2px !important; line-height: 1.25; }
+.rapport-pdf table.individuel { font-size: 7px !important; }
+.rapport-pdf table.individuel :is(th, td) { padding-inline: 2px !important; min-width: 0 !important; }
+.rapport-pdf table.individuel thead th { white-space: normal !important; }
+.rapport-pdf table.individuel tbody :is(th, td) { white-space: nowrap; }
+.rapport-pdf table.individuel tbody th[scope='row'] { position: static !important; min-width: 0 !important; }
+.rapport-pdf .page-ecran { height: auto; display: block; }
+.rapport-pdf .snap-zone { flex: none; }
+.rapport-pdf .snap-scroll { height: auto; overflow: visible; display: flex; flex-direction: column; gap: var(--sp-4); scroll-snap-type: none; }
+.rapport-pdf .rapport-excel .snap-section { height: auto; display: flex; flex-direction: column; gap: var(--sp-3); padding: 0; }
+.rapport-pdf :is(.panneau, .panneau-corps) { max-height: none !important; overflow: visible !important; flex: none !important; }
+.rapport-pdf table.dense thead th { position: static !important; }
+.rapport-pdf .graphes-excel .graphes { grid-template-columns: 1fr 1fr; grid-template-rows: none; }
+.rapport-pdf .graphes-excel .graphe-zone { height: 260px; flex: none; }
+.rapport-partie + .rapport-partie { margin-top: var(--sp-6); }
+@page { size: A4 landscape; margin: 10mm; }
+@media print {
+  .rapport-pdf { max-width: none; padding: 0; min-height: 0; }
+  .rapport-outils { display: none; }
+  .rapport-partie + .rapport-partie { break-before: page; margin-top: 0; }
+  html { font-size: 14px; }
+  body, .rapport-pdf { background: #fff; }
+  #root { min-height: 0; }
+  .rapport-pdf .graphe { break-inside: avoid; }
+  .rapport-pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
