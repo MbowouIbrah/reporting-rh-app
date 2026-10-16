@@ -53,7 +53,7 @@ test('en-têtes de DONNEES, rubriques exclues regroupées juste avant le TOTAL',
   const entetes = screen.getAllByRole('columnheader').map((th) => th.textContent)
   expect(entetes).toEqual([
     'ANNÉE', 'MOIS', 'MATRICULE', 'Noms', 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service',
-    'Brut Réel', 'Absences (nb) (exclu)', 'Total exclusions (technique)', 'TOTAL CHARGES (FCFA)',
+    'Brut Réel', 'Absences (nb) (exclu)', 'Total des colonnes exclues', 'TOTAL CHARGES (FCFA)',
   ])
   expect(screen.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeInTheDocument()
   expect(screen.getByText(/^Saisir ANNÉE \(ex\. 2025\)/)).toBeInTheDocument()

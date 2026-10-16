@@ -22,7 +22,7 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
     await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
-    await expect(page.getByText('4. Nature de contrat')).toBeVisible()
+    await expect(page.getByText('4. Répartition par nature de contrat')).toBeVisible()
   })
 }
 

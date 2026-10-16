@@ -16,7 +16,7 @@ const CONSIGNE =
 // Les quatre premières colonnes (ANNÉE à Noms) restent figées au défilement horizontal.
 const FIGEES = ['ANNÉE', 'MOIS', 'MATRICULE', 'Noms']
 const FIXES = [...FIGEES, 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service']
-const EXCLUSIONS = 'Total exclusions (technique)'
+const EXCLUSIONS = 'Total des colonnes exclues'
 const TOTAL = 'TOTAL CHARGES (FCFA)'
 const CLES = ['annee', 'mois', 'service', 'site', 'matricule'] as const
 

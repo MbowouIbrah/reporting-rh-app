@@ -12,7 +12,7 @@ const TEXTE: Record<TypeEtat, string> = {
 
 const AIDE: Partial<Record<TypeEtat, string>> = {
   '403': 'Votre rôle ne donne pas accès à ce contenu. Contactez la DRH si besoin.',
-  '404': 'Choisissez une autre période, ou vérifiez que les données ont été importées.',
+  '404': 'Choisissez une autre période, ou vérifiez que ses données ont été saisies ou importées.',
   vide: 'Aucune période n’est encore disponible.',
 }
 

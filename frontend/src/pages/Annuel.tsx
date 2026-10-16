@@ -46,7 +46,7 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
             titre: 'Répartition par type de contrat et effectif',
             panneaux: [
               [
-                { titre: '4. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
+                { titre: '4. Répartition par nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
                 { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
               ],
             ],

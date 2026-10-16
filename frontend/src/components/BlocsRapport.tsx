@@ -323,12 +323,12 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
         </tr>
       </thead>
       <tbody>
-        {ligne('Effectif début', (i) => entier(i.debut))}
+        {ligne('Effectif début de période', (i) => entier(i.debut))}
         {ligne('Recrutements', (i) => entier(i.recrutements))}
         {ligne('Départs', (i) => entier(i.departs))}
-        {ligne('Effectif fin', (i) => entier(i.fin), 'total')}
+        {ligne('Effectif fin de période', (i) => entier(i.fin), 'total')}
         {ligne('Taux de rotation', (i) => pct(i.taux_rotation))}
-        {ligne('Absences (jours)', (i) => fcfa(i.absences))}
+        {ligne('Nombre d’absences (jours)', (i) => fcfa(i.absences))}
         {ligne('Taux d’absentéisme', (i) => pct(i.taux_absenteisme))}
       </tbody>
     </table>

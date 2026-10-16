@@ -34,8 +34,8 @@ export default function Mensuel() {
             <>
               <span>Contrôles de cohérence : <strong className="val">—</strong></span>
               <span>Effectif fin de mois : <strong className="val">—</strong></span>
-              <span>Rotation : <strong className="val">—</strong></span>
-              <span>Absentéisme : <strong className="val">—</strong></span>
+              <span>Taux de rotation : <strong className="val">—</strong></span>
+              <span>Taux d’absentéisme : <strong className="val">—</strong></span>
             </>
           }
         />
@@ -54,12 +54,12 @@ function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string
       <p className={bloquants.length ? 'bandeau ko' : 'bandeau ok'} role="status">
         <span>
           {bloquants.length
-            ? `Contrôles en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`
+            ? `Contrôles de cohérence en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`
             : 'Contrôles de cohérence : OK'}
         </span>
         <span>Effectif fin de mois : <strong className="val">{entier(s.effectif.fin)}</strong></span>
-        <span>Rotation : <strong className="val">{pct(s.taux_rotation)}</strong></span>
-        <span>Absentéisme : <strong className="val">{pct(s.taux_absenteisme)}</strong></span>
+        <span>Taux de rotation : <strong className="val">{pct(s.taux_rotation)}</strong></span>
+        <span>Taux d’absentéisme : <strong className="val">{pct(s.taux_absenteisme)}</strong></span>
       </p>
       <SnapSections
         sections={[
@@ -88,7 +88,7 @@ function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string
             titre: 'Répartition par type de contrat et effectif',
             panneaux: [
               [
-                { titre: '4. Nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
+                { titre: '4. Répartition par nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
                 { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
               ],
             ],

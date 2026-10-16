@@ -133,7 +133,7 @@ export default function Individuel() {
         <p className="note note-entete">
           {d.matricule
             ? <>Employé retenu : <span className="val">{d.nom}{matriculeAffiche(d.matricule) ? ` (${matriculeAffiche(d.matricule)})` : ''}</span></>
-            : q.isLoading ? <span className="val">—</span> : 'Aucun employé sélectionné — les listes ci-dessus restent toutes ouvertes.'}
+            : q.isLoading ? <span className="val">—</span> : 'Aucun employé sélectionné : cumul de tous les employés du périmètre.'}
         </p>
       )}
       {f.vide && <Etat type="vide" />}
@@ -210,7 +210,7 @@ export default function Individuel() {
       {d && (
         <p className="note">
           Note : le TOTAL MENSUEL additionne les colonnes ci-dessus, hors{' '}
-          <span className="legende-exclu">colonnes hachurées, exclues du total comme dans DONNEES</span>.
+          <span className="legende-exclu">colonnes hachurées</span> (exclues du total).
         </p>
       )}
     </section>
