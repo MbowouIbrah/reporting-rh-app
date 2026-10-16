@@ -190,6 +190,18 @@ def test_annuel_resume_n1_part_mad_et_ca_par_effectif():
     assert vide["taux_mad"] is None and vide["ca_par_effectif"]["m"] is None
 
 
+def test_annuel_mad_sites_deportes():
+    dep = {"type_site": "deporte"}
+    n = {1: pd(L(1, ctr="MAD"), Ligne(2, "SAV PL", "Dimon", "Front office", "MAD", **dep)),
+         2: pd(L(1, ctr="MAD"), Ligne(2, "SAV PL", "Dimon", "Front office", "MAD", **dep),
+               Ligne(3, "SAV PL", "Dimon", "Front office", "MAD", **dep),
+               Ligne(4, "SAV PL", "Dimon", "Front office", "CDI", **dep))}
+    r = annuel(n, {}, 2, REFS, Params())
+    assert r["mad_deportes"]["m"] == D("1.5") and r["effectif_mad"] == D("2.5")
+    assert r["taux_mad_deportes"] == D("1.5") / D("2.5")
+    assert annuel({}, {}, 2, REFS, Params())["taux_mad_deportes"] is None
+
+
 def test_annuel_sans_n1():
     r = annuel({1: pd(L(1, Brut_Réel=10))}, {}, 12, REFS, Params())
     assert r["cumul_ytd"]["m1"] is None and r["moyenne_mensuelle"]["m1"] is None

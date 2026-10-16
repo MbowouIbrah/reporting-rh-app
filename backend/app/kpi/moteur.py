@@ -399,6 +399,7 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                                     for c in refs.contrats],
                       "total": cell_eff(lambda L: True)},
         "effectif_global": cell_eff(lambda L: True),
+        "mad_deportes": cell_eff(lambda L: L.contrat == "MAD" and L.type_site == "deporte"),
         "nb_mois_absences": nb,
     }
 
@@ -480,6 +481,7 @@ def annuel(
         "nb_mois_ca": len(avec_ca),
         "ca_ytd": ca_ytd,
         "taux_marge_ytd": f.taux_marge(ca_avec_marge, marge_ytd),
+        "ca_avec_marge": ca_avec_marge,
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
         "ca_cumul": cell(ca_ytd, ca1),
@@ -490,6 +492,9 @@ def annuel(
                              if ok1 else None),
         "effectif_moyen": eff,
         "taux_mad": ratio(mad["m"] if mad else ZERO, eff["m"]),
+        "effectif_mad": mad["m"] if mad else None,
+        # MAD affectés aux sites déportés / MAD globaux (effectifs moyens)
+        "taux_mad_deportes": ratio(blocs["mad_deportes"]["m"], mad["m"] if mad else None),
         "ca_par_effectif": cell(ratio(ca_ytd, eff["m"]), ratio(ca1, eff["m1"])),
         "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
         "par_service": [

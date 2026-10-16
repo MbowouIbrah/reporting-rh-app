@@ -1,20 +1,41 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { getAnnuel } from '../api/rapports'
-import type { Val } from '../api/types'
+import type { Cell, Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import { ChoixComparaison } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, pct } from '../lib/format'
+import { cls, fcfa, MOIS, pct, SEP, valeurBrute } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
+
+type Detail = [string, string][]
+
+const NF2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 })
+const vide = (v: Val | undefined): v is null | undefined | 'n/a' => v == null || v === 'n/a'
+/** Montant exact de l'API (3 décimales au plus), sans passer par un flottant. */
+const exact = (v: Val | undefined) => {
+  if (vide(v)) return v === 'n/a' ? 'n/a' : '—'
+  const [e, d] = v.split('.')
+  return `${valeurBrute(d ? `${e}.${d.slice(0, 3)}` : e)}${SEP}FCFA`
+}
+/** Effectifs moyens et taux : affichage seulement, deux décimales. */
+const dec = (v: Val | undefined) => (vide(v) ? (v ?? '—') : NF2.format(Number(v)).replace(/ /g, SEP))
+const taux = (v: Val | undefined) => (vide(v) ? (v ?? '—') : `${dec(String(Number(v) * 100))}${SEP}%`)
+const comparaison = (c: Cell | undefined, an: string, n1: string): Detail => [
+  [an, exact(c?.m)],
+  [n1, exact(c?.m1)],
+  ['Écart', exact(c?.var)],
+  ['Évolution', taux(c?.var_pct)],
+]
 
 function Case({
   titre,
   valeur,
   devise = true,
   libelle2,
+  detail,
   children,
 }: {
   titre: string
@@ -22,10 +43,12 @@ function Case({
   devise?: boolean
   /** Libellé de l'élément secondaire, à gauche sous le titre ; sa valeur (children) sous la valeur. */
   libelle2?: string
+  /** Chiffres exacts affichés au survol (ou au focus clavier), comme les bulles des graphiques. */
+  detail?: Detail
   children?: ReactNode
 }) {
   return (
-    <div className="tuile case">
+    <div className="tuile case" tabIndex={detail ? 0 : undefined}>
       <span className="micro">{titre}</span>
       <strong>
         {valeur}
@@ -33,6 +56,16 @@ function Case({
       </strong>
       {libelle2 && <span className="second-libelle">{libelle2}</span>}
       {children}
+      {detail && (
+        <div className="bulle" role="tooltip">
+          {detail.map(([k, v]) => (
+            <div key={k}>
+              <span>{k}</span>
+              <span className="num">{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -48,6 +81,7 @@ export default function Resume() {
     placeholderData: keepPreviousData,
   })
   const maj = ann.isPlaceholderData
+  const an = f.filtres ? `${f.filtres.annee}` : 'N'
   const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : 'N-1'
   const erreur = ann.error
   const a = ann.data
@@ -80,7 +114,7 @@ export default function Resume() {
       {ann.isLoading && (
         // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
         <>
-          {[['COMMISSIONS', 'MASSE SALARIALE', 'EFFECTIF MOYEN'], ['PRIMES DE PRODUCTIVITÉ', 'MOYENNE MENSUELLE']].map((ligne) => (
+          {[['COMMISSIONS', 'MASSE SALARIALE', 'EFFECTIF MOYEN'], ['PRIMES DE PRODUCTIVITÉ', 'MAD SITES DÉPORTÉS']].map((ligne) => (
             <div key={ligne[0]} className="cases">
               {ligne.map((t) => (
                 <Case key={t} titre={t} valeur="—" devise={false} />
@@ -111,38 +145,75 @@ export default function Resume() {
       {a && (
         <>
           {/* Lecture par colonne (retour du 15/10) : CA puis marge, commissions puis primes, masse salariale
-              puis moyenne, effectifs puis CA / effectif. Pas de rappel « n mois saisis » : déjà connu. */}
+              puis MAD des sites déportés, effectifs puis CA / effectif. Pas de rappel « n mois saisis » : déjà connu. */}
           <div className="cases">
             {aCa && (
-              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} libelle2={`Par rapport à ${n1}`}>
+              <Case titre="CHIFFRE D’AFFAIRES" valeur={montrer(a.ca_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
               </Case>
             )}
-            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} libelle2={`Par rapport à ${n1}`}>
+            <Case titre="COMMISSIONS" valeur={montrer(a.commissions_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
               <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
-            <Case titre="MASSE SALARIALE" valeur={fcfa(a.cumul_ytd.m)} libelle2={`Par rapport à ${n1}`}>
+            <Case
+              titre="MASSE SALARIALE"
+              valeur={fcfa(a.cumul_ytd.m)}
+              libelle2={`Par rapport à ${n1}`}
+              detail={[...comparaison(a.cumul_ytd, an, n1), ['Mois saisis', `${a.cumul_ytd.nb_mois}`]]}
+            >
               <Variation v={a.cumul_ytd.var_pct} vs="" />
             </Case>
-            <Case titre="EFFECTIF MOYEN" valeur={montrer(a.effectif_moyen.m)} devise={false} libelle2="Part des MAD">
+            <Case titre="EFFECTIF MOYEN" valeur={montrer(a.effectif_moyen.m)} devise={false}
+              libelle2="Part des MAD"
+              detail={[
+                ['Effectif moyen', dec(a.effectif_moyen.m)],
+                ['dont MAD', dec(a.effectif_mad)],
+                ['Part des MAD', taux(a.taux_mad)],
+                [`Effectif moyen ${n1}`, dec(a.effectif_moyen.m1)],
+              ]}
+            >
               <span className="second">{a.taux_mad == null ? '—' : pct(a.taux_mad)}</span>
             </Case>
           </div>
           <div className="cases">
             {aCa && (
               // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
-              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} libelle2="Taux de marge">
+              <Case titre="MARGE" valeur={montrer(a.marge_ytd)} libelle2="Taux de marge"
+                detail={[
+                  ['Marge cumulée', exact(a.marge_ytd)],
+                  ['CA des mois avec marge', exact(a.ca_avec_marge)],
+                  ['Taux de marge', taux(a.taux_marge_ytd)],
+                  ['Mois saisis', a.nb_mois_marge ? `${a.nb_mois_marge}` : '—'],
+                ]}
+              >
                 <span className="second">{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</span>
               </Case>
             )}
-            <Case titre="PRIMES DE PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} libelle2={`Par rapport à ${n1}`}>
+            <Case titre="PRIMES DE PRODUCTIVITÉ" valeur={montrer(a.primes_ytd)} libelle2={`Par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
-            <Case titre="MOYENNE MENSUELLE" valeur={montrer(a.moyenne_mensuelle.m)} libelle2={`Par rapport à ${n1}`}>
-              <Variation v={a.moyenne_mensuelle.var_pct} vs="" />
+            <Case
+              titre="MAD SITES DÉPORTÉS"
+              valeur={montrer(a.mad_deportes?.m)}
+              devise={false}
+              libelle2="Part des MAD globaux"
+              detail={[
+                ['MAD sites déportés', dec(a.mad_deportes?.m)],
+                ['MAD globaux', dec(a.effectif_mad)],
+                ['Part des sites déportés', taux(a.taux_mad_deportes)],
+                [`MAD sites déportés ${n1}`, dec(a.mad_deportes?.m1)],
+              ]}
+            >
+              <span className="second">{a.taux_mad_deportes == null ? '—' : pct(a.taux_mad_deportes)}</span>
             </Case>
             {aCa && (
-              <Case titre="CA PAR SALARIÉ" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Par rapport à ${n1}`}>
+              <Case titre="CA PAR SALARIÉ" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Par rapport à ${n1}`}
+                detail={[
+                  ...comparaison(a.ca_par_effectif, an, n1),
+                  ['CA cumulé', exact(a.ca_ytd)],
+                  ['Effectif moyen', dec(a.effectif_moyen.m)],
+                ]}
+              >
                 <Variation v={a.ca_par_effectif?.var_pct} vs="" />
               </Case>
             )}

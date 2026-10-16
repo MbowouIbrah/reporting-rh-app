@@ -45,6 +45,7 @@ function routes(avecMarge: boolean, perms: string[]) {
         serie_n1: serie, cumul_ytd: { ...cell('2000'), nb_mois: 2, nb_mois_n1: 2 },
         moyenne_mensuelle: cell('1000'), cumul_annee_n1: null, par_service: [],
         commissions_cumul: cell('10'), primes_cumul: cell('5'), effectif_moyen: cell('4'), taux_mad: '0.25',
+        effectif_mad: '1', mad_deportes: cell('0.5'), taux_mad_deportes: '0.5',
         ...(avecMarge ? { ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
@@ -89,6 +90,14 @@ test('Résumé : effectif moyen avec la part des MAD en second plan', async () =
   expect(tuile).toHaveTextContent(/EFFECTIF MOYEN4Part des MAD25,0/)
   expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
   expect(screen.queryByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeNull()
+})
+
+test('Résumé : MAD des sites déportés et part des MAD globaux, détail exact en bulle', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  const tuile = (await screen.findByText('Part des MAD globaux')).closest('.tuile')!
+  expect(tuile).toHaveTextContent(/MAD SITES DÉPORTÉS\S*Part des MAD globaux50,0/)
+  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés0,5MAD globaux1/)
+  expect(screen.queryByText(/MOYENNE MENSUELLE/)).toBeNull()
 })
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {

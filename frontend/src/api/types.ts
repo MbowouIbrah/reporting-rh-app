@@ -140,6 +140,10 @@ export interface Annuel {
   primes_cumul: Cell
   effectif_moyen: Cell
   taux_mad: Val
+  effectif_mad: Val
+  mad_deportes?: Cell
+  taux_mad_deportes: Val
+  ca_avec_marge?: Val
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
   b_service_activite: Mensuel['b_service_activite']
