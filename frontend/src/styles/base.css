@@ -418,6 +418,7 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-excel .graphe figcaption { background: var(--gris-section); color: var(--paper); font: 700 var(--fs-md)/1.2 var(--font-body); text-transform: uppercase; letter-spacing: .02em; padding: 7px 16px; margin: 0; }
 .graphes-excel .graphe-zone { padding: 8px; height: 240px; }
 .graphes-excel .details-donnees { margin-top: var(--sp-3); }
+.graphes-excel .graphe-lecture { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.35; }
 @media (min-width: 1360px) {
   .graphes-excel .graphes { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--v, 8px); margin: 0 0 var(--v, 8px); }
   .graphes-excel .graphe-zone { flex: 1; min-height: 0; height: auto; }

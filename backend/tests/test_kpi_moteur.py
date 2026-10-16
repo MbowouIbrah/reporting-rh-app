@@ -287,3 +287,13 @@ def test_masse_par_contrat_et_site_somme_au_site():
     douala = next(c for c in r["c_site"] if c["site"] == "Douala")
     assert douala["ms_contrat"]["MAD"]["m"] == 0
     assert douala["ms_contrat"]["CDI"]["m1"] == douala["ms"]["m1"]
+
+
+def test_annuel_serie_frais_mission_remuneration_et_contrats():
+    n = {1: pd(L(1, Brut_Réel=100, Frais_de_mission=30, Primes_sur_ventes=20, Absences_nb=2),
+               L(2, Brut_Réel=50, ctr="MAD"))}
+    s = annuel(n, {}, 1, REFS, Params())["serie_n"]
+    assert s[0]["frais_mission"] == 30
+    assert s[0]["remuneration"] == 180 + 20  # TOTAL CHARGES + exclusions hors absences
+    assert s[0]["effectif_contrat"] == {"CDI": 1, "CDD": 0, "MAD": 1}
+    assert s[1]["frais_mission"] is None and s[1]["effectif_contrat"] is None

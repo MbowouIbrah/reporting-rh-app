@@ -114,6 +114,9 @@ export interface SerieMois {
   absences: Dec | null
   commissions: Dec | null
   primes: Dec | null
+  frais_mission: Dec | null
+  remuneration: Dec | null
+  effectif_contrat: Record<string, number> | null
   ca?: Val
   marge?: Val
   taux_marge?: Val

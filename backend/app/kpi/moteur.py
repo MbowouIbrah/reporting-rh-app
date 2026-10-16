@@ -11,6 +11,7 @@ from app.kpi import formules as f
 
 ABSENCES = "Absences (nb)"
 COMMISSION = "Commission"
+FRAIS_MISSION = "Frais de mission"
 PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
 ZERO = Decimal(0)
 
@@ -407,6 +408,13 @@ def annuel(
     budgets: dict[int, Budgets] | None = None,
 ) -> dict:
     """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul."""
+    def remuneration(pd: PeriodeData) -> Decimal:
+        # comme `remuneration_globale` du mensuel : TOTAL CHARGES + exclusions hors absences
+        return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r != ABSENCES), ZERO)
+
+    def par_contrat(pd: PeriodeData) -> dict[str, int]:
+        return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
+
     def serie(pds):
         return [{"mois": m,
                  "ms": pds[m].ms if _ok(pds.get(m)) else None,
@@ -415,6 +423,9 @@ def annuel(
                  "commissions": pds[m].rubrique(COMMISSION) if _ok(pds.get(m)) else None,
                  "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
                  if _ok(pds.get(m)) else None,
+                 "frais_mission": pds[m].rubrique(FRAIS_MISSION) if _ok(pds.get(m)) else None,
+                 "remuneration": remuneration(pds[m]) if _ok(pds.get(m)) else None,
+                 "effectif_contrat": par_contrat(pds[m]) if _ok(pds.get(m)) else None,
                  # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
                  **_ca_marge(pds.get(m))}
                 for m in range(1, 13)]
