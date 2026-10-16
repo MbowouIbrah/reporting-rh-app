@@ -10,6 +10,7 @@ import FiltresPeriode from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS_COURTS } from '../lib/format'
+import { TitreRapport } from '../components/ExportPdf'
 
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
 // Une teinte par graphe pour qu'on les distingue d'un coup d'œil.
@@ -98,7 +99,7 @@ export default function Graphes() {
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
     <section className="page-ecran page-etroite rapport-excel graphes-excel">
-      <h2 className="bandeau-titre">GRAPHES D’ÉVOLUTION</h2>
+      <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}

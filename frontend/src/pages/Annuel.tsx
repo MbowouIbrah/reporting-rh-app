@@ -8,6 +8,7 @@ import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS } from '../lib/format'
+import { TitreRapport } from '../components/ExportPdf'
 
 function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
   const { annee, mois } = f
@@ -69,7 +70,7 @@ export default function Annuel() {
   const maj = q.isPlaceholderData
   return (
     <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
-      <h2 className="bandeau-titre">REPORTING ANNUEL</h2>
+      <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}

@@ -8,6 +8,7 @@ import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, pct } from '../lib/format'
+import { TitreRapport } from '../components/ExportPdf'
 
 export default function Mensuel() {
   const f = useFiltres({ comparaison: 'periode' })
@@ -22,7 +23,7 @@ export default function Mensuel() {
 
   return (
     <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
-      <h2 className="bandeau-titre">REPORTING MENSUEL</h2>
+      <TitreRapport titre="REPORTING MENSUEL" />
       {f.filtres && (
         <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}

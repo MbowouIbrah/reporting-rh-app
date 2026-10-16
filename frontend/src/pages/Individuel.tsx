@@ -10,6 +10,7 @@ import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { plafonner } from '../lib/plafond'
+import { TitreRapport } from '../components/ExportPdf'
 
 /** Colonnes du reporting individuel, dans l'ordre demandé (servies aussi par l'API). */
 const COLONNES = [
@@ -82,7 +83,7 @@ export default function Individuel() {
 
   return (
     <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
-      <h2 className="bandeau-titre">REPORTING INDIVIDUEL</h2>
+      <TitreRapport titre="REPORTING INDIVIDUEL" />
       {f.filtres && (
         <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
           <TitreFiltres />

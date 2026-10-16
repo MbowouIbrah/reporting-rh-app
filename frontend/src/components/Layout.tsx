@@ -3,7 +3,6 @@ import { useIsFetching } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import ExportPdf from './ExportPdf'
 import Fond from './Fond'
 import MenuProfil from './MenuProfil'
 
@@ -46,7 +45,6 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <ExportPdf />
         <MenuProfil />
        </div>
       </header>

@@ -1024,16 +1024,20 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
 @media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } }
 
-/* Export PDF : bouton de la barre, choix des parties */
-.topbar .export-pdf { margin-left: auto; flex: none; }
-.topbar .export-pdf + .profil { margin-left: var(--sp-2); }
+/* Export PDF : bouton à droite du titre de page, menu déroulant du choix des parties */
+.titre-rapport { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }
+.titre-rapport .bandeau-titre { flex: 1 1 auto; }
+.rapport-excel .titre-rapport, .resume-excel .titre-rapport { margin-bottom: var(--sp-2); }
+.rapport-excel .titre-rapport .bandeau-titre, .resume-excel .titre-rapport .bandeau-titre { margin-bottom: 0; }
+.export-pdf { position: relative; flex: none; }
 .export-bouton { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 var(--sp-3); border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--navy); font-weight: 600; font-size: var(--fs-sm); cursor: pointer; }
-.export-bouton:hover { background: rgba(0, 0, 0, 0.04); }
+.export-bouton:hover, .export-bouton[aria-expanded='true'] { background: rgba(0, 0, 0, 0.04); }
 .export-bouton:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
-.export-aide { margin-bottom: var(--sp-2); }
-.export-choix { border: 0; display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.export-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); min-width: 320px; padding: var(--sp-3) var(--sp-4); background: var(--paper); border: 1px solid var(--rule); box-shadow: var(--shadow-3); font-size: var(--fs-sm); color: var(--ink); }
+.export-choix { border: 0; padding: 0; display: grid; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
+.export-choix legend { padding: 0; margin-bottom: var(--sp-2); color: var(--muted); }
+.export-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--rule); }
 .export-choix label { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
-@media (max-width: 720px) { .topbar .export-pdf { margin-left: auto; } }
 
 /* Rapport PDF (route /rapport) : les pages l'une sous l'autre, hauteur naturelle, sans commandes */
 .rapport-pdf { max-width: 1120px; margin: 0 auto; padding: var(--sp-4); background: var(--paper); min-height: 100dvh; }

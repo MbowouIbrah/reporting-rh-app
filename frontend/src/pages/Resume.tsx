@@ -8,6 +8,7 @@ import { ChoixComparaison } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, fcfa, MOIS, pct } from '../lib/format'
+import { TitreRapport } from '../components/ExportPdf'
 
 function Case({
   titre,
@@ -55,7 +56,7 @@ export default function Resume() {
 
   return (
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}`} aria-busy={maj || ann.isLoading || undefined}>
-      <h2 className="bandeau-titre">RÉSUMÉ DES INDICATEURS</h2>
+      <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
         <div className="filtre-annee">
           <label className="selecteur-annee">
