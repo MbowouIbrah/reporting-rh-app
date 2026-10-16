@@ -11,6 +11,7 @@ import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS_COURTS } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
+import { useLocation } from 'react-router-dom'
 
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
 // Une teinte par graphe pour qu'on les distingue d'un coup d'œil.
@@ -46,7 +47,7 @@ const LEGENDE = {
 } as const
 const BULLE_FCFA = (v: unknown) => fcfa(Number(v))
 // Transition courte d'une valeur à l'autre (1,5 s par défaut pour une courbe : trop lent au changement de filtre).
-const ANIM = { animationDuration: 450, animationEasing: 'ease-out' } as const
+const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as const
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v))
 
@@ -65,6 +66,8 @@ function Carte({ titre, lecture, children }: { titre: string; lecture?: string; 
 }
 
 export default function Graphes() {
+  // Rapport PDF : sans animation, sinon l'impression relance le tracé et fige des courbes à moitié dessinées
+  const ANIM = useLocation().pathname.startsWith('/rapport') ? { isAnimationActive: false } : ANIMATION
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false })
   const salaries = useSalaries(f.filtres?.annee)

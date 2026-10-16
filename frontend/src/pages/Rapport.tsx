@@ -14,6 +14,30 @@ const Graphes = lazy(() => import('./Graphes'))
 
 const PAGES: Record<IdSection, ComponentType> = { resume: Resume, graphes: Graphes, annuel: Annuel, mensuel: Mensuel, individuel: Individuel }
 
+/** Hauteur utile d'une page A4 paysage (210 mm moins 2 × 10 mm de marge), en px CSS, avec une marge de sécurité. */
+const PAGE_H = (190 * 96) / 25.4 - 12
+
+/**
+ * Chaque bloc doit tenir sur sa page : la partie entière (résumé, graphiques, individuel) ou, dans les rapports
+ * annuel et mensuel, chaque section (la première partage sa page avec le titre). Un bloc trop haut ou trop large
+ * est réduit d'un seul tenant (zoom), jamais coupé.
+ */
+function ajusterAuxPages(racine: HTMLElement) {
+  racine.querySelectorAll<HTMLElement>('.rapport-partie').forEach((partie, n) => {
+    // La première page porte aussi l'en-tête du rapport
+    const debutPage = (n === 0 ? racine.querySelector('.rapport-entete') ?? partie : partie).getBoundingClientRect().top
+    const sections = [...partie.querySelectorAll<HTMLElement>('.snap-section')]
+    const blocs = sections.length ? sections : [partie]
+    blocs.forEach((b, i) => {
+      b.style.zoom = ''
+      const haut = b.getBoundingClientRect()
+      const avant = i === 0 ? haut.top - debutPage : 0
+      const z = Math.min(1, (PAGE_H - avant) / haut.height, b.clientWidth / Math.max(b.scrollWidth, 1))
+      if (z < 1) b.style.zoom = String(Math.floor(z * 100) / 100)
+    })
+  })
+}
+
 /** Délai après la dernière réponse : laisse les graphiques finir leur animation avant l'impression. */
 const DELAI_IMPRESSION = 1200
 
@@ -30,6 +54,7 @@ export default function Rapport() {
   const occupe = useIsFetching() > 0
   const [pret, setPret] = useState(false)
   const imprime = useRef(false)
+  const racine = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (occupe) return setPret(false)
@@ -38,7 +63,9 @@ export default function Rapport() {
   }, [occupe])
 
   useEffect(() => {
-    if (!pret || imprime.current || sp.has('apercu')) return
+    if (!pret) return
+    if (racine.current) ajusterAuxPages(racine.current)
+    if (imprime.current || sp.has('apercu')) return
     imprime.current = true
     window.print()
   }, [pret, sp])
@@ -46,7 +73,7 @@ export default function Rapport() {
   const perimetre = [p.service, p.type_site, p.site, p.poste, p.matricule && `matricule ${p.matricule}`].filter(Boolean)
 
   return (
-    <div className="rapport-pdf">
+    <div className="rapport-pdf" ref={racine}>
       <div className="rapport-outils">
         <span role="status">{pret ? 'Rapport prêt.' : 'Préparation du rapport…'}</span>
         <button type="button" className="bouton bouton-primaire" disabled={!pret} onClick={() => window.print()}>
@@ -55,7 +82,7 @@ export default function Rapport() {
         </button>
       </div>
       <header className="rapport-entete">
-        <img src={`${import.meta.env.BASE_URL}images/cfao_academy.png`} alt="" />
+        <img src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
         <div>
           <h1>Reporting RH</h1>
           <p>

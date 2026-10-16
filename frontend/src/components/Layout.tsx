@@ -25,7 +25,7 @@ export default function Layout() {
       <header className="topbar">
        <div className="topbar-inner">
         <NavLink to="/resume" className="marque" aria-label="Reporting RH, accueil">
-          <span className="marque-logo"><img src={`${import.meta.env.BASE_URL}images/cfao_academy.png`} alt="" /></span>
+          <img className="marque-logo" src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
           <h1>Reporting RH</h1>
         </NavLink>
         <button

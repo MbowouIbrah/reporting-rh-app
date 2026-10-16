@@ -13,6 +13,9 @@ export function urlRapport(sections: string[], filtres: Record<string, string | 
   return `${import.meta.env.BASE_URL}rapport?${p}`
 }
 
+/** Largeur proche de la zone imprimable A4 paysage (277 mm ≈ 1047 px) : mêmes règles CSS à l'écran qu'au papier. */
+const LARGEUR_IMPRESSION = 'popup,width=1080,height=900'
+
 /** Titre d'une page de rapport, avec le bouton d'export à sa droite. */
 export function TitreRapport({ titre }: { titre: string }) {
   return (
@@ -57,7 +60,8 @@ export default function ExportPdf() {
   const tout = choix.length === dispo.length
 
   function exporter() {
-    window.open(urlRapport(dispo.filter((s) => choix.includes(s.id)).map((s) => s.id), lirePartage()), '_blank')
+    // Fenêtre à la largeur de la page imprimée : l'aperçu se met en page comme le PDF, ses blocs y sont ajustés juste
+    window.open(urlRapport(dispo.filter((s) => choix.includes(s.id)).map((s) => s.id), lirePartage()), 'rapport-rh', LARGEUR_IMPRESSION)
     setOuvert(false)
   }
 

@@ -713,8 +713,7 @@ html, body { overscroll-behavior: none; }
 .topbar { background: var(--verre-plein); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 0; border-bottom: 1px solid rgba(0, 0, 0, 0.06); box-shadow: none; }
 .topbar-inner { min-height: 60px; }
 .marque { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-.marque-logo { display: inline-block; flex: none; width: 38px; height: 38px; padding: 2px; border-radius: var(--radius); border: 1px solid rgba(0, 0, 0, 0.06); background: var(--paper); overflow: hidden; }
-.marque-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.marque-logo { display: block; flex: none; height: 34px; width: auto; }
 .topbar .marque h1 { margin: 0; font-family: var(--font-body); font-size: var(--fs-base); font-weight: 700; letter-spacing: -0.01em; color: var(--ink); transition: color var(--dur) var(--ease); }
 .marque:hover h1 { color: var(--red); }
 .topbar nav a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius); font-size: var(--fs-sm); font-weight: 600; color: var(--muted); text-decoration: none; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
@@ -796,6 +795,20 @@ html, body { overscroll-behavior: none; }
 .profil-sortie:hover { text-decoration: underline; }
 @media (max-width: 720px) { .topbar .profil { flex-basis: auto; margin-left: var(--sp-2); } }
 
+@media (min-width: 900px), print {
+  /* Résumé : cartes KPI sur deux lignes (libellé et note à gauche, valeur à droite), le tableau prend le reste */
+  .resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur' 'note variation'; align-items: center; column-gap: var(--sp-2); row-gap: 0; min-height: 0; padding: .375rem .625rem; }
+  .resume-excel .cases .case .micro { grid-area: titre; }
+  /* La valeur se règle sur la largeur de la carte (cqi) pour laisser le libellé sur une seule ligne */
+  .resume-excel .cases .case { container-type: inline-size; }
+  .resume-excel .cases .case strong { grid-area: valeur; font-size: min(var(--fs-lg), 5.4cqi); line-height: 1.2; white-space: nowrap; min-height: 0; padding-top: 0; }
+  .resume-excel .cases .case :is(.micro, .second-libelle) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .resume-excel .cases .case:not(:has(.variation, .second)) .note { grid-column: 1 / -1; }
+  .resume-excel .cases .case .note { grid-area: note; }
+  .resume-excel .cases .case .variation, .resume-excel .cases .case .second { grid-area: variation; }
+  .resume-excel .cases .case .second-libelle { grid-area: note; }
+}
+
 /* Tenue à l'écran (>= 1100 px), reprise de Suivi de formation : la taille racine suit la fenêtre
    (référence 1440 × 900 à 16 px, la dimension la plus contraignante l'emporte), les tailles en rem
    suivent ; lignes de tableau à hauteur fixe en rem (environ 28 px à la référence) */
@@ -806,14 +819,6 @@ html, body { overscroll-behavior: none; }
   /* Hauteur de ligne plafonnée : sur un grand écran, les tableaux s'arrêtent au lieu d'étirer leurs lignes */
   :root { --ligne-max: 2.25rem; }
 
-  /* Résumé : cartes KPI sur deux lignes (libellé et note à gauche, valeur à droite), le tableau prend le reste */
-  .resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur' 'note variation'; align-items: center; column-gap: var(--sp-3); row-gap: 0; min-height: 0; padding: .375rem .75rem; }
-  .resume-excel .cases .case .micro { grid-area: titre; }
-  .resume-excel .cases .case strong { grid-area: valeur; font-size: var(--fs-lg); line-height: 1.2; }
-  .resume-excel .cases .case:not(:has(.variation, .second)) .note { grid-column: 1 / -1; }
-  .resume-excel .cases .case .note { grid-area: note; }
-  .resume-excel .cases .case .variation, .resume-excel .cases .case .second { grid-area: variation; }
-  .resume-excel .cases .case .second-libelle { grid-area: note; }
   .resume-excel .regle { margin-bottom: 0; }
   /* Le tableau occupe toute la hauteur restante, les 12 mois se partagent l'espace à parts égales */
   .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(13 * var(--ligne-max)); }
@@ -1040,11 +1045,14 @@ table.tableau-squelette td { height: 2.1em; }
 .export-choix label { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
 
 /* Rapport PDF (route /rapport) : les pages l'une sous l'autre, hauteur naturelle, sans commandes */
-.rapport-pdf { max-width: 1120px; margin: 0 auto; padding: var(--sp-4); background: var(--paper); min-height: 100dvh; }
+.rapport-pdf { width: 277mm; margin: 0 auto; padding: var(--sp-4) 0; background: var(--paper); min-height: 100dvh; }
+/* Aperçu à l'échelle de l'impression (largeur utile A4 paysage, taille de texte fixe) : les blocs y sont mesurés
+   puis réduits pour tenir chacun sur une page */
+html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 .rapport-outils { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); }
 .rapport-outils .bouton { display: inline-flex; align-items: center; gap: 6px; }
 .rapport-entete { display: flex; align-items: center; gap: var(--sp-3); padding-bottom: var(--sp-3); margin-bottom: var(--sp-4); border-bottom: 2px solid var(--navy); }
-.rapport-entete img { height: 40px; }
+.rapport-entete img { height: 36px; }
 .rapport-entete h1 { font-size: var(--fs-xl); color: var(--navy); }
 .rapport-entete p { color: var(--muted); font-size: var(--fs-sm); }
 .rapport-pdf :is(.filtres, .filtre-annee, .rail, .snap-suite, .details-donnees) { display: none !important; }
@@ -1067,12 +1075,13 @@ table.tableau-squelette td { height: 2.1em; }
 .rapport-partie + .rapport-partie { margin-top: var(--sp-6); }
 @page { size: A4 landscape; margin: 10mm; }
 @media print {
-  .rapport-pdf { max-width: none; padding: 0; min-height: 0; }
+  .rapport-pdf { width: auto; padding: 0; min-height: 0; }
   .rapport-outils { display: none; }
   .rapport-partie + .rapport-partie { break-before: page; margin-top: 0; }
   html { font-size: 14px; }
   body, .rapport-pdf { background: #fff; }
   #root { min-height: 0; }
-  .rapport-pdf .graphe { break-inside: avoid; }
+  .rapport-pdf :is(.graphe, .panneau, .snap-section) { break-inside: avoid; }
+  .rapport-pdf .snap-section + .snap-section { break-before: page; }
   .rapport-pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
