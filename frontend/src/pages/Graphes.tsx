@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, ComposedChart, LabelList, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { getAnnuel } from '../api/rapports'
 import type { SerieMois } from '../api/types'
@@ -16,7 +16,6 @@ import { useLocation } from 'react-router-dom'
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
 // Une teinte par graphe pour qu'on les distingue d'un coup d'œil.
 const C_MS = 'var(--data-1)'
-const C_EFF = 'var(--data-3)'
 const C_FRAIS = 'var(--data-4)'
 const C_REMU = 'var(--data-5)'
 // Une couleur fixe par type de contrat, dans l'ordre du référentiel : un filtre ne la change pas.
@@ -85,6 +84,7 @@ export default function Graphes() {
   const serie = ann.data?.serie_n.map((m: SerieMois, i) => ({
     mois: MOIS_COURTS[m.mois - 1],
     ms: num(m.ms),
+    ms1: num(n1?.[i]?.ms),
     effectif: m.effectif,
     frais: num(m.frais_mission),
     frais1: num(n1?.[i]?.frais_mission),
@@ -92,6 +92,21 @@ export default function Graphes() {
     remu1: num(n1?.[i]?.remuneration),
     ...Object.fromEntries(contrats.map((c) => [c, m.effectif_contrat?.[c] ?? null])),
   }))
+  // Valeur sur chaque point : la courbe la plus basse du mois écrit la sienne dessous, les autres dessus,
+  // pour que deux courbes proches ne se masquent pas ; un mois à zéro n'écrit rien.
+  const etiquette = (c: string) => ({ x, y, value, index }: { x?: number | string; y?: number | string; value?: unknown; index?: number }) => {
+    const v = Number(value)
+    if (!v || index == null || !serie) return null
+    const valeurs = contrats.map((k) => Number(serie[index][k as keyof (typeof serie)[number]] ?? NaN))
+    const positifs = valeurs.filter((u) => u > 0)
+    // Dessous seulement s'il y a une courbe au-dessus : seule valeur du mois, elle reste au-dessus de l'axe.
+    const bas = positifs.some((u) => u > v) && valeurs.findIndex((w) => w === Math.min(...positifs)) === contrats.indexOf(c)
+    return (
+      <text x={Number(x)} y={Number(y)} dy={bas ? 16 : -8} textAnchor="middle" fill="var(--ink)" fontSize={11}>
+        {v}
+      </text>
+    )
+  }
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
   const avecN1 = !!n1?.some((m) => m.remuneration != null)
   const serieN = `${annee ?? 'N'}`
@@ -119,41 +134,36 @@ export default function Graphes() {
           ))}
         {serie && (
           <>
-            {/* Demande explicite : masse salariale et effectif sur le même graphe, deux graduations. Chaque axe
-                porte la couleur et le nom de sa série ; 5 graduations chacun, donc une seule grille commune. */}
-            <Carte titre={TITRES[0]} lecture="Barres bleues : masse salariale, graduation de gauche (millions de FCFA). Courbe orange : nombre de salariés, graduation de droite.">
-              <ComposedChart data={serie}>
+            {/* Retour du 16/10 : même présentation que la rémunération globale (aire N, pointillés N-1) ;
+                l'effectif a son propre graphe. */}
+            <Carte titre={TITRES[0]} lecture={`Masse salariale de chaque mois en ${serieN}${comparaison}.`}>
+              <AreaChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
-                <YAxis yAxisId="ms" {...AXE_FCFA} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.6) : 1)]} width={64}
-                  axisLine={{ stroke: C_MS, strokeWidth: 3 }} label={{ value: 'Millions FCFA', angle: -90, position: 'insideLeft', offset: 2, fill: 'var(--muted)', fontSize: 11, style: { textAnchor: 'middle' } }} />
-                <YAxis yAxisId="eff" orientation="right" {...AXE} allowDecimals={false} tickCount={5} width={56}
-                  domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]}
-                  axisLine={{ stroke: C_EFF, strokeWidth: 3 }} label={{ value: 'Salariés', angle: 90, position: 'insideRight', offset: 2, fill: 'var(--muted)', fontSize: 11, style: { textAnchor: 'middle' } }} />
-                <Tooltip formatter={(v, nom) => (nom === 'Effectif' ? `${entier(Number(v))} salariés` : fcfa(Number(v)))} />
+                <YAxis {...AXE_FCFA} />
+                <Tooltip formatter={BULLE_FCFA} />
                 <Legend {...LEGENDE} />
-                <Bar yAxisId="ms" dataKey="ms" name="Masse salariale" fill={C_MS} fillOpacity={0.85} radius={[3, 3, 0, 0]} {...ANIM} />
-                <Line yAxisId="eff" dataKey="effectif" name="Effectif" stroke={C_EFF} strokeWidth={2.5} dot={{ r: 3.5, fill: C_EFF }} connectNulls={false} {...ANIM}>
-                  <LabelList dataKey="effectif" position="top" fill="var(--ink)" fontSize={11} />
-                </Line>
-              </ComposedChart>
+                <Area dataKey="ms" name={serieN} stroke={C_MS} strokeWidth={2.5} fill={C_MS} fillOpacity={0.15} dot={{ r: 3, fill: C_MS }} connectNulls={false} {...ANIM} />
+                {avecN1 && <Area dataKey="ms1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+              </AreaChart>
             </Carte>
-            <Carte titre={TITRES[1]} lecture="Nombre de salariés par mois, découpé par type de contrat ; le total est inscrit au-dessus.">
-              <BarChart data={serie}>
+            {/* Une courbe par type de contrat, valeur inscrite sur chaque point. */}
+            <Carte titre={TITRES[1]} lecture="Nombre de salariés par mois, une courbe par type de contrat.">
+              <LineChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
-                <YAxis allowDecimals={false} width={36} {...AXE} />
+                <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
                 <Tooltip formatter={(v) => `${entier(Number(v))} salariés`} />
-                <Legend {...LEGENDE} iconType="square" />
-                {contrats.map((c, i) => (
-                  <Bar key={c} dataKey={c} name={c} stackId="contrat" fill={COULEURS_CONTRAT[i % COULEURS_CONTRAT.length]}
-                    stroke="var(--surface)" strokeWidth={1} {...ANIM}>
-                    {i === contrats.length - 1 && (
-                      <LabelList dataKey="effectif" position="top" fill="var(--ink)" fontSize={11} formatter={(v: unknown) => (v ? String(v) : '')} />
-                    )}
-                  </Bar>
-                ))}
-              </BarChart>
+                <Legend {...LEGENDE} />
+                {contrats.map((c, i) => {
+                  const coul = COULEURS_CONTRAT[i % COULEURS_CONTRAT.length]
+                  return (
+                    <Line key={c} dataKey={c} name={c} stroke={coul} strokeWidth={2.5} dot={{ r: 3.5, fill: coul }} connectNulls={false} {...ANIM}>
+                      <LabelList dataKey={c} content={etiquette(c)} />
+                    </Line>
+                  )
+                })}
+              </LineChart>
             </Carte>
             <Carte titre={TITRES[2]} lecture={`Frais de mission payés chaque mois en ${serieN}${comparaison}.`}>
               <ComposedChart data={serie}>
