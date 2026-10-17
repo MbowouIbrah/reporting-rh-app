@@ -9,7 +9,7 @@ Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC(18,3)`, 
 | KPI | Définition | Règle « vide / zéro » |
 |---|---|---|
 | TOTAL CHARGES (ligne) | Somme des rubriques dont `inclus_total_charges` = vrai à la date de la période | Rubrique vide = 0 |
-| Rubriques exclues du total (à date d'effet) | Absences (nb), Salaire brut garantie, Primes sur ventes, Primes sur résultats, Productivité Ateliers | Modifiable : une règle datée (date d'effet) ; tout changement est tracé au journal d'audit |
+| Rubriques exclues du total (à date d'effet) | Absences (nb), Salaire brut garantie, Primes sur ventes, Primes sur résultats, Productivité Ateliers, Commission (depuis le 16/10, partout) | Modifiable : une règle datée (date d'effet) ; tout changement est tracé au journal d'audit |
 | Masse salariale (MS) | Somme des TOTAL CHARGES sur le périmètre filtré et la période | 0 si aucune ligne, affiché « — » |
 | VARIATION | M − (M-1) | M-1 absent : « — » |
 | VAR % | (M − M-1) / M-1 | M-1 = 0 : « n/a » (l'Excel affichait 0, écart connu documenté) |

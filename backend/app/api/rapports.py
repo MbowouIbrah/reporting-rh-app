@@ -11,6 +11,7 @@ from app.imports.regles import norm
 from app.kpi import chargement as ch
 from app.kpi import moteur
 from app.models.donnees import Periode, Salarie
+from app.models.referentiel import Rubrique
 from app.repos.scope import scope_for
 from app.security import audit
 from app.security.deps import current_principal
@@ -27,6 +28,7 @@ COLONNES_INDIVIDUEL: dict[str, tuple[str, ...]] = {
     "Salaire brut garanti": ("Salaire brut garantie",),
     "Commission": ("Commission",),
     "Primes de productivité": ("Productivité Ateliers",),
+    "Brut réel": ("Brut Réel",),
     "Bonus": ("Bonus",),
     "Primes sur ventes": ("Primes sur ventes",),
     "Primes sur résultats": ("Primes sur résultats",),
@@ -281,7 +283,7 @@ def individuel_tous(
     db: Session = Depends(get_db),
 ):
     """Onglet REPORTING_RH_INDIVIDUEL : par mois, somme des montants de chaque rubrique sur les
-    salariés retenus (tous par défaut), effectif concerné par colonne, total et budget.
+    salariés retenus (tous par défaut), effectif concerné par colonne et total.
     Comme dans DONNEES, une colonne dont les rubriques sont exclues du total de ligne est signalée
     (`exclues`) et le TOTAL MENSUEL ne somme que les colonnes comptées à la date du mois.
     `deporte` indique si un site déporté figure dans le mois (logement sinon sans objet)."""
@@ -292,7 +294,10 @@ def individuel_tous(
         sal = db.scalar(select(Salarie).where(Salarie.matricule_norm == norm(matricule)))
         if sal is None:
             raise HTTPException(404, "Matricule introuvable")
-    rubriques = list(COLONNES_INDIVIDUEL)
+    # Ordre global des colonnes (paramétrage, partagé avec DONNEES).
+    rang = {lib: o for lib, o in db.execute(select(Rubrique.libelle, Rubrique.ordre))}
+    rubriques = sorted(COLONNES_INDIVIDUEL,
+                       key=lambda c: min(rang.get(r, 10**6) for r in COLONNES_INDIVIDUEL[c]))
     exclues = ch.rubriques_exclues(db)
     zero = Decimal(0)
 
@@ -312,7 +317,6 @@ def individuel_tous(
         if pd is None or not lignes:
             mois.append({"mois": m, "present": False})
             continue
-        budget = ch.charger_params(db, annee, m).budget_employe
         mois.append({
             "mois": m, "present": True, "effectif": len(lignes),
             "montants": {c: sum((montant(L, c) for L in lignes), zero) for c in rubriques},
@@ -320,7 +324,6 @@ def individuel_tous(
             "total": sum((montant(L, c) for L in lignes for c in rubriques if comptee(pd, c)),
                          zero),
             "deporte": any(L.type_site == "deporte" for L in lignes),
-            "budget": None if budget is None else budget * len(lignes),
         })
     if sal is not None and not any(x["present"] for x in mois):
         raise HTTPException(404, "Matricule introuvable")  # hors périmètre : rien ne fuit
@@ -331,6 +334,7 @@ def individuel_tous(
                      "nom": sal.nom if sal else None, "rubriques": rubriques,
                      "exclues": [c for c in rubriques
                                  if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
+                     "sources": {c: list(COLONNES_INDIVIDUEL[c]) for c in rubriques},
                      "mois": mois})
 
 

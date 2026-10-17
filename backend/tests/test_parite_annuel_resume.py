@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from tests.test_import_regles import V4
-from tests.test_parite_v4 import API, XLSX, proche
+from tests.test_parite_v4 import API, XLSX, proche, regles_v4
 
 RACINE = Path(__file__).parents[2] / "golden"
 pytestmark = pytest.mark.skipif(
@@ -31,7 +31,8 @@ def ecarts():
 
 
 @pytest.fixture()
-def rapports(make_client):
+def rapports(make_client, db):
+    regles_v4(db)
     c = make_client("admin@exemple.invalid")
     lot = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)}).json()
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200

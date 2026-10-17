@@ -197,6 +197,8 @@ export interface IndividuelTous {
   rubriques: string[]
   /** Colonnes exclues du total de ligne (hachurées, hors TOTAL MENSUEL). */
   exclues?: string[]
+  /** Rubriques de DONNEES derrière chaque colonne (ordre et hachuré enregistrés par rubrique). */
+  sources?: Record<string, string[]>
   mois: {
     mois: number
     present: boolean
@@ -206,6 +208,5 @@ export interface IndividuelTous {
     total?: Dec
     /** Un site déporté figure dans le mois (sinon logement sans objet). */
     deporte?: boolean
-    budget?: Dec | null
   }[]
 }

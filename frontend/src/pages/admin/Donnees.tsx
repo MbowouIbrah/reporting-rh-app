@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom'
+import { useEnregistrerColonnes } from '../../api/admin'
 import { useStructure, useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
+import { useAuth } from '../../auth/AuthContext'
 import AdminNav from '../../components/AdminNav'
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import ChoixSalarie from '../../components/ChoixSalarie'
+import ConfirmerColonne from '../../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../../components/Etat'
 import { useFenetre } from '../../hooks/useFenetre'
 import { usePartage } from '../../hooks/useFiltres'
+import { useOrdreColonnes } from '../../hooks/useOrdreColonnes'
 import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../lib/format'
 import BandeauEnregistre from './saisie/Enregistre'
 
@@ -58,16 +62,25 @@ export default function Donnees() {
   // Des milliers de lignes × une trentaine de colonnes : seules celles proches de la zone visible sont rendues.
   const { ref, debut, fin, avant, apres } = useFenetre(squelette ? 0 : d?.lignes.length ?? 0)
 
-  // Rubriques comptées d'abord, puis celles exclues du total, regroupées juste avant le TOTAL.
-  const exclues = new Set(st?.exclues)
-  const comptees = st?.colonnes.filter((c) => !exclues.has(c)) ?? []
-  const horsTotal = st?.colonnes.filter((c) => exclues.has(c)) ?? []
+  // Rubriques exclues du total d'abord (bloc hachuré), puis les comptées ; ordre global (serveur),
+  // déplaçable par qui a le droit de modifier le paramétrage.
+  const { can } = useAuth()
+  const ecrire = useEnregistrerColonnes()
+  const colonnes = useOrdreColonnes(st?.colonnes ?? [], new Set(st?.exclues), {
+    modifiable: can('referentiel:write'),
+    enregistrer: (l) => ecrire.mutateAsync(l.map((x) => ({ rubrique: x.colonne, exclu: x.exclu }))),
+  })
+  const { ordre: rubriques, exclues } = colonnes
+  // Trait rouge au début de chaque suite de colonnes hachurées.
+  const classeRubrique = (i: number) => {
+    if (!exclues.has(rubriques[i])) return 'num'
+    return `num exclu${i === 0 || !exclues.has(rubriques[i - 1]) ? ' exclu-debut' : ''}`
+  }
   const classes = [
     // Colonnes fixes : texte issu des données (squelette « var ») ; les quatre premières restent figées.
     ...FIXES.map((_, i) => (i < FIGEES.length ? `${classeFixe(i)} var` : 'var')),
-    ...comptees.map(() => 'num'),
-    ...horsTotal.map((_, i) => `num exclu${i === 0 ? ' exclu-debut' : ''}`),
-    ...(st ? [`num exclu${horsTotal.length ? '' : ' exclu-debut'}`, 'num total'] : []),
+    ...rubriques.map((_, i) => classeRubrique(i)),
+    ...(st ? ['num total', 'num exclu exclu-debut fige-dx'] : []),
   ]
 
   return (
@@ -129,9 +142,10 @@ export default function Donnees() {
         <>
           <p className="bandeau">
             <span className="val">{d ? `${d.lignes.length} ligne${d.lignes.length > 1 ? 's' : ''}` : '—'}</span>
-            {horsTotal.length > 0 && <span className="legende-exclu">Colonnes hachurées : exclues du TOTAL</span>}
+            {exclues.size > 0 && <span className="legende-exclu">Colonnes hachurées : exclues du TOTAL</span>}
             <Link className="bouton bouton-primaire bandeau-action" to="/admin/saisie">Renseigner des données</Link>
           </p>
+          <ConfirmerColonne {...colonnes} />
           {d && d.lignes.length === 0 && !charge ? (
             <Etat type="vide" />
           ) : (
@@ -141,17 +155,16 @@ export default function Donnees() {
                   <thead>
                     <tr>
                       {FIXES.map((c, i) => <th key={c} scope="col" className={classeFixe(i)} style={i < FIGEES.length ? undefined : { minWidth: largeurEntete(c) }}>{c}</th>)}
-                      {comptees.map((c) => <th key={c} scope="col" className="num" style={{ minWidth: largeurEntete(c) }}>{c}</th>)}
-                      {horsTotal.map((c, i) => (
-                        <th key={c} scope="col" className={`num exclu${i === 0 ? ' exclu-debut' : ''}`} style={{ minWidth: largeurEntete(c) }}>
+                      {rubriques.map((c, i) => (
+                        <th key={c} scope="col" className={classeRubrique(i)} style={{ minWidth: largeurEntete(c) }} {...colonnes.entete(c)}>
                           {c}
-                          <span className="exclu-mention"> (exclu)</span>
+                          {exclues.has(c) && <span className="exclu-mention"> (exclu)</span>}
                         </th>
                       ))}
                       {st && (
                         <>
-                          <th scope="col" className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`} style={{ minWidth: largeurEntete(EXCLUSIONS) }}>{EXCLUSIONS}</th>
-                          <th scope="col" className="num total" style={{ minWidth: largeurEntete(TOTAL) }}>{TOTAL}</th>
+                          <th scope="col" className="num total">{TOTAL}</th>
+                          <th scope="col" className="num exclu exclu-debut fige-dx">{EXCLUSIONS}</th>
                         </>
                       )}
                     </tr>
@@ -164,12 +177,9 @@ export default function Donnees() {
                         {texte(l).map((v, i) => (
                           <td key={FIXES[i]} className={classes[i]} title={i === 3 ? String(v) : undefined}>{v}</td>
                         ))}
-                        {comptees.map((c) => <td key={c} className="num">{valeurBrute(l.montants[c])}</td>)}
-                        {horsTotal.map((c, i) => (
-                          <td key={c} className={`num exclu${i === 0 ? ' exclu-debut' : ''}`}>{valeurBrute(l.montants[c])}</td>
-                        ))}
-                        <td className={`num exclu${horsTotal.length ? '' : ' exclu-debut'}`}>{valeurBrute(l.exclusions)}</td>
+                        {rubriques.map((c, i) => <td key={c} className={classeRubrique(i)}>{valeurBrute(l.montants[c])}</td>)}
                         <td className="num total">{valeurBrute(l.total)}</td>
+                        <td className="num exclu exclu-debut fige-dx">{valeurBrute(l.exclusions)}</td>
                       </tr>
                     ))}
                   </tbody>

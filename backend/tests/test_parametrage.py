@@ -70,3 +70,50 @@ def test_rubriques(charge, db):
     assert charge.put(f"{P}/rubriques/{moteur}", json={"actif": False}).status_code == 409
     assert charge.put(f"{P}/rubriques/{rid}", json={"actif": False}).json()["actif"] is False
     assert charge.put(f"{P}/rubriques/9999", json={"ordre": 1}).status_code == 404
+
+
+# ---- ordre et hachuré des colonnes ----
+PV = "Primes sur ventes"
+
+
+def _colonnes(c, *paires):
+    return c.put(f"{P}/colonnes", json={"colonnes": [{"rubrique": r, "exclu": e} for r, e in paires]})
+
+
+def test_colonnes_droits_et_validation(charge, make_client):
+    assert make_client(DRH).put(f"{P}/colonnes", json={"colonnes": [
+        {"rubrique": PV, "exclu": True}]}).status_code == 403
+    for mauvais in ([], [("Inconnue", True)], [(PV, True), (PV, False)],
+                    [("Absences (nb)", False)]):  # une rubrique en jours ne peut entrer au TOTAL
+        assert _colonnes(charge, *mauvais).status_code == 422
+
+
+def test_colonnes_ordre_partage_et_audit(charge, db):
+    avant = charge.get(f"{API}/donnees/tableau").json()["colonnes"]
+    # « Commission » passe devant « Brut Réel » ; les autres rubriques gardent leur place.
+    assert _colonnes(charge, ("Commission", True), ("Brut Réel", False)).status_code == 200
+    apres = charge.get(f"{API}/donnees/tableau").json()["colonnes"]
+    i, j = sorted((avant.index("Commission"), avant.index("Brut Réel")))
+    assert apres[i] == "Commission" and apres[j] == "Brut Réel"
+    assert [x for x in apres if x not in ("Commission", "Brut Réel")] == \
+        [x for x in avant if x not in ("Commission", "Brut Réel")]
+    ind = charge.get(f"{API}/rapports/individuel/tous", params={"annee": 2026}).json()
+    assert ind["rubriques"].index("Commission") < ind["rubriques"].index("Brut réel")
+    assert ind["sources"]["Brut réel"] == ["Brut Réel"]
+    assert db.scalars(select(AuditEvent).where(AuditEvent.entite == "colonnes")).one()
+
+
+def test_colonne_sortie_de_la_zone_hachuree_recalcule_tout(charge):
+    # février : E2 a 999 de primes sur ventes, exclues du total
+    assert _colonnes(charge, (PV, False)).json()["colonnes"]
+    ms = charge.get(f"{API}/rapports/mensuel", params={"annee": 2026, "mois": 2}).json()
+    assert ms["synthese"]["ms"]["m"] in ("4699", "4699.000")
+    ind = charge.get(f"{API}/rapports/individuel/tous", params={"annee": 2026}).json()
+    assert PV not in ind["exclues"] and ind["mois"][1]["total"] in ("4699", "4699.000")
+    e2 = next(x for x in charge.get(f"{API}/donnees/tableau", params={"mois": 2}).json()["lignes"]
+              if x["matricule"] == "E2")
+    assert e2["total"] == "3099.000"
+    # retour dans la zone hachurée : sur tout l'historique
+    _colonnes(charge, (PV, True))
+    ms = charge.get(f"{API}/rapports/mensuel", params={"annee": 2026, "mois": 2}).json()
+    assert ms["synthese"]["ms"]["m"] in ("3700", "3700.000")

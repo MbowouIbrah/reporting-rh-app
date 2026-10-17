@@ -5,3 +5,5 @@
   ecart_attendu: "mensuel.synthese.absences.m"
 - id: var_pct_na
   raison: "VAR % : l'application renvoie n/a ou null là où l'Excel affiche 0 ou vide ; accepté"
+- id: commission_hors_total
+  raison: "Commission sortie du total (décision Q1, migration 0010) ; l'Excel V4 la comptait : les tests de parité retirent la règle avant de comparer"

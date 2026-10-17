@@ -144,12 +144,12 @@ test('Individuel : tous les salariés par défaut', async () => {
   expect(await screen.findByRole('region', { name: 'Reporting individuel' })).toBeInTheDocument()
   await screen.findAllByText('150')
   const entetes = screen.getAllByRole('columnheader').map((th) => th.textContent)
-  // colonne exclue regroupée juste avant le total
-  expect(entetes.slice(1, 4)).toEqual(['Commission', 'Logement site déporté', 'Salaire brut garanti'])
+  // colonnes exclues en tête, juste après le mois
+  expect(entetes.slice(1, 4)).toEqual(['Salaire brut garanti', 'Commission', 'Logement site déporté'])
   const janvier = screen.getByRole('rowheader', { name: 'Janvier' }).closest('tr')!
   // logement sans objet hors site déporté, colonne exclue hachurée, total servi par le serveur
-  expect(janvier.cells[2]).toHaveTextContent('-')
-  expect(janvier.cells[3]).toHaveClass('exclu')
+  expect(janvier.cells[1]).toHaveClass('exclu')
+  expect(janvier.cells[3]).toHaveTextContent('-')
   expect(janvier.cells[4]).toHaveTextContent('150')
 })
 

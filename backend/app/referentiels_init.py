@@ -36,7 +36,7 @@ RUBRIQUES = [
 ]
 # Règles d'exclusion du total de ligne à date d'effet (docs/P0_CADRAGE.md §1).
 EXCLUES_TOTAL_LIGNE = ["Absences (nb)", "Salaire brut garantie", "Primes sur ventes",
-                       "Primes sur résultats", "Productivité Ateliers"]
+                       "Primes sur résultats", "Productivité Ateliers", "Commission"]
 DEBUT = date(2000, 1, 1)
 PARAMETRES_DEFAUT = {"jours_ouvres": "22", "budget_employe": "600000"}
 

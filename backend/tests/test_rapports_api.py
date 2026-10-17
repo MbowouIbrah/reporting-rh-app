@@ -154,8 +154,8 @@ def test_individuel_tous(charge, make_client):
     assert len(j["mois"]) == 12 and j["matricule"] is None
     jan = j["mois"][0]
     assert jan["present"] and jan["effectif"] == 3
-    assert D(jan["total"]) == 0  # Brut Réel n'est pas une colonne de l'individuel
-    assert D(jan["budget"]) == D("1800000")
+    assert D(jan["total"]) == D("7000.5")  # Brut réel compté ; ses composantes hachurées, non
+    assert "budget" not in jan
     assert not j["mois"][5]["present"]
     un = get(make_client(DRH), "individuel/tous", annee=2026, matricule="e1").json()
     assert un["nom"] == "Ann" and un["mois"][0]["effectif"] == 1
@@ -296,15 +296,17 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
     lot = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(lignes), XLSX)}).json()
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
     j = get(c, "individuel/tous", annee=2025).json()
+    # ordre global des rubriques (celui de DONNEES, modifiable par PUT /parametrage/colonnes)
     assert j["rubriques"] == [
-        "Salaire brut garanti", "Commission", "Primes de productivité", "Bonus", "Primes sur ventes",
-        "Primes sur résultats", "Marge MAD + TVA", "Crédit téléphonique", "Frais de mission", "Primes exceptionnelles",
-        "Logement site déporté", "Carburant véhicule service"]
-    assert set(j["exclues"]) == {"Salaire brut garanti", "Primes de productivité",
+        "Primes sur ventes", "Primes sur résultats", "Bonus", "Primes de productivité", "Commission",
+        "Salaire brut garanti", "Frais de mission", "Primes exceptionnelles", "Logement site déporté",
+        "Carburant véhicule service", "Crédit téléphonique", "Brut réel", "Marge MAD + TVA"]
+    assert set(j["exclues"]) == {"Salaire brut garanti", "Commission", "Primes de productivité",
                                  "Primes sur ventes", "Primes sur résultats"}
     jan = j["mois"][0]
     assert D(jan["montants"]["Primes sur ventes"]) == 30 and jan["staff"]["Primes sur résultats"] == 1
-    assert D(jan["total"]) == 107  # Commission + Primes exceptionnelles, exclues et retirées hors
+    assert D(jan["montants"]["Brut réel"]) == 5000
+    assert D(jan["total"]) == 5007  # Brut réel + Primes exceptionnelles : colonnes exclues retirées
     assert jan["deporte"] is False
     db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "deporte"
     db.commit()

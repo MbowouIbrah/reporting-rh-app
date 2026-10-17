@@ -8,13 +8,15 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.kpi.chargement import rubriques_exclues
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
 from app.models.pilotage import Parametre
 from app.models.referentiel import Rubrique, RubriqueRegle
+from app.referentiels_init import DEBUT
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
@@ -110,6 +112,60 @@ def modifier_rubrique(
     audit.record(db, p.user_id, "update", "rubrique", rid, avant, _rubrique(r))
     db.commit()
     return _rubrique(r)
+
+
+# ---- ordre et hachuré des colonnes (Individuel et DONNEES, un ordre pour tous) ----
+class ColonneIn(BaseModel):
+    rubrique: str
+    exclu: bool
+
+
+class ColonnesIn(BaseModel):
+    colonnes: list[ColonneIn]
+
+
+def _colonnes(rubriques: list[Rubrique], exclues: frozenset[str]) -> list[dict]:
+    return [{"rubrique": r.libelle, "ordre": r.ordre, "exclu": r.libelle in exclues}
+            for r in rubriques]
+
+
+@router.put("/parametrage/colonnes")
+def ordonner_colonnes(
+    body: ColonnesIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Les rubriques reçues reprennent, dans l'ordre reçu, les places qu'elles occupaient (une page
+    n'envoie que ses colonnes, les autres ne bougent pas). Une rubrique qui change de zone sort du
+    TOTAL ou y revient sur tout l'historique : ses règles d'exclusion datées sont remplacées."""
+    authorize(p, "referentiel:write")
+    toutes = list(db.scalars(select(Rubrique).order_by(Rubrique.ordre, Rubrique.id)))
+    par_lib = {r.libelle: r for r in toutes}
+    libs = [c.rubrique for c in body.colonnes]
+    if not libs or len(set(libs)) != len(libs) or any(x not in par_lib for x in libs):
+        raise HTTPException(422, "Colonnes invalides")
+    if any(not c.exclu and par_lib[c.rubrique].unite != "FCFA" for c in body.colonnes):
+        raise HTTPException(422, "Une rubrique en jours ne peut pas entrer dans le TOTAL")
+    exclues = rubriques_exclues(db)
+    avant = _colonnes(toutes, exclues)
+    recues = set(libs)
+    places = iter([i for i, r in enumerate(toutes) if r.libelle in recues])
+    for lib in libs:
+        toutes[next(places)] = par_lib[lib]
+    for i, r in enumerate(toutes, start=1):
+        r.ordre = i
+    for c in body.colonnes:
+        if c.exclu == (c.rubrique in exclues):
+            continue
+        rid = par_lib[c.rubrique].id
+        db.execute(delete(RubriqueRegle).where(RubriqueRegle.rubrique_id == rid,
+                                               RubriqueRegle.regle == "exclu_total_ligne"))
+        if c.exclu:
+            db.add(RubriqueRegle(rubrique_id=rid, regle="exclu_total_ligne", date_debut=DEBUT))
+    db.flush()
+    apres = _colonnes(toutes, rubriques_exclues(db))
+    audit.record(db, p.user_id, "update", "colonnes", None, {"colonnes": avant},
+                 {"colonnes": apres})
+    db.commit()
+    return {"colonnes": apres}
 
 
 # ---- règles d'exclusion datées ----

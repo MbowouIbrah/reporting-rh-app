@@ -1,12 +1,16 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Fragment, useLayoutEffect, useRef } from 'react'
+import { useEnregistrerColonnes } from '../api/admin'
 import { getIndividuelTous } from '../api/rapports'
 import type { IndividuelTous, Val } from '../api/types'
+import { useAuth } from '../auth/AuthContext'
 import { Panneau } from '../components/BlocsRapport'
 import BoutonReinitialiser from '../components/BoutonReinitialiser'
+import ConfirmerColonne from '../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../components/Etat'
 import { ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
+import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
 import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { plafonner } from '../lib/plafond'
@@ -17,6 +21,7 @@ const COLONNES = [
   'Salaire brut garanti',
   'Commission',
   'Primes de productivité',
+  'Brut réel',
   'Bonus',
   'Primes sur ventes',
   'Primes sur résultats',
@@ -31,7 +36,7 @@ const LOGEMENT = 'Logement site déporté'
 
 const MODELE_VIDE: IndividuelTous = {
   annee: 0, matricule: null, nom: null, rubriques: COLONNES,
-  exclues: ['Salaire brut garanti', 'Primes de productivité', 'Primes sur ventes', 'Primes sur résultats'],
+  exclues: ['Salaire brut garanti', 'Commission', 'Primes de productivité', 'Primes sur ventes', 'Primes sur résultats'],
   mois: MOIS.map((_, i) => ({ mois: i + 1, present: false })),
 }
 
@@ -56,13 +61,19 @@ export default function Individuel() {
   // que le squelette commun masque ; seules les valeurs chargent.
   const maj = q.isPlaceholderData || q.isLoading
   const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
-  // Comme DONNEES (QUESTIONS_CLIENT B1) : colonnes comptées d'abord, puis celles exclues du total,
-  // hachurées et regroupées juste avant le TOTAL MENSUEL (servi par le serveur, sans elles).
-  const exclues = new Set(d?.exclues)
-  const toutes = d?.rubriques ?? COLONNES
-  const horsTotal = toutes.filter((c) => exclues.has(c))
-  const rubriques = [...toutes.filter((c) => !exclues.has(c)), ...horsTotal]
-  const classe = (r: string) => (exclues.has(r) ? ` exclu${r === horsTotal[0] ? ' exclu-debut' : ''}` : '')
+  // Comme DONNEES : colonnes exclues du total (hachurées) d'abord, juste après le mois, puis les
+  // colonnes comptées dans le TOTAL MENSUEL (servi par le serveur, sans les hachurées).
+  // Ordre global (serveur, commun avec DONNEES), modifiable en glissant les en-têtes par qui a le droit ;
+  // chaque colonne affichée est enregistrée par ses rubriques sources.
+  const { can } = useAuth()
+  const ecrire = useEnregistrerColonnes()
+  const colonnes = useOrdreColonnes(d?.rubriques ?? COLONNES, new Set(d?.exclues), {
+    modifiable: can('referentiel:write') && !maj,
+    enregistrer: (l) =>
+      ecrire.mutateAsync(l.flatMap((x) => (d?.sources?.[x.colonne] ?? [x.colonne]).map((r) => ({ rubrique: r, exclu: x.exclu })))),
+  })
+  const { ordre: rubriques, exclues } = colonnes
+  const classe = (r: string) => (exclues.has(r) ? ' exclu' : '')
   type Mois = NonNullable<typeof d>['mois'][number]
   const totalMois = (m: Mois) => m.total ?? '0'
   // Logement site déporté : sans objet (« - ») quand aucun site déporté ne figure dans le mois.
@@ -144,6 +155,7 @@ export default function Individuel() {
         ) : (
           <Etat type={etatErreur(q.error)} />
         ))}
+      <ConfirmerColonne {...colonnes} />
       {d && (
         <Panneau titre="Reporting individuel" sansTitre>
           <table className="dense individuel">
@@ -151,12 +163,11 @@ export default function Individuel() {
               <tr>
                 <th scope="col" className="fige-g">Mois</th>
                 {rubriques.map((r) => (
-                  <th scope="col" key={r} className={classe(r).trim() || undefined} style={{ minWidth: Math.round(largeurEntete(r) * 0.68) }}>
+                  <th scope="col" key={r} {...colonnes.entete(r)} className={classe(r).trim() || undefined} style={{ minWidth: Math.round(largeurEntete(r) * 0.68) }}>
                     {r}
                   </th>
                 ))}
                 <th scope="col" className="num fige-d1">Total mensuel</th>
-                <th scope="col" className="num fige-d2">Total budget</th>
               </tr>
             </thead>
             <tbody>
@@ -170,7 +181,6 @@ export default function Individuel() {
                       </td>
                     ))}
                     <td className="num fige-d1">{fcfa(totalMois(m))}</td>
-                    <td className="num fige-d2">{fcfa(val(m.budget ?? undefined))}</td>
                   </tr>
                   <tr className="sous">
                     <th scope="row" className="fige-g">Staff</th>
@@ -180,7 +190,6 @@ export default function Individuel() {
                       </td>
                     ))}
                     <td className="fige-d1" />
-                    <td className="fige-d2" />
                   </tr>
                 </Fragment>
               ))}
@@ -192,7 +201,6 @@ export default function Individuel() {
                   </td>
                 ))}
                 <td className="num fige-d1">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
-                <td className="num fige-d2">{fcfa(somme(d.mois.map((m) => m.budget ?? null)) ?? '0')}</td>
               </tr>
               <tr className="total">
                 <th scope="row" className="fige-g">Total Staff</th>
@@ -202,7 +210,6 @@ export default function Individuel() {
                   </td>
                 ))}
                 <td className="fige-d1" />
-                <td className="fige-d2" />
               </tr>
             </tbody>
           </table>

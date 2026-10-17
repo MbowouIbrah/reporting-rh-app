@@ -497,12 +497,16 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
   .donnees-excel table.dense .fige-1, .donnees-excel table.dense .fige-2, .donnees-excel table.dense .fige-3 { left: auto; }
   .donnees-excel table.dense .fige-4 { left: 0; }
 }
-/* Rubriques exclues du TOTAL : bloc hachuré en fin de ligne, juste avant le TOTAL */
+/* Rubriques exclues du TOTAL : bloc hachuré en début de ligne, juste après le mois */
 :is(.donnees-excel, .individuel-excel) { --hachure: repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--red-deep) 9%, transparent) 5px 7px); }
 :is(.donnees-excel, .individuel-excel) .panneau table.dense thead th.exclu { background: var(--red-soft); color: var(--red-deep); }
 .rapport-excel.individuel-excel .panneau table.individuel thead th.exclu { background: var(--red-soft); color: var(--red-deep); }
 :is(.donnees-excel, .individuel-excel).rapport-excel .panneau table.dense td.exclu { color: var(--muted); font-style: italic; background-image: var(--hachure); }
 .donnees-excel .panneau table.dense .exclu-debut { border-left: 2px solid var(--red-deep); }
+/* Colonnes déplaçables : en-tête saisi, colonne visée par le dépôt */
+:is(.donnees-excel, .individuel-excel) .panneau table.dense thead th[draggable] { cursor: grab; }
+:is(.donnees-excel, .individuel-excel) .panneau table.dense thead th[data-glisse] { opacity: .5; }
+:is(.donnees-excel, .individuel-excel) .panneau table.dense thead th[data-cible] { box-shadow: inset 0 -3px 0 var(--peche); }
 :is(.donnees-excel, .individuel-excel) .exclu-mention { display: block; font-size: var(--fs-xs); font-weight: 400; font-style: italic; }
 .donnees-excel .panneau table.dense .total { border-left: 2px solid var(--navy); font-weight: 700; }
 .donnees-excel .panneau table.dense thead th.total { background: var(--peche); color: var(--brun); }
@@ -541,17 +545,16 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 }
 
 /* Reporting individuel : en-tête bleu sur une ligne, Mois à gauche et totaux à droite figés, rubriques défilantes */
-.individuel-excel { --d1: 104px; --d2: 104px; }
+.individuel-excel { --d1: 104px; }
 .rapport-excel.individuel-excel .panneau table.individuel { width: auto; min-width: 0; }
 .rapport-excel.individuel-excel .panneau table.individuel thead th { background: var(--navy); color: #fff; white-space: normal; vertical-align: middle; line-height: 1.2; text-wrap: balance; }
 .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-g { left: 0; z-index: 3; }
-.individuel-excel table.individuel .fige-d1, .individuel-excel table.individuel .fige-d2 { position: sticky; z-index: 1; text-align: right; background: var(--surface); }
-.individuel-excel table.individuel .fige-d1 { right: var(--d2); width: var(--d1); min-width: var(--d1); max-width: var(--d1); box-shadow: inset 1px 0 0 var(--rule-strong); }
-.individuel-excel table.individuel .fige-d2 { right: 0; width: var(--d2); min-width: var(--d2); max-width: var(--d2); }
-.rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d1, .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d2 { z-index: 3; background: var(--navy); }
-.rapport-excel.individuel-excel .panneau table.individuel tr.groupe .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.groupe .fige-d2 { background: var(--rapport-groupe); }
-.rapport-excel.individuel-excel .panneau table.individuel tr.sous .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.sous .fige-d2 { background: var(--paper); }
-.rapport-excel.individuel-excel .panneau table.individuel tr.total .fige-d1, .rapport-excel.individuel-excel .panneau table.individuel tr.total .fige-d2 { background: var(--peche); }
+.individuel-excel table.individuel .fige-d1 { position: sticky; z-index: 1; text-align: right; background: var(--surface); }
+.individuel-excel table.individuel .fige-d1 { right: 0; width: var(--d1); min-width: var(--d1); max-width: var(--d1); box-shadow: inset 1px 0 0 var(--rule-strong); }
+.rapport-excel.individuel-excel .panneau table.individuel thead th.fige-d1 { z-index: 3; background: var(--navy); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.groupe .fige-d1 { background: var(--rapport-groupe); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.sous .fige-d1 { background: var(--paper); }
+.rapport-excel.individuel-excel .panneau table.individuel tr.total .fige-d1 { background: var(--peche); }
 .rapport-excel.individuel-excel .panneau table.individuel { border-collapse: separate; border-spacing: 0; }
 .rapport-excel.individuel-excel .panneau table.individuel th, .rapport-excel.individuel-excel .panneau table.individuel td { border-right: 1px solid var(--rule-strong); }
 .rapport-excel.individuel-excel .panneau table.individuel thead th { border-right-color: rgba(255, 255, 255, .18); }
@@ -567,8 +570,13 @@ html, body { overscroll-behavior: none; }
   .page-ecran.rapport-excel:not(.graphes-excel) .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; }
 }
 
-/* DONNEES : colonne TOTAL CHARGES figée à droite */
-.donnees-excel table.dense .total { position: sticky; right: 0; z-index: 1; width: 150px; min-width: 150px; max-width: 150px; }
+/* DONNEES : TOTAL CHARGES puis Total des colonnes exclues, figées à droite */
+.donnees-excel { --dx: 128px; }
+.donnees-excel table.dense .total { position: sticky; right: var(--dx); z-index: 1; width: 150px; min-width: 150px; max-width: 150px; }
+.donnees-excel table.dense .fige-dx { position: sticky; right: 0; z-index: 1; width: var(--dx); min-width: var(--dx); max-width: var(--dx); }
+.donnees-excel.rapport-excel .panneau table.dense tbody td.fige-dx { background-color: var(--surface); }
+.donnees-excel.rapport-excel .panneau table.dense tbody tr:nth-child(even) td.fige-dx { background-color: var(--rapport-zebre); }
+.donnees-excel.page-ecran.rapport-excel .panneau table.dense thead th.fige-dx { position: sticky; top: 0; z-index: 3; }
 .donnees-excel.rapport-excel .panneau table.dense tbody td.total { background: var(--surface); }
 .donnees-excel.rapport-excel .panneau table.dense tbody tr:nth-child(even) td.total { background: var(--rapport-zebre); }
 .donnees-excel.rapport-excel .panneau table.dense tbody tr.reste:nth-child(n) td.total { background: var(--surface); }

@@ -47,22 +47,25 @@ const tableau = () => appels.filter((u) => u.includes('/donnees/tableau'))
 let appels: string[] = []
 afterEach(() => vi.restoreAllMocks())
 
-test('en-têtes de DONNEES, rubriques exclues regroupées juste avant le TOTAL', async () => {
+test('en-têtes de DONNEES, rubriques exclues en tête, juste après les colonnes fixes', async () => {
   appels = rendu(['saisie:write'])
   await screen.findByRole('cell', { name: 'Février' })
   const entetes = screen.getAllByRole('columnheader').map((th) => th.textContent)
   expect(entetes).toEqual([
     'ANNÉE', 'MOIS', 'MATRICULE', 'Noms', 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service',
-    'Brut Réel', 'Absences (nb) (exclu)', 'Total des colonnes exclues', 'TOTAL CHARGES (FCFA)',
+    'Absences (nb) (exclu)', 'Brut Réel', 'TOTAL CHARGES (FCFA)', 'Total des colonnes exclues',
   ])
   expect(screen.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeInTheDocument()
   expect(screen.getByText(/^Saisir ANNÉE \(ex\. 2025\)/)).toBeInTheDocument()
   const cellules = screen.getAllByRole('cell')
-  expect(cellules[9].textContent).toMatch(/^1\s000,5$/)
-  expect(cellules[10].textContent).toBe('') // Absences non saisies : cellule vide
-  expect(cellules[10]).toHaveClass('exclu')
+  expect(cellules[10].textContent).toMatch(/^1\s000,5$/)
+  expect(cellules[9].textContent).toBe('') // Absences non saisies : cellule vide
+  expect(cellules[9]).toHaveClass('exclu')
   expect(cellules.slice(0, 4).every((c) => c.classList.contains('fige'))).toBe(true)
   expect(cellules[4]).not.toHaveClass('fige')
+  // totaux figés à droite
+  expect(cellules[11]).toHaveClass('total')
+  expect(cellules[12]).toHaveClass('exclu', 'fige-dx')
 })
 
 test('Employé : liste triée avec « Tous », recherche par nom ou matricule, sans accents', async () => {

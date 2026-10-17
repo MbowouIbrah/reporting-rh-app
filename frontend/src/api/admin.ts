@@ -12,6 +12,12 @@ function useEcriture<V, R = unknown>(fn: (v: V) => Promise<R>) {
   })
 }
 
+// ---- ordre et hachuré des colonnes (Individuel et DONNEES, un ordre pour tous) ----
+export const useEnregistrerColonnes = () =>
+  useEcriture((colonnes: { rubrique: string; exclu: boolean }[]) =>
+    api('/parametrage/colonnes', json('PUT', { colonnes })),
+  )
+
 // ---- référentiels (sites et services) ----
 export type DimensionRef = 'site' | 'service'
 export interface ValeurRef {

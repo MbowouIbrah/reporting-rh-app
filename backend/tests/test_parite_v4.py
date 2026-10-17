@@ -8,7 +8,9 @@ from decimal import Decimal as D
 
 import pytest
 from openpyxl import load_workbook
+from sqlalchemy import delete, select
 
+from app.models.referentiel import Rubrique, RubriqueRegle
 from tests.test_import_regles import V4
 
 pytestmark = pytest.mark.skipif(not V4.exists(), reason="fichier V4 requis")
@@ -16,6 +18,14 @@ API = "/api/v1"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 TOL = D("0.5")
 ALIAS = {"Variable": "Commission", "Salaire brut garantie": "Salaire brut garantie"}
+
+
+def regles_v4(db):
+    """Règles de l'Excel V4 : la commission y comptait dans le total (sortie depuis, décision Q1)."""
+    rid = select(Rubrique.id).where(Rubrique.libelle == "Commission").scalar_subquery()
+    db.execute(delete(RubriqueRegle).where(
+        RubriqueRegle.rubrique_id == rid, RubriqueRegle.regle == "exclu_total_ligne"))
+    db.commit()
 
 
 @pytest.fixture(scope="module")
@@ -28,7 +38,8 @@ def excel():
 
 
 @pytest.fixture()
-def rapport(make_client):
+def rapport(make_client, db):
+    regles_v4(db)
     c = make_client("admin@exemple.invalid")
     r = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)})
     assert r.status_code == 201
