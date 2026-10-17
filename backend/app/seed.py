@@ -15,12 +15,14 @@ from app.models.auth import Perimetre, PerimetreRegle, RoleAssignment, Utilisate
 from app.referentiels_init import seed_referentiels
 from app.security.passwords import hash_password
 
+# Mêmes valeurs que la migration 0011 (la base de test est créée sans migrations).
 PERIMETRES = {
-    "equipment": (
-        "Equipment",
-        ["SAV PL", "SAV Engins", "Pneumatique", "Sites Déportés"],
-    ),
+    "dps": ("DPS", ["Commerce Pièces", "SAV PL", "SAV Engins", "Sites Déportés"]),
     "commerce_vn": ("Commerce VN", ["Commerce VN"]),
+    "pneumatique": ("Pneumatique", ["Pneumatique"]),
+    "sav_pl": ("SAV PL", ["SAV PL"]),
+    "sav_engins": ("SAV Engins", ["SAV Engins"]),
+    "sites_deportes": ("Sites Déportés", ["Sites Déportés"]),
 }
 
 
@@ -55,10 +57,18 @@ def run(db: Session, admin_email: str, admin_password: str, demo_password: str |
     if demo_password:
         _user(db, "drh@exemple.invalid", "DRH", demo_password, "lecteur_global", None, True)
         _user(db, "dop@exemple.invalid", "DOP", demo_password, "lecteur_global", None, True)
-        _user(db, "dps.equipment@exemple.invalid", "DPS Equipment", demo_password,
-              "lecteur_perimetre", ids["equipment"])
+        _user(db, "dps.equipment@exemple.invalid", "DPS", demo_password,
+              "lecteur_perimetre", ids["dps"])
         _user(db, "dir.commercial.vn@exemple.invalid", "Directeur commercial VN", demo_password,
               "lecteur_perimetre", ids["commerce_vn"])
+        _user(db, "dc.pneumatique@exemple.invalid", "DC Pneumatique", demo_password,
+              "lecteur_perimetre", ids["pneumatique"])
+        _user(db, "dir.technique@exemple.invalid", "Directeur technique", demo_password,
+              "lecteur_perimetre", ids["sav_pl"])
+        _user(db, "resp.sav.engins@exemple.invalid", "Responsable technique SAV Engins",
+              demo_password, "lecteur_perimetre", ids["sav_engins"])
+        _user(db, "resp.sites.deportes@exemple.invalid", "Responsable des sites déportés",
+              demo_password, "lecteur_perimetre", ids["sites_deportes"])
     db.commit()
 
 

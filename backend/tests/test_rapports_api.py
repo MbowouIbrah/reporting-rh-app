@@ -102,6 +102,24 @@ def test_perimetre_filtre_cote_serveur(charge, make_client):
     assert len(get(make_client(VN), "periodes").json()) == 2
 
 
+@pytest.mark.parametrize("email, ms", [
+    ("dir.technique@exemple.invalid", "1000.5"),  # SAV PL
+    ("dc.pneumatique@exemple.invalid", None),  # aucun salarié Pneumatique en janvier
+    ("resp.sav.engins@exemple.invalid", None),
+])
+def test_lecteurs_a_un_service(charge, make_client, email, ms):
+    c = make_client(email)
+    r = get(c, "mensuel", annee=2026, mois=1)
+    if ms is None:
+        assert r.status_code == 404 or D(r.json()["synthese"]["ms"]["m"] or 0) == 0
+    else:
+        s = r.json()["synthese"]
+        assert D(s["ms"]["m"]) == D(ms) and "marge" not in s and "ca" not in s
+    assert get(c, "individuel", annee=2026, matricule="E1").status_code == 403
+    f = {"fichier": ("d.xlsx", xlsx(donnees()), XLSX)}
+    assert c.post(f"{API}/imports", files=f).status_code == 403
+
+
 def test_filtre_utilisateur_restreint(charge):
     r = get(charge, "mensuel", annee=2026, mois=1, service="SAV PL").json()
     assert D(r["synthese"]["ms"]["m"]) == D("1000.5")

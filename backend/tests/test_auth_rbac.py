@@ -94,12 +94,12 @@ def test_anonyme_401(make_client, method, path, body):
 def test_lecteur_perimetre_ne_voit_que_le_sien(make_client):
     equip = make_client(EQUIP)
     liste = equip.get(f"{API}/perimetres").json()
-    assert [p["code"] for p in liste] == ["equipment"]
+    assert [p["code"] for p in liste] == ["dps"]
     ids = {p["code"]: p["id"] for p in make_client(ADMIN).get(f"{API}/perimetres").json()}
-    assert equip.get(f"{API}/perimetres/{ids['equipment']}").status_code == 200
+    assert equip.get(f"{API}/perimetres/{ids['dps']}").status_code == 200
     assert equip.get(f"{API}/perimetres/{ids['commerce_vn']}").status_code == 403
-    assert make_client(VN).get(f"{API}/perimetres/{ids['equipment']}").status_code == 403
-    assert len(make_client(DRH).get(f"{API}/perimetres").json()) == 2
+    assert make_client(VN).get(f"{API}/perimetres/{ids['dps']}").status_code == 403
+    assert len(make_client(DRH).get(f"{API}/perimetres").json()) == 6
 
 
 def test_filtre_de_perimetre_couche_depot(db):
@@ -108,7 +108,7 @@ def test_filtre_de_perimetre_couche_depot(db):
     meta.create_all(db.get_bind())
     db.execute(
         sa_insert(t),
-        [{"service": s} for s in ("SAV PL", "Pneumatique", "Commerce VN", "Administration")],
+        [{"service": s} for s in ("SAV PL", "Pneumatique", "Commerce Pièces", "Commerce VN", "Administration")],
     )
 
     def vus(email):
@@ -117,9 +117,9 @@ def test_filtre_de_perimetre_couche_depot(db):
         stmt = apply_scope(select(t.c.service), scope, service=t.c.service)
         return {r[0] for r in db.execute(stmt)}
 
-    assert vus(EQUIP) == {"SAV PL", "Pneumatique"}
+    assert vus(EQUIP) == {"SAV PL", "Commerce Pièces"}  # DPS : plus Pneumatique
     assert vus(VN) == {"Commerce VN"}
-    assert len(vus(DRH)) == 4 and len(vus(ADMIN)) == 4
+    assert len(vus(DRH)) == 5 and len(vus(ADMIN)) == 5
     # périmètre sans règle = aucune donnée
     p = db.scalar(select(Perimetre).where(Perimetre.code == "commerce_vn"))
     p.regles.clear()

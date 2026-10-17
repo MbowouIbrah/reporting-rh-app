@@ -14,10 +14,10 @@ Serveur Academy, réseau Docker `edge`, base sans port publié. Commandes depuis
 Pas d'écran de gestion des comptes : console serveur, `C="docker compose -f deploy/docker-compose.yml exec api python -m app.comptes"`.
 - Premier compte : rh_admin créé par le seed (étape 1.3).
 - Les autres comptes (mot de passe demandé au clavier, jamais en argument) :
-  - `$C perimetres` : codes disponibles (`equipment`, `commerce_vn`) ;
+  - `$C perimetres` : codes disponibles (`dps`, `commerce_vn`, `pneumatique`, `sav_pl`, `sav_engins`, `sites_deportes`) ;
   - `$C creer drh@exemple.invalid --nom "DRH" --role lecteur_global` ;
-  - `$C creer dps@exemple.invalid --nom "DPS Equipment" --role lecteur_perimetre --perimetre equipment`.
-- Modèle d'attribution : DRH et DOP en `lecteur_global`, DPS Equipment en `lecteur_perimetre` Equipment, directeur commercial en `lecteur_perimetre` Commerce VN. `--nominatif` ouvre le reporting individuel à un `lecteur_perimetre` (`lecteur_global` l'a d'office).
+  - `$C creer dps@exemple.invalid --nom "DPS" --role lecteur_perimetre --perimetre dps`.
+- Modèle d'attribution : les administrateurs RH en `rh_admin` ; DRH et DOP en `lecteur_global` ; en `lecteur_perimetre` : DPS `dps`, directeur commercial `commerce_vn`, DC Pneumatique `pneumatique`, directeur technique `sav_pl`, responsable technique SAV Engins `sav_engins`, responsable des sites déportés `sites_deportes`. `--nominatif` ouvre le reporting individuel à un `lecteur_perimetre` (`lecteur_global` l'a d'office).
 - `$C lister`, `$C role EMAIL --role ...`, `$C mot-de-passe EMAIL`, `$C desactiver EMAIL` / `$C activer EMAIL`.
 - Mots de passe : 12 caractères minimum, communiqués hors e-mail. Il reste toujours au moins un rh_admin actif (refus sinon).
 - Départ d'un utilisateur : `desactiver` (ne pas supprimer, pour garder l'audit).

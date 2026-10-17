@@ -43,19 +43,21 @@ Annuel : N / N-1, cumul YTD, moyenne mensuelle, nb de mois saisis, ventilation p
 
 | Rôle | Qui | Périmètre | Écriture | Détail nominatif |
 |---|---|---|---|---|
-| `rh_admin` | Administrateur principal (1 personne) | Global | Oui : import, saisie, CA, budgets, référentiels, règles, utilisateurs | Oui |
+| `rh_admin` | Administrateurs RH (Administrateurs RH), même niveau | Global | Oui : import, saisie, CA, budgets, référentiels, règles, comptes | Oui |
 | `lecteur_global` | DRH, DOP | Global | Non | Oui |
-| `lecteur_perimetre` | DOP/DPS Equipment | Périmètre Equipment **[H]** | Non | Non, agrégats seulement **[H]** |
-| `lecteur_perimetre` | Directeur commercial VN | Périmètre Commerce VN **[H]** | Non | Non, agrégats seulement **[H]** |
+| `lecteur_perimetre` | DPS | `dps` : Commerce Pièces, SAV PL, SAV Engins, Sites Déportés | Non | Non, agrégats seulement |
+| `lecteur_perimetre` | Directeur commercial | `commerce_vn` : Commerce VN | Non | Non |
+| `lecteur_perimetre` | DC Pneumatique | `pneumatique` : Pneumatique | Non | Non |
+| `lecteur_perimetre` | Directeur technique | `sav_pl` : SAV PL | Non | Non |
+| `lecteur_perimetre` | Responsable technique SAV Engins | `sav_engins` : SAV Engins | Non | Non |
+| `lecteur_perimetre` | Responsable des sites déportés | `sites_deportes` : Sites Déportés | Non | Non |
 
-Périmètres (données, éditables dans l'application) :
-- **Equipment [H]** : SAV PL, SAV Engins, Pneumatique, Sites Déportés. Administration exclue.
-- **Commerce VN [H]** : service Commerce VN seul.
+Périmètres : créés par la migration 0011 (retours du 16/10, remplacent Equipment), filtrés par service, éditables en données.
 
 Règles :
 - Le filtre de périmètre est appliqué côté serveur (couche dépôt), jamais côté front.
 - Tout `POST/PUT/DELETE` d'un lecteur renvoie 403.
-- La marge et le taux de marge ne sont visibles que par `rh_admin` et `lecteur_global` **[H]** : le CA est global, il n'existe pas par périmètre.
+- La marge et le taux de marge ne sont visibles que par `rh_admin` et `lecteur_global` : le CA est global, il n'existe pas par périmètre.
 - Le drapeau `nominatif` est porté par chaque affectation de rôle : l'accorder à un lecteur à périmètre ne demande aucun développement.
 - Toute lecture de fiche individuelle est journalisée. Toute écriture produit un `audit_event`.
 - Ajouter une personne = une ligne `utilisateur` + une `role_assignment`.

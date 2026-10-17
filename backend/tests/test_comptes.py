@@ -19,7 +19,7 @@ def _dernier_audit(db):
 def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
     argv = ["creer", " DPS.Sav@exemple.invalid ", "--nom", "DPS SAV", "--role",
-            "lecteur_perimetre", "--perimetre", "equipment"]
+            "lecteur_perimetre", "--perimetre", "dps"]
     assert main(argv, db) == 0
     u = _u(db, "dps.sav@exemple.invalid")
     assert u.actif and verify_password(NOUVEAU, u.password_hash)
@@ -39,7 +39,7 @@ def test_creer_refuse_doublon_mot_de_passe_court_et_perimetre_manquant(db, monke
     assert main(["creer", "drh@exemple.invalid", "--nom", "X", "--role", "lecteur_global"], db) == 1
     assert main(["creer", "a@exemple.invalid", "--nom", "A", "--role", "lecteur_perimetre"], db) == 1
     assert main(["creer", "b@exemple.invalid", "--nom", "B", "--role", "lecteur_global",
-                 "--perimetre", "equipment"], db) == 1
+                 "--perimetre", "dps"], db) == 1
     assert main(["creer", "c@exemple.invalid", "--nom", "C", "--role", "lecteur_perimetre",
                  "--perimetre", "inconnu"], db) == 1
     monkeypatch.setenv("MOT_DE_PASSE", "court")
