@@ -65,7 +65,9 @@ def lire_entetes(ws, rap):
         n = str(v).replace(" ", " ").strip()
         trouves.append(ALIAS_ENTETES.get(n, n))
     manquants = [e for e in ENTETES if e not in trouves]
-    inconnus = [t for t in trouves if t not in ENTETES]
+    # colonnes calculées de l'Excel REPORTING RH : ignorées sans avertissement
+    calculees = {"TOTAL CHARGES (FCFA)", "Total exclusions (technique)"}
+    inconnus = [t for t in trouves if t not in ENTETES and t not in calculees and not t.endswith("(norme)")]
     for m in manquants:
         rap.add(1, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
     for i in inconnus:
@@ -110,9 +112,16 @@ def valider(chemin):
     if "DONNEES" not in wb.sheetnames:
         raise ValueError("Feuille DONNEES introuvable.")
     lignes = wb["DONNEES"].iter_rows(values_only=True)
-    entete = next(lignes, None)
+    # en-tête cherché dans les 10 premières lignes (ligne 3 dans l'Excel REPORTING RH et le template)
+    entete, ligne_entete = None, 0
+    for ligne_entete, row in enumerate(lignes, start=1):
+        if ligne_entete > 10:
+            break
+        if {"ANNÉE", "MATRICULE"} <= {str(v).strip() for v in row if v is not None}:
+            entete = row
+            break
     if entete is None:
-        raise ValueError("Feuille DONNEES vide.")
+        raise ValueError("En-tête introuvable (ANNÉE, MATRICULE) dans les 10 premières lignes.")
 
     class _Feuille:  # petit adaptateur pour réutiliser lire_entetes
         def __getitem__(self, _):
@@ -125,7 +134,7 @@ def valider(chemin):
     cles = defaultdict(list)
     par_matricule = defaultdict(list)
     n = 0
-    for num, row in enumerate(lignes, start=2):
+    for num, row in enumerate(lignes, start=ligne_entete + 1):
         if all(v is None or str(v).strip() == "" for v in row):
             continue
         n += 1

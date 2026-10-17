@@ -69,25 +69,32 @@ def modele_employes(refs: dict[str, list[str]], exemples: list[list] | None = No
 
 def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, list[str]],
                    lignes: list[list]) -> bytes:
-    """Feuille DONNEES au format de l'import : consignes lignes 1-2, en-tête ligne 3.
+    """Feuille DONNEES identique à celle de l'Excel REPORTING RH : titre ligne 1, consigne ligne 2,
+    en-tête ligne 3, rubriques dans l'ordre de l'Excel (pas l'ordre d'affichage de l'application).
 
     lignes : [matricule, nom, poste, contrat, activité, site, service, *montants (rubriques)].
     """
     from app.imports.regles import ATTRIBUTS, MOIS
+    from app.referentiels_init import RUBRIQUES
+
+    rang = {lib: i for i, (lib, _u) in enumerate(RUBRIQUES)}
+    ordre = sorted(range(len(rubriques)), key=lambda i: (rang.get(rubriques[i], len(rang)), i))
+    rubriques = [rubriques[i] for i in ordre]
 
     wb = Workbook()
     ws = wb.active
     ws.title = "DONNEES"
-    ws["A1"] = (f"Données de {MOIS[mois - 1]} {annee} : une ligne par employé. Ne pas modifier les "
-                "colonnes ANNÉE et MOIS. Cellule vide = pas de montant ; listes déroulantes.")
-    ws["A1"].font = Font(italic=True)
-    ws["A2"] = "Importer ensuite ce fichier dans Administration > Données mensuelles."
+    ws["A1"] = "FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois"
+    ws["A1"].font = Font(bold=True, size=13)
+    ws["A2"] = (f"Données de {MOIS[mois - 1]} {annee}. Saisir ANNÉE (ex. 2025), MOIS (nom dans la "
+                "liste) et MATRICULE (clé unique, ex. EMP001). Cellule vide = pas de montant. Importer "
+                "ensuite ce fichier dans Administration > Données mensuelles.")
+    ws["A2"].font = Font(italic=True)
     entete(ws, 3, ATTRIBUTS + rubriques)
     for i, ligne in enumerate(lignes, start=4):
-        mat, nom, *reste = ligne
-        poste, contrat, activite, site, service, *montants = reste
+        mat, nom, poste, contrat, activite, site, service, *montants = ligne
         valeurs = [annee, MOIS[mois - 1], mat, nom, poste, contrat, activite, site, service,
-                   *montants]
+                   *(montants[k] for k in ordre)]
         for j, v in enumerate(valeurs, start=1):
             c = ws.cell(i, j, v)
             if j > len(ATTRIBUTS):

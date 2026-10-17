@@ -70,3 +70,23 @@ def test_saisie_manuelle(make_client):
     assert r.status_code == 201
     d = c.get(f"{API}/donnees", params={"annee": 2026, "mois": 3}).json()
     assert len(d["lignes"]) == 1 and d["lignes"][0]["montants"][BR] == "700.000"
+
+
+def test_modele_mensuel_identique_a_la_feuille_donnees_excel():
+    """Titre ligne 1, consigne ligne 2, en-tête ligne 3, rubriques dans l'ordre de l'Excel même si
+    l'ordre d'affichage a été changé ; les montants suivent leur colonne."""
+    from app.imports import modeles
+    from app.imports.regles import ATTRIBUTS
+    from app.referentiels_init import RUBRIQUES
+
+    v5 = [r for r, _ in RUBRIQUES]
+    inverse = v5[::-1]
+    montants = [i * 10 for i in range(len(inverse))]
+    refs = {k: [] for k in ("Poste", "Type Contrat", "Activité", "Site", "Service")}
+    ws = load_workbook(io.BytesIO(modeles.modele_mensuel(
+        2026, 1, inverse, refs, [["E1", "Ann", "P", "CDI", "Front office", "Douala", "SAV PL",
+                                  *montants]])))["DONNEES"]
+    assert ws["A1"].value.startswith("FEUILLE DE DONNÉES CENTRALE") and ws["A2"].value
+    assert [x.value for x in ws[3]] == ATTRIBUTS + v5
+    rang = {r: m for r, m in zip(inverse, montants, strict=True)}
+    assert [c.value for c in ws[4]][len(ATTRIBUTS):] == [rang[r] for r in v5]

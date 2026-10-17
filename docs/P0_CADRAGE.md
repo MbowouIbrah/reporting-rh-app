@@ -67,7 +67,7 @@ Décision (2026-10-02) : les hypothèses **[H]** ci-dessus (périmètre Equipmen
 ## 3. Autres décisions de cadrage
 - Plusieurs administrateurs : hors cycle 1 (une seule personne modifie le système).
 - Jours ouvrés (22) et budget par employé (600 000) : paramètres datés, modifiables par l'administrateur.
-- Template d'import v1 : `templates/TEMPLATE_IMPORT_DONNEES_v1.xlsx`. Contrôle : `outils/valider_import.py` (les mêmes règles seront reprises par l'import du backend).
+- Template d'import v1 : `templates/TEMPLATE_IMPORT_DONNEES_v1.xlsx`. Même disposition que la feuille DONNEES de l'Excel REPORTING RH (titre ligne 1, consigne ligne 2, en-têtes ligne 3) : le fichier REPORTING RH s'importe tel quel, ses colonnes calculées (TOTAL CHARGES, exclusions, colonnes « (norme) ») sont ignorées. Contrôle hors application : `tools/valider_import.py` (mêmes règles que l'import du backend).
 - Source de vérité de la parité : l'Excel V5 alimenté de données réelles purifiées, pas la V4 test.
 - Hébergement **[H]** : ajout d'un `location /reporting-rh/` au nginx d'Academy, accès sur le réseau interne. À confirmer en P1.
 

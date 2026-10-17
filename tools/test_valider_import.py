@@ -8,10 +8,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from valider_import import BLOQUANT, ENTETES, valider  # noqa: E402
 
 
-def fichier(tmp_path, lignes, entetes=ENTETES):
+def fichier(tmp_path, lignes, entetes=ENTETES, avant=0):
     wb = Workbook()
     ws = wb.active
     ws.title = "DONNEES"
+    for _ in range(avant):
+        ws.append(["titre"])
     ws.append(entetes)
     for l in lignes:
         ws.append(l)
@@ -71,3 +73,10 @@ def test_entete_manquant_et_alias(tmp_path):
 def test_mutation(tmp_path):
     rap, _ = valider(fichier(tmp_path, [ligne(), ligne(MOIS="Février", Service="Pneumatique")]))
     assert "MUTATION" in codes(rap) and rap.compte(BLOQUANT) == 0
+
+
+def test_entete_en_ligne_3_et_colonnes_calculees_ignorees(tmp_path):
+    ent = ENTETES + ["TOTAL CHARGES (FCFA)", "MOIS (norme)"]
+    rap, stats = valider(fichier(tmp_path, [ligne() + [0, "janvier"]], ent, avant=2))
+    assert rap.compte(BLOQUANT) == 0 and "ENTETE_INCONNU" not in codes(rap)
+    assert stats["lignes"] == 1

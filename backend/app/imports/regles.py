@@ -23,6 +23,12 @@ ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # NUMERIC(18,3) : 15 chiffres entiers
 RE_NOMBRE = re.compile(r"^-?\d{1,3}(?: ?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
 TROIS = Decimal("0.001")
+# Colonnes calculées de la feuille DONNEES de l'Excel REPORTING RH : ignorées sans avertissement.
+CALCULEES = {norm("TOTAL CHARGES (FCFA)"), norm("Total exclusions (technique)")}
+
+
+def calculee(n: str) -> bool:
+    return n in CALCULEES or n.endswith("(norme)")
 
 
 @dataclass
@@ -136,6 +142,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             continue
         n = norm(v)
         canon = attr_canon.get(n) or rub_canon.get(n)
+        if canon is None and calculee(n):
+            continue
         if canon is None:
             add(feuille.entete_ligne, str(v), "ENTETE_INCONNU", AVERT, v,
                 "Colonne inconnue, ignorée à l'import.")
@@ -158,6 +166,9 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     postes_vus: set[str] = set()
 
     for num, row in feuille.lignes:
+        if all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in cols.values()):
+            continue  # seules les colonnes calculées (formules) sont remplies
+
         def g(nom, row=row):
             j = cols[nom]
             return row[j] if j < len(row) else None

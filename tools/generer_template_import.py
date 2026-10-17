@@ -1,7 +1,9 @@
 """Génère le template d'import des données RH (structure de la feuille DONNEES de la V5).
 
-Usage : python outils/generer_template_import.py
+Usage : python tools/generer_template_import.py
 Sortie : templates/TEMPLATE_IMPORT_DONNEES_v1.xlsx
+Feuille DONNEES identique à celle de REPORTING_RH_V5.xlsx : titre ligne 1, consigne ligne 2,
+en-têtes ligne 3, données à partir de la ligne 4.
 """
 from pathlib import Path
 
@@ -10,8 +12,12 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-VERSION = "1.0"
+VERSION = "1.1"
 LIGNES = 5000  # lignes pré-validées
+ENTETE = 3  # comme la feuille DONNEES de l'Excel
+TITRE = "FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois"
+CONSIGNE = ("Saisir ANNÉE (ex. 2025), MOIS (nom dans la liste) et MATRICULE (clé unique, ex. EMP001). "
+            "Ajouter les nouveaux mois à la suite. Le TOTAL se calcule seul.")
 
 NAVY, RED, PAPER = "1A1F3C", "E3001B", "F4F5F8"
 
@@ -74,17 +80,17 @@ def feuille_lisez_moi(wb):
     regles = [
         ("Feuille à remplir", "DONNEES uniquement. Ne pas renommer les feuilles ni les en-têtes, ne pas insérer, déplacer ou supprimer de colonne."),
         ("Granularité", "Une ligne par salarié et par mois. Clé unique : ANNÉE + MOIS + MATRICULE."),
-        ("Début des données", "Ligne 2 de la feuille DONNEES (la ligne 1 contient les en-têtes). Aucune ligne vide, aucune ligne de total."),
+        ("Début des données", "Ligne 4 de la feuille DONNEES (titre ligne 1, consigne ligne 2, en-têtes ligne 3), comme dans l'Excel REPORTING RH. Aucune ligne de total."),
         ("ANNÉE / MOIS", "ANNÉE : nombre entier (2026). MOIS : nom complet avec accent, issu de la liste (Février, Août, Décembre)."),
         ("MATRICULE", "Texte, sans espace en début ou fin. Conserver les zéros de tête (colonne au format texte)."),
         ("Référentiels", "Type Contrat, Activité, Site, Service : choisir dans la liste (feuille REFERENTIELS). Une valeur absente de la liste est rejetée à l'import. Toute nouvelle valeur doit d'abord être créée dans l'application."),
         ("Montants", "Nombre uniquement : pas de texte, pas d'unité, pas d'espace, pas de formule, pas de #N/A. Séparateur décimal selon le poste Excel. Cellule vide = 0. Les négatifs sont admis (régularisations)."),
         ("Absences (nb)", "Nombre de jours d'absence (pas un montant). Les autres rubriques sont en FCFA."),
-        ("TOTAL CHARGES", "Absent du template : calculé par l'application selon les règles d'inclusion de chaque rubrique."),
+        ("TOTAL CHARGES", "Absent du template : calculé par l'application. La feuille DONNEES de l'Excel REPORTING RH peut être importée telle quelle : ses colonnes calculées (TOTAL CHARGES, Total exclusions, colonnes « (norme) ») sont ignorées."),
         ("Commission", "Remplace l'ancienne colonne « Variable » de la V4."),
         ("Doublons", "Deux lignes avec la même clé ANNÉE + MOIS + MATRICULE bloquent l'import."),
         ("Contrôle à l'import", "Chaque anomalie est rapportée avec sa ligne et sa colonne. Rien n'est appliqué tant que le rapport n'a pas été validé. Un lot appliqué peut être annulé."),
-        ("Après la ligne 5001", "Les validations de saisie couvrent 5 000 lignes. L'import lit toutes les lignes, au-delà aussi."),
+        ("Après la ligne 5003", "Les validations de saisie couvrent 5 000 lignes. L'import lit toutes les lignes, au-delà aussi."),
     ]
     ws["B5"], ws["C5"] = "Règle", "Détail"
     entete(ws["B5"]), entete(ws["C5"])
@@ -100,18 +106,23 @@ def feuille_lisez_moi(wb):
 
 def feuille_donnees(wb):
     ws = wb.create_sheet("DONNEES")
+    ws["A1"] = TITRE
+    ws["A1"].font = Font(size=13, bold=True, color=NAVY)
+    ws["A2"] = CONSIGNE
+    ws["A2"].font = Font(italic=True)
     colonnes = [a[0] for a in ATTRIBUTS] + [r[0] for r in RUBRIQUES]
     for j, nom in enumerate(colonnes, start=1):
-        c = ws.cell(1, j, nom)
+        c = ws.cell(ENTETE, j, nom)
         entete(c, NAVY if j <= len(ATTRIBUTS) else RED)
         larg = ATTRIBUTS[j - 1][1] if j <= len(ATTRIBUTS) else 16
         ws.column_dimensions[get_column_letter(j)].width = larg
-    ws.row_dimensions[1].height = 34
-    ws.freeze_panes = "D2"
+    ws.row_dimensions[ENTETE].height = 34
+    ws.freeze_panes = f"D{ENTETE + 1}"
+    debut, fin = ENTETE + 1, ENTETE + LIGNES
 
     # formats : matricule en texte, montants en nombre
     nb_attr = len(ATTRIBUTS)
-    for r in range(2, LIGNES + 2):
+    for r in range(debut, fin + 1):
         ws.cell(r, 3).number_format = "@"
         for j in range(nb_attr + 1, len(colonnes) + 1):
             ws.cell(r, j).number_format = "#,##0.###;[Red]-#,##0.###"
@@ -120,7 +131,7 @@ def feuille_donnees(wb):
         dv = DataValidation(type="list", formula1=formule, allow_blank=True,
                             showErrorMessage=True, errorTitle=titre,
                             error="Valeur absente de la liste (feuille REFERENTIELS).")
-        dv.add(f"{col}2:{col}{LIGNES + 1}")
+        dv.add(f"{col}{debut}:{col}{fin}")
         ws.add_data_validation(dv)
 
     liste("=REF_MOIS", "B", "Mois invalide")
@@ -132,26 +143,26 @@ def feuille_donnees(wb):
     annee = DataValidation(type="whole", operator="between", formula1="2000", formula2="2100",
                            allow_blank=True, showErrorMessage=True,
                            errorTitle="Année invalide", error="Entier entre 2000 et 2100.")
-    annee.add(f"A2:A{LIGNES + 1}")
+    annee.add(f"A{debut}:A{fin}")
     ws.add_data_validation(annee)
 
-    texte = DataValidation(type="custom", formula1="ISTEXT(C2)", allow_blank=True,
+    texte = DataValidation(type="custom", formula1=f"ISTEXT(C{debut})", allow_blank=True,
                            showErrorMessage=True, errorTitle="Matricule invalide",
                            error="Le matricule doit être du texte.")
-    texte.add(f"C2:C{LIGNES + 1}")
+    texte.add(f"C{debut}:C{fin}")
     ws.add_data_validation(texte)
 
     montant = DataValidation(type="decimal", operator="between", formula1="-1E+12", formula2="1E+12",
                              allow_blank=True, showErrorMessage=True,
                              errorTitle="Montant invalide", error="Nombre uniquement, sans texte.")
-    montant.add(f"{get_column_letter(nb_attr + 1)}2:{get_column_letter(len(colonnes))}{LIGNES + 1}")
+    montant.add(f"{get_column_letter(nb_attr + 1)}{debut}:{get_column_letter(len(colonnes))}{fin}")
     ws.add_data_validation(montant)
 
     # commentaires d'aide sur les en-têtes
     from openpyxl.comments import Comment
     aides = [a[2] for a in ATTRIBUTS] + [f"Unité : {r[1]}" for r in RUBRIQUES]
     for j, aide in enumerate(aides, start=1):
-        ws.cell(1, j).comment = Comment(aide, "Template")
+        ws.cell(ENTETE, j).comment = Comment(aide, "Template")
     return ws
 
 

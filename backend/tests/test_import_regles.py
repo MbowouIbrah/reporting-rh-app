@@ -123,6 +123,19 @@ def test_entete_en_ligne_3_et_numeros_de_ligne_reels():
     assert (4, "Service", "REFERENTIEL_INCONNU") in ens
 
 
+def test_feuille_donnees_excel_v5_colonnes_calculees_ignorees():
+    """Fichier REPORTING RH tel quel : titre, consigne, colonnes calculées après TVA & Marge MAD,
+    formules prolongées sous les données ; plusieurs mois."""
+    calc = ["TOTAL CHARGES (FCFA)", "Total exclusions (technique)", "MOIS (norme)",
+            "MATRICULE (norme)", "Service (norme)"]
+    rows = [ligne() + [1000, 0, "janvier", "emp001", "sav pl"],
+            ligne(MOIS="Février") + [1000, 0, "fevrier", "emp001", "sav pl"],
+            [None] * len(ENTETES) + [0, 0, "", "", ""]]
+    L, ens, anos, st = run(rows, ENTETES + calc, avant=2)
+    assert not [a for a in anos if a.code.startswith("ENTETE")]
+    assert st["lignes"] == 2 and st["periodes"] == 2 and not any(x.bloquant for x in L)
+
+
 def test_fichier_vide_et_illisible():
     _, ens, _, _ = run([])
     assert (2, "DONNEES", "FICHIER_VIDE") in ens
