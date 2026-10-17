@@ -80,3 +80,14 @@ def test_entete_en_ligne_3_et_colonnes_calculees_ignorees(tmp_path):
     rap, stats = valider(fichier(tmp_path, [ligne() + [0, "janvier"]], ent, avant=2))
     assert rap.compte(BLOQUANT) == 0 and "ENTETE_INCONNU" not in codes(rap)
     assert stats["lignes"] == 1
+
+
+def test_fichier_reporting_rh_formules_prolongees_et_entetes_souples(tmp_path):
+    """En-têtes en casse libre / NBSP comme au backend ; lignes « formules seules » sautées ;
+    anomalies d'en-tête rapportées sur la vraie ligne d'en-tête."""
+    ent = [e.lower() for e in ENTETES[:3]] + ENTETES[3:] + ["Total charges (FCFA)", "Inconnue"]
+    ent[2] = "MATRICULE "
+    rap, stats = valider(fichier(tmp_path, [ligne() + [0, None], [None] * len(ENTETES) + [0, None]],
+                                 ent, avant=2))
+    assert rap.compte(BLOQUANT) == 0 and stats["lignes"] == 1
+    assert [(a[0], a[2]) for a in rap.lignes if a[2].startswith("ENTETE")] == [(3, "ENTETE_INCONNU")]

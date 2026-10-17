@@ -90,3 +90,18 @@ def test_modele_mensuel_identique_a_la_feuille_donnees_excel():
     assert [x.value for x in ws[3]] == ATTRIBUTS + v5
     rang = {r: m for r, m in zip(inverse, montants, strict=True)}
     assert [c.value for c in ws[4]][len(ATTRIBUTS):] == [rang[r] for r in v5]
+    assert "Ne pas modifier les colonnes ANNÉE et MOIS" in ws["A2"].value
+
+
+def test_modele_mensuel_rubrique_hors_liste_excel_apres_sa_voisine():
+    from app.imports import modeles
+    from app.imports.regles import ATTRIBUTS
+    from app.referentiels_init import RUBRIQUES
+
+    v5 = [r for r, _ in RUBRIQUES]
+    app = [v5[0], "Nouvelle prime", *v5[1:]]
+    refs = {k: [] for k in ("Poste", "Type Contrat", "Activité", "Site", "Service")}
+    ws = load_workbook(io.BytesIO(modeles.modele_mensuel(
+        2026, 1, app, refs, [["E1", "Ann", "P", "CDI", "Front office", "Douala", "SAV PL",
+                              *range(len(app))]])))["DONNEES"]
+    assert [x.value for x in ws[3]][len(ATTRIBUTS):] == app

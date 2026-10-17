@@ -8,13 +8,15 @@ Le fichier source n'est jamais modifié.
 import argparse
 import re
 import sys
-import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+# mêmes normalisation et colonnes calculées que l'import du backend (dépend d'openpyxl seulement)
+from app.imports.lecture import LIGNES_ENTETE, calculee, norm  # noqa: E402
 from generer_template_import import (  # noqa: E402
     ACTIVITES, ATTRIBUTS, CONTRATS, MOIS, RUBRIQUES, SERVICES, SITES,
 )
@@ -24,13 +26,6 @@ ENTETES = [a[0] for a in ATTRIBUTS] + [r[0] for r in RUBRIQUES]
 ALIAS_ENTETES = {"Variable": "Commission"}  # V4 -> V5
 ANNEE_MIN, ANNEE_MAX = 2000, 2100
 ABSENCES_MAX = 31
-
-
-def norm(v):
-    """Texte comparable : sans NBSP/espaces multiples, sans accents, minuscule."""
-    s = unicodedata.normalize("NFKD", str(v).replace(" ", " ").strip())
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    return re.sub(r"\s+", " ", s).casefold()
 
 
 def index_ref(valeurs):
@@ -56,35 +51,27 @@ class Rapport:
         return sum(1 for a in self.lignes if a[3] == gravite)
 
 
-def lire_entetes(ws, rap):
-    brut = [c.value for c in ws[1]]
-    trouves = []
-    for v in brut:
-        if v is None or str(v).strip() == "":
-            continue
-        n = str(v).replace(" ", " ").strip()
-        trouves.append(ALIAS_ENTETES.get(n, n))
-    manquants = [e for e in ENTETES if e not in trouves]
-    # colonnes calculées de l'Excel REPORTING RH : ignorées sans avertissement
-    calculees = {"TOTAL CHARGES (FCFA)", "Total exclusions (technique)"}
-    inconnus = [t for t in trouves if t not in ENTETES and t not in calculees and not t.endswith("(norme)")]
-    for m in manquants:
-        rap.add(1, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
-    for i in inconnus:
-        rap.add(1, i, "ENTETE_INCONNU", AVERT, i, "Colonne inconnue, ignorée à l'import.")
-    for v in brut:
-        if v is not None and ALIAS_ENTETES.get(str(v).strip()):
-            rap.add(1, v, "ENTETE_ALIAS", AVERT, v, f"Renommée « {ALIAS_ENTETES[str(v).strip()]} ».")
-    if manquants:
-        return None
+def lire_entetes(brut, ligne, rap):
+    """Colonnes reconnues -> position. En-têtes comparés comme au backend (accents, casse, NBSP)."""
+    canon = {norm(e): e for e in ENTETES} | {norm(k): v for k, v in ALIAS_ENTETES.items()}
     cols = {}
     for j, v in enumerate(brut):
-        if v is None:
+        if v is None or str(v).strip() == "":
             continue
-        n = ALIAS_ENTETES.get(str(v).replace(" ", " ").strip(), str(v).replace(" ", " ").strip())
-        if n in ENTETES and n not in cols:
-            cols[n] = j
-    return cols
+        n = norm(v)
+        e = canon.get(n)
+        if e is None:
+            # colonnes calculées de l'Excel REPORTING RH : ignorées sans avertissement
+            if not calculee(n):
+                rap.add(ligne, v, "ENTETE_INCONNU", AVERT, v, "Colonne inconnue, ignorée à l'import.")
+            continue
+        if n in {norm(k) for k in ALIAS_ENTETES}:
+            rap.add(ligne, v, "ENTETE_ALIAS", AVERT, v, f"Renommée « {e} ».")
+        cols.setdefault(e, j)
+    manquants = [e for e in ENTETES if e not in cols]
+    for m in manquants:
+        rap.add(ligne, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
+    return None if manquants else cols
 
 
 def nombre(v):
@@ -115,19 +102,15 @@ def valider(chemin):
     # en-tête cherché dans les 10 premières lignes (ligne 3 dans l'Excel REPORTING RH et le template)
     entete, ligne_entete = None, 0
     for ligne_entete, row in enumerate(lignes, start=1):
-        if ligne_entete > 10:
+        if ligne_entete > LIGNES_ENTETE:
             break
-        if {"ANNÉE", "MATRICULE"} <= {str(v).strip() for v in row if v is not None}:
+        if {"annee", "mois", "matricule"} <= {norm(v) for v in row if v is not None}:
             entete = row
             break
     if entete is None:
-        raise ValueError("En-tête introuvable (ANNÉE, MATRICULE) dans les 10 premières lignes.")
+        raise ValueError("En-tête introuvable (ANNÉE, MOIS, MATRICULE) dans les 10 premières lignes.")
 
-    class _Feuille:  # petit adaptateur pour réutiliser lire_entetes
-        def __getitem__(self, _):
-            return [type("C", (), {"value": v}) for v in entete]
-
-    cols = lire_entetes(_Feuille(), rap)
+    cols = lire_entetes(entete, ligne_entete, rap)
     if cols is None:
         return rap, {"lignes": 0}
 
@@ -135,8 +118,8 @@ def valider(chemin):
     par_matricule = defaultdict(list)
     n = 0
     for num, row in enumerate(lignes, start=ligne_entete + 1):
-        if all(v is None or str(v).strip() == "" for v in row):
-            continue
+        if all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in cols.values()):
+            continue  # vide, ou seules les colonnes calculées (formules prolongées)
         n += 1
         g = lambda nom: row[cols[nom]] if cols[nom] < len(row) else None  # noqa: E731
 

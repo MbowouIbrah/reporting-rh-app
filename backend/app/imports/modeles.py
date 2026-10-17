@@ -77,8 +77,14 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
     from app.imports.regles import ATTRIBUTS, MOIS
     from app.referentiels_init import RUBRIQUES
 
-    rang = {lib: i for i, (lib, _u) in enumerate(RUBRIQUES)}
-    ordre = sorted(range(len(rubriques)), key=lambda i: (rang.get(rubriques[i], len(rang)), i))
+    # Rang dans l'Excel ; une rubrique absente de la liste d'origine (ajoutée ou renommée dans
+    # l'application) se place juste après celle qui la précède dans l'ordre de l'application.
+    rang_excel = {lib: i for i, (lib, _u) in enumerate(RUBRIQUES)}
+    rang, prec = [], -1.0
+    for lib in rubriques:
+        prec = rang_excel[lib] if lib in rang_excel else prec + 0.001
+        rang.append(prec)
+    ordre = sorted(range(len(rubriques)), key=lambda i: (rang[i], i))
     rubriques = [rubriques[i] for i in ordre]
 
     wb = Workbook()
@@ -86,8 +92,8 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
     ws.title = "DONNEES"
     ws["A1"] = "FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois"
     ws["A1"].font = Font(bold=True, size=13)
-    ws["A2"] = (f"Données de {MOIS[mois - 1]} {annee}. Saisir ANNÉE (ex. 2025), MOIS (nom dans la "
-                "liste) et MATRICULE (clé unique, ex. EMP001). Cellule vide = pas de montant. Importer "
+    ws["A2"] = (f"Données de {MOIS[mois - 1]} {annee}. Ne pas modifier les colonnes ANNÉE et MOIS. "
+                "MATRICULE : clé unique (ex. EMP001). Cellule vide = pas de montant. Importer "
                 "ensuite ce fichier dans Administration > Données mensuelles.")
     ws["A2"].font = Font(italic=True)
     entete(ws, 3, ATTRIBUTS + rubriques)

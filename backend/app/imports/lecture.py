@@ -24,6 +24,16 @@ def norm(v) -> str:
     return re.sub(r"\s+", " ", s).casefold()
 
 
+# Colonnes calculées de la feuille DONNEES de l'Excel REPORTING RH.
+CALCULEES = {norm("TOTAL CHARGES (FCFA)"), norm("Total exclusions (technique)")}
+
+
+def calculee(n: str) -> bool:
+    """En-tête normalisé d'une colonne calculée de la feuille DONNEES de l'Excel REPORTING RH
+    (ignorée sans avertissement à l'import)."""
+    return n in CALCULEES or n.endswith("(norme)")
+
+
 @dataclass
 class Feuille:
     entete_ligne: int
@@ -31,8 +41,10 @@ class Feuille:
     lignes: list[tuple[int, tuple]]  # (numéro de ligne Excel, valeurs)
 
 
-def _vide(row) -> bool:
-    return all(v is None or str(v).strip() == "" for v in row)
+def _vide(row, utiles) -> bool:
+    """Vide si aucune colonne utile n'est remplie : les formules prolongées sous les données
+    (colonnes calculées seules) ne comptent pas."""
+    return all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in utiles)
 
 
 def lire(contenu: bytes) -> Feuille:
@@ -56,9 +68,11 @@ def lire(contenu: bytes) -> Feuille:
                 break
         if entete is None:
             raise FichierIllisible("En-tête introuvable (ANNÉE, MOIS, MATRICULE) dans les 10 premières lignes.")
+        utiles = [j for j, v in enumerate(entete)
+                  if v is not None and str(v).strip() != "" and not calculee(norm(v))]
         lignes, vides = [], 0
         for num, row in enumerate(it, start=entete_ligne + 1):
-            if _vide(row):
+            if _vide(row, utiles):
                 vides += 1
                 if vides >= MAX_LIGNES_VIDES:
                     break

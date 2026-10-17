@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from itertools import combinations
 
-from app.imports.lecture import Feuille, norm
+from app.imports.lecture import Feuille, calculee, norm
 from app.imports.similarite import SEUIL_NOM_PROCHE, SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
 
 BLOQUANT, AVERT = "bloquant", "avertissement"
@@ -23,12 +23,6 @@ ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # NUMERIC(18,3) : 15 chiffres entiers
 RE_NOMBRE = re.compile(r"^-?\d{1,3}(?: ?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
 TROIS = Decimal("0.001")
-# Colonnes calculées de la feuille DONNEES de l'Excel REPORTING RH : ignorées sans avertissement.
-CALCULEES = {norm("TOTAL CHARGES (FCFA)"), norm("Total exclusions (technique)")}
-
-
-def calculee(n: str) -> bool:
-    return n in CALCULEES or n.endswith("(norme)")
 
 
 @dataclass

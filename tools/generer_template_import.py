@@ -17,7 +17,8 @@ LIGNES = 5000  # lignes pré-validées
 ENTETE = 3  # comme la feuille DONNEES de l'Excel
 TITRE = "FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois"
 CONSIGNE = ("Saisir ANNÉE (ex. 2025), MOIS (nom dans la liste) et MATRICULE (clé unique, ex. EMP001). "
-            "Ajouter les nouveaux mois à la suite. Le TOTAL se calcule seul.")
+            "Ajouter les nouveaux mois à la suite, sans ligne vide. "
+            "Pas de colonne TOTAL : il est calculé par l'application.")
 
 NAVY, RED, PAPER = "1A1F3C", "E3001B", "F4F5F8"
 
@@ -81,6 +82,7 @@ def feuille_lisez_moi(wb):
         ("Feuille à remplir", "DONNEES uniquement. Ne pas renommer les feuilles ni les en-têtes, ne pas insérer, déplacer ou supprimer de colonne."),
         ("Granularité", "Une ligne par salarié et par mois. Clé unique : ANNÉE + MOIS + MATRICULE."),
         ("Début des données", "Ligne 4 de la feuille DONNEES (titre ligne 1, consigne ligne 2, en-têtes ligne 3), comme dans l'Excel REPORTING RH. Aucune ligne de total."),
+        ("Lignes vides", "À éviter entre les données : après 50 lignes vides consécutives, la lecture s'arrête et les lignes suivantes ne sont pas importées."),
         ("ANNÉE / MOIS", "ANNÉE : nombre entier (2026). MOIS : nom complet avec accent, issu de la liste (Février, Août, Décembre)."),
         ("MATRICULE", "Texte, sans espace en début ou fin. Conserver les zéros de tête (colonne au format texte)."),
         ("Référentiels", "Type Contrat, Activité, Site, Service : choisir dans la liste (feuille REFERENTIELS). Une valeur absente de la liste est rejetée à l'import. Toute nouvelle valeur doit d'abord être créée dans l'application."),

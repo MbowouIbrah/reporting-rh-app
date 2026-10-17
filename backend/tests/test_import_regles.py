@@ -136,6 +136,18 @@ def test_feuille_donnees_excel_v5_colonnes_calculees_ignorees():
     assert st["lignes"] == 2 and st["periodes"] == 2 and not any(x.bloquant for x in L)
 
 
+def test_formules_prolongees_comptees_comme_lignes_vides():
+    """Les lignes où seules les colonnes calculées ont une valeur ne sont pas chargées et la
+    lecture s'arrête après MAX_LIGNES_VIDES d'entre elles."""
+    from app.imports.lecture import MAX_LIGNES_VIDES
+
+    calc = ["TOTAL CHARGES (FCFA)", "MOIS (norme)"]
+    formules = [[None] * len(ENTETES) + [0, ""]] * (MAX_LIGNES_VIDES + 10)
+    f = lire(xlsx([ligne() + [1000, "janvier"], *formules, ligne(MOIS="Février") + [0, ""]],
+                  ENTETES + calc, avant=2))
+    assert [n for n, _ in f.lignes] == [4]
+
+
 def test_fichier_vide_et_illisible():
     _, ens, _, _ = run([])
     assert (2, "DONNEES", "FICHIER_VIDE") in ens
