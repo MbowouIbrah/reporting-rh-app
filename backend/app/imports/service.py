@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.imports.lecture import Feuille, FichierIllisible, lire
-from app.imports.regles import BLOQUANT, Refs, norm, valider
+from app.imports.regles import BLOQUANT, Refs, entetes_reconnus, norm, valider
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
@@ -78,16 +78,17 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes) -> LotImport:
         if existant.statut == "valide":
             raise HTTPException(409, {"message": "Fichier déjà importé", "lot_id": existant.id})
         return existant
+    refs = charger_refs(db)
     try:
-        feuille = lire(contenu)
+        feuille = lire(contenu, entetes_reconnus(refs))
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
-    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu))
+    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs)
 
 
 def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha: str,
-                     taille: int) -> LotImport:
-    lignes, anos, stats = valider(feuille, charger_refs(db))
+                     taille: int, refs: Refs | None = None) -> LotImport:
+    lignes, anos, stats = valider(feuille, refs or charger_refs(db))
     nb_b = sum(1 for a in anos if a.gravite == BLOQUANT)
     lot = LotImport(
         fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,

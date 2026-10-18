@@ -10,6 +10,7 @@ from openpyxl import load_workbook
 MAX_OCTETS = 20 * 1024 * 1024
 MAX_LIGNES_VIDES = 50  # la plage déclarée d'un xlsx peut aller à 1 048 576 lignes
 LIGNES_ENTETE = 10
+MAX_LIGNES_APRES = 20_000  # recherche de données oubliées après l'arrêt de lecture
 CLES_ENTETE = ("annee", "mois", "matricule")
 
 
@@ -39,15 +40,18 @@ class Feuille:
     entete_ligne: int
     entetes: list  # valeurs brutes de la ligne d'en-tête, par position réelle
     lignes: list[tuple[int, tuple]]  # (numéro de ligne Excel, valeurs)
+    ligne_ignoree: int | None = None  # 1re ligne remplie après MAX_LIGNES_VIDES lignes vides
 
 
-def _vide(row, utiles) -> bool:
+def ligne_vide(row, utiles) -> bool:
     """Vide si aucune colonne utile n'est remplie : les formules prolongées sous les données
     (colonnes calculées seules) ne comptent pas."""
     return all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in utiles)
 
 
-def lire(contenu: bytes) -> Feuille:
+def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
+    """reconnues : en-têtes normalisés qui décident si une ligne est vide (ceux que les règles
+    lisent) ; par défaut toute colonne nommée non calculée."""
     if len(contenu) > MAX_OCTETS:
         raise FichierIllisible("Fichier trop volumineux (20 Mo maximum).")
     try:
@@ -68,17 +72,25 @@ def lire(contenu: bytes) -> Feuille:
                 break
         if entete is None:
             raise FichierIllisible("En-tête introuvable (ANNÉE, MOIS, MATRICULE) dans les 10 premières lignes.")
-        utiles = [j for j, v in enumerate(entete)
-                  if v is not None and str(v).strip() != "" and not calculee(norm(v))]
-        lignes, vides = [], 0
+        utiles = [j for j, v in enumerate(entete) if v is not None and str(v).strip() != ""
+                  and (norm(v) in reconnues if reconnues is not None else not calculee(norm(v)))]
+        lignes, vides, num = [], 0, entete_ligne
         for num, row in enumerate(it, start=entete_ligne + 1):
-            if _vide(row, utiles):
+            if ligne_vide(row, utiles):
                 vides += 1
                 if vides >= MAX_LIGNES_VIDES:
                     break
                 continue
             vides = 0
             lignes.append((num, tuple(row)))
-        return Feuille(entete_ligne, entete, lignes)
+        ignoree = None
+        if vides >= MAX_LIGNES_VIDES:  # données plus bas : signalées, jamais perdues en silence
+            for k, row in enumerate(it, start=num + 1):
+                if k > num + MAX_LIGNES_APRES:
+                    break
+                if not ligne_vide(row, utiles):
+                    ignoree = k
+                    break
+        return Feuille(entete_ligne, entete, lignes, ignoree)
     finally:
         wb.close()

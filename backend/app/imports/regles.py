@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from itertools import combinations
 
-from app.imports.lecture import Feuille, calculee, norm
+from openpyxl.utils import get_column_letter
+
+from app.imports.lecture import MAX_LIGNES_VIDES, Feuille, calculee, ligne_vide, norm
 from app.imports.similarite import SEUIL_NOM_PROCHE, SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
 
 BLOQUANT, AVERT = "bloquant", "avertissement"
@@ -118,6 +120,11 @@ def nombre(v) -> tuple[Decimal, bool] | None:
         return None
 
 
+def entetes_reconnus(refs: Refs) -> set[str]:
+    """En-têtes normalisés lus par les règles : seuls eux décident si une ligne est vide."""
+    return {norm(a) for a in ATTRIBUTS} | {norm(r) for r, _ in refs.rubriques} | set(refs.rubrique_alias)
+
+
 def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], dict]:
     anos: list[Anomalie] = []
     nb_bloq = 0
@@ -131,6 +138,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     rub_canon = {norm(r): r for r, _ in refs.rubriques} | refs.rubrique_alias
     attr_canon = {norm(a): a for a in ATTRIBUTS}
     cols: dict[str, int] = {}
+    utiles: list[int] = []  # colonnes reconnues, doublons compris (même règle que la lecture)
     for j, v in enumerate(feuille.entetes):
         if v is None or str(v).strip() == "":
             continue
@@ -142,11 +150,19 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             add(feuille.entete_ligne, str(v), "ENTETE_INCONNU", AVERT, v,
                 "Colonne inconnue, ignorée à l'import.")
             continue
-        if canon not in cols:
-            cols[canon] = j
-            if canon in rub_canon.values() and norm(canon) != n:
-                add(feuille.entete_ligne, str(v), "ENTETE_ALIAS", AVERT, v,
-                    f"Renommée « {canon} ».")
+        utiles.append(j)
+        if canon in cols:
+            add(feuille.entete_ligne, str(v), "ENTETE_DOUBLON", BLOQUANT, v,
+                f"« {canon} » déjà en colonne {get_column_letter(cols[canon] + 1)} : "
+                "garder une seule de ces colonnes.")
+            continue
+        cols[canon] = j
+        if canon in rub_canon.values() and norm(canon) != n:
+            add(feuille.entete_ligne, str(v), "ENTETE_ALIAS", AVERT, v, f"Renommée « {canon} ».")
+    if feuille.ligne_ignoree:
+        add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
+            f"Données après {MAX_LIGNES_VIDES} lignes vides consécutives : elles ne seraient pas "
+            "importées. Supprimer les lignes vides au-dessus.")
     requis = ATTRIBUTS + [r for r, _ in refs.rubriques]
     manquants = [e for e in requis if e not in cols]
     for m in manquants:
@@ -160,8 +176,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     postes_vus: set[str] = set()
 
     for num, row in feuille.lignes:
-        if all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in cols.values()):
-            continue  # seules les colonnes calculées (formules) sont remplies
+        if ligne_vide(row, utiles):
+            continue  # seules des colonnes non lues (calculées, inconnues) sont remplies
 
         def g(nom, row=row):
             j = cols[nom]

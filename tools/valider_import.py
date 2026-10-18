@@ -11,12 +11,13 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 # mêmes normalisation et colonnes calculées que l'import du backend (dépend d'openpyxl seulement)
-from app.imports.lecture import LIGNES_ENTETE, calculee, norm  # noqa: E402
+from app.imports.lecture import MAX_LIGNES_VIDES, calculee, lire, norm  # noqa: E402
 from generer_template_import import (  # noqa: E402
     ACTIVITES, ATTRIBUTS, CONTRATS, MOIS, RUBRIQUES, SERVICES, SITES,
 )
@@ -51,23 +52,30 @@ class Rapport:
         return sum(1 for a in self.lignes if a[3] == gravite)
 
 
+CANON = {norm(e): e for e in ENTETES} | {norm(k): v for k, v in ALIAS_ENTETES.items()}
+ALIAS = {norm(k) for k in ALIAS_ENTETES}
+
+
 def lire_entetes(brut, ligne, rap):
     """Colonnes reconnues -> position. En-têtes comparés comme au backend (accents, casse, NBSP)."""
-    canon = {norm(e): e for e in ENTETES} | {norm(k): v for k, v in ALIAS_ENTETES.items()}
     cols = {}
     for j, v in enumerate(brut):
         if v is None or str(v).strip() == "":
             continue
         n = norm(v)
-        e = canon.get(n)
+        e = CANON.get(n)
         if e is None:
             # colonnes calculées de l'Excel REPORTING RH : ignorées sans avertissement
             if not calculee(n):
                 rap.add(ligne, v, "ENTETE_INCONNU", AVERT, v, "Colonne inconnue, ignorée à l'import.")
             continue
-        if n in {norm(k) for k in ALIAS_ENTETES}:
+        if e in cols:
+            rap.add(ligne, v, "ENTETE_DOUBLON", BLOQUANT, v, f"« {e} » déjà en colonne "
+                    f"{get_column_letter(cols[e] + 1)} : garder une seule de ces colonnes.")
+            continue
+        if n in ALIAS:
             rap.add(ligne, v, "ENTETE_ALIAS", AVERT, v, f"Renommée « {e} ».")
-        cols.setdefault(e, j)
+        cols[e] = j
     manquants = [e for e in ENTETES if e not in cols]
     for m in manquants:
         rap.add(ligne, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
@@ -95,31 +103,20 @@ def texte(v):
 
 def valider(chemin):
     rap, stats = Rapport(), {}
-    wb = load_workbook(chemin, data_only=True, read_only=True)
-    if "DONNEES" not in wb.sheetnames:
-        raise ValueError("Feuille DONNEES introuvable.")
-    lignes = wb["DONNEES"].iter_rows(values_only=True)
-    # en-tête cherché dans les 10 premières lignes (ligne 3 dans l'Excel REPORTING RH et le template)
-    entete, ligne_entete = None, 0
-    for ligne_entete, row in enumerate(lignes, start=1):
-        if ligne_entete > LIGNES_ENTETE:
-            break
-        if {"annee", "mois", "matricule"} <= {norm(v) for v in row if v is not None}:
-            entete = row
-            break
-    if entete is None:
-        raise ValueError("En-tête introuvable (ANNÉE, MOIS, MATRICULE) dans les 10 premières lignes.")
-
-    cols = lire_entetes(entete, ligne_entete, rap)
+    # même lecture que l'import (en-tête dans les 10 premières lignes, arrêt après 50 lignes vides)
+    feuille = lire(Path(chemin).read_bytes(), set(CANON))
+    cols = lire_entetes(feuille.entetes, feuille.entete_ligne, rap)
     if cols is None:
         return rap, {"lignes": 0}
+    if feuille.ligne_ignoree:
+        rap.add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
+                f"Données après {MAX_LIGNES_VIDES} lignes vides consécutives : elles ne seraient pas "
+                "importées. Supprimer les lignes vides au-dessus.")
 
     cles = defaultdict(list)
     par_matricule = defaultdict(list)
     n = 0
-    for num, row in enumerate(lignes, start=ligne_entete + 1):
-        if all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in cols.values()):
-            continue  # vide, ou seules les colonnes calculées (formules prolongées)
+    for num, row in feuille.lignes:
         n += 1
         g = lambda nom: row[cols[nom]] if cols[nom] < len(row) else None  # noqa: E731
 

@@ -91,3 +91,14 @@ def test_fichier_reporting_rh_formules_prolongees_et_entetes_souples(tmp_path):
                                  ent, avant=2))
     assert rap.compte(BLOQUANT) == 0 and stats["lignes"] == 1
     assert [(a[0], a[2]) for a in rap.lignes if a[2].startswith("ENTETE")] == [(3, "ENTETE_INCONNU")]
+
+
+def test_meme_lecture_que_l_import_arret_apres_lignes_vides_et_doublon(tmp_path):
+    from app.imports.lecture import MAX_LIGNES_VIDES
+
+    rows = [ligne(), *[[None] * len(ENTETES)] * MAX_LIGNES_VIDES, ligne(MATRICULE="EMP002")]
+    rap, stats = valider(fichier(tmp_path, rows))
+    assert stats["lignes"] == 1
+    assert (MAX_LIGNES_VIDES + 3, "LIGNES_IGNOREES") in {(a[0], a[2]) for a in rap.lignes}
+    rap, _ = valider(fichier(tmp_path, [ligne() + [3]], ENTETES + ["Variable"]))
+    assert codes(rap) == {"ENTETE_DOUBLON"} and rap.compte(BLOQUANT) == 1

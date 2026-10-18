@@ -145,7 +145,28 @@ def test_formules_prolongees_comptees_comme_lignes_vides():
     formules = [[None] * len(ENTETES) + [0, ""]] * (MAX_LIGNES_VIDES + 10)
     f = lire(xlsx([ligne() + [1000, "janvier"], *formules, ligne(MOIS="Février") + [0, ""]],
                   ENTETES + calc, avant=2))
-    assert [n for n, _ in f.lignes] == [4]
+    assert [n for n, _ in f.lignes] == [4] and f.ligne_ignoree == 4 + MAX_LIGNES_VIDES + 11
+
+
+def test_donnees_apres_lignes_vides_bloquantes_et_colonne_inconnue_ignoree():
+    """Un bloc séparé par 50 lignes vides n'est pas perdu en silence ; une colonne inconnue
+    recopiée vers le bas ne prolonge pas la lecture (même règle « vide » que les règles)."""
+    from app.imports.lecture import MAX_LIGNES_VIDES
+    from app.imports.regles import entetes_reconnus
+
+    vides = [[None] * len(ENTETES) + ["note"]] * MAX_LIGNES_VIDES
+    contenu = xlsx([ligne(), *vides, ligne(MOIS="Février")], ENTETES + ["Commentaire"])
+    f = lire(contenu, entetes_reconnus(refs()))
+    assert [n for n, _ in f.lignes] == [2] and f.ligne_ignoree == 3 + MAX_LIGNES_VIDES
+    _, anos, _ = valider(f, refs(postes={"p"}))
+    assert (f.ligne_ignoree, "LIGNES_IGNOREES", BLOQUANT) in {(a.ligne, a.code, a.gravite) for a in anos}
+
+
+def test_entete_en_double_bloquant_sans_faux_alias():
+    ent = ENTETES + ["Variable"]
+    _, ens, anos, _ = run([ligne(Commission=5) + [7]], ent, postes={"p"})
+    assert ens == {(1, "Variable", "ENTETE_DOUBLON")}
+    assert "colonne " in anos[0].message and anos[0].gravite == BLOQUANT
 
 
 def test_fichier_vide_et_illisible():

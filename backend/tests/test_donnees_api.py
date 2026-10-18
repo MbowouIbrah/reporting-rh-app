@@ -93,15 +93,16 @@ def test_modele_mensuel_identique_a_la_feuille_donnees_excel():
     assert "Ne pas modifier les colonnes ANNÉE et MOIS" in ws["A2"].value
 
 
-def test_modele_mensuel_rubrique_hors_liste_excel_apres_sa_voisine():
+def test_modele_mensuel_rubriques_hors_liste_excel_en_fin_dans_l_ordre_recu():
     from app.imports import modeles
     from app.imports.regles import ATTRIBUTS
     from app.referentiels_init import RUBRIQUES
 
     v5 = [r for r, _ in RUBRIQUES]
-    app = [v5[0], "Nouvelle prime", *v5[1:]]
+    app = [v5[0], "Nouvelle prime", *v5[1:3], "Autre prime", *v5[3:]]
     refs = {k: [] for k in ("Poste", "Type Contrat", "Activité", "Site", "Service")}
     ws = load_workbook(io.BytesIO(modeles.modele_mensuel(
         2026, 1, app, refs, [["E1", "Ann", "P", "CDI", "Front office", "Douala", "SAV PL",
                               *range(len(app))]])))["DONNEES"]
-    assert [x.value for x in ws[3]][len(ATTRIBUTS):] == app
+    assert [x.value for x in ws[3]][len(ATTRIBUTS):] == [*v5, "Nouvelle prime", "Autre prime"]
+    assert ws.cell(4, len(ATTRIBUTS) + len(v5) + 1).value == 1  # le montant suit sa colonne

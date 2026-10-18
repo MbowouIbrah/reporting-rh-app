@@ -120,7 +120,7 @@ def modele_mensuel(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1,
                    matricules: list[str] | None = Query(None),
                    p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "saisie:write")
-    rubriques = [r.libelle for r in _rubriques(db)]
+    rubriques = [r.libelle for r in sorted(_rubriques(db), key=lambda r: r.id)]  # ordre de création
     refs = {k: sorted(_libelles(db, m).values()) for k, m in REFS.items()}
     existantes = {x["matricule"]: x for x in _lignes(db, annee, mois)}
     fiche = [(m, c, _libelles(db, m)) for m, c in (
@@ -235,7 +235,7 @@ def modele_saisie(corps: SaisieIn, p: Principal = Depends(current_principal),
     """Modèle xlsx tiré de l'assistant : exactement les lignes envoyées (employés cochés, valeurs
     déjà saisies dans la grille). Aucune ligne : modèle vide, en-tête et listes déroulantes."""
     authorize(p, "saisie:write")
-    rubriques = [r.libelle for r in _rubriques(db)]
+    rubriques = [r.libelle for r in sorted(_rubriques(db), key=lambda r: r.id)]  # ordre de création
     refs = {k: sorted(_libelles(db, m).values()) for k, m in REFS.items()}
     lignes = [["" if est_sans_matricule(x.matricule) else x.matricule.strip(), x.nom,
                x.poste, x.type_contrat, x.activite, x.site, x.service,

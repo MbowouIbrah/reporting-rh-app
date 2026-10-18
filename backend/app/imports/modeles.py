@@ -78,13 +78,10 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
     from app.referentiels_init import RUBRIQUES
 
     # Rang dans l'Excel ; une rubrique absente de la liste d'origine (ajoutée ou renommée dans
-    # l'application) se place juste après celle qui la précède dans l'ordre de l'application.
+    # l'application) va en fin de fichier, dans l'ordre reçu (ordre de création) : déplacer les
+    # colonnes à l'écran ne change jamais la disposition du modèle.
     rang_excel = {lib: i for i, (lib, _u) in enumerate(RUBRIQUES)}
-    rang, prec = [], -1.0
-    for lib in rubriques:
-        prec = rang_excel[lib] if lib in rang_excel else prec + 0.001
-        rang.append(prec)
-    ordre = sorted(range(len(rubriques)), key=lambda i: (rang[i], i))
+    ordre = sorted(range(len(rubriques)), key=lambda i: (rang_excel.get(rubriques[i], len(RUBRIQUES)), i))
     rubriques = [rubriques[i] for i in ordre]
 
     wb = Workbook()
