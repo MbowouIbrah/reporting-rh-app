@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react'
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { appliquerDecisions, lireLigne, simulerDecisions, type AnomalieLot, type Decisions, type LigneLot, type Lot } from '../../../api/saisie'
 import { Bouton } from '../../../components/Kit'
 import { MOIS, valeurBrute } from '../../../lib/format'
@@ -252,7 +252,7 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauPr
               </tr>
               {ouvert && (
                 <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} point={a} edition={edition}
-                  points={tous.filter((x) => x.ligne === a.ligne)} />
+                  points={tous} />
               )}
             </Fragment>
           )
@@ -284,7 +284,7 @@ interface DetailProps {
   cible: string | null
   /** Point déplié : les décisions proposées dépendent de son code. */
   point: AnomalieLot
-  /** Points de la ligne : cellule rouge ou orange tant que le point reste, verte une fois réglé. */
+  /** Points du lot : cellule rouge ou orange tant que le point reste, verte une fois réglé. */
   points: AnomalieLot[]
   edition: Edition
 }
@@ -308,7 +308,7 @@ interface Decision {
 }
 
 /** Question posée par la liste et décisions proposées, selon le code du point. Aucune n'est choisie d'office. */
-function decisions(point: AnomalieLot, num: number): { question: string; choix: Decision[] } | null {
+function decisions(point: AnomalieLot): { question: string; choix: Decision[] } | null {
   const col = point.colonne ?? ''
   const prop = point.proposition
   const precedent: Decision[] = prop?.valeur
@@ -329,7 +329,7 @@ function decisions(point: AnomalieLot, num: number): { question: string; choix: 
       choix: prop.lignes.map((n) => {
         const autres = prop.lignes!.filter((x) => x !== n)
         return {
-          libelle: `Garder la ligne ${n}${n === num ? ' (celle-ci)' : ''}, retirer ${autres.length > 1 ? 'les lignes' : 'la ligne'} ${autres.join(', ')}`,
+          libelle: `Supprimer ${autres.length > 1 ? 'les lignes' : 'la ligne'} ${autres.join(', ')}, garder la ligne ${n}`,
           retirer: autres,
         }
       }),
@@ -350,11 +350,18 @@ function ignorable(a: AnomalieLot) {
 
 /** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
 function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps) {
-  const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
+  // Doublon : toutes les lignes en cause, dans l'ordre du fichier, pour les comparer.
+  const ordre = point.code === 'DOUBLON' && (point.proposition?.lignes?.length ?? 0) > 1
+    ? [...point.proposition!.lignes!].sort((a, b) => a - b) : [num]
+  const qs = useQueries({ queries: ordre.map((n) => ({ queryKey: ['saisie', 'ligne', lotId, n], queryFn: () => lireLigne(lotId, n) })) })
+  const q = qs[ordre.indexOf(num)]
+  const comparer = ordre.length > 1
+  // Mêmes colonnes sur chaque ligne comparée.
+  const colonnes = [...new Set(qs.flatMap((x) => Object.keys(x.data?.montants ?? {})))]
   const { plan, setPlan, occupe } = edition
   const k = cle(point)
   const c = cellule(point)
-  const proposees = decisions(point, num)
+  const proposees = decisions(point)
   const choisi = plan.choix[k]
   const ignore = plan.ignores.includes(c)
   const nouveauSite = choisi?.decision.ajout?.dimension === 'site' ? choisi.decision.ajout.valeur : null
@@ -373,21 +380,38 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
   const question = proposees?.question
     ?? `${point.colonne}${point.valeur ? ` « ${point.valeur} »` : ' vide'} : que faire ?`
   // Revenir à la valeur du fichier efface la modification ; saisir une valeur annule « ignorer » sur la cellule.
-  const modifier = (col: string, v: string | null) => setPlan((p) => {
-    const ligne = { ...p.modifs[num] }
+  const modifier = (n: number, brut: Record<string, string | null>) => (col: string, v: string | null) => setPlan((p) => {
+    const ligne = { ...p.modifs[n] }
     delete ligne[col]
-    if (v !== (q.data?.brut?.[col] ?? null)) ligne[col] = v
-    const modifs = { ...p.modifs, [num]: ligne }
-    if (!Object.keys(ligne).length) delete modifs[num]
-    return { ...p, modifs, ignores: p.ignores.filter((x) => x !== `${num}|${col}`) }
+    if (v !== (brut[col] ?? null)) ligne[col] = v
+    const modifs = { ...p.modifs, [n]: ligne }
+    if (!Object.keys(ligne).length) delete modifs[n]
+    return { ...p, modifs, ignores: p.ignores.filter((x) => x !== `${n}|${col}`) }
   })
+  // Lignes comparées : un défilement horizontal entraîne les autres.
+  const suivre = (e: UIEvent<HTMLElement>) => {
+    const t = e.target as HTMLElement
+    if (!t.classList.contains('ligne-fichier')) return
+    e.currentTarget.querySelectorAll<HTMLElement>('.ligne-fichier').forEach((d) => { if (d !== t) d.scrollLeft = t.scrollLeft })
+  }
   return (
     <tr className={edition.restants.has(k) ? 'detail-contrat' : 'detail-contrat detail-regle'}>
-      <td colSpan={5}>
+      <td colSpan={5} className={comparer ? 'comparer' : undefined} onScrollCapture={comparer ? suivre : undefined}>
         {q.isSuccess ? (
           <>
-            <LigneFichier l={q.data} num={num} cible={cible} points={points}
-              restants={edition.restants} modifs={edition.lignes[num]} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
+            {ordre.map((n, i) => {
+              const d = qs[i].data
+              return (
+                <Fragment key={n}>
+                  {comparer && <p className="ligne-titre">Ligne {n}{n === num ? ' (signalée)' : ''}</p>}
+                  {d ? (
+                    <LigneFichier l={d} num={n} cible={n === num ? cible : null} points={points.filter((x) => x.ligne === n)}
+                      colonnes={comparer ? colonnes : undefined} restants={edition.restants} modifs={edition.lignes[n]}
+                      onModifie={d.brut ? modifier(n, d.brut) : undefined} enCours={occupe} />
+                  ) : <span className="muted">{qs[i].isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
+                </Fragment>
+              )
+            })}
             {q.data.brut && (regle
               ? <p className="actions-point regle">Point réglé.</p>
               : (proposees || ignorable(point)) && (
@@ -430,6 +454,8 @@ interface LigneProps {
   num: number
   cible: string | null
   points: AnomalieLot[]
+  /** Rubriques à afficher en plus de celles de la ligne (lignes comparées). */
+  colonnes?: string[]
   /** Clés des points encore présents ; absent : tous. */
   restants?: Set<string>
   /** Valeurs changées, pas encore enregistrées. */
@@ -439,7 +465,7 @@ interface LigneProps {
   enCours?: boolean
 }
 
-function LigneFichier({ l, num, cible, points, restants, modifs = {}, onModifie, enCours }: LigneProps) {
+function LigneFichier({ l, num, cible, points, colonnes = [], restants, modifs = {}, onModifie, enCours }: LigneProps) {
   const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number; saisi?: boolean } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
@@ -464,7 +490,7 @@ function LigneFichier({ l, num, cible, points, restants, modifs = {}, onModifie,
   const reste = (p: AnomalieLot) => !restants || restants.has(cle(p))
   // Un point restant l'emporte sur un point réglé de la même colonne.
   const parColonne = new Map([...points].sort((a, b) => Number(reste(a)) - Number(reste(b))).map((p) => [p.colonne, p]))
-  const rubriques = [...new Set([...Object.keys(l.montants), ...points.map((p) => p.colonne ?? '')])]
+  const rubriques = [...new Set([...Object.keys(l.montants), ...colonnes, ...points.map((p) => p.colonne ?? '')])]
     .filter((c) => c && !ATTRIBUTS.some(([n]) => n === c))
   const cellules: [string, string | null][] = [
     ...ATTRIBUTS.map(([n, f]): [string, string | null] => [n, f(l)]),

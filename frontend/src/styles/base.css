@@ -768,6 +768,11 @@ table.points td.cellule-modifiee { background: var(--info-soft); color: var(--in
 .ligne-fichier table.dense td.en-saisie:not(.fige) { position: relative; }
 .ligne-fichier table.dense td.en-saisie .fantome { visibility: hidden; }
 .ligne-fichier table.dense td.en-saisie input::-webkit-calendar-picker-indicator { display: none !important; }
+/* Doublon : lignes comparées l'une sous l'autre, colonnes de même largeur, alignées. */
+.ligne-titre { margin: 0; padding: 6px 8px 4px; font-size: 13px; font-weight: 600; color: var(--navy); position: sticky; left: 0; }
+.page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense, .comparer .ligne-fichier table.dense { table-layout: fixed; width: max-content; min-width: 0; }
+.page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense :is(th, td), .comparer .ligne-fichier table.dense :is(th, td) { width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense thead th, .comparer .ligne-fichier table.dense thead th { white-space: normal; vertical-align: bottom; }
 /* Point réglé : cellule et liseré gauche passent au vert. */
 table.points td.cellule-ok, .ligne-fichier table.dense td.fige.cellule-ok { background: #E6F6EC; color: #147a41; font-weight: 600; }
 table.points tr.point-regle td.ouvert, table.points tr.detail-regle > td, .rapport-excel .panneau table.points tr.detail-regle > td { border-left-color: #147a41; }

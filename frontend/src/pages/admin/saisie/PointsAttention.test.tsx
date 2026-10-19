@@ -166,7 +166,10 @@ test('doublon : aucune solution choisie d’office ; « Garder la ligne 41 » en
   pointsOuverts({ ...anomalie('DOUBLON', 'bloquant', 'Même employé deux fois.', 'MATRICULE'), ligne: 40, proposition: { lignes: [40, 41] } }, onLot)
   const liste = await screen.findByRole('combobox', { name: 'Employé sur plusieurs lignes du même mois : quelle ligne garder ?' })
   expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
-    'Choisir une solution…', 'Garder la ligne 40 (celle-ci), retirer la ligne 41', 'Garder la ligne 41, retirer la ligne 40'])
+    'Choisir une solution…', 'Supprimer la ligne 41, garder la ligne 40', 'Supprimer la ligne 40, garder la ligne 41'])
+  // Les deux lignes, dans l'ordre du fichier, pour comparer.
+  expect(await screen.findByRole('table', { name: 'Ligne 41 du fichier' })).toBeInTheDocument()
+  expect(screen.getAllByText(/^Ligne 4[01]/).map((p) => p.textContent)).toEqual(['Ligne 40 (signalée)', 'Ligne 41'])
   expect(liste).toHaveValue('')
   const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
   expect(enregistrer).toBeDisabled()
