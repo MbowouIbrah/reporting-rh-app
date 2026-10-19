@@ -710,11 +710,11 @@ html, body { overscroll-behavior: none; }
 .saisie-synthese .saisie-total strong { display: block; font-size: var(--fs-lg); color: var(--navy); }
 .saisie-oubli { color: var(--red-deep); font-weight: var(--fw-bold); }
 .saisie-tout { margin: 0; padding: var(--sp-2) var(--sp-3); display: flex; justify-content: flex-end; gap: var(--sp-2); }
-/* Volets : un seul ouvert, titres toujours visibles, seul le contenu du volet ouvert défile */
-.page-ecran.saisie-apercu .panneau-corps.volets { overflow: hidden; border: 0; }
+.page-ecran.saisie-apercu .panneau-corps.volets { overflow: hidden; border: 0; padding: 16px; }
+@media (min-width: 1360px) { .page-ecran.saisie-apercu .panneau { flex: 1; } }
 /* Volets : copie des blocs du compte rendu cfaoacademy (.cr-bloc), un seul ouvert, seul son contenu défile */
 .volets { display: flex; flex-direction: column; gap: 12px; }
-.volet { flex: none; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); overflow: hidden; }
+.volet { flex: none; border: 1px solid var(--rule); border-radius: 0; background: var(--paper); overflow: hidden; }
 .volet-ouvert { border-color: var(--muted-2); display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .page .volet-titre { margin: 0; font-size: inherit; }
 .volet-bouton { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 16px; border: 0; background: var(--paper-2); font-family: inherit; text-align: left; cursor: pointer; transition: background .14s; }
@@ -725,13 +725,11 @@ html, body { overscroll-behavior: none; }
 .volet-ouvert .volet-fleche { transform: rotate(90deg); color: var(--red); }
 .volet-nom { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink); }
 .volet-resume { flex: none; font-size: 12.5px; font-weight: 400; color: var(--muted-2); }
-.volet-valeur { flex: none; font-family: var(--font-mono); font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px; background: var(--paper-3); color: var(--muted); display: inline-block; white-space: nowrap; }
+.volet-valeur { flex: none; font-family: var(--font-mono); font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 0; background: var(--paper-3); color: var(--muted); display: inline-block; white-space: nowrap; }
 .volet-valeur-ok { background: #E6F6EC; color: #147a41; }
 .volet-valeur-ko { background: var(--red-soft); color: var(--red-deep); }
-.volet-corps { padding: 16px; flex: 1; min-height: 0; overflow: auto; }
-.page-ecran.rapport-excel:not(.graphes-excel) .panneau .volet-corps table.dense thead th { top: -16px; }
-.volet-corps > table.dense { margin: 0; }
-.page-ecran.rapport-excel .volet-corps table.dense thead th { top: -16px; }
+.volet-corps { flex: 1; min-height: 0; overflow: auto; }
+.page-ecran.saisie-apercu .volet-corps > table.dense { margin: 0; border: 0; border-collapse: separate; border-spacing: 0; }
 .saisie-apercu table.dense { width: 100%; }
 .saisie-apercu table.dense th, .saisie-apercu table.dense td { vertical-align: top; white-space: normal; }
 .saisie-apercu table.dense thead th:not(.num) { text-align: left; }
