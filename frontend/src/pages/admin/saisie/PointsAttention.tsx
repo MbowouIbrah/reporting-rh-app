@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ajouterReferentiel, corrigerLigne, lireLigne, retirerLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { appliquerDecisions, lireLigne, simulerDecisions, type AnomalieLot, type Decisions, type LigneLot, type Lot } from '../../../api/saisie'
 import { Bouton } from '../../../components/Kit'
 import { MOIS, valeurBrute } from '../../../lib/format'
 import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
@@ -59,8 +59,10 @@ interface Props {
   anomalies: AnomalieLot[]
   /** Lot importé : permet de rouvrir la ligne du fichier. Absent pour une saisie en grille. */
   lotId?: number
-  /** Lot renvoyé après une correction sur place (contrôles relancés). */
+  /** Lot renvoyé après l'enregistrement des corrections (contrôles relancés). */
   onLot?: (lot: Lot) => void
+  /** Nombre de changements pas encore enregistrés. */
+  onAttente?: (n: number) => void
   /** Numéro de ligne du fichier : sans objet pour une saisie en grille. */
   afficherLigne: boolean
   /** Volet ouvert, partagé avec le reste de l'aperçu : un seul à la fois. */
@@ -68,17 +70,127 @@ interface Props {
   onOuvrir: (id: string) => void
 }
 
+const cle = (a: { ligne: number | null; colonne: string | null; code: string }) => `${a.ligne}|${a.colonne}|${a.code}`
+const cellule = (a: AnomalieLot) => `${a.ligne}|${a.colonne}`
+
+/** Changements en attente jusqu'à « Enregistrer » : cellules saisies, solution choisie par point, valeurs ignorées. */
+interface Plan {
+  modifs: Record<number, Record<string, string | null>>
+  choix: Record<string, { index: number; decision: Decision; ligne: number }>
+  /** Type de chaque nouveau site, par nom de site. */
+  typeSite: Record<string, string>
+  /** « ligne|colonne » : cellule laissée vide, point accepté. */
+  ignores: string[]
+}
+
+const VIDE: Plan = { modifs: {}, choix: {}, typeSite: {}, ignores: [] }
+
+function nombre(p: Plan) {
+  return Object.keys(p.choix).length + p.ignores.length
+    + Object.values(p.modifs).reduce((n, m) => n + Object.keys(m).length, 0)
+}
+
+/** Corps envoyé au serveur : valeurs par ligne (choix, puis saisies, puis cellules ignorées vidées). */
+function corps(p: Plan): Decisions {
+  const lignes: Decisions['lignes'] = {}
+  const ajouts = new Map<string, Decisions['ajouts'][number]>()
+  const retirees = new Set<number>()
+  for (const { decision: d, ligne } of Object.values(p.choix)) {
+    if (d.valeurs) lignes[ligne] = { ...lignes[ligne], ...d.valeurs }
+    if (d.ajout) {
+      const typeSite = d.ajout.dimension === 'site' ? p.typeSite[d.ajout.valeur] ?? null : null
+      ajouts.set(`${d.ajout.dimension}|${d.ajout.valeur}`, { ...d.ajout, type_site: typeSite })
+    }
+    d.retirer?.forEach((n) => retirees.add(n))
+  }
+  for (const [n, m] of Object.entries(p.modifs)) lignes[+n] = { ...lignes[+n], ...m }
+  for (const i of p.ignores) {
+    const [n, col] = i.split('|')
+    lignes[+n] = { ...lignes[+n], [col]: null }
+  }
+  for (const n of retirees) delete lignes[n]
+  return { lignes, ajouts: [...ajouts.values()], retirees: [...retirees], ignores: p.ignores }
+}
+
+/** Ce que le détail d'un point lit et change dans le plan commun. */
+interface Edition {
+  plan: Plan
+  lignes: Decisions['lignes']
+  /** Clés des points encore présents (après vérification des changements en attente). */
+  restants: Set<string>
+  occupe: boolean
+  setPlan: (f: (p: Plan) => Plan) => void
+}
+
 /** Points regroupés par nature et par niveau (à corriger, à confirmer, corrigé automatiquement). */
-export default function PointsAttention({ anomalies, lotId, onLot, afficherLigne, ouvert, onOuvrir }: Props) {
+export default function PointsAttention({ anomalies, lotId, onLot, onAttente, afficherLigne, ouvert, onOuvrir }: Props) {
+  const [plan, setPlan] = useState<Plan>(VIDE)
+  const qc = useQueryClient()
+  // Un point réglé reste affiché (en vert) : la liste ne bouge pas sous les yeux.
+  const memoire = useRef<{ lot?: number; points: Map<string, AnomalieLot> }>({ lot: lotId, points: new Map() })
+  if (memoire.current.lot !== lotId) memoire.current = { lot: lotId, points: new Map() }
+  const vus = new Map<string, number>()
+  for (const a of anomalies) {
+    const k = cle(a)
+    vus.set(k, (vus.get(k) ?? 0) + 1)
+    memoire.current.points.set(`${k}#${vus.get(k)}`, a)
+  }
+  const tous = lotId != null ? [...memoire.current.points.values()] : anomalies
+  const n = nombre(plan)
+  const envoi = n > 0 ? corps(plan) : null
+  // Vérification des changements en attente, un instant après la dernière saisie.
+  const texte = JSON.stringify(envoi)
+  const [verifie, setVerifie] = useState<Decisions | null>(null)
+  useEffect(() => {
+    const t = window.setTimeout(() => setVerifie(JSON.parse(texte)), 300)
+    return () => window.clearTimeout(t)
+  }, [texte])
+  const simulation = useQuery({
+    queryKey: ['saisie', 'simulation', lotId, verifie], queryFn: () => simulerDecisions(lotId!, verifie!),
+    enabled: lotId != null && verifie != null, placeholderData: keepPreviousData, retry: false,
+  })
+  const enregistrer = useMutation({
+    mutationFn: () => appliquerDecisions(lotId!, envoi!),
+    onSuccess: async (lot) => {
+      onLot?.(lot)
+      // Points relus avant de vider le plan : ceux réglés passent au vert sans repasser par le rouge.
+      await qc.invalidateQueries({ queryKey: ['saisie'], predicate: (q) => q.queryKey[1] !== 'simulation' })
+      setPlan(VIDE)
+    },
+  })
+  useEffect(() => { onAttente?.(n) }, [n, onAttente])
+  const restants = new Set((envoi && simulation.data ? simulation.data.anomalies : anomalies).map(cle))
+  const occupe = enregistrer.isPending
+  const sansType = envoi?.ajouts.some((a) => a.dimension === 'site' && !a.type_site) ?? false
+  const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan }
+  const erreur = enregistrer.error ?? (envoi ? simulation.error : null)
   return (
     <>
-      {repartir(anomalies).map((g) => (
-        <Volet key={g.id} titre={g.titre} valeur={g.lignes.length} ton={NIVEAUX[g.niveau].ton}
-          resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
-          ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
-          <Tableau lignes={g.lignes} tous={anomalies} lotId={lotId} onLot={onLot} afficherLigne={afficherLigne} ton={NIVEAUX[g.niveau].ton} />
-        </Volet>
-      ))}
+      {repartir(tous).map((g) => {
+        const reste = g.lignes.filter((a) => restants.has(cle(a))).length
+        return (
+          <Volet key={g.id} titre={g.titre} valeur={reste} ton={reste === 0 ? 'ok' : NIVEAUX[g.niveau].ton}
+            resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
+            ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
+            <Tableau lignes={g.lignes} tous={tous} lotId={lotId} afficherLigne={afficherLigne}
+              ton={NIVEAUX[g.niveau].ton} edition={lotId != null ? edition : undefined} />
+          </Volet>
+        )
+      })}
+      {lotId != null && afficherLigne && tous.length > 0 && (
+        <div className="corrections-pied">
+          <span className="muted" aria-live="polite">
+            {n === 0 ? 'Aucun changement en attente.'
+              : `${n} changement${n > 1 ? 's' : ''} en attente${sansType ? ' : choisir le type du nouveau site' : ''}`}
+            {envoi && simulation.isFetching ? ' · vérification…' : ''}
+          </span>
+          {n > 0 && <Bouton variante="secondaire" disabled={occupe} onClick={() => setPlan(() => VIDE)}>Annuler les changements</Bouton>}
+          <Bouton disabled={n === 0 || occupe || sansType} onClick={() => enregistrer.mutate()}>
+            {occupe ? 'Enregistrement…' : 'Enregistrer'}
+          </Bouton>
+          {erreur && <p className="champ-erreur admin-erreur" role="alert">{erreur.message}</p>}
+        </div>
+      )}
     </>
   )
 }
@@ -93,19 +205,15 @@ interface TableauProps {
   lignes: AnomalieLot[]
   tous: AnomalieLot[]
   lotId?: number
-  onLot?: (lot: Lot) => void
   afficherLigne: boolean
   /** Couleur de la bordure du détail déplié : celle du niveau du volet. */
   ton?: 'ko' | 'attention'
+  /** Absent : saisie en grille, rien à corriger ici. */
+  edition?: Edition
 }
 
-const cle = (a: AnomalieLot) => `${a.ligne}|${a.colonne}|${a.code}`
-
-function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProps) {
-  // Point déplié repéré par sa clé : après une correction, s'il a disparu, la même ligne reste ouverte sur le point suivant.
-  const [deplie, setDeplie] = useState<{ ligne: number; cle: string } | null>(null)
-  const meme = deplie ? lignes.findIndex((a) => cle(a) === deplie.cle) : -1
-  const iDeplie = meme >= 0 || !deplie ? meme : lignes.findIndex((a) => a.ligne === deplie.ligne)
+function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauProps) {
+  const [deplie, setDeplie] = useState<string | null>(null)
   return (
     <table className={ton ? `dense points bord-${ton}` : 'dense points'}>
       <thead>
@@ -119,13 +227,15 @@ function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProp
       </thead>
       <tbody>
         {lignes.map((a, i) => {
-          const depliable = afficherLigne && lotId != null && ancrable(a)
-          const ouvert = depliable && iDeplie === i
+          const k = `${cle(a)}|${i}`
+          const depliable = afficherLigne && lotId != null && edition != null && ancrable(a)
+          const ouvert = depliable && deplie === k
+          const regle = edition != null && !edition.restants.has(cle(a))
           return (
-            <Fragment key={`${cle(a)}|${i}`}>
+            <Fragment key={k}>
               {/* Toute la ligne ouvre le détail ; le bouton ▸ reçoit le clic au clavier (il remonte jusqu'à la ligne). */}
-              <tr className={depliable ? 'depliable' : undefined}
-                onClick={depliable ? () => setDeplie(ouvert ? null : { ligne: a.ligne!, cle: cle(a) }) : undefined}>
+              <tr className={[depliable && 'depliable', regle && 'point-regle'].filter(Boolean).join(' ') || undefined}
+                onClick={depliable ? () => setDeplie(ouvert ? null : k) : undefined}>
                 {afficherLigne && (
                   <td className={ouvert ? 'num ouvert' : 'num'}>
                     {depliable ? (
@@ -138,11 +248,11 @@ function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProp
                 <td>{employe(a)}</td>
                 <td>{a.colonne}</td>
                 <td>{a.valeur}</td>
-                <td>{a.message}</td>
+                <td>{regle && <span className="regle">Réglé · </span>}{a.message}</td>
               </tr>
               {ouvert && (
-                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} onLot={onLot} point={a}
-                  points={tous.filter((x) => x.ligne === a.ligne)} />
+                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} point={a} edition={edition}
+                  points={tous.filter((x) => x.ligne === a.ligne && edition.restants.has(cle(x)))} />
               )}
             </Fragment>
           )
@@ -174,8 +284,9 @@ interface DetailProps {
   cible: string | null
   /** Point déplié : les décisions proposées dépendent de son code. */
   point: AnomalieLot
+  /** Points encore présents sur la ligne : leurs cellules restent surlignées. */
   points: AnomalieLot[]
-  onLot?: (lot: Lot) => void
+  edition: Edition
 }
 
 /** Liste du référentiel où ajouter une valeur inconnue, selon la colonne. */
@@ -196,7 +307,7 @@ interface Decision {
   retirer?: number[]
 }
 
-/** Question posée par la liste et décisions proposées, selon le code du point. « Ignorer » vient toujours en premier. */
+/** Question posée par la liste et décisions proposées, selon le code du point. Aucune n'est choisie d'office. */
 function decisions(point: AnomalieLot, num: number): { question: string; choix: Decision[] } | null {
   const col = point.colonne ?? ''
   const prop = point.proposition
@@ -224,48 +335,48 @@ function decisions(point: AnomalieLot, num: number): { question: string; choix: 
       }),
     }
   }
-  if (['SANS_MONTANT', 'FORMULE_SANS_VALEUR', 'ERREUR_EXCEL'].includes(point.code) && col) {
-    return { question: `${col} sans valeur lisible : que faire ?`, choix: [{ libelle: 'Laisser la cellule vide', valeurs: { [col]: null } }] }
-  }
   return null
 }
 
+/** Montants illisibles ou douteux : la cellule peut rester vide. */
+const MONTANT_VIDE = ['ERREUR_EXCEL', 'FORMULE_SANS_VALEUR', 'SANS_MONTANT', 'NON_NUMERIQUE', 'MONTANT_HORS_BORNES']
+
+/** Seules les cellules qui peuvent rester vides s'ignorent (montants, nom, poste) ; jamais une colonne obligatoire. */
+function ignorable(a: AnomalieLot) {
+  if (!a.colonne) return false
+  if (MONTANT_VIDE.includes(a.code)) return !ATTRIBUTS.some(([n]) => n === a.colonne)
+  return ['VALEUR_MANQUANTE', 'TEXTE_TROP_LONG'].includes(a.code) && ['Noms', 'Poste'].includes(a.colonne)
+}
+
 /** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
-function DetailLigne({ lotId, num, cible, point, points, onLot }: DetailProps) {
+function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps) {
   const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
-  const qc = useQueryClient()
-  // Rien ne part avant « Enregistrer » : cellules changées et décision choisie restent en attente.
-  const [modifs, setModifs] = useState<Record<string, string | null>>({})
-  const [choisi, setChoisi] = useState(-1)
-  const [typeSite, setTypeSite] = useState('')
+  const { plan, setPlan, occupe } = edition
+  const k = cle(point)
+  const c = cellule(point)
   const proposees = decisions(point, num)
-  const decision = choisi >= 0 ? proposees?.choix[choisi] : undefined
-  const site = decision?.ajout?.dimension === 'site'
-  const enregistrer = useMutation({
-    mutationFn: async () => {
-      let lot: Lot | undefined
-      if (decision?.ajout) lot = await ajouterReferentiel(lotId, decision.ajout.dimension, decision.ajout.valeur, site ? typeSite : undefined)
-      // Garder une ligne d'un doublon : toutes les autres du groupe sont retirées, l'une après l'autre.
-      for (const n of decision?.retirer ?? []) lot = await retirerLigne(lotId, n)
-      const valeurs = { ...decision?.valeurs, ...modifs }
-      if (Object.keys(valeurs).length && !decision?.retirer?.includes(num)) lot = await corrigerLigne(lotId, num, valeurs)
-      return lot!
-    },
-    onSuccess: (lot) => {
-      setModifs({})
-      setChoisi(-1)
-      void qc.invalidateQueries({ queryKey: ['saisie'] })
-      onLot?.(lot)
-    },
+  const choisi = plan.choix[k]
+  const ignore = plan.ignores.includes(c)
+  const nouveauSite = choisi?.decision.ajout?.dimension === 'site' ? choisi.decision.ajout.valeur : null
+  const regle = !edition.restants.has(k) && choisi == null && !ignore
+  // Choisir une solution annule « ignorer » sur la même cellule, et inversement.
+  const choisir = (i: number) => setPlan((p) => ({
+    ...p, ignores: p.ignores.filter((x) => x !== c),
+    choix: { ...p.choix, [k]: { index: i, decision: proposees!.choix[i], ligne: num } },
+  }))
+  const basculer = () => setPlan((p) => {
+    const choix = { ...p.choix }
+    delete choix[k]
+    return { ...p, choix, ignores: ignore ? p.ignores.filter((x) => x !== c) : [...p.ignores, c] }
   })
-  const occupe = enregistrer.isPending
-  const change = Object.keys(modifs).length > 0 || decision != null
-  const pret = change && !occupe && (!site || typeSite !== '')
-  // Revenir à la valeur du fichier efface la modification.
-  const modifier = (col: string, v: string | null) => setModifs((m) => {
-    const reste = { ...m }
-    delete reste[col]
-    return v === (q.data?.brut?.[col] ?? null) ? reste : { ...m, [col]: v }
+  // Revenir à la valeur du fichier efface la modification ; saisir une valeur annule « ignorer » sur la cellule.
+  const modifier = (col: string, v: string | null) => setPlan((p) => {
+    const ligne = { ...p.modifs[num] }
+    delete ligne[col]
+    if (v !== (q.data?.brut?.[col] ?? null)) ligne[col] = v
+    const modifs = { ...p.modifs, [num]: ligne }
+    if (!Object.keys(ligne).length) delete modifs[num]
+    return { ...p, modifs, ignores: p.ignores.filter((x) => x !== `${num}|${col}`) }
   })
   return (
     <tr className="detail-contrat">
@@ -273,34 +384,37 @@ function DetailLigne({ lotId, num, cible, point, points, onLot }: DetailProps) {
         {q.isSuccess ? (
           <>
             <LigneFichier l={q.data} num={num} cible={cible} points={points}
-              modifs={{ ...decision?.valeurs, ...modifs }} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
-            {q.data.brut && (
-              <div className="actions-point">
-                {proposees && (
-                  <label className="decision">
-                    <span>{proposees.question}</span>
-                    <select value={choisi} disabled={occupe} onChange={(e) => setChoisi(Number(e.target.value))}>
-                      <option value={-1}>Ignorer la valeur (ne rien changer)</option>
-                      {proposees.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
-                    </select>
-                  </label>
-                )}
-                {site && (
-                  <label className="decision">
-                    <span>Type du nouveau site</span>
-                    <select value={typeSite} disabled={occupe} onChange={(e) => setTypeSite(e.target.value)}>
-                      <option value="" disabled>Choisir…</option>
-                      {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
-                    </select>
-                  </label>
-                )}
-                <span className="muted">Cliquez sur une cellule pour changer sa valeur.</span>
-                <Bouton className="enregistrer-point" disabled={!pret} onClick={() => enregistrer.mutate()}>
-                  {occupe ? 'Enregistrement…' : 'Enregistrer'}
-                </Bouton>
-              </div>
-            )}
-            {enregistrer.error && <p className="champ-erreur admin-erreur" role="alert">{enregistrer.error.message}</p>}
+              modifs={edition.lignes[num]} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
+            {q.data.brut && (regle
+              ? <p className="actions-point regle">Point réglé.</p>
+              : (proposees || ignorable(point)) && (
+                <div className="actions-point">
+                  {proposees && (
+                    <label className="decision">
+                      <span>{proposees.question}</span>
+                      <select value={choisi?.index ?? ''} disabled={occupe} onChange={(e) => choisir(Number(e.target.value))}>
+                        <option value="" disabled>Choisir une solution…</option>
+                        {proposees.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {nouveauSite && (
+                    <label className="decision">
+                      <span>Type du nouveau site</span>
+                      <select value={plan.typeSite[nouveauSite] ?? ''} disabled={occupe}
+                        onChange={(e) => setPlan((p) => ({ ...p, typeSite: { ...p.typeSite, [nouveauSite]: e.target.value } }))}>
+                        <option value="" disabled>Choisir…</option>
+                        {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {ignorable(point) && (
+                    <Bouton variante="secondaire" aria-pressed={ignore} disabled={occupe} onClick={basculer}>
+                      {ignore ? 'Ne plus ignorer' : 'Ignorer la valeur (laisser vide)'}
+                    </Bouton>
+                  )}
+                </div>
+              ))}
           </>
         )
           : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
@@ -308,6 +422,7 @@ function DetailLigne({ lotId, num, cible, point, points, onLot }: DetailProps) {
     </tr>
   )
 }
+
 
 interface LigneProps {
   l: LigneLot

@@ -754,7 +754,9 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .actions-point .decision { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--navy); font-weight: 600; }
 .actions-point .decision select { font-weight: 400; max-width: 100%; }
 .actions-point { align-items: flex-end; }
-.actions-point .enregistrer-point { margin-left: auto; }
+.corrections-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+table.points tr.point-regle:nth-child(n) td { background: #E6F6EC; color: #147a41; }
+.regle { color: #147a41; font-weight: 600; }
 table.points td.cellule-modifiee { background: var(--info-soft); color: var(--info); font-weight: 600; }
 .ligne-fichier table.dense td.fige.cellule-modifiee { background: var(--info-soft); }
 .actions-point select { height: 36px; border: 1px solid var(--rule-strong); background: var(--surface); color: var(--navy); font: inherit; padding: 0 8px; }

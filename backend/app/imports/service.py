@@ -189,14 +189,83 @@ def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Ref
 
 def _relancer(db: Session, lot: LotImport, feuille: Feuille, refs: Refs, **decisions) -> None:
     """Relance tous les contrôles ; les décisions du lot (ajouts, lignes retirées) sont conservées."""
-    lignes, anos, stats = valider(feuille, refs)
+    lignes, anos, stats = _controler(feuille, refs, decisions.get("ignores", lot.feuille.get("ignores", [])))
     if lot.statut == "rejete" and _statut(anos) == "pret" and db.scalar(select(LotImport.id).where(
             LotImport.sha256 == lot.sha256, LotImport.id != lot.id,
             LotImport.statut.in_(("pret", "valide")))) is not None:
         raise HTTPException(409, "Ce fichier est déjà en vérification ou importé : reprendre ce lot-là.")
-    gardees = {k: lot.feuille[k] for k in ("ajouts", "retirees") if k in lot.feuille}
+    gardees = {k: lot.feuille[k] for k in ("ajouts", "retirees", "ignores") if k in lot.feuille}
     lot.feuille = {**_feuille_json(feuille), **gardees, **decisions}
     _ecrire(db, lot, lignes, anos, stats)
+
+
+def _controler(feuille: Feuille, refs: Refs, ignores):
+    """Contrôles du lot ; un avertissement sur une cellule que l'utilisateur a choisi d'ignorer n'est plus signalé."""
+    lignes, anos, stats = valider(feuille, refs)
+    ign = set(ignores)
+    return lignes, [a for a in anos if a.gravite == BLOQUANT or f"{a.ligne}|{a.colonne}" not in ign], stats
+
+
+def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dict[int, dict[str, str | None]],
+                        ajouts: list[dict], retirees: list[int], ignores: list[str], simuler: bool):
+    """Toutes les décisions de l'écran en une fois : valeurs ajoutées aux listes, lignes retirées, cellules
+    corrigées, cellules ignorées. Simulation : renvoie les points restants sans rien écrire."""
+    lot = _lot_modifiable(db, lot_id)
+    feuille = _feuille_du_lot(lot)
+    tout = {d: dict(v) for d, v in lot.feuille.get("ajouts", {}).items()}
+    refs = _refs_du_lot(db, lot)
+    for a in ajouts:
+        dim, valeur, type_site = a["dimension"], (a.get("valeur") or "").strip(), a.get("type_site")
+        if dim not in DIM_REFS:
+            raise HTTPException(422, "Liste inconnue")
+        if not valeur or len(valeur) > 200:
+            raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
+        if norm(valeur) in getattr(refs, DIM_REFS[dim]):
+            raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+        if dim != "site":
+            type_site = None
+        elif type_site not in TYPES_SITE and not simuler:
+            raise HTTPException(422, "Type de site obligatoire : " + ", ".join(TYPES_SITE))
+        tout.setdefault(dim, {})[valeur] = type_site
+    refs = _refs_du_lot(db, lot, tout)
+    cols = colonnes(feuille.entetes, refs)
+    texte_libre = set(ATTRIBUTS) - {"ANNÉE"}
+    presents = {n for n, _ in feuille.lignes}
+    traces = []
+    for num, valeurs in corrections.items():
+        if num not in presents:
+            raise HTTPException(404, f"Ligne {num} introuvable")
+        k = next(k for k, (n, _) in enumerate(feuille.lignes) if n == num)
+        row, avant = list(feuille.lignes[k][1]), {}
+        for col, v in valeurs.items():
+            j = cols.get(col)
+            if j is None:
+                raise HTTPException(422, f"Colonne « {col} » absente du fichier")
+            row += [None] * (j + 1 - len(row))
+            avant[col] = _brut(row[j])
+            row[j] = _saisie(v, col not in texte_libre)
+        feuille.lignes[k] = (num, tuple(row))
+        traces.append(("import_correction", {"ligne": num, **avant}, {"ligne": num, **valeurs}))
+    for num in retirees:
+        if num not in presents:
+            raise HTTPException(404, f"Ligne {num} introuvable")
+        traces.append(("import_ligne_retiree", {"ligne": num}, None))
+    feuille.lignes = [(n, r) for n, r in feuille.lignes if n not in set(retirees)]
+    tous_ignores = sorted({*lot.feuille.get("ignores", []), *ignores})
+    if simuler:
+        _, anos, _ = _controler(feuille, refs, tous_ignores)
+        db.rollback()
+        return [{"ligne": a.ligne, "colonne": a.colonne, "code": a.code} for a in anos]
+    _relancer(db, lot, feuille, refs, ajouts=tout, retirees=[*lot.feuille.get("retirees", []), *retirees],
+              ignores=tous_ignores)
+    for a in ajouts:
+        traces.append(("import_ajout_referentiel", None, a))
+    if ignores:
+        traces.append(("import_ignore", None, {"cellules": ignores}))
+    for action, avant, apres in traces:
+        audit.record(db, user_id, action, "lot_import", lot.id, avant, apres)
+    db.commit()
+    return lot
 
 
 def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,

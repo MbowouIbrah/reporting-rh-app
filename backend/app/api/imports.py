@@ -97,6 +97,25 @@ def corriger(lot_id: int, num: int, corps: CorrectionIn, p: Principal = Depends(
     return service.lot_dict(service.corriger_ligne(db, p.user_id, lot_id, num, corps.valeurs))
 
 
+class DecisionsIn(BaseModel):
+    lignes: dict[int, dict[str, str | None]] = {}  # numéro de ligne -> colonne -> valeur saisie
+    ajouts: list[dict] = []  # {dimension, valeur, type_site}
+    retirees: list[int] = []
+    ignores: list[str] = []  # "ligne|colonne" : avertissement accepté, cellule laissée vide
+    simuler: bool = False
+
+
+@router.post("/{lot_id}/decisions")
+def decisions(lot_id: int, corps: DecisionsIn, p: Principal = Depends(current_principal),
+              db: Session = Depends(get_db)):
+    """Applique les décisions de l'écran, contrôles relancés ; simulation : points restants."""
+    authorize(p, "import:write")
+    _lot(db, lot_id)
+    r = service.appliquer_decisions(db, p.user_id, lot_id, corps.lignes, corps.ajouts,
+                                    corps.retirees, corps.ignores, corps.simuler)
+    return {"anomalies": r} if corps.simuler else service.lot_dict(r)
+
+
 class ReferentielIn(BaseModel):
     dimension: str
     valeur: str

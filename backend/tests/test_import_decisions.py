@@ -93,3 +93,22 @@ def test_lecteur_403(make_client, methode, chemin, corps):
     c = make_client(DRH)
     r = getattr(c, methode)(f"{API}/imports/{lot['id']}/{chemin}", **({"json": corps} if corps else {}))
     assert r.status_code == 403
+
+
+def test_decisions_simulees_puis_appliquees_en_une_fois(make_client, db):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Site="Kribi"), ligne(MATRICULE="E2", Poste=None)]).json()
+    u = f"{API}/imports/{lot['id']}/decisions"
+    corps = {"ajouts": [{"dimension": "site", "valeur": "Kribi"}], "ignores": ["3|Poste"]}
+    sim = c.post(u, json={**corps, "simuler": True})
+    assert sim.status_code == 200, sim.text
+    restants = {(a["ligne"], a["colonne"], a["code"]) for a in sim.json()["anomalies"]}
+    assert (2, "Site", "REFERENTIEL_INCONNU") not in restants and (3, "Poste", "VALEUR_MANQUANTE") not in restants
+    assert c.get(f"{API}/imports/{lot['id']}").json()["statut"] == "rejete"  # rien écrit
+    assert c.post(u, json=corps).status_code == 422  # type du site obligatoire pour enregistrer
+    corps["ajouts"][0]["type_site"] = "agence"
+    r = c.post(u, json={**corps, "lignes": {"2": {"Poste": "Chef"}}})
+    assert r.status_code == 200 and r.json()["statut"] == "pret", r.text
+    tous = c.get(f"{API}/imports/{lot['id']}/anomalies").json()
+    assert not any(a["ligne"] == 3 and a["colonne"] == "Poste" for a in tous)
+    assert c.get(f"{API}/imports/{lot['id']}/lignes/2").json()["brut"]["Poste"] == "Chef"

@@ -165,6 +165,19 @@ export const corrigerLigne = (id: number, num: number, valeurs: Record<string, s
 export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string) =>
   api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null }))
 export const retirerLigne = (id: number, num: number) => api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'DELETE' })
+
+/** Toutes les décisions de l'écran Vérification, enregistrées ensemble. */
+export interface Decisions {
+  lignes: Record<number, Record<string, string | null>>
+  ajouts: { dimension: string; valeur: string; type_site: string | null }[]
+  retirees: number[]
+  ignores: string[]
+}
+export const appliquerDecisions = (id: number, d: Decisions) => api<Lot>(`/imports/${id}/decisions`, json(d))
+/** Points qui resteraient après ces décisions, sans rien enregistrer. */
+export const simulerDecisions = (id: number, d: Decisions) =>
+  api<{ anomalies: { ligne: number | null; colonne: string | null; code: string }[] }>(
+    `/imports/${id}/decisions`, json({ ...d, simuler: true }))
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 

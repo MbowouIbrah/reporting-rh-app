@@ -80,6 +80,17 @@ test('un clic sur la ligne du point déplie la ligne du fichier (en-tête et val
   expect(screen.queryByRole('table', { name: 'Ligne 4 du fichier' })).toBeNull()
 })
 
+const LOT = { id: 7, statut: 'pret' } as saisie.Lot
+const decisions = (d: Partial<saisie.Decisions>): saisie.Decisions => ({ lignes: {}, ajouts: [], retirees: [], ignores: [], ...d })
+
+/** Rien n'est enregistré avant « Enregistrer » ; la vérification renvoie les points restants. */
+function serveur(restants: AnomalieLot[] = []) {
+  return {
+    simuler: vi.spyOn(saisie, 'simulerDecisions').mockResolvedValue({ anomalies: restants }),
+    appliquer: vi.spyOn(saisie, 'appliquerDecisions').mockResolvedValue(LOT),
+  }
+}
+
 test('cellule de la ligne corrigée sur place, liste proposée sans obligation, lot renvoyé', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
     ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
@@ -87,8 +98,7 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
     brut: { 'ANNÉE': '2026', MOIS: 'Août', MATRICULE: 'EMP004', Noms: 'John Doe', Site: 'Kribi', Bonus: '1000' },
     choix: { Site: ['Bertoua', 'Douala'] },
   })
-  const lot = { id: 7, statut: 'pret' } as saisie.Lot
-  const corriger = vi.spyOn(saisie, 'corrigerLigne').mockResolvedValue(lot)
+  const { appliquer } = serveur()
   const onLot = vi.fn()
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -99,12 +109,13 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   )
   fireEvent.click(screen.getAllByRole('button', { name: 'Détail de la ligne 4' })[0])
   const ligne = await screen.findByRole('table', { name: 'Ligne 4 du fichier' })
+  expect(screen.queryByText(/Cliquez sur une cellule/)).toBeNull()
   // Autre colonne que celle du point : modifiable aussi.
   fireEvent.click([...ligne.querySelectorAll('td')].find((td) => /^1\D?000/.test(td.textContent ?? ''))!)
   const bonus = screen.getByRole('textbox', { name: 'Bonus, ligne 4' })
   fireEvent.change(bonus, { target: { value: '1200' } })
   fireEvent.keyDown(bonus, { key: 'Escape' })
-  expect(corriger).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
   fireEvent.click([...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Kribi')!)
   const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
   // Valeur inconnue tapée : la liste ne garde que les valeurs qui la contiennent.
@@ -115,12 +126,13 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   fireEvent.change(site, { target: { value: 'Limbé' } })
   fireEvent.keyDown(site, { key: 'Enter' })
   // Rien ne part avant « Enregistrer ».
-  expect(corriger).not.toHaveBeenCalled()
+  expect(appliquer).not.toHaveBeenCalled()
   expect(within(ligne).getByText('Limbé')).toHaveClass('cellule-modifiee')
+  expect(screen.getByText(/1 changement en attente/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-  await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 4, { Site: 'Limbé' }))
-  expect(corriger).toHaveBeenCalledTimes(1)
-  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 4: { Site: 'Limbé' } } })))
+  expect(appliquer).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(LOT))
 })
 
 test('saisie en grille : pas de colonne Ligne', () => {
@@ -132,7 +144,7 @@ test('saisie en grille : pas de colonne Ligne', () => {
 const LIGNE_BRUTE = {
   ligne: 40, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: null,
   activite: 'VN', site: 'Kribi', service: 'SAV PL', montants: {},
-  brut: { 'ANNÉE': '2026', MOIS: 'Août', MATRICULE: 'EMP004', Noms: 'John Doe', 'Type Contrat': '', Site: 'Kribi' },
+  brut: { 'ANNÉE': '2026', MOIS: 'Août', MATRICULE: 'EMP004', Noms: 'John Doe', 'Type Contrat': '', Site: 'Kribi', Bonus: '#N/A' },
   choix: { Site: ['Douala'], 'Type Contrat': ['CDD', 'CDI'] },
 }
 
@@ -145,27 +157,28 @@ function pointsOuverts(a: AnomalieLot, onLot = vi.fn()) {
   fireEvent.click(screen.getByRole('button', { name: `Détail de la ligne ${a.ligne}` }))
 }
 
-test('doublon : « Garder la ligne 41 » choisi puis enregistré retire la ligne 40', async () => {
+test('doublon : aucune solution choisie d’office ; « Garder la ligne 41 » enregistré retire la ligne 40', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
-  const lot = { id: 7, statut: 'pret' } as saisie.Lot
-  const retirer = vi.spyOn(saisie, 'retirerLigne').mockResolvedValue(lot)
+  const { appliquer } = serveur()
   const onLot = vi.fn()
   pointsOuverts({ ...anomalie('DOUBLON', 'bloquant', 'Même employé deux fois.', 'MATRICULE'), ligne: 40, proposition: { lignes: [40, 41] } }, onLot)
   const liste = await screen.findByRole('combobox', { name: 'Employé sur plusieurs lignes du même mois : quelle ligne garder ?' })
   expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
-    'Ignorer la valeur (ne rien changer)', 'Garder la ligne 40 (celle-ci), retirer la ligne 41', 'Garder la ligne 41, retirer la ligne 40'])
+    'Choisir une solution…', 'Garder la ligne 40 (celle-ci), retirer la ligne 41', 'Garder la ligne 41, retirer la ligne 40'])
+  expect(liste).toHaveValue('')
+  // Matricule obligatoire : pas de bouton pour l'ignorer.
+  expect(screen.queryByRole('button', { name: /Ignorer la valeur/ })).toBeNull()
   const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
   expect(enregistrer).toBeDisabled()
   fireEvent.change(liste, { target: { value: '1' } })
   fireEvent.click(enregistrer)
-  await vi.waitFor(() => expect(retirer).toHaveBeenCalledWith(7, 40))
-  expect(retirer).toHaveBeenCalledTimes(1)
-  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ retirees: [40] })))
+  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(LOT))
 })
 
-test('valeur manquante : « Reprendre » envoie la valeur du mois précédent', async () => {
+test('valeur manquante : « Remplacer » envoie la valeur du mois précédent', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
-  const corriger = vi.spyOn(saisie, 'corrigerLigne').mockResolvedValue({ id: 7, statut: 'pret' } as saisie.Lot)
+  const { appliquer } = serveur()
   pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'bloquant', 'Obligatoire.', 'Type Contrat'), ligne: 40, valeur: null,
     proposition: { valeur: 'CDD', periode: 'juillet 2026' } })
   const liste = await screen.findByRole('combobox', { name: 'Type Contrat vide : que faire ?' })
@@ -173,13 +186,12 @@ test('valeur manquante : « Reprendre » envoie la valeur du mois précédent', 
   // La valeur reprise s'affiche dans la cellule avant l'enregistrement.
   expect(within(screen.getByRole('table', { name: 'Ligne 40 du fichier' })).getByText('CDD')).toHaveClass('cellule-modifiee')
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
-  await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 40, { 'Type Contrat': 'CDD' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { 'Type Contrat': 'CDD' } } })))
 })
 
 test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis envoyé avec le type', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
-  const lot = { id: 7, statut: 'pret' } as saisie.Lot
-  const ajouter = vi.spyOn(saisie, 'ajouterReferentiel').mockResolvedValue(lot)
+  const { appliquer } = serveur()
   pointsOuverts({ ...anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site'), ligne: 40, valeur: 'Kribi',
     proposition: { dimension: 'site' } })
   fireEvent.change(await screen.findByRole('combobox', { name: 'Site « Kribi » absent de la liste des sites : que faire ?' }),
@@ -189,5 +201,23 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
   fireEvent.change(screen.getByRole('combobox', { name: 'Type du nouveau site' }), { target: { value: 'agence' } })
   expect(bouton).toBeEnabled()
   fireEvent.click(bouton)
-  await vi.waitFor(() => expect(ajouter).toHaveBeenCalledWith(7, 'site', 'Kribi', 'agence'))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7,
+    decisions({ ajouts: [{ dimension: 'site', valeur: 'Kribi', type_site: 'agence' }] })))
+})
+
+test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le point passe au vert sans quitter la liste', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { simuler, appliquer } = serveur()
+  pointsOuverts({ ...anomalie('ERREUR_EXCEL', 'bloquant', 'Erreur Excel.', 'Bonus'), ligne: 40, valeur: '#N/A' })
+  const point = screen.getByText('Erreur Excel.').closest('tr')!
+  expect(point).not.toHaveClass('point-regle')
+  fireEvent.click(await screen.findByRole('button', { name: 'Ignorer la valeur (laisser vide)' }))
+  const attendu = decisions({ lignes: { 40: { Bonus: null } }, ignores: ['40|Bonus'] })
+  // Vérification sans enregistrer : le point n'est plus renvoyé, il passe au vert.
+  await vi.waitFor(() => expect(simuler).toHaveBeenCalledWith(7, attendu))
+  await vi.waitFor(() => expect(screen.getByText('Erreur Excel.').closest('tr')).toHaveClass('point-regle'))
+  expect(appliquer).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Ne plus ignorer' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, attendu))
 })
