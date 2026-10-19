@@ -113,6 +113,18 @@ def admis(colonne: str, index: dict[str, str] | None) -> str:
     return f"{LIBELLES[colonne]} admis : {', '.join(vals[:MAX_ADMIS])}{suite}."
 
 
+SUJETS = {"MOIS": "Le mois", "Type Contrat": "Le type de contrat", "Activité": "L’activité", "Site": "Le site",
+          "Service": "Le service"}
+
+
+def _periode(L) -> str:
+    return f"{MOIS[L.mois - 1].lower()} {L.annee}" if L.annee and L.mois else f"ligne {L.num}"
+
+
+def _porteur(matricule: str) -> str:
+    return "L’employé sans matricule" if est_sans_matricule(matricule) else f"Le matricule {matricule}"
+
+
 def _qui(matricule: str) -> str:
     return "sans matricule" if est_sans_matricule(matricule) else f"matricule {matricule}"
 
@@ -252,12 +264,12 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             v = g(nom)
             t = texte(v)
             if not t:
-                add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, f"Obligatoire. {admis(nom, index)}")
+                add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, f"{SUJETS[nom]} est obligatoire et la cellule est vide. {admis(nom, index)}")
                 continue
             ref = {norm(m): m for m in MOIS} if index is None else index
             canon = ref.get(norm(t))
             if canon is None:
-                add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, f"Valeur inconnue. {admis(nom, index)}")
+                add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, f"« {t} » ne figure pas dans la liste. {admis(nom, index)}")
                 continue
             if canon != str(v):
                 add(num, nom, "NORMALISE", AVERT, v, f"Écrit « {t} », repris comme « {canon} ».")
@@ -291,7 +303,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, "MATRICULE", "TEXTE_TROP_LONG", BLOQUANT, mat, "30 caractères maximum.")
         L.matricule = mat
 
-        for nom, attr, libelle in (("Noms", "nom", "Nom vide."), ("Poste", "poste", "Poste vide.")):
+        for nom, attr, libelle in (("Noms", "nom", "Le nom de l’employé est vide."),
+                                      ("Poste", "poste", "Le poste est vide.")):
             t = texte(g(nom))
             if not t:
                 add(num, nom, "VALEUR_MANQUANTE", AVERT, None, libelle)
@@ -364,23 +377,37 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             proches = all(similarite(a, b) >= SEUIL_NOM_PROCHE for a, b in combinations(sorted(noms), 2))
             if proches:
                 add(occ[0][0], "Noms", "NOM_PROCHE", AVERT, occ[0][4],
-                    f"Noms très proches ({_qui(occ[0][4])}) : {liste}. Faute de frappe ?")
+                    f"{_porteur(occ[0][4])} porte des noms très proches : {liste}. Faute de frappe ?")
             else:
                 add(occ[0][0], "Noms", "NOM_INCOHERENT", AVERT, occ[0][4],
-                    f"Noms différents ({_qui(occ[0][4])}) : {liste}.")
+                    f"{_porteur(occ[0][4])} porte des noms différents : {liste}. Erreur de matricule ?")
         elif not connu and noms:
             nom_norm = next(iter(noms))
             trouve = plus_proche(next(o[3] for o in occ if o[1] == nom_norm), refs.annuaire, mat,
                                  SEUIL_NOUVEAU_PROCHE)
             if trouve:
                 add(occ[0][0], "Noms", "NOM_SIMILAIRE", AVERT, occ[0][4],
-                    f"Nouvel employé « {occ[0][3]} » ({_qui(occ[0][4])}), très proche de « {trouve[1]} » "
-                    f"({_qui(trouve[0])}). Matricule ou nom mal saisi ?")
+                    f"Nouvel employé « {occ[0][3]} » ({_qui(occ[0][4])}) : nom très proche de « {trouve[1]} » "
+                    f"({_qui(trouve[0])}). Même personne avec un matricule ou un nom mal saisi ?")
         for champ in ("Service", "Site", "Type Contrat", "Activité"):
             vals = {o[2].get(champ) for o in occ if o[2].get(champ)}
             if len(vals) > 1:
-                add(occ[0][0], champ, "MUTATION", AVERT, mat,
-                    f"{champ} change selon les mois : {', '.join(sorted(vals))} (mutation ou erreur ?).")
+                # Valeurs dans l'ordre des mois, puis du fichier : « passe de X (juillet) à Y (août) ».
+                suite = sorted((o for o in occ if o[2].get(champ)),
+                               key=lambda o: (by_num[o[0]].annee or 0, by_num[o[0]].mois or 0, o[0]))
+                etapes: list[tuple[str, str, int]] = []
+                for o in suite:
+                    if not etapes or etapes[-1][0] != o[2][champ]:
+                        etapes.append((o[2][champ], _periode(by_num[o[0]]), o[0]))
+                qui = occ[0][3] or _qui(mat)
+                if len({e[1] for e in etapes}) == 1:
+                    detail = ", ".join(f"« {v} » (ligne {n})" for v, _p, n in etapes)
+                    msg = f"{SUJETS[champ]} de {qui} diffère d’une ligne à l’autre en {etapes[0][1]} : {detail}."
+                else:
+                    detail = " puis ".join(f"« {v} » ({p})" for v, p, _n in etapes[1:])
+                    msg = (f"{SUJETS[champ]} de {qui} passe de « {etapes[0][0]} » ({etapes[0][1]}) à {detail} : "
+                           "mutation ou erreur ?")
+                add(occ[0][0], champ, "MUTATION", AVERT, mat, msg)
 
     if not lignes:
         add(feuille.entete_ligne + 1, "DONNEES", "FICHIER_VIDE", BLOQUANT, None, "Aucune ligne de données.")
