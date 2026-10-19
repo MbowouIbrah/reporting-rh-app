@@ -194,9 +194,9 @@ function LigneFichier({ l, num, cible, points }: { l: LigneLot; num: number; cib
     // Colonnes figées : chacune se cale à droite des précédentes.
     const entetes = [...div.querySelectorAll<HTMLElement>('thead th')]
     for (let i = 0; i < FIGEES; i++) {
-      div.querySelectorAll<HTMLElement>(`tr > :nth-child(${i + 1})`).forEach((c) => { c.style.left = `${entetes[i].offsetLeft}px` })
+      div.querySelectorAll<HTMLElement>(`tr > :nth-child(${i + 1})`).forEach((c) => { c.style.left = `${entetes[i].offsetLeft - entetes[0].offsetLeft}px` })
     }
-    const gauche = entetes[FIGEES].offsetLeft
+    const gauche = entetes[FIGEES].offsetLeft - entetes[0].offsetLeft
     // Défilement horizontal animé jusqu'à centrer la cellule en cause dans la partie non figée.
     const td = div.querySelector<HTMLElement>('td.cellule-cible:not(.fige)')
     if (!td) return
