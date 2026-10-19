@@ -731,14 +731,13 @@ html, body { overscroll-behavior: none; }
 .volet-valeur-ko { background: var(--red-soft); color: var(--red-deep); }
 .volet-valeur-attention { background: var(--warning-soft); color: var(--warning); }
 .volet-niveau { font-weight: 600; color: var(--ink); }
-tr.ligne-detail > td { background: var(--paper-2); padding: 8px 12px 12px; }
-.ligne-fichier { overflow-x: auto; }
-.ligne-fichier table.dense { width: auto; margin: 0; }
-.page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
-.ligne-fichier table.dense td { white-space: nowrap; }
-.ligne-fichier td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
-.ligne-fichier td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
-.saisie-apercu .ligne-fichier td.cellule-cible { outline: 2px solid currentColor; outline-offset: -2px; }
+table.points th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); vertical-align: top; text-align: left; padding-left: calc(12px + var(--sp-1)); }
+table.points th.service.detail .detail-libelle { display: inline-flex; align-items: baseline; font-size: 0.62rem; color: var(--navy); }
+table.points th.service.detail .detail-libelle::before { content: "↳"; display: inline-block; width: 1rem; font-size: .8rem; line-height: 1; }
+table.points td.ouvert { border-left: 3px solid var(--navy); }
+table.points td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
+table.points td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
+table.points td.cellule-cible { outline: 2px solid currentColor; outline-offset: -2px; }
 .volet-corps { flex: 1; min-height: 0; overflow: auto; }
 .page-ecran.saisie-apercu .volet-corps > table.dense { margin: 0; border: 0; border-collapse: separate; border-spacing: 0; }
 .saisie-apercu table.dense { width: 100%; }

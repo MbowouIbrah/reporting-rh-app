@@ -60,18 +60,23 @@ test('niveaux, employé nommé, un seul volet ouvert à la fois', () => {
   expect(noms).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('« Ligne N » déplie la ligne du fichier, cellule en cause surlignée', async () => {
+test('la ligne se déplie comme le détail par contrat, cellule en cause surlignée', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
     ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
     activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' },
   })
   render(<Volets lotId={7} anomalies={[anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site')]} />)
-  fireEvent.click(screen.getByRole('button', { name: '4' }))
-  const ligne = await screen.findByRole('table', { name: 'Ligne 4 du fichier' })
+  const deplier = screen.getByRole('button', { name: 'Détail de la ligne 4' })
+  expect(deplier).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(screen.getByText('Valeur inconnue.'))
+  expect(deplier).toHaveAttribute('aria-expanded', 'true')
+  expect(await screen.findByRole('row', { name: /^MOIS Août/ })).toBeInTheDocument()
+  expect(screen.getByRole('rowheader', { name: 'Détail de la ligne 4 du fichier' })).toBeInTheDocument()
   expect(saisie.lireLigne).toHaveBeenCalledWith(7, 4)
-  const cellule = [...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Jhon')!
-  expect(cellule).toHaveClass('cellule-ko', 'cellule-cible')
-  expect(ligne).toHaveTextContent('Août')
+  const site = screen.getByRole('row', { name: /^Site Jhon/ })
+  expect(site.querySelectorAll('td')[1]).toHaveClass('cellule-ko', 'cellule-cible')
+  fireEvent.click(deplier)
+  expect(screen.queryByRole('row', { name: /^MOIS Août/ })).toBeNull()
 })
 
 test('saisie en grille : pas de colonne Ligne', () => {
