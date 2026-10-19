@@ -81,22 +81,23 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
       </BarreParcours>
       <h2 className="bandeau-titre">VÉRIFICATION AVANT ENREGISTREMENT{objet && ` — ${objet}`}</h2>
       <div className="saisie-synthese" role="status">
-        <section aria-label="Lignes">
+        <section aria-label="Lignes" className="saisie-carte-chiffre">
           <h3>Lignes ({d.lignes.length})</h3>
           <ul>
             <li><Badge ton="succes">{d.nouvelle}</Badge> à ajouter (pas encore enregistrée{s(d.nouvelle)})</li>
             <li><Badge ton="alerte">{d.modifiee}</Badge> à mettre à jour (déjà enregistrée{s(d.modifiee)}, montants différents)</li>
             <li><Badge>{d.identique}</Badge> déjà enregistrée{s(d.identique)} à l’identique (ignorée{s(d.identique)})</li>
           </ul>
+          <p className="saisie-chiffre">Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</p>
         </section>
-        <section aria-label="Employés">
+        <section aria-label="Employés" className="saisie-carte-chiffre">
           <h3>Employés ({d.employes.total})</h3>
           <ul>
-            {effectifs.map(([p, n]) => <li key={p}>Effectif {p} : <strong>{n}</strong></li>)}
             <li><Badge>{d.employes.existants}</Badge> déjà connu{s(d.employes.existants)}</li>
             <li><Badge ton={d.employes.nouveaux ? 'info' : 'neutre'}>{d.employes.nouveaux}</Badge> nouvel{s(d.employes.nouveaux)} employé{s(d.employes.nouveaux)} (à créer)</li>
             <li><Badge ton={d.nb_absents ? 'erreur' : 'neutre'}>{d.nb_absents}</Badge> <span className="saisie-oubli">oubli{s(d.nb_absents)}</span> ou départ{s(d.nb_absents)} (présent{s(d.nb_absents)} le mois précédent, sans ligne ici)</li>
           </ul>
+          <p className="saisie-chiffre">{effectifs.map(([p, n]) => <span key={p}>Effectif {p} : <strong>{n}</strong></span>)}</p>
         </section>
         <section aria-label="Contrôles">
           <h3>Contrôles</h3>
@@ -106,7 +107,6 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
             <li><Badge ton={d.effaces ? 'erreur' : 'neutre'}>{d.effaces}</Badge> montant{s(d.effaces)} enregistré{s(d.effaces)} vidé{s(d.effaces)} en cas de remplacement</li>
           </ul>
         </section>
-        <p className="saisie-total">Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</p>
       </div>
       {d.effaces > 0 && (
         <p className="bandeau ko" role="alert">

@@ -706,8 +706,10 @@ html, body { overscroll-behavior: none; }
 .saisie-synthese section { background: var(--paper); border: 1px solid var(--rule-strong); padding: var(--sp-2) var(--sp-3); }
 .saisie-synthese h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-md); text-transform: uppercase; color: var(--navy); }
 .saisie-synthese ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: var(--fs-md); }
-.saisie-synthese .saisie-total { margin: 0; align-self: center; justify-self: end; text-align: right; font-size: var(--fs-md); }
-.saisie-synthese .saisie-total strong { display: block; font-size: var(--fs-lg); color: var(--navy); }
+.saisie-synthese .saisie-carte-chiffre { display: grid; grid-template-columns: 1fr auto; column-gap: var(--sp-3); align-content: start; }
+.saisie-carte-chiffre > :not(.saisie-chiffre) { grid-column: 1; }
+.saisie-synthese .saisie-chiffre { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; display: grid; gap: var(--sp-1); text-align: right; font-size: var(--fs-md); }
+.saisie-chiffre strong { display: block; font-size: var(--fs-lg); color: var(--navy); }
 .saisie-oubli { color: var(--red-deep); font-weight: var(--fw-bold); }
 .saisie-tout { margin: 0; padding: var(--sp-2) var(--sp-3); display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .page-ecran.saisie-apercu .panneau-corps.volets { overflow: hidden; border: 0; padding: 16px; }
