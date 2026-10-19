@@ -38,6 +38,8 @@ const GROUPES: Groupe[] = [
       || (a.code === 'VALEUR_MANQUANTE' && a.colonne === 'Noms') },
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
+  { id: 'liaisons', titre: 'Cellules liées à un autre fichier', niveau: 'confirmer',
+    aide: 'valeurs reprises du dernier calcul d’Excel : vérifiez qu’elles sont à jour', retenir: codes('LIAISON_EXTERNE') },
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
     aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
     retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },

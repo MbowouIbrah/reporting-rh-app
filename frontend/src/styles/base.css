@@ -1217,5 +1217,3 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 .marche li { display: flex; gap: var(--sp-2); align-items: flex-start; }
 .marche .saisie-etape-num { flex: none; background: var(--red); border-color: var(--red); color: #fff; }
 .marche kbd { font-family: inherit; font-size: var(--fs-xs); border: 1px solid var(--rule-strong); padding: 0 4px; background: var(--paper-2); }
-.bandeau.alerte { background: var(--warning-soft); color: var(--warning); font-weight: 600; }
-.saisie-apercu > .formules-refusees { margin-bottom: var(--sp-3); }
