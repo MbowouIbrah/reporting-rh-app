@@ -22,7 +22,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - `-`, `/`, `néant`, `n/a`, `x`… dans un montant : plus bloquant, *À confirmer* avec l'action « Ignorer (vide) ».
 - Référentiels : liste déroulante dans le modèle mais collage libre accepté (alerte Excel en simple avertissement) ; casse ignorée, la valeur de référence est reprise telle quelle.
 
-**G3. Socle des décisions + erreurs bloquantes**
+**G3. Socle des décisions + erreurs bloquantes** — livré : décisions gardées dans le lot (`feuille.ajouts`, `feuille.retirees`), valeurs ajoutées créées seulement à l'enregistrement ; « Laisser vide » / « Saisir le montant » pour les montants de G2.
 - Référentiel inconnu (`Kribi`) : « Ajouter aux sites » ou « Remplacer par… » (liste).
 - Valeur obligatoire vide : « Reprendre la valeur enregistrée (CDD, juillet 2026) ».
 - Doublon : « Garder la ligne 40 » / « Garder la ligne 41 ».

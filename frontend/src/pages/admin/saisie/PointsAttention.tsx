@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { corrigerLigne, lireLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
+import { ajouterReferentiel, corrigerLigne, lireLigne, retirerLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
 import { MOIS, valeurBrute } from '../../../lib/format'
 import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
 import Volet from './Volet'
@@ -140,7 +140,7 @@ function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProp
                 <td>{a.message}</td>
               </tr>
               {ouvert && (
-                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} onLot={onLot}
+                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} onLot={onLot} point={a}
                   points={tous.filter((x) => x.ligne === a.ligne)} />
               )}
             </Fragment>
@@ -171,29 +171,111 @@ interface DetailProps {
   lotId: number
   num: number
   cible: string | null
+  /** Point déplié : ses boutons d'action dépendent de son code. */
+  point: AnomalieLot
   points: AnomalieLot[]
   onLot?: (lot: Lot) => void
 }
 
+/** Liste du référentiel où ajouter une valeur inconnue, selon la colonne. */
+const LISTES: Record<string, { dimension: string; pluriel: string }> = {
+  Site: { dimension: 'site', pluriel: 'sites' },
+  Service: { dimension: 'service', pluriel: 'services' },
+  'Activité': { dimension: 'activite', pluriel: 'activités' },
+  'Type Contrat': { dimension: 'type_contrat', pluriel: 'types de contrat' },
+}
+
+const TYPES_SITE = [['agence', 'Agence'], ['deporte', 'Site déporté'], ['principal', 'Siège / principal']]
+
 /** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
-function DetailLigne({ lotId, num, cible, points, onLot }: DetailProps) {
+function DetailLigne({ lotId, num, cible, point, points, onLot }: DetailProps) {
   const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
   const qc = useQueryClient()
+  const apres = (lot: Lot) => {
+    void qc.invalidateQueries({ queryKey: ['saisie'] })
+    onLot?.(lot)
+  }
   const corriger = useMutation({
     mutationFn: (valeurs: Record<string, string | null>) => corrigerLigne(lotId, num, valeurs),
-    onSuccess: (lot) => {
-      void qc.invalidateQueries({ queryKey: ['saisie'] })
-      onLot?.(lot)
-    },
+    onSuccess: apres,
   })
+  const ajouter = useMutation({
+    mutationFn: ({ dimension, valeur, type }: { dimension: string; valeur: string; type?: string }) =>
+      ajouterReferentiel(lotId, dimension, valeur, type),
+    onSuccess: apres,
+  })
+  // Garder une ligne d'un doublon : toutes les autres du groupe sont retirées, l'une après l'autre.
+  const retirer = useMutation({
+    mutationFn: async (lignes: number[]) => {
+      let lot: Lot | undefined
+      for (const n of lignes) lot = await retirerLigne(lotId, n)
+      return lot!
+    },
+    onSuccess: apres,
+  })
+  const [typeSite, setTypeSite] = useState('')
+  const [demande, setDemande] = useState<{ col: string; n: number }>({ col: '', n: 0 })
+  const occupe = corriger.isPending || ajouter.isPending || retirer.isPending
+  const erreur = corriger.error ?? ajouter.error ?? retirer.error
+  const col = point.colonne ?? ''
+  const saisir = (libelle: string) => (
+    <button type="button" className="bouton bouton-secondaire" disabled={occupe}
+      onClick={() => setDemande({ col, n: demande.n + 1 })}>{libelle}</button>
+  )
+  const prop = point.proposition
+  const liste = LISTES[col]
+  let actions: ReactNode = null
+  if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {
+    const dimension = prop?.dimension ?? liste.dimension
+    const site = dimension === 'site'
+    actions = (
+      <>
+        {site && (
+          <select aria-label="Type du site" value={typeSite} disabled={occupe} onChange={(e) => setTypeSite(e.target.value)}>
+            <option value="" disabled>Type de site…</option>
+            {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
+          </select>
+        )}
+        <button type="button" className="bouton bouton-secondaire" disabled={occupe || (site && !typeSite)}
+          onClick={() => ajouter.mutate({ dimension, valeur: point.valeur!, type: site ? typeSite : undefined })}>
+          Ajouter « {point.valeur} » aux {liste.pluriel}
+        </button>
+        {saisir('Remplacer par…')}
+      </>
+    )
+  } else if (point.code === 'VALEUR_MANQUANTE' && prop?.valeur) {
+    actions = (
+      <>
+        <button type="button" className="bouton bouton-secondaire" disabled={occupe}
+          onClick={() => corriger.mutate({ [col]: prop.valeur! })}>Reprendre « {prop.valeur} » ({prop.periode})</button>
+        {saisir('Saisir la valeur')}
+      </>
+    )
+  } else if (point.code === 'DOUBLON' && prop?.lignes?.length) {
+    actions = prop.lignes.map((n) => (
+      <button key={n} type="button" className="bouton bouton-secondaire" disabled={occupe}
+        onClick={() => retirer.mutate(prop.lignes!.filter((x) => x !== n))}>Garder la ligne {n}</button>
+    ))
+  } else if (['SANS_MONTANT', 'FORMULE_SANS_VALEUR', 'ERREUR_EXCEL'].includes(point.code)) {
+    actions = (
+      <>
+        <button type="button" className="bouton bouton-secondaire" disabled={occupe}
+          onClick={() => corriger.mutate({ [col]: null })}>Laisser vide</button>
+        {saisir('Saisir le montant')}
+      </>
+    )
+  } else if (['NON_NUMERIQUE', 'ABSENCES_HORS_BORNES', 'MONTANT_HORS_BORNES'].includes(point.code)) {
+    actions = saisir('Saisir la valeur')
+  }
   return (
     <tr className="detail-contrat">
       <td colSpan={5}>
         {q.isSuccess ? (
           <>
-            <LigneFichier l={q.data} num={num} cible={cible} points={points}
-              onCorrige={q.data.brut ? (col, v) => corriger.mutate({ [col]: v }) : undefined} enCours={corriger.isPending} />
-            {corriger.isError && <p className="champ-erreur admin-erreur" role="alert">{corriger.error.message}</p>}
+            <LigneFichier l={q.data} num={num} cible={cible} points={points} demande={demande}
+              onCorrige={q.data.brut ? (col, v) => corriger.mutate({ [col]: v }) : undefined} enCours={occupe} />
+            {q.data.brut && actions && <div className="actions-point">{actions}</div>}
+            {erreur && <p className="champ-erreur admin-erreur" role="alert">{erreur.message}</p>}
           </>
         )
           : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
@@ -210,15 +292,21 @@ interface LigneProps {
   /** Absent : ligne en lecture seule (lot analysé avant les corrections sur place). */
   onCorrige?: (colonne: string, valeur: string | null) => void
   enCours?: boolean
+  /** Ouvre l'édition d'une cellule depuis un bouton d'action : chaque demande a un numéro différent. */
+  demande?: { col: string; n: number }
 }
 
-function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps) {
+function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: LigneProps) {
   const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
     ferme.current = false
     setEdition({ col: n, valeur: l.brut?.[n] ?? '', actif: -1 })
   }
+  useEffect(() => {
+    if (demande?.n) ouvrir(demande.col)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demande?.n])
   // Comme la grille de saisie : valeur vide ou connue, toutes les valeurs ; sinon celles qui la contiennent.
   const toutes = edition ? (edition.col === 'MOIS' ? MOIS : l.choix?.[edition.col]) ?? [] : []
   const tape = sansAccents(edition?.valeur.trim() ?? '')

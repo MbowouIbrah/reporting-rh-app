@@ -102,6 +102,8 @@ export interface AnomalieLot {
   /** Employé de la ligne : nom du fichier, sinon celui déjà enregistré ; absents pour une ligne d'en-tête. */
   matricule?: string | null
   nom?: string | null
+  /** Aide à la décision : lignes du doublon, valeur du mois précédent, liste où ajouter une valeur inconnue. */
+  proposition?: { lignes?: number[]; valeur?: string; periode?: string; dimension?: string } | null
 }
 
 /** Ligne du fichier telle que lue : une valeur refusée est absente. */
@@ -160,6 +162,9 @@ export const lireAnomalies = (id: number, gravite?: string) =>
 export const lireLigne = (id: number, num: number) => api<LigneLot>(`/imports/${id}/lignes/${num}`)
 export const corrigerLigne = (id: number, num: number, valeurs: Record<string, string | null>) =>
   api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'PUT', body: JSON.stringify({ valeurs }) })
+export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string) =>
+  api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null }))
+export const retirerLigne = (id: number, num: number) => api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'DELETE' })
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 

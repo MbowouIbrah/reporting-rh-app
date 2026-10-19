@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { vi } from 'vitest'
@@ -109,9 +109,9 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
   // Valeur inconnue tapée : la liste ne garde que les valeurs qui la contiennent.
   fireEvent.change(site, { target: { value: 'dou' } })
-  expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Douala'])
+  expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Douala'])
   fireEvent.change(site, { target: { value: '' } })
-  expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Bertoua', 'Douala'])
+  expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Bertoua', 'Douala'])
   fireEvent.change(site, { target: { value: 'Limbé' } })
   fireEvent.keyDown(site, { key: 'Enter' })
   await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 4, { Site: 'Limbé' }))
@@ -123,4 +123,59 @@ test('saisie en grille : pas de colonne Ligne', () => {
   render(<Volets afficherLigne={false} anomalies={[anomalie('MUTATION')]} />)
   expect(screen.queryByRole('columnheader', { name: 'Ligne' })).toBeNull()
   expect(screen.getByText('Changements d’affectation')).toBeInTheDocument()
+})
+
+const LIGNE_BRUTE = {
+  ligne: 40, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: null,
+  activite: 'VN', site: 'Kribi', service: 'SAV PL', montants: {},
+  brut: { 'ANNÉE': '2026', MOIS: 'Août', MATRICULE: 'EMP004', Noms: 'John Doe', 'Type Contrat': '', Site: 'Kribi' },
+  choix: { Site: ['Douala'], 'Type Contrat': ['CDD', 'CDI'] },
+}
+
+function pointsOuverts(a: AnomalieLot, onLot = vi.fn()) {
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <PointsAttention lotId={7} onLot={onLot} afficherLigne ouvert={VOLET_ERREURS} onOuvrir={() => {}} anomalies={[a]} />
+    </QueryClientProvider>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: `Détail de la ligne ${a.ligne}` }))
+}
+
+test('doublon : « Garder la ligne 41 » retire la ligne 40', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const lot = { id: 7, statut: 'pret' } as saisie.Lot
+  const retirer = vi.spyOn(saisie, 'retirerLigne').mockResolvedValue(lot)
+  const onLot = vi.fn()
+  pointsOuverts({ ...anomalie('DOUBLON', 'bloquant', 'Même employé deux fois.', 'MATRICULE'), ligne: 40, proposition: { lignes: [40, 41] } }, onLot)
+  expect(await screen.findByRole('button', { name: 'Garder la ligne 40' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Garder la ligne 41' }))
+  await vi.waitFor(() => expect(retirer).toHaveBeenCalledWith(7, 40))
+  expect(retirer).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
+})
+
+test('valeur manquante : « Reprendre » envoie la valeur du mois précédent', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const corriger = vi.spyOn(saisie, 'corrigerLigne').mockResolvedValue({ id: 7, statut: 'pret' } as saisie.Lot)
+  pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'bloquant', 'Obligatoire.', 'Type Contrat'), ligne: 40, valeur: null,
+    proposition: { valeur: 'CDD', periode: 'juillet 2026' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Reprendre « CDD » (juillet 2026)' }))
+  await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 40, { 'Type Contrat': 'CDD' }))
+  // « Saisir la valeur » ouvre la cellule en édition.
+  fireEvent.click(screen.getByRole('button', { name: 'Saisir la valeur' }))
+  expect(await screen.findByRole('combobox', { name: 'Type Contrat, ligne 40' })).toBeInTheDocument()
+})
+
+test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis envoyé avec le type', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const lot = { id: 7, statut: 'pret' } as saisie.Lot
+  const ajouter = vi.spyOn(saisie, 'ajouterReferentiel').mockResolvedValue(lot)
+  pointsOuverts({ ...anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site'), ligne: 40, valeur: 'Kribi',
+    proposition: { dimension: 'site' } })
+  const bouton = await screen.findByRole('button', { name: 'Ajouter « Kribi » aux sites' })
+  expect(bouton).toBeDisabled()
+  fireEvent.change(screen.getByRole('combobox', { name: 'Type du site' }), { target: { value: 'agence' } })
+  expect(bouton).toBeEnabled()
+  fireEvent.click(bouton)
+  await vi.waitFor(() => expect(ajouter).toHaveBeenCalledWith(7, 'site', 'Kribi', 'agence'))
 })

@@ -66,9 +66,11 @@ def anomalies(
     anos = list(db.scalars(q.offset(offset).limit(limit)))
     qui = service.employes_des_lignes(db, lot_id, {a.num_ligne for a in anos if a.num_ligne})
     personne = {"matricule": None, "nom": None}
+    prop = service.propositions(db, lot_id, anos)
     return [
         {"ligne": a.num_ligne, "colonne": a.colonne, "code": a.code, "gravite": a.gravite,
-         "valeur": a.valeur, "message": a.message, **qui.get(a.num_ligne, personne)}
+         "valeur": a.valeur, "message": a.message, **qui.get(a.num_ligne, personne),
+         "proposition": prop.get(a.id)}
         for a in anos
     ]
 
@@ -93,6 +95,31 @@ def corriger(lot_id: int, num: int, corps: CorrectionIn, p: Principal = Depends(
     authorize(p, "import:write")
     _lot(db, lot_id)
     return service.lot_dict(service.corriger_ligne(db, p.user_id, lot_id, num, corps.valeurs))
+
+
+class ReferentielIn(BaseModel):
+    dimension: str
+    valeur: str
+    type_site: str | None = None  # obligatoire pour un site
+
+
+@router.post("/{lot_id}/referentiels")
+def ajouter_referentiel(lot_id: int, corps: ReferentielIn,
+                        p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Ajoute une valeur inconnue au référentiel (gardée dans le lot, créée à la validation)."""
+    authorize(p, "import:write")
+    _lot(db, lot_id)
+    return service.lot_dict(service.ajouter_referentiel(
+        db, p.user_id, lot_id, corps.dimension, corps.valeur, corps.type_site))
+
+
+@router.delete("/{lot_id}/lignes/{num}")
+def retirer_ligne(lot_id: int, num: int, p: Principal = Depends(current_principal),
+                  db: Session = Depends(get_db)):
+    """Retire une ligne du lot (ex. doublon) ; les contrôles sont relancés."""
+    authorize(p, "import:write")
+    _lot(db, lot_id)
+    return service.lot_dict(service.retirer_ligne(db, p.user_id, lot_id, num))
 
 
 @router.get("/{lot_id}/rapport.xlsx")

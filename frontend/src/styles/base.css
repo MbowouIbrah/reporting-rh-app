@@ -748,6 +748,9 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { border-right-color: rgba(255, 255, 255, .18); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
 .ligne-fichier table.dense td { white-space: nowrap; }
+/* Boutons d'action sous la ligne du fichier, selon la nature du point. */
+.actions-point { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 8px; padding: 0 8px 8px; position: sticky; left: 0; }
+.actions-point select { height: 36px; border: 1px solid var(--rule-strong); background: var(--surface); color: var(--navy); font: inherit; padding: 0 8px; }
 /* Cellule corrigible : un clic l'ouvre en saisie, la liste proposée n'oblige à rien. */
 .ligne-fichier table.dense td.modifiable { cursor: text; }
 /* En saisie, la cellule reste la même : seul un liseré intérieur montre qu'on y écrit, le champ n'a ni bord ni fond. */

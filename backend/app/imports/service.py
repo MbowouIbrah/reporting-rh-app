@@ -12,6 +12,7 @@ from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
     ATTRIBUTS,
     BLOQUANT,
+    MOIS,
     Refs,
     colonnes,
     entetes_reconnus,
@@ -24,6 +25,7 @@ from app.imports.regles import (
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
+    TYPES_SITE,
     Activite,
     Poste,
     RefAlias,
@@ -155,23 +157,58 @@ def _saisie(v: str | None, numerique: bool):
     return int(r[0]) if r[0] == r[0].to_integral_value() else float(r[0])
 
 
+def _lot_modifiable(db: Session, lot_id: int) -> LotImport:
+    """Lot verrouillé, encore corrigeable et dont le fichier a été gardé."""
+    lot = _get_lot(db, lot_id, verrou=True)
+    if lot.statut not in ("pret", "rejete"):
+        raise HTTPException(409, f"Lot au statut « {lot.statut} » : modification impossible")
+    if not lot.feuille:
+        raise HTTPException(409, "Fichier analysé avant les corrections sur place : "
+                                 "le corriger dans Excel puis l'importer de nouveau.")
+    return lot
+
+
+def _feuille_du_lot(lot: LotImport) -> Feuille:
+    f = lot.feuille
+    return Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
+                   f["ligne_ignoree"])
+
+
+DIM_REFS = {"service": "services", "activite": "activites", "site": "sites", "type_contrat": "contrats"}
+
+
+def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Refs:
+    """Référentiels de la base, plus les valeurs que le lot propose d'ajouter (créées à la validation)."""
+    refs = charger_refs(db)
+    for dim, valeurs in (lot.feuille.get("ajouts", {}) if ajouts is None else ajouts).items():
+        idx = getattr(refs, DIM_REFS[dim])
+        for v in valeurs:
+            idx[norm(v)] = v
+    return refs
+
+
+def _relancer(db: Session, lot: LotImport, feuille: Feuille, refs: Refs, **decisions) -> None:
+    """Relance tous les contrôles ; les décisions du lot (ajouts, lignes retirées) sont conservées."""
+    lignes, anos, stats = valider(feuille, refs)
+    if lot.statut == "rejete" and _statut(anos) == "pret" and db.scalar(select(LotImport.id).where(
+            LotImport.sha256 == lot.sha256, LotImport.id != lot.id,
+            LotImport.statut.in_(("pret", "valide")))) is not None:
+        raise HTTPException(409, "Ce fichier est déjà en vérification ou importé : reprendre ce lot-là.")
+    gardees = {k: lot.feuille[k] for k in ("ajouts", "retirees") if k in lot.feuille}
+    lot.feuille = {**_feuille_json(feuille), **gardees, **decisions}
+    _ecrire(db, lot, lignes, anos, stats)
+
+
 def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
                    valeurs: dict[str, str | None]) -> LotImport:
     """Corrige des cellules d'une ligne du fichier puis relance tous les contrôles (doublons,
     noms proches… dépendent des autres lignes). Rien n'est écrit hors du lot."""
-    lot = _get_lot(db, lot_id, verrou=True)
-    if lot.statut not in ("pret", "rejete"):
-        raise HTTPException(409, f"Lot au statut « {lot.statut} » : correction impossible")
-    if not lot.feuille:
-        raise HTTPException(409, "Fichier analysé avant les corrections sur place : "
-                                 "le corriger dans Excel puis l'importer de nouveau.")
-    f = lot.feuille
-    feuille = Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
-                      f["ligne_ignoree"])
+    lot = _lot_modifiable(db, lot_id)
+    feuille = _feuille_du_lot(lot)
     k = next((k for k, (n, _) in enumerate(feuille.lignes) if n == num), None)
     if k is None:
         raise HTTPException(404, "Ligne introuvable")
-    refs = charger_refs(db)
+    refs = _refs_du_lot(db, lot)
     cols = colonnes(feuille.entetes, refs)
     texte_libre = set(ATTRIBUTS) - {"ANNÉE"}
     row, avant = list(feuille.lignes[k][1]), {}
@@ -183,15 +220,52 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
         avant[col] = row[j]
         row[j] = _saisie(v, col not in texte_libre)
     feuille.lignes[k] = (num, tuple(row))
-    lignes, anos, stats = valider(feuille, refs)
-    if lot.statut == "rejete" and _statut(anos) == "pret" and db.scalar(select(LotImport.id).where(
-            LotImport.sha256 == lot.sha256, LotImport.id != lot.id,
-            LotImport.statut.in_(("pret", "valide")))) is not None:
-        raise HTTPException(409, "Ce fichier est déjà en vérification ou importé : reprendre ce lot-là.")
-    lot.feuille = _feuille_json(feuille)
-    _ecrire(db, lot, lignes, anos, stats)
+    _relancer(db, lot, feuille, refs)
     audit.record(db, user_id, "import_correction", "lot_import", lot.id,
                  {"ligne": num, **avant}, {"ligne": num, **valeurs})
+    db.commit()
+    return lot
+
+
+def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, valeur: str,
+                        type_site: str | None = None) -> LotImport:
+    """Décide d'ajouter une valeur inconnue au référentiel : gardée dans le lot, créée à la validation."""
+    if dimension not in DIM_REFS:
+        raise HTTPException(422, "Liste inconnue")
+    valeur = (valeur or "").strip()
+    if not valeur or len(valeur) > 200:
+        raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
+    if dimension == "site":
+        if type_site not in TYPES_SITE:
+            raise HTTPException(422, "Type de site obligatoire : " + ", ".join(TYPES_SITE))
+    else:
+        type_site = None
+    lot = _lot_modifiable(db, lot_id)
+    refs = _refs_du_lot(db, lot)
+    if norm(valeur) in getattr(refs, DIM_REFS[dimension]):
+        raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+    ajouts = {d: dict(v) for d, v in lot.feuille.get("ajouts", {}).items()}
+    ajouts.setdefault(dimension, {})[valeur] = type_site
+    _relancer(db, lot, _feuille_du_lot(lot), _refs_du_lot(db, lot, ajouts), ajouts=ajouts)
+    audit.record(db, user_id, "import_ajout_referentiel", "lot_import", lot.id, None,
+                 {"dimension": dimension, "valeur": valeur, "type_site": type_site})
+    db.commit()
+    return lot
+
+
+def retirer_ligne(db: Session, user_id: int, lot_id: int, num: int) -> LotImport:
+    """Retire une ligne du lot (doublon…) ; le fichier d'origine n'est pas touché."""
+    lot = _lot_modifiable(db, lot_id)
+    feuille = _feuille_du_lot(lot)
+    ligne = next((r for n, r in feuille.lignes if n == num), None)
+    if ligne is None:
+        raise HTTPException(404, "Ligne introuvable")
+    feuille.lignes = [(n, r) for n, r in feuille.lignes if n != num]
+    refs = _refs_du_lot(db, lot)
+    avant = {"ligne": num, **{c: _brut(ligne[j]) if j < len(ligne) else None
+                              for c, j in colonnes(feuille.entetes, refs).items()}}
+    _relancer(db, lot, feuille, refs, retirees=[*lot.feuille.get("retirees", []), num])
+    audit.record(db, user_id, "import_ligne_retiree", "lot_import", lot.id, avant, None)
     db.commit()
     return lot
 
@@ -212,7 +286,7 @@ def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
     if lot.feuille:
         cells = next((r for n, r in lot.feuille["lignes"] if n == num), None)
         if cells is not None:
-            refs = charger_refs(db)
+            refs = _refs_du_lot(db, lot)
             brut = {c: _brut(cells[j]) if j < len(cells) else None
                     for c, j in colonnes(lot.feuille["entetes"], refs).items()}
             choix = {c: sorted(set(d.values()), key=norm) for c, d in (
@@ -224,6 +298,47 @@ def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
           {"annee": None, "mois": None, "matricule": None, "nom": None, "poste": None, "type_contrat": None,
            "activite": None, "site": None, "service": None, "montants": {}})
     return {"ligne": num, **lu, "brut": brut, "choix": choix}
+
+
+COLONNES_REF = {"Type Contrat": ("type_contrat", TypeContrat, "type_contrat_id"),
+                "Activité": ("activite", Activite, "activite_id"),
+                "Site": ("site", Site, "site_id"), "Service": ("service", Service, "service_id")}
+
+
+def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
+    """Aide à la décision pour chaque point : lignes du doublon, valeur du mois précédent,
+    liste où ajouter une valeur inconnue. Clé : id du point."""
+    nums = {a.num_ligne for a in anos if a.num_ligne and (
+        a.code == "DOUBLON" or (a.code == "VALEUR_MANQUANTE" and a.colonne in COLONNES_REF))}
+    rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
+        StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
+    out: dict[int, dict] = {}
+    for a in anos:
+        if a.code == "REFERENTIEL_INCONNU" and a.colonne in COLONNES_REF:
+            out[a.id] = {"dimension": COLONNES_REF[a.colonne][0]}
+            continue
+        r = rows.get(a.num_ligne)
+        if r is None or r.annee is None or r.mois is None or not r.matricule:
+            continue
+        if a.code == "DOUBLON":
+            q = select(StagingLigne.num_ligne).where(
+                StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
+                StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
+            out[a.id] = {"lignes": sorted(db.scalars(q))}
+        elif a.code == "VALEUR_MANQUANTE" and a.colonne in COLONNES_REF:
+            _, model, attr = COLONNES_REF[a.colonne]
+            q = (select(model.libelle, Periode.annee, Periode.mois)
+                 .select_from(SituationMensuelle)
+                 .join(Periode, Periode.id == SituationMensuelle.periode_id)
+                 .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
+                 .join(model, model.id == getattr(SituationMensuelle, attr))
+                 .where(Salarie.matricule_norm == r.matricule.casefold(),
+                        (Periode.annee < r.annee) | ((Periode.annee == r.annee) & (Periode.mois < r.mois)))
+                 .order_by(Periode.annee.desc(), Periode.mois.desc()).limit(1))
+            trouve = db.execute(q).first()
+            if trouve:
+                out[a.id] = {"valeur": trouve[0], "periode": f"{MOIS[trouve[2] - 1].lower()} {trouve[1]}"}
+    return out
 
 
 def employes_des_lignes(db: Session, lot_id: int, nums: set[int]) -> dict[int, dict]:
@@ -414,6 +529,15 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
             db.add(obj)
             db.flush()
             postes[norm(p)] = obj.id
+
+    # valeurs de référentiel ajoutées dans le lot : créées maintenant seulement
+    for dim, valeurs in ((lot.feuille or {}).get("ajouts") or {}).items():
+        model = DIM_MODELS[dim]
+        connus = {norm(k) for k in _ids(db, model)}
+        for v, type_site in valeurs.items():
+            if norm(v) not in connus:
+                db.add(Site(libelle=v, type_site=type_site) if dim == "site" else model(libelle=v))
+        db.flush()
 
     ids = {d: _ids(db, m) for d, m in DIM_MODELS.items() if d != "poste"}
     rub = _ids(db, Rubrique)
