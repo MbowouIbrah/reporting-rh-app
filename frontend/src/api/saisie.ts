@@ -99,6 +99,24 @@ export interface AnomalieLot {
   gravite: 'bloquant' | 'avertissement'
   valeur: string | null
   message: string
+  /** Employé de la ligne : nom du fichier, sinon celui déjà enregistré ; absents pour une ligne d'en-tête. */
+  matricule?: string | null
+  nom?: string | null
+}
+
+/** Ligne du fichier telle que lue : une valeur refusée est absente. */
+export interface LigneLot {
+  ligne: number
+  annee: number | null
+  mois: number | null
+  matricule: string | null
+  nom: string | null
+  poste: string | null
+  type_contrat: string | null
+  activite: string | null
+  site: string | null
+  service: string | null
+  montants: Record<string, string>
 }
 
 export type Cle = { annee: number; mois: number; matricule: string }
@@ -135,6 +153,7 @@ export function envoyerFichier(f: File) {
 export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)
 export const lireAnomalies = (id: number, gravite?: string) =>
   api<AnomalieLot[]>(`/imports/${id}/anomalies${qs({ gravite, limit: 1000 })}`)
+export const lireLigne = (id: number, num: number) => api<LigneLot>(`/imports/${id}/lignes/${num}`)
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 

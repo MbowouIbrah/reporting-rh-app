@@ -89,6 +89,20 @@ def matricule_sans_matricule(nom: str, refs: "Refs") -> tuple[str, list[str]]:
     return PREFIXE_SANS_MATRICULE + hashlib.sha1(cle.encode()).hexdigest()[:12].upper(), []
 
 
+LIBELLES = {"MOIS": "Mois", "Type Contrat": "Types de contrat", "Activité": "Activités", "Site": "Sites",
+            "Service": "Services"}
+MAX_ADMIS = 15
+
+
+def admis(colonne: str, index: dict[str, str] | None) -> str:
+    """Valeurs acceptées pour une colonne à liste, pour les citer dans le message d'erreur."""
+    if index is None:
+        return "Mois en lettres, de Janvier à Décembre."
+    vals = sorted(set(index.values()), key=norm)
+    suite = ", …" if len(vals) > MAX_ADMIS else ""
+    return f"{LIBELLES[colonne]} admis : {', '.join(vals[:MAX_ADMIS])}{suite}."
+
+
 def _qui(matricule: str) -> str:
     return "sans matricule" if est_sans_matricule(matricule) else f"matricule {matricule}"
 
@@ -190,11 +204,11 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         r = nombre(a) if a is not None else None
         if r is None or r[0] != int(r[0]) or not ANNEE_MIN <= r[0] <= ANNEE_MAX:
             add(num, "ANNÉE", "ANNEE_INVALIDE", BLOQUANT, a,
-                f"Entier entre {ANNEE_MIN} et {ANNEE_MAX} attendu.")
+                f"Année attendue : nombre entier de {ANNEE_MIN} à {ANNEE_MAX} (ex. 2026).")
         else:
             L.annee = int(r[0])
             if r[1]:
-                add(num, "ANNÉE", "TEXTE_CONVERTI", AVERT, a, "Année saisie en texte, convertie.")
+                add(num, "ANNÉE", "TEXTE_CONVERTI", AVERT, a, f"Année saisie en texte, lue {int(r[0])}.")
 
         for nom, index, attr in (("MOIS", None, "mois"), ("Type Contrat", refs.contrats, "type_contrat"),
                                  ("Activité", refs.activites, "activite"), ("Site", refs.sites, "site"),
@@ -202,15 +216,15 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             v = g(nom)
             t = texte(v)
             if not t:
-                add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, "Obligatoire.")
+                add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, f"Obligatoire. {admis(nom, index)}")
                 continue
             ref = {norm(m): m for m in MOIS} if index is None else index
             canon = ref.get(norm(t))
             if canon is None:
-                add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, "Valeur absente du référentiel.")
+                add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, f"Valeur inconnue. {admis(nom, index)}")
                 continue
             if canon != str(v):
-                add(num, nom, "NORMALISE", AVERT, v, f"Normalisée en « {canon} ».")
+                add(num, nom, "NORMALISE", AVERT, v, f"Écrit « {t} », repris comme « {canon} ».")
             setattr(L, attr, MOIS.index(canon) + 1 if index is None else canon)
 
         mat_brut = g("MATRICULE")
@@ -230,13 +244,13 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         else:
             if isinstance(mat_brut, (int, float)) and not isinstance(mat_brut, bool):
                 add(num, "MATRICULE", "MATRICULE_NUMERIQUE", AVERT, mat_brut,
-                    "Saisi en nombre : les zéros de tête ont pu être perdus.")
+                    "Matricule saisi en nombre : les zéros ou lettres de tête ont pu être perdus.")
                 mat = str(int(mat_brut)) if float(mat_brut).is_integer() else str(mat_brut)
             elif mat != str(mat_brut):
-                add(num, "MATRICULE", "NORMALISE", AVERT, repr(mat_brut), "Espaces parasites supprimés.")
+                add(num, "MATRICULE", "NORMALISE", AVERT, repr(mat_brut), "Espaces en trop supprimés.")
             if re.search(r"\s", mat):
                 add(num, "MATRICULE", "MATRICULE_ESPACE", BLOQUANT, mat,
-                    "Espace à l'intérieur du matricule.")
+                    f"Matricule attendu sans espace (« {re.sub(r'\s', '', mat)} » ?).")
             if len(mat) > 30:
                 add(num, "MATRICULE", "TEXTE_TROP_LONG", BLOQUANT, mat, "30 caractères maximum.")
         L.matricule = mat
@@ -251,7 +265,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 setattr(L, attr, t)
         if L.poste and norm(L.poste) not in refs.postes and norm(L.poste) not in postes_vus:
             postes_vus.add(norm(L.poste))
-            add(num, "Poste", "POSTE_NOUVEAU", AVERT, L.poste, "Poste inconnu, créé à la validation.")
+            add(num, "Poste", "POSTE_NOUVEAU", AVERT, L.poste, "Poste inconnu : il sera créé à l'enregistrement.")
 
         if L.annee and L.mois and mat and not re.search(r"\s", mat):
             cles[(L.annee, L.mois, mat.casefold())].append(num)
@@ -264,39 +278,41 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             if v is None or (isinstance(v, str) and not v.strip()):
                 continue  # cellule vide : pas de montant
             if isinstance(v, str) and v.strip().startswith("#"):
-                add(num, nom, "ERREUR_EXCEL", BLOQUANT, v, "Valeur d'erreur Excel (#N/A, #REF!...).")
+                add(num, nom, "ERREUR_EXCEL", BLOQUANT, v, f"Erreur Excel {v.strip()} au lieu d'un nombre : corriger la formule ou vider la cellule.")
                 continue
             res = nombre(v)
             if res is None:
                 add(num, nom, "NON_NUMERIQUE", BLOQUANT, v,
-                    "Nombre attendu (pas de texte, d'unité ni de formule).")
+                    "Nombre attendu, sans texte ni unité (ex. 25000).")
                 continue
             val, converti = res
             if converti:
-                add(num, nom, "TEXTE_CONVERTI", AVERT, v, f"Nombre saisi en texte, converti en {val}.")
+                add(num, nom, "TEXTE_CONVERTI", AVERT, v, f"Nombre saisi en texte, lu {val}.")
             if abs(val) >= BORNE:
-                add(num, nom, "MONTANT_HORS_BORNES", BLOQUANT, v, "Valeur hors limites (15 chiffres).")
+                add(num, nom, "MONTANT_HORS_BORNES", BLOQUANT, v, "Nombre trop grand : 15 chiffres au plus avant la virgule.")
                 continue
             q = val.quantize(TROIS, rounding=ROUND_HALF_UP)
             if q != val:
-                add(num, nom, "PRECISION_TRONQUEE", AVERT, v, "Plus de 3 décimales, arrondi.")
+                add(num, nom, "PRECISION_TRONQUEE", AVERT, v, f"Plus de 3 décimales, arrondi à {q.normalize():f}.")
             if unite == "jours":
                 if q < 0 or q > ABSENCES_MAX:
-                    add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, v, f"Entre 0 et {ABSENCES_MAX} jours.")
+                    add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, v, f"Nombre de jours attendu, de 0 à {ABSENCES_MAX}.")
             elif q < 0:
-                add(num, nom, "MONTANT_NEGATIF", AVERT, v, "Montant négatif (régularisation ?).")
+                add(num, nom, "MONTANT_NEGATIF", AVERT, v, "Montant négatif : régularisation ou erreur de signe ?")
             L.montants[nom] = q
 
         L.bloquant = nb_bloq > nb_avant
         lignes.append(L)
 
     by_num = {L.num: L for L in lignes}
-    for (a, m, mat), nums in cles.items():
+    for (a, m, _mat), nums in cles.items():
         if len(nums) > 1:
+            # Une seule erreur pour le groupe, ancrée sur la première ligne : les autres sont citées.
             for k in nums:
                 by_num[k].bloquant = True
-                add(k, "ANNÉE+MOIS+MATRICULE", "DOUBLON", BLOQUANT, f"{a}-{m:02d} {mat}",
-                    f"Clé en double (lignes {', '.join(map(str, nums))}).")
+            liste = ", ".join(map(str, nums[:-1])) + f" et {nums[-1]}"
+            add(nums[0], "MATRICULE", "DOUBLON", BLOQUANT, by_num[nums[0]].matricule,
+                f"Même employé deux fois pour {MOIS[m - 1].lower()} {a} (lignes {liste}) : garder une seule ligne.")
 
     for mat, occ in par_matricule.items():
         noms = {o[1] for o in occ if o[1]}

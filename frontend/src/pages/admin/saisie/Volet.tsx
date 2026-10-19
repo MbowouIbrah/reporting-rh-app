@@ -4,7 +4,7 @@ interface Props {
   titre: ReactNode
   resume?: ReactNode
   valeur: ReactNode
-  ton?: 'ok' | 'ko'
+  ton?: 'ok' | 'ko' | 'attention'
   ouvert: boolean
   onOuvrir: () => void
   children: ReactNode

@@ -729,6 +729,16 @@ html, body { overscroll-behavior: none; }
 .volet-valeur { flex: none; font-family: var(--font-mono); font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 0; background: var(--paper-3); color: var(--muted); display: inline-block; white-space: nowrap; }
 .volet-valeur-ok { background: #E6F6EC; color: #147a41; }
 .volet-valeur-ko { background: var(--red-soft); color: var(--red-deep); }
+.volet-valeur-attention { background: var(--warning-soft); color: var(--warning); }
+.volet-niveau { font-weight: 600; color: var(--ink); }
+tr.ligne-detail > td { background: var(--paper-2); padding: 8px 12px 12px; }
+.ligne-fichier { overflow-x: auto; }
+.ligne-fichier table.dense { width: auto; margin: 0; }
+.page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
+.ligne-fichier table.dense td { white-space: nowrap; }
+.ligne-fichier td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
+.ligne-fichier td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
+.saisie-apercu .ligne-fichier td.cellule-cible { outline: 2px solid currentColor; outline-offset: -2px; }
 .volet-corps { flex: 1; min-height: 0; overflow: auto; }
 .page-ecran.saisie-apercu .volet-corps > table.dense { margin: 0; border: 0; border-collapse: separate; border-spacing: 0; }
 .saisie-apercu table.dense { width: 100%; }

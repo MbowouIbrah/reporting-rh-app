@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.imports.lecture import Feuille, FichierIllisible, lire
-from app.imports.regles import BLOQUANT, Refs, entetes_reconnus, norm, valider
+from app.imports.regles import BLOQUANT, Refs, entetes_reconnus, est_sans_matricule, norm, valider
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
@@ -113,6 +113,28 @@ def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha:
                  {"statut": lot.statut, "fichier": lot.fichier_nom, **(stats or {})})
     db.commit()
     return lot
+
+
+def employes_des_lignes(db: Session, lot_id: int, nums: set[int]) -> dict[int, dict]:
+    """Matricule et nom de l'employé de chaque ligne : nom du fichier, sinon celui déjà enregistré."""
+    if not nums:
+        return {}
+    rows = db.execute(select(StagingLigne.num_ligne, StagingLigne.matricule, StagingLigne.donnees)
+                      .where(StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums))).all()
+    mats = {r.matricule.casefold() for r in rows if r.matricule}
+    connus = dict(db.execute(select(Salarie.matricule_norm, Salarie.nom)
+                             .where(Salarie.matricule_norm.in_(mats))).all()) if mats else {}
+    return {r.num_ligne: {
+        "matricule": None if est_sans_matricule(r.matricule) else r.matricule,
+        "nom": (r.donnees or {}).get("nom") or connus.get((r.matricule or "").casefold()),
+    } for r in rows}
+
+
+def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
+    row = db.scalar(select(StagingLigne).where(StagingLigne.lot_id == lot_id, StagingLigne.num_ligne == num))
+    if row is None:
+        raise HTTPException(404, "Ligne introuvable")
+    return {"ligne": num, "annee": row.annee, "mois": row.mois, "matricule": row.matricule, **row.donnees}
 
 
 def _get_lot(db: Session, lot_id: int, *, verrou: bool = False) -> LotImport:

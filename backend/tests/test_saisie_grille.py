@@ -150,3 +150,20 @@ def test_apercu_ignore_ligne_sans_mois(make_client):
     lot_id = r.json()["id"]
     ap = c.get(f"{API}/imports/{lot_id}/apercu")
     assert ap.status_code == 200 and [x["matricule"] for x in ap.json()["lignes"]] == ["EMP001"]
+
+
+def test_anomalies_nommees_doublon_unique_et_detail_ligne(make_client):
+    # Chaque erreur porte l'employé ; un doublon donne une seule erreur ; la ligne se relit depuis l'erreur.
+    from tests.test_donnees_api import XLSX
+    from tests.test_import_regles import xlsx
+    c = make_client(ADMIN)
+    lignes = [ligne(**{BR: 1000}), ligne(**{BR: 2000}), ligne(MATRICULE="EMP002", Noms="Awa", Site="Kribi")]
+    lot_id = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(lignes), XLSX)}).json()["id"]
+    anos = c.get(f"{API}/imports/{lot_id}/anomalies").json()
+    doublons = [a for a in anos if a["code"] == "DOUBLON"]
+    assert len(doublons) == 1 and doublons[0]["ligne"] == 2 and "lignes 2 et 3" in doublons[0]["message"]
+    site = next(a for a in anos if a["code"] == "REFERENTIEL_INCONNU")
+    assert (site["matricule"], site["nom"]) == ("EMP002", "Awa") and "Sites admis : " in site["message"]
+    d = c.get(f"{API}/imports/{lot_id}/lignes/4").json()
+    assert d["matricule"] == "EMP002" and d["site"] is None and d["service"] == "SAV PL"
+    assert c.get(f"{API}/imports/{lot_id}/lignes/99").status_code == 404

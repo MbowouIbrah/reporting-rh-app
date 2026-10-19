@@ -81,7 +81,7 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
     ]
     L, ens, anos, _ = run(rows, postes={"p"})
     assert ens == {
-        (2, "ANNÉE+MOIS+MATRICULE", "DOUBLON"), (3, "ANNÉE+MOIS+MATRICULE", "DOUBLON"),
+        (2, "MATRICULE", "DOUBLON"),
         (4, "Service", "REFERENTIEL_INCONNU"),
         (5, "Primes sur ventes", "NON_NUMERIQUE"),
         (6, "Bonus", "ERREUR_EXCEL"),

@@ -63,11 +63,23 @@ def anomalies(
     if gravite:
         q = q.where(ImportAnomalie.gravite == gravite)
     q = q.order_by(ImportAnomalie.gravite, ImportAnomalie.num_ligne, ImportAnomalie.id)
+    anos = list(db.scalars(q.offset(offset).limit(limit)))
+    qui = service.employes_des_lignes(db, lot_id, {a.num_ligne for a in anos if a.num_ligne})
+    personne = {"matricule": None, "nom": None}
     return [
         {"ligne": a.num_ligne, "colonne": a.colonne, "code": a.code, "gravite": a.gravite,
-         "valeur": a.valeur, "message": a.message}
-        for a in db.scalars(q.offset(offset).limit(limit))
+         "valeur": a.valeur, "message": a.message, **qui.get(a.num_ligne, personne)}
+        for a in anos
     ]
+
+
+@router.get("/{lot_id}/lignes/{num}")
+def ligne(lot_id: int, num: int, p: Principal = Depends(current_principal),
+          db: Session = Depends(get_db)):
+    """Contenu lu d'une ligne du fichier, pour la montrer depuis une erreur."""
+    authorize(p, "import:read")
+    _lot(db, lot_id)
+    return service.ligne_du_lot(db, lot_id, num)
 
 
 @router.get("/{lot_id}/rapport.xlsx")

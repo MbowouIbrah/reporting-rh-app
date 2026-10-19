@@ -212,7 +212,7 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
               </table>
             </Volet>
           )}
-          {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} />}
+          {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot.id} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} />}
         </div>
       </div>
       <div className="saisie-pied">

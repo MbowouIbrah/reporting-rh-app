@@ -63,7 +63,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {lot && (
         <div className="panneau">
           <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
-            {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
           </div>
         </div>
       )}
