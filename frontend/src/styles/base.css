@@ -739,10 +739,11 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .ligne-fichier { overflow-x: auto; position: sticky; left: 0; animation: ligne-fichier-ouvre .2s ease-out; }
 @keyframes ligne-fichier-ouvre { from { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .ligne-fichier { animation: none; } }
-.ligne-fichier table.dense td.fige { position: sticky; z-index: 1; }
+.ligne-fichier table.dense :is(td, tbody th).fige { position: sticky; z-index: 1; }
+.ligne-fichier table.dense tbody th.num-ligne { background: var(--surface); color: var(--navy); font-weight: 600; text-align: right; }
 .ligne-fichier table.dense td.fige:not(.cellule-ko):not(.cellule-attention):not(.cellule-ok) { background: var(--surface); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th.fige, .ligne-fichier table.dense thead th.fige { position: sticky; z-index: 2; }
-.page-ecran.rapport-excel .panneau .ligne-fichier table.dense .fige:nth-child(4), .ligne-fichier table.dense .fige:nth-child(4) { border-right: 2px solid var(--navy); }
+.page-ecran.rapport-excel .panneau .ligne-fichier table.dense .fige-bord, .ligne-fichier table.dense .fige-bord { border-right: 2px solid var(--navy); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense, .ligne-fichier table.dense { width: auto; min-width: 100%; margin: 0; border-collapse: separate; border-spacing: 0; }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense th, .page-ecran.rapport-excel .panneau .ligne-fichier table.dense td, .ligne-fichier table.dense th, .ligne-fichier table.dense td { border: 0; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { border-right-color: rgba(255, 255, 255, .18); }
@@ -754,6 +755,10 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .actions-point .decision { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--navy); font-weight: 600; }
 .actions-point .decision select { font-weight: 400; max-width: 100%; }
 .actions-point { align-items: flex-end; }
+/* Pied de l'écran : liens à gauche, corrections en attente à droite. */
+.pied-liens, .pied-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.pied-actions:empty { display: none; }
+.pied-actions .corrections-pied { padding: 0; border: 0; }
 .corrections-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--rule); }
 table.points tr.point-regle:nth-child(n) td, .rapport-excel .panneau table.points tbody tr.point-regle:nth-child(n) td { background: #E6F6EC; color: #147a41; }
 .regle { color: #147a41; font-weight: 600; }
@@ -768,11 +773,11 @@ table.points td.cellule-modifiee { background: var(--info-soft); color: var(--in
 .ligne-fichier table.dense td.en-saisie:not(.fige) { position: relative; }
 .ligne-fichier table.dense td.en-saisie .fantome { visibility: hidden; }
 .ligne-fichier table.dense td.en-saisie input::-webkit-calendar-picker-indicator { display: none !important; }
-/* Doublon : lignes comparées l'une sous l'autre, colonnes de même largeur, alignées. */
-.ligne-titre { margin: 0; padding: 6px 8px 4px; font-size: 13px; font-weight: 600; color: var(--navy); position: sticky; left: 0; }
+/* Doublon : lignes comparées dans le même tableau, sous un seul en-tête, colonnes de même largeur. */
 .page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense, .comparer .ligne-fichier table.dense { table-layout: fixed; width: max-content; min-width: 0; }
 .page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense :is(th, td), .comparer .ligne-fichier table.dense :is(th, td) { width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
 .page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense thead th, .comparer .ligne-fichier table.dense thead th { white-space: normal; vertical-align: bottom; }
+.page-ecran.rapport-excel .panneau .comparer .ligne-fichier table.dense .num-ligne, .comparer .ligne-fichier table.dense .num-ligne { width: 72px; min-width: 72px; max-width: 72px; }
 /* Point réglé : cellule et liseré gauche passent au vert. */
 table.points td.cellule-ok, .ligne-fichier table.dense td.fige.cellule-ok { background: #E6F6EC; color: #147a41; font-weight: 600; }
 table.points tr.point-regle td.ouvert, table.points tr.detail-regle > td, .rapport-excel .panneau table.points tr.detail-regle > td { border-left-color: #147a41; }

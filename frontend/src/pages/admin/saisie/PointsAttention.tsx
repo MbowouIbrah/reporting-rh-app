@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type UIEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { appliquerDecisions, lireLigne, simulerDecisions, type AnomalieLot, type Decisions, type LigneLot, type Lot } from '../../../api/saisie'
 import { Bouton } from '../../../components/Kit'
@@ -68,6 +69,8 @@ interface Props {
   /** Volet ouvert, partagé avec le reste de l'aperçu : un seul à la fois. */
   ouvert: string | null
   onOuvrir: (id: string) => void
+  /** Pied de l'écran où placer « Annuler les changements » et « Enregistrer ». */
+  pied?: HTMLElement | null
 }
 
 const cle = (a: { ligne: number | null; colonne: string | null; code: string }) => `${a.ligne}|${a.colonne}|${a.code}`
@@ -123,7 +126,7 @@ interface Edition {
 }
 
 /** Points regroupés par nature et par niveau (à corriger, à confirmer, corrigé automatiquement). */
-export default function PointsAttention({ anomalies, lotId, onLot, onAttente, afficherLigne, ouvert, onOuvrir }: Props) {
+export default function PointsAttention({ anomalies, lotId, onLot, onAttente, afficherLigne, ouvert, onOuvrir, pied }: Props) {
   const [plan, setPlan] = useState<Plan>(VIDE)
   const qc = useQueryClient()
   // Un point réglé reste affiché (en vert) : la liste ne bouge pas sous les yeux.
@@ -164,6 +167,24 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
   const sansType = envoi?.ajouts.some((a) => a.dimension === 'site' && !a.type_site) ?? false
   const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan }
   const erreur = enregistrer.error ?? (envoi ? simulation.error : null)
+  // Barre des corrections : dans le pied de l'écran quand il est fourni, sinon sous les volets.
+  const barre = lotId != null && afficherLigne && (n > 0 || erreur) ? (
+    <span className="corrections-pied">
+      {n > 0 && (
+        <span className="muted" aria-live="polite">
+          {`${n} changement${n > 1 ? 's' : ''} en attente${sansType ? ' : choisir le type du nouveau site' : ''}`}
+          {envoi && simulation.isFetching ? ' · vérification…' : ''}
+        </span>
+      )}
+      {erreur && <span className="champ-erreur" role="alert">{erreur.message}</span>}
+      {n > 0 && <Bouton variante="lien" disabled={occupe} onClick={() => setPlan(() => VIDE)}>Annuler les changements</Bouton>}
+      {n > 0 && (
+        <Bouton disabled={occupe || sansType} onClick={() => enregistrer.mutate()}>
+          {occupe ? 'Enregistrement…' : 'Enregistrer'}
+        </Bouton>
+      )}
+    </span>
+  ) : null
   return (
     <>
       {repartir(tous).map((g) => {
@@ -177,20 +198,7 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
           </Volet>
         )
       })}
-      {lotId != null && afficherLigne && tous.length > 0 && (
-        <div className="corrections-pied">
-          <span className="muted" aria-live="polite">
-            {n === 0 ? 'Aucun changement en attente.'
-              : `${n} changement${n > 1 ? 's' : ''} en attente${sansType ? ' : choisir le type du nouveau site' : ''}`}
-            {envoi && simulation.isFetching ? ' · vérification…' : ''}
-          </span>
-          {n > 0 && <Bouton variante="secondaire" disabled={occupe} onClick={() => setPlan(() => VIDE)}>Annuler les changements</Bouton>}
-          <Bouton disabled={n === 0 || occupe || sansType} onClick={() => enregistrer.mutate()}>
-            {occupe ? 'Enregistrement…' : 'Enregistrer'}
-          </Bouton>
-          {erreur && <p className="champ-erreur admin-erreur" role="alert">{erreur.message}</p>}
-        </div>
-      )}
+      {barre && (pied ? createPortal(barre, pied) : barre)}
     </>
   )
 }
@@ -214,8 +222,16 @@ interface TableauProps {
 
 function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauProps) {
   const [deplie, setDeplie] = useState<string | null>(null)
+  const table = useRef<HTMLTableElement>(null)
+  // Ligne dépliée placée juste sous l'en-tête figé : son détail et les lignes suivantes restent visibles.
+  useEffect(() => {
+    const tr = deplie && table.current?.querySelector<HTMLElement>('tr[data-ouvert]')
+    if (!tr) return
+    tr.style.scrollMarginTop = `${table.current!.tHead?.offsetHeight ?? 0}px`
+    tr.scrollIntoView?.({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [deplie])
   return (
-    <table className={ton ? `dense points bord-${ton}` : 'dense points'}>
+    <table ref={table} className={ton ? `dense points bord-${ton}` : 'dense points'}>
       <thead>
         <tr>
           {afficherLigne && <th scope="col" className="num">Ligne</th>}
@@ -235,6 +251,7 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauPr
             <Fragment key={k}>
               {/* Toute la ligne ouvre le détail ; le bouton ▸ reçoit le clic au clavier (il remonte jusqu'à la ligne). */}
               <tr className={[depliable && 'depliable', regle && 'point-regle'].filter(Boolean).join(' ') || undefined}
+                data-ouvert={ouvert || undefined}
                 onClick={depliable ? () => setDeplie(ouvert ? null : k) : undefined}>
                 {afficherLigne && (
                   <td className={ouvert ? 'num ouvert' : 'num'}>
@@ -276,6 +293,7 @@ const ATTRIBUTS: [string, (l: LigneLot) => string | null][] = [
 
 /** ANNÉE, MOIS, MATRICULE, Noms restent visibles pendant le défilement. */
 const FIGEES = 4
+const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ') || undefined
 const sansAccents = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 interface DetailProps {
@@ -329,7 +347,7 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
       choix: prop.lignes.map((n) => {
         const autres = prop.lignes!.filter((x) => x !== n)
         return {
-          libelle: `Supprimer ${autres.length > 1 ? 'les lignes' : 'la ligne'} ${autres.join(', ')}, garder la ligne ${n}`,
+          libelle: `Garder la ligne ${n}, supprimer ${autres.length > 1 ? 'les lignes' : 'la ligne'} ${autres.join(', ')}`,
           retirer: autres,
         }
       }),
@@ -388,33 +406,25 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
     if (!Object.keys(ligne).length) delete modifs[n]
     return { ...p, modifs, ignores: p.ignores.filter((x) => x !== `${n}|${col}`) }
   })
-  // Lignes comparées : un défilement horizontal entraîne les autres.
-  const suivre = (e: UIEvent<HTMLElement>) => {
-    const t = e.target as HTMLElement
-    if (!t.classList.contains('ligne-fichier')) return
-    e.currentTarget.querySelectorAll<HTMLElement>('.ligne-fichier').forEach((d) => { if (d !== t) d.scrollLeft = t.scrollLeft })
-  }
+  const tout = qs.every((x) => x.isSuccess)
   return (
     <tr className={edition.restants.has(k) ? 'detail-contrat' : 'detail-contrat detail-regle'}>
-      <td colSpan={5} className={comparer ? 'comparer' : undefined} onScrollCapture={comparer ? suivre : undefined}>
-        {q.isSuccess ? (
+      <td colSpan={5} className={comparer ? 'comparer' : undefined}>
+        {tout ? (
           <>
-            {ordre.map((n, i) => {
-              const d = qs[i].data
-              return (
-                <Fragment key={n}>
-                  {comparer && <p className="ligne-titre">Ligne {n}{n === num ? ' (signalée)' : ''}</p>}
-                  {d ? (
-                    <LigneFichier l={d} num={n} cible={n === num ? cible : null} points={points.filter((x) => x.ligne === n)}
-                      colonnes={comparer ? colonnes : undefined} restants={edition.restants} modifs={edition.lignes[n]}
-                      onModifie={d.brut ? modifier(n, d.brut) : undefined} enCours={occupe} />
-                  ) : <span className="muted">{qs[i].isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
-                </Fragment>
-              )
-            })}
-            {q.data.brut && (regle
+            {/* Doublon : un seul en-tête, les lignes en cause l'une sous l'autre. */}
+            <LigneFichier signalee={num} cible={cible} colonnes={comparer ? colonnes : undefined}
+              restants={edition.restants} enCours={occupe}
+              rangs={ordre.map((n, i) => {
+                const d = qs[i].data!
+                return { num: n, l: d, points: points.filter((x) => x.ligne === n), modifs: edition.lignes[n],
+                  onModifie: d.brut ? modifier(n, d.brut) : undefined }
+              })} />
+            {q.data!.brut && (regle
               ? <p className="actions-point regle">Point réglé.</p>
-              : (proposees || ignorable(point)) && (
+              : !(proposees || ignorable(point))
+                ? <p className="actions-point">Veuillez saisir une valeur conforme : cliquez sur la cellule en cause pour la corriger.</p>
+                : (
                 <div className="actions-point">
                   <label className="decision">
                     <span>{question}</span>
@@ -442,39 +452,50 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
               ))}
           </>
         )
-          : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
+          : <span className="muted">{qs.some((x) => x.isPending) ? 'Chargement…' : 'Contenu indisponible.'}</span>}
       </td>
     </tr>
   )
 }
 
 
-interface LigneProps {
-  l: LigneLot
+/** Ligne du fichier montrée sous le point ; plusieurs pour un doublon. */
+interface Rang {
   num: number
-  cible: string | null
+  l: LigneLot
   points: AnomalieLot[]
-  /** Rubriques à afficher en plus de celles de la ligne (lignes comparées). */
-  colonnes?: string[]
-  /** Clés des points encore présents ; absent : tous. */
-  restants?: Set<string>
   /** Valeurs changées, pas encore enregistrées. */
   modifs?: Record<string, string | null>
   /** Absent : ligne en lecture seule (lot analysé avant les corrections sur place). */
   onModifie?: (colonne: string, valeur: string | null) => void
+}
+
+interface LigneProps {
+  rangs: Rang[]
+  /** Ligne du point déplié : seule sa cellule en cause est ciblée. */
+  signalee: number
+  cible: string | null
+  /** Rubriques à afficher en plus de celles des lignes (lignes comparées). */
+  colonnes?: string[]
+  /** Clés des points encore présents ; absent : tous. */
+  restants?: Set<string>
   enCours?: boolean
 }
 
-function LigneFichier({ l, num, cible, points, colonnes = [], restants, modifs = {}, onModifie, enCours }: LigneProps) {
-  const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number; saisi?: boolean } | null>(null)
+function LigneFichier({ rangs, signalee, cible, colonnes = [], restants, enCours }: LigneProps) {
+  const [edition, setEdition] = useState<{ num: number; col: string; valeur: string; actif: number; saisi?: boolean } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
-  const ouvrir = (n: string) => {
+  const comparer = rangs.length > 1
+  // Lignes comparées : leur numéro en tête, figé avec ANNÉE, MOIS, MATRICULE, Noms.
+  const figees = FIGEES + (comparer ? 1 : 0)
+  const rang = edition ? rangs.find((r) => r.num === edition.num) : undefined
+  const ouvrir = (r: Rang, n: string) => {
     ferme.current = false
-    setEdition({ col: n, valeur: (n in modifs ? modifs[n] : l.brut?.[n]) ?? '', actif: -1 })
+    setEdition({ num: r.num, col: n, valeur: (r.modifs && n in r.modifs ? r.modifs[n] : r.l.brut?.[n]) ?? '', actif: -1 })
   }
   // Comme la grille de saisie : valeur vide ou connue, toutes les valeurs ; sinon celles qui la contiennent.
   // À l'ouverture ou sans valeur qui corresponde (valeur inconnue du fichier), la liste entière reste proposée.
-  const toutes = edition ? (edition.col === 'MOIS' ? MOIS : l.choix?.[edition.col]) ?? [] : []
+  const toutes = edition ? (edition.col === 'MOIS' ? MOIS : rang?.l.choix?.[edition.col]) ?? [] : []
   const tape = sansAccents(edition?.valeur.trim() ?? '')
   const filtrees = toutes.filter((o) => sansAccents(o).includes(tape))
   const options = !edition?.saisi || !tape || !filtrees.length || toutes.some((o) => sansAccents(o) === tape) ? toutes : filtrees
@@ -485,17 +506,16 @@ function LigneFichier({ l, num, cible, points, colonnes = [], restants, modifs =
     ferme.current = true
     const v = (choisie ?? edition.valeur).trim()
     setEdition(null)
-    if (garder) onModifie?.(edition.col, v || null)
+    if (garder) rang?.onModifie?.(edition.col, v || null)
   }
   const reste = (p: AnomalieLot) => !restants || restants.has(cle(p))
-  // Un point restant l'emporte sur un point réglé de la même colonne.
-  const parColonne = new Map([...points].sort((a, b) => Number(reste(a)) - Number(reste(b))).map((p) => [p.colonne, p]))
-  const rubriques = [...new Set([...Object.keys(l.montants), ...colonnes, ...points.map((p) => p.colonne ?? '')])]
+  const rubriques = [...new Set([...rangs.flatMap((r) => [...Object.keys(r.l.montants), ...r.points.map((p) => p.colonne ?? '')]), ...colonnes])]
     .filter((c) => c && !ATTRIBUTS.some(([n]) => n === c))
-  const cellules: [string, string | null][] = [
+  const cellules = (l: LigneLot): [string, string | null][] => [
     ...ATTRIBUTS.map(([n, f]): [string, string | null] => [n, f(l)]),
     ...rubriques.map((r): [string, string | null] => [r, l.montants[r] != null ? valeurBrute(l.montants[r]) : null]),
   ]
+  const noms = cellules(rangs[0].l).map(([n]) => n)
   const cadre = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const div = cadre.current
@@ -505,10 +525,10 @@ function LigneFichier({ l, num, cible, points, colonnes = [], restants, modifs =
     if (volet) div.style.width = `${volet.clientWidth - 3}px`
     // Colonnes figées : chacune se cale à droite des précédentes.
     const entetes = [...div.querySelectorAll<HTMLElement>('thead th')]
-    for (let i = 0; i < FIGEES; i++) {
+    for (let i = 0; i < figees; i++) {
       div.querySelectorAll<HTMLElement>(`tr > :nth-child(${i + 1})`).forEach((c) => { c.style.left = `${entetes[i].offsetLeft - entetes[0].offsetLeft}px` })
     }
-    const gauche = entetes[FIGEES].offsetLeft - entetes[0].offsetLeft
+    const gauche = entetes[figees].offsetLeft - entetes[0].offsetLeft
     // Défilement horizontal animé jusqu'à centrer la cellule en cause dans la partie non figée.
     const td = div.querySelector<HTMLElement>('td.cellule-cible:not(.fige)')
     if (!td) return
@@ -521,58 +541,72 @@ function LigneFichier({ l, num, cible, points, colonnes = [], restants, modifs =
   }, [])
   return (
     <div className="ligne-fichier" ref={cadre}>
-      <table className="dense points" aria-label={`Ligne ${num} du fichier`}>
+      <table className="dense points" aria-label={comparer ? `Lignes ${rangs.map((r) => r.num).join(' et ')} du fichier` : `Ligne ${signalee} du fichier`}>
         <thead>
-          <tr>{cellules.map(([n], i) => <th key={n} scope="col" className={i < FIGEES ? 'fige' : undefined}>{n}</th>)}</tr>
-        </thead>
-        <tbody>
           <tr>
-            {cellules.map(([n, brute], i) => {
-              const change = n in modifs
-              const v = change ? modifs[n] : brute
-              const p = parColonne.get(n)
-              const ok = p != null && !reste(p)
-              const classe = [ok && 'cellule-ok', p && !ok && !change && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'),
-                change && !ok && 'cellule-modifiee',
-                n === cible && 'cellule-cible', i < FIGEES && 'fige']
-                .filter(Boolean).join(' ')
-              const modifiable = onModifie != null && l.brut != null && n in l.brut && !enCours
-              if (edition?.col === n) {
-                const ouverte = options.length > 0
-                const touche = (e: KeyboardEvent) => {
-                  // Liste ouverte : les flèches parcourent les valeurs, Entrée retient celle en surbrillance.
-                  if (ouverte && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-                    e.preventDefault()
-                    const k = options.length, pas = e.key === 'ArrowDown' ? 1 : -1
-                    setEdition({ ...edition, actif: edition.actif < 0 && pas < 0 ? k - 1 : (edition.actif + pas + k) % k })
-                  } else if (e.key === 'Enter') fermer(true, ouverte && edition.actif >= 0 ? options[edition.actif] : undefined)
-                  else if (e.key === 'Escape') fermer(false)
-                }
-                return (
-                  <td key={n} ref={setAncre} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
-                    {/* Valeur gardée, invisible : la cellule garde sa taille, le champ se pose dessus. */}
-                    <span className="fantome" aria-hidden="true">{change ? v : v ?? p?.valeur ?? ''}</span>
-                    <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur}
-                      {...(toutes.length ? {
-                        role: 'combobox', 'aria-autocomplete': 'list' as const, 'aria-expanded': ouverte,
-                        'aria-controls': ouverte ? ID_LISTE : undefined,
-                        'aria-activedescendant': ouverte && edition.actif >= 0 ? idOption(edition.actif) : undefined,
-                      } : {})}
-                      onChange={(e) => setEdition({ col: n, valeur: e.target.value, actif: -1, saisi: true })} onBlur={() => fermer(true)}
-                      onKeyDown={touche} />
-                    {ouverte && ancre && (
-                      <ListeChoix ancre={ancre} options={options} actif={edition.actif} valeur={edition.valeur}
-                        onChoisir={(o) => fermer(true, o)} onSurvol={(k) => setEdition({ ...edition, actif: k })} />
-                    )}
-                  </td>
-                )
-              }
-              return (
-                <td key={n} className={[classe, modifiable && 'modifiable'].filter(Boolean).join(' ') || undefined} title={p?.message}
-                  onClick={modifiable ? () => ouvrir(n) : undefined}>{change ? v : v ?? p?.valeur ?? ''}</td>
-              )
+            {comparer && <th scope="col" className="fige num-ligne">Ligne</th>}
+            {noms.map((n, j) => {
+              const i = j + (comparer ? 1 : 0)
+              return <th key={n} scope="col" className={cx(i < figees && 'fige', i === figees - 1 && 'fige-bord')}>{n}</th>
             })}
           </tr>
+        </thead>
+        <tbody>
+          {rangs.map((r) => {
+            const { l, num, modifs = {}, onModifie } = r
+            // Un point restant l'emporte sur un point réglé de la même colonne.
+            const parColonne = new Map([...r.points].sort((a, b) => Number(reste(a)) - Number(reste(b))).map((p) => [p.colonne, p]))
+            return (
+              <tr key={num}>
+                {comparer && <th scope="row" className="fige num-ligne">{num}</th>}
+                {cellules(l).map(([n, brute], j) => {
+                  const i = j + (comparer ? 1 : 0)
+                  const change = n in modifs
+                  const v = change ? modifs[n] : brute
+                  const p = parColonne.get(n)
+                  const ok = p != null && !reste(p)
+                  const classe = cx(ok && 'cellule-ok', p && !ok && !change && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'),
+                    change && !ok && 'cellule-modifiee',
+                    num === signalee && n === cible && 'cellule-cible', i < figees && 'fige', i === figees - 1 && 'fige-bord')
+                  const modifiable = onModifie != null && l.brut != null && n in l.brut && !enCours
+                  if (edition?.num === num && edition.col === n) {
+                    const ouverte = options.length > 0
+                    const touche = (e: KeyboardEvent) => {
+                      // Liste ouverte : les flèches parcourent les valeurs, Entrée retient celle en surbrillance.
+                      if (ouverte && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                        e.preventDefault()
+                        const k = options.length, pas = e.key === 'ArrowDown' ? 1 : -1
+                        setEdition({ ...edition, actif: edition.actif < 0 && pas < 0 ? k - 1 : (edition.actif + pas + k) % k })
+                      } else if (e.key === 'Enter') fermer(true, ouverte && edition.actif >= 0 ? options[edition.actif] : undefined)
+                      else if (e.key === 'Escape') fermer(false)
+                    }
+                    return (
+                      <td key={n} ref={setAncre} className={cx(classe, 'en-saisie')} title={p?.message}>
+                        {/* Valeur gardée, invisible : la cellule garde sa taille, le champ se pose dessus. */}
+                        <span className="fantome" aria-hidden="true">{change ? v : v ?? p?.valeur ?? ''}</span>
+                        <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur}
+                          {...(toutes.length ? {
+                            role: 'combobox', 'aria-autocomplete': 'list' as const, 'aria-expanded': ouverte,
+                            'aria-controls': ouverte ? ID_LISTE : undefined,
+                            'aria-activedescendant': ouverte && edition.actif >= 0 ? idOption(edition.actif) : undefined,
+                          } : {})}
+                          onChange={(e) => setEdition({ num, col: n, valeur: e.target.value, actif: -1, saisi: true })} onBlur={() => fermer(true)}
+                          onKeyDown={touche} />
+                        {ouverte && ancre && (
+                          <ListeChoix ancre={ancre} options={options} actif={edition.actif} valeur={edition.valeur}
+                            onChoisir={(o) => fermer(true, o)} onSurvol={(k) => setEdition({ ...edition, actif: k })} />
+                        )}
+                      </td>
+                    )
+                  }
+                  return (
+                    <td key={n} className={cx(classe, modifiable && 'modifiable')} title={p?.message}
+                      onClick={modifiable ? () => ouvrir(r, n) : undefined}>{change ? v : v ?? p?.valeur ?? ''}</td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

@@ -115,7 +115,7 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   const bonus = screen.getByRole('textbox', { name: 'Bonus, ligne 4' })
   fireEvent.change(bonus, { target: { value: '1200' } })
   fireEvent.keyDown(bonus, { key: 'Escape' })
-  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
   fireEvent.click([...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Kribi')!)
   const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
   // Valeur inconnue du fichier : toute la liste est proposée dès l'ouverture.
@@ -159,22 +159,22 @@ function pointsOuverts(a: AnomalieLot, onLot = vi.fn()) {
   fireEvent.click(screen.getByRole('button', { name: `Détail de la ligne ${a.ligne}` }))
 }
 
-test('doublon : aucune solution choisie d’office ; « Garder la ligne 41 » enregistré retire la ligne 40', async () => {
+test('doublon : un seul tableau pour les deux lignes ; « Garder la ligne 41 » enregistré retire la ligne 40', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
   const { appliquer } = serveur()
   const onLot = vi.fn()
   pointsOuverts({ ...anomalie('DOUBLON', 'bloquant', 'Même employé deux fois.', 'MATRICULE'), ligne: 40, proposition: { lignes: [40, 41] } }, onLot)
   const liste = await screen.findByRole('combobox', { name: 'Employé sur plusieurs lignes du même mois : quelle ligne garder ?' })
   expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
-    'Choisir une solution…', 'Supprimer la ligne 41, garder la ligne 40', 'Supprimer la ligne 40, garder la ligne 41'])
-  // Les deux lignes, dans l'ordre du fichier, pour comparer.
-  expect(await screen.findByRole('table', { name: 'Ligne 41 du fichier' })).toBeInTheDocument()
-  expect(screen.getAllByText(/^Ligne 4[01]/).map((p) => p.textContent)).toEqual(['Ligne 40 (signalée)', 'Ligne 41'])
+    'Choisir une solution…', 'Garder la ligne 40, supprimer la ligne 41', 'Garder la ligne 41, supprimer la ligne 40'])
+  // Les deux lignes, dans l'ordre du fichier, sous un seul en-tête.
+  const tableau = await screen.findByRole('table', { name: 'Lignes 40 et 41 du fichier' })
+  expect(within(tableau).getAllByRole('columnheader', { name: 'MATRICULE' })).toHaveLength(1)
+  expect(within(tableau).getAllByRole('rowheader').map((c) => c.textContent)).toEqual(['40', '41'])
   expect(liste).toHaveValue('')
-  const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
-  expect(enregistrer).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
   fireEvent.change(liste, { target: { value: '1' } })
-  fireEvent.click(enregistrer)
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ retirees: [40] })))
   await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(LOT))
 })
@@ -200,7 +200,7 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
   fireEvent.change(await screen.findByRole('combobox', { name: 'Site « Kribi » absent de la liste des sites : que faire ?' }),
     { target: { value: '0' } })
   const bouton = screen.getByRole('button', { name: 'Enregistrer' })
-  expect(bouton).toBeDisabled()
+  expect(bouton).toBeDisabled()  // type du nouveau site attendu
   fireEvent.change(screen.getByRole('combobox', { name: 'Type du nouveau site' }), { target: { value: 'agence' } })
   expect(bouton).toBeEnabled()
   fireEvent.click(bouton)
@@ -243,5 +243,13 @@ test('un choix s’annule seul : « Annuler ce choix » rend la liste à « Choi
   fireEvent.change(liste, { target: { value: '' } })
   expect(liste).toHaveValue('')
   expect(within(liste).getAllByRole('option')[0]).toHaveTextContent('Choisir une solution…')
-  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+})
+
+test('point sans autre solution que la saisie : texte par défaut', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  serveur()
+  pointsOuverts({ ...anomalie('ABSENCES_HORS_BORNES', 'bloquant', 'Hors bornes.', 'Absences'), ligne: 40, valeur: '45' })
+  expect(await screen.findByText(/^Veuillez saisir une valeur conforme/)).toBeInTheDocument()
+  expect(screen.queryByRole('combobox')).toBeNull()
 })

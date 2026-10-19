@@ -25,7 +25,7 @@ export function ChoixFichier({
   variante = 'secondaire',
 }: {
   libelle: string
-  variante?: 'primaire' | 'secondaire'
+  variante?: 'primaire' | 'secondaire' | 'lien'
   accept: string
   inputRef: RefObject<HTMLInputElement | null>
   onFichier: (f: File | undefined) => void

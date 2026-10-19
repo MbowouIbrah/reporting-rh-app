@@ -21,6 +21,7 @@ interface Props {
 export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Props) {
   const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string }>({})
   const [volet, setVolet] = useState<string>(VOLET_ERREURS)
+  const [pied, setPied] = useState<HTMLElement | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -63,13 +64,17 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {lot && (
         <div className="panneau">
           <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
-            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => (l.statut === 'pret' ? onLot(l) : setEtat({ lot: l }))} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => (l.statut === 'pret' ? onLot(l) : setEtat({ lot: l }))} afficherLigne ouvert={volet} onOuvrir={setVolet} pied={pied} />}
           </div>
         </div>
       )}
+      {/* Liens à gauche ; à droite, « Annuler les changements » et « Enregistrer » des corrections. */}
       <div className="saisie-pied">
-        {lot &&<a className="bouton bouton-lien" href={urlRapport(lot.id)} download>Télécharger le rapport d’erreurs (xlsx)</a>}
-        {(lot || etat.erreur) && <ChoixFichier libelle="Choisir un autre fichier" accept={ACCEPT} inputRef={input} onFichier={onAutre} />}
+        <span className="pied-liens">
+          {lot && <a className="bouton bouton-lien" href={urlRapport(lot.id)} download>Télécharger le rapport d’erreurs (xlsx)</a>}
+          {(lot || etat.erreur) && <ChoixFichier variante="lien" libelle="Choisir un autre fichier" accept={ACCEPT} inputRef={input} onFichier={onAutre} />}
+        </span>
+        <span ref={setPied} className="pied-actions" />
       </div>
     </section>
   )
