@@ -252,7 +252,7 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauPr
               </tr>
               {ouvert && (
                 <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} point={a} edition={edition}
-                  points={tous.filter((x) => x.ligne === a.ligne && edition.restants.has(cle(x)))} />
+                  points={tous.filter((x) => x.ligne === a.ligne)} />
               )}
             </Fragment>
           )
@@ -284,7 +284,7 @@ interface DetailProps {
   cible: string | null
   /** Point déplié : les décisions proposées dépendent de son code. */
   point: AnomalieLot
-  /** Points encore présents sur la ligne : leurs cellules restent surlignées. */
+  /** Points de la ligne : cellule rouge ou orange tant que le point reste, verte une fois réglé. */
   points: AnomalieLot[]
   edition: Edition
 }
@@ -364,10 +364,11 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
     ...p, ignores: p.ignores.filter((x) => x !== c),
     choix: { ...p.choix, [k]: { index: i, decision: proposees!.choix[i], ligne: num } },
   }))
-  const ignorer = () => setPlan((p) => {
+  // Sans valeur : annule le choix fait sur ce point seulement.
+  const ignorer = (garder = true) => setPlan((p) => {
     const choix = { ...p.choix }
     delete choix[k]
-    return { ...p, choix, ignores: [...p.ignores.filter((x) => x !== c), c] }
+    return { ...p, choix, ignores: [...p.ignores.filter((x) => x !== c), ...(garder ? [c] : [])] }
   })
   const question = proposees?.question
     ?? `${point.colonne}${point.valeur ? ` « ${point.valeur} »` : ' vide'} : que faire ?`
@@ -381,12 +382,12 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
     return { ...p, modifs, ignores: p.ignores.filter((x) => x !== `${num}|${col}`) }
   })
   return (
-    <tr className="detail-contrat">
+    <tr className={edition.restants.has(k) ? 'detail-contrat' : 'detail-contrat detail-regle'}>
       <td colSpan={5}>
         {q.isSuccess ? (
           <>
             <LigneFichier l={q.data} num={num} cible={cible} points={points}
-              modifs={edition.lignes[num]} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
+              restants={edition.restants} modifs={edition.lignes[num]} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
             {q.data.brut && (regle
               ? <p className="actions-point regle">Point réglé.</p>
               : (proposees || ignorable(point)) && (
@@ -394,8 +395,11 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
                   <label className="decision">
                     <span>{question}</span>
                     <select value={ignore ? 'ignorer' : (choisi?.index ?? '')} disabled={occupe}
-                      onChange={(e) => (e.target.value === 'ignorer' ? ignorer() : choisir(Number(e.target.value)))}>
-                      <option value="" disabled>Choisir une solution…</option>
+                      onChange={(e) => (e.target.value === 'ignorer' || e.target.value === ''
+                        ? ignorer(e.target.value === 'ignorer') : choisir(Number(e.target.value)))}>
+                      {choisi || ignore
+                        ? <option value="">Annuler ce choix (garder la valeur du fichier)</option>
+                        : <option value="" disabled>Choisir une solution…</option>}
                       {proposees?.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
                       {ignorable(point) && <option value="ignorer">Ignorer la valeur (laisser vide)</option>}
                     </select>
@@ -426,6 +430,8 @@ interface LigneProps {
   num: number
   cible: string | null
   points: AnomalieLot[]
+  /** Clés des points encore présents ; absent : tous. */
+  restants?: Set<string>
   /** Valeurs changées, pas encore enregistrées. */
   modifs?: Record<string, string | null>
   /** Absent : ligne en lecture seule (lot analysé avant les corrections sur place). */
@@ -433,7 +439,7 @@ interface LigneProps {
   enCours?: boolean
 }
 
-function LigneFichier({ l, num, cible, points, modifs = {}, onModifie, enCours }: LigneProps) {
+function LigneFichier({ l, num, cible, points, restants, modifs = {}, onModifie, enCours }: LigneProps) {
   const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
@@ -453,7 +459,9 @@ function LigneFichier({ l, num, cible, points, modifs = {}, onModifie, enCours }
     setEdition(null)
     if (garder) onModifie?.(edition.col, v || null)
   }
-  const parColonne = new Map(points.map((p) => [p.colonne, p]))
+  const reste = (p: AnomalieLot) => !restants || restants.has(cle(p))
+  // Un point restant l'emporte sur un point réglé de la même colonne.
+  const parColonne = new Map([...points].sort((a, b) => Number(reste(a)) - Number(reste(b))).map((p) => [p.colonne, p]))
   const rubriques = [...new Set([...Object.keys(l.montants), ...points.map((p) => p.colonne ?? '')])]
     .filter((c) => c && !ATTRIBUTS.some(([n]) => n === c))
   const cellules: [string, string | null][] = [
@@ -495,7 +503,9 @@ function LigneFichier({ l, num, cible, points, modifs = {}, onModifie, enCours }
               const change = n in modifs
               const v = change ? modifs[n] : brute
               const p = parColonne.get(n)
-              const classe = [p && !change && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), change && 'cellule-modifiee',
+              const ok = p != null && !reste(p)
+              const classe = [ok && 'cellule-ok', p && !ok && !change && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'),
+                change && !ok && 'cellule-modifiee',
                 n === cible && 'cellule-cible', i < FIGEES && 'fige']
                 .filter(Boolean).join(' ')
               const modifiable = onModifie != null && l.brut != null && n in l.brut && !enCours
