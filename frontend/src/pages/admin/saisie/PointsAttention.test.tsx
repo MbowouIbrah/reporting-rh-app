@@ -114,6 +114,10 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Bertoua', 'Douala'])
   fireEvent.change(site, { target: { value: 'Limbé' } })
   fireEvent.keyDown(site, { key: 'Enter' })
+  // Rien ne part avant « Enregistrer ».
+  expect(corriger).not.toHaveBeenCalled()
+  expect(within(ligne).getByText('Limbé')).toHaveClass('cellule-modifiee')
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 4, { Site: 'Limbé' }))
   expect(corriger).toHaveBeenCalledTimes(1)
   await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
@@ -141,14 +145,19 @@ function pointsOuverts(a: AnomalieLot, onLot = vi.fn()) {
   fireEvent.click(screen.getByRole('button', { name: `Détail de la ligne ${a.ligne}` }))
 }
 
-test('doublon : « Garder la ligne 41 » retire la ligne 40', async () => {
+test('doublon : « Garder la ligne 41 » choisi puis enregistré retire la ligne 40', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
   const lot = { id: 7, statut: 'pret' } as saisie.Lot
   const retirer = vi.spyOn(saisie, 'retirerLigne').mockResolvedValue(lot)
   const onLot = vi.fn()
   pointsOuverts({ ...anomalie('DOUBLON', 'bloquant', 'Même employé deux fois.', 'MATRICULE'), ligne: 40, proposition: { lignes: [40, 41] } }, onLot)
-  expect(await screen.findByRole('button', { name: 'Garder la ligne 40' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Garder la ligne 41' }))
+  const liste = await screen.findByRole('combobox', { name: 'Employé sur plusieurs lignes du même mois : quelle ligne garder ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Ignorer la valeur (ne rien changer)', 'Garder la ligne 40 (celle-ci), retirer la ligne 41', 'Garder la ligne 41, retirer la ligne 40'])
+  const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
+  expect(enregistrer).toBeDisabled()
+  fireEvent.change(liste, { target: { value: '1' } })
+  fireEvent.click(enregistrer)
   await vi.waitFor(() => expect(retirer).toHaveBeenCalledWith(7, 40))
   expect(retirer).toHaveBeenCalledTimes(1)
   await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
@@ -159,11 +168,12 @@ test('valeur manquante : « Reprendre » envoie la valeur du mois précédent', 
   const corriger = vi.spyOn(saisie, 'corrigerLigne').mockResolvedValue({ id: 7, statut: 'pret' } as saisie.Lot)
   pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'bloquant', 'Obligatoire.', 'Type Contrat'), ligne: 40, valeur: null,
     proposition: { valeur: 'CDD', periode: 'juillet 2026' } })
-  fireEvent.click(await screen.findByRole('button', { name: 'Reprendre « CDD » (juillet 2026)' }))
+  const liste = await screen.findByRole('combobox', { name: 'Type Contrat vide : que faire ?' })
+  fireEvent.change(liste, { target: { value: '0' } })
+  // La valeur reprise s'affiche dans la cellule avant l'enregistrement.
+  expect(within(screen.getByRole('table', { name: 'Ligne 40 du fichier' })).getByText('CDD')).toHaveClass('cellule-modifiee')
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 40, { 'Type Contrat': 'CDD' }))
-  // « Saisir la valeur » ouvre la cellule en édition.
-  fireEvent.click(screen.getByRole('button', { name: 'Saisir la valeur' }))
-  expect(await screen.findByRole('combobox', { name: 'Type Contrat, ligne 40' })).toBeInTheDocument()
 })
 
 test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis envoyé avec le type', async () => {
@@ -172,9 +182,11 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
   const ajouter = vi.spyOn(saisie, 'ajouterReferentiel').mockResolvedValue(lot)
   pointsOuverts({ ...anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site'), ligne: 40, valeur: 'Kribi',
     proposition: { dimension: 'site' } })
-  const bouton = await screen.findByRole('button', { name: 'Ajouter « Kribi » aux sites' })
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Site « Kribi » absent de la liste des sites : que faire ?' }),
+    { target: { value: '0' } })
+  const bouton = screen.getByRole('button', { name: 'Enregistrer' })
   expect(bouton).toBeDisabled()
-  fireEvent.change(screen.getByRole('combobox', { name: 'Type du site' }), { target: { value: 'agence' } })
+  fireEvent.change(screen.getByRole('combobox', { name: 'Type du nouveau site' }), { target: { value: 'agence' } })
   expect(bouton).toBeEnabled()
   fireEvent.click(bouton)
   await vi.waitFor(() => expect(ajouter).toHaveBeenCalledWith(7, 'site', 'Kribi', 'agence'))

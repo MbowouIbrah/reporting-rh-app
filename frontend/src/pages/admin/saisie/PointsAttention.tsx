@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ajouterReferentiel, corrigerLigne, lireLigne, retirerLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
+import { Bouton } from '../../../components/Kit'
 import { MOIS, valeurBrute } from '../../../lib/format'
 import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
 import Volet from './Volet'
@@ -171,7 +172,7 @@ interface DetailProps {
   lotId: number
   num: number
   cible: string | null
-  /** Point déplié : ses boutons d'action dépendent de son code. */
+  /** Point déplié : les décisions proposées dépendent de son code. */
   point: AnomalieLot
   points: AnomalieLot[]
   onLot?: (lot: Lot) => void
@@ -187,95 +188,119 @@ const LISTES: Record<string, { dimension: string; pluriel: string }> = {
 
 const TYPES_SITE = [['agence', 'Agence'], ['deporte', 'Site déporté'], ['principal', 'Siège / principal']]
 
+/** Décision possible sur un point : ce qu'elle change dans la ligne, ajoute au référentiel ou retire du lot. */
+interface Decision {
+  libelle: string
+  valeurs?: Record<string, string | null>
+  ajout?: { dimension: string; valeur: string }
+  retirer?: number[]
+}
+
+/** Question posée par la liste et décisions proposées, selon le code du point. « Ignorer » vient toujours en premier. */
+function decisions(point: AnomalieLot, num: number): { question: string; choix: Decision[] } | null {
+  const col = point.colonne ?? ''
+  const prop = point.proposition
+  const precedent: Decision[] = prop?.valeur
+    ? [{ libelle: `Remplacer par la valeur de ${prop.periode} : « ${prop.valeur} »`, valeurs: { [col]: prop.valeur } }]
+    : []
+  const liste = LISTES[col]
+  if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {
+    return {
+      question: `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel} : que faire ?`,
+      choix: [{ libelle: `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
+        ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...precedent],
+    }
+  }
+  if (point.code === 'VALEUR_MANQUANTE' && precedent.length) return { question: `${col} vide : que faire ?`, choix: precedent }
+  if (point.code === 'DOUBLON' && prop?.lignes && prop.lignes.length > 1) {
+    return {
+      question: 'Employé sur plusieurs lignes du même mois : quelle ligne garder ?',
+      choix: prop.lignes.map((n) => {
+        const autres = prop.lignes!.filter((x) => x !== n)
+        return {
+          libelle: `Garder la ligne ${n}${n === num ? ' (celle-ci)' : ''}, retirer ${autres.length > 1 ? 'les lignes' : 'la ligne'} ${autres.join(', ')}`,
+          retirer: autres,
+        }
+      }),
+    }
+  }
+  if (['SANS_MONTANT', 'FORMULE_SANS_VALEUR', 'ERREUR_EXCEL'].includes(point.code) && col) {
+    return { question: `${col} sans valeur lisible : que faire ?`, choix: [{ libelle: 'Laisser la cellule vide', valeurs: { [col]: null } }] }
+  }
+  return null
+}
+
 /** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
 function DetailLigne({ lotId, num, cible, point, points, onLot }: DetailProps) {
   const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
   const qc = useQueryClient()
-  const apres = (lot: Lot) => {
-    void qc.invalidateQueries({ queryKey: ['saisie'] })
-    onLot?.(lot)
-  }
-  const corriger = useMutation({
-    mutationFn: (valeurs: Record<string, string | null>) => corrigerLigne(lotId, num, valeurs),
-    onSuccess: apres,
-  })
-  const ajouter = useMutation({
-    mutationFn: ({ dimension, valeur, type }: { dimension: string; valeur: string; type?: string }) =>
-      ajouterReferentiel(lotId, dimension, valeur, type),
-    onSuccess: apres,
-  })
-  // Garder une ligne d'un doublon : toutes les autres du groupe sont retirées, l'une après l'autre.
-  const retirer = useMutation({
-    mutationFn: async (lignes: number[]) => {
+  // Rien ne part avant « Enregistrer » : cellules changées et décision choisie restent en attente.
+  const [modifs, setModifs] = useState<Record<string, string | null>>({})
+  const [choisi, setChoisi] = useState(-1)
+  const [typeSite, setTypeSite] = useState('')
+  const proposees = decisions(point, num)
+  const decision = choisi >= 0 ? proposees?.choix[choisi] : undefined
+  const site = decision?.ajout?.dimension === 'site'
+  const enregistrer = useMutation({
+    mutationFn: async () => {
       let lot: Lot | undefined
-      for (const n of lignes) lot = await retirerLigne(lotId, n)
+      if (decision?.ajout) lot = await ajouterReferentiel(lotId, decision.ajout.dimension, decision.ajout.valeur, site ? typeSite : undefined)
+      // Garder une ligne d'un doublon : toutes les autres du groupe sont retirées, l'une après l'autre.
+      for (const n of decision?.retirer ?? []) lot = await retirerLigne(lotId, n)
+      const valeurs = { ...decision?.valeurs, ...modifs }
+      if (Object.keys(valeurs).length && !decision?.retirer?.includes(num)) lot = await corrigerLigne(lotId, num, valeurs)
       return lot!
     },
-    onSuccess: apres,
+    onSuccess: (lot) => {
+      setModifs({})
+      setChoisi(-1)
+      void qc.invalidateQueries({ queryKey: ['saisie'] })
+      onLot?.(lot)
+    },
   })
-  const [typeSite, setTypeSite] = useState('')
-  const [demande, setDemande] = useState<{ col: string; n: number }>({ col: '', n: 0 })
-  const occupe = corriger.isPending || ajouter.isPending || retirer.isPending
-  const erreur = corriger.error ?? ajouter.error ?? retirer.error
-  const col = point.colonne ?? ''
-  const saisir = (libelle: string) => (
-    <button type="button" className="bouton bouton-secondaire" disabled={occupe}
-      onClick={() => setDemande({ col, n: demande.n + 1 })}>{libelle}</button>
-  )
-  const prop = point.proposition
-  const liste = LISTES[col]
-  let actions: ReactNode = null
-  if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {
-    const dimension = prop?.dimension ?? liste.dimension
-    const site = dimension === 'site'
-    actions = (
-      <>
-        {site && (
-          <select aria-label="Type du site" value={typeSite} disabled={occupe} onChange={(e) => setTypeSite(e.target.value)}>
-            <option value="" disabled>Type de site…</option>
-            {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
-          </select>
-        )}
-        <button type="button" className="bouton bouton-secondaire" disabled={occupe || (site && !typeSite)}
-          onClick={() => ajouter.mutate({ dimension, valeur: point.valeur!, type: site ? typeSite : undefined })}>
-          Ajouter « {point.valeur} » aux {liste.pluriel}
-        </button>
-        {saisir('Remplacer par…')}
-      </>
-    )
-  } else if (point.code === 'VALEUR_MANQUANTE' && prop?.valeur) {
-    actions = (
-      <>
-        <button type="button" className="bouton bouton-secondaire" disabled={occupe}
-          onClick={() => corriger.mutate({ [col]: prop.valeur! })}>Reprendre « {prop.valeur} » ({prop.periode})</button>
-        {saisir('Saisir la valeur')}
-      </>
-    )
-  } else if (point.code === 'DOUBLON' && prop?.lignes?.length) {
-    actions = prop.lignes.map((n) => (
-      <button key={n} type="button" className="bouton bouton-secondaire" disabled={occupe}
-        onClick={() => retirer.mutate(prop.lignes!.filter((x) => x !== n))}>Garder la ligne {n}</button>
-    ))
-  } else if (['SANS_MONTANT', 'FORMULE_SANS_VALEUR', 'ERREUR_EXCEL'].includes(point.code)) {
-    actions = (
-      <>
-        <button type="button" className="bouton bouton-secondaire" disabled={occupe}
-          onClick={() => corriger.mutate({ [col]: null })}>Laisser vide</button>
-        {saisir('Saisir le montant')}
-      </>
-    )
-  } else if (['NON_NUMERIQUE', 'ABSENCES_HORS_BORNES', 'MONTANT_HORS_BORNES'].includes(point.code)) {
-    actions = saisir('Saisir la valeur')
-  }
+  const occupe = enregistrer.isPending
+  const change = Object.keys(modifs).length > 0 || decision != null
+  const pret = change && !occupe && (!site || typeSite !== '')
+  // Revenir à la valeur du fichier efface la modification.
+  const modifier = (col: string, v: string | null) => setModifs((m) => {
+    const reste = { ...m }
+    delete reste[col]
+    return v === (q.data?.brut?.[col] ?? null) ? reste : { ...m, [col]: v }
+  })
   return (
     <tr className="detail-contrat">
       <td colSpan={5}>
         {q.isSuccess ? (
           <>
-            <LigneFichier l={q.data} num={num} cible={cible} points={points} demande={demande}
-              onCorrige={q.data.brut ? (col, v) => corriger.mutate({ [col]: v }) : undefined} enCours={occupe} />
-            {q.data.brut && actions && <div className="actions-point">{actions}</div>}
-            {erreur && <p className="champ-erreur admin-erreur" role="alert">{erreur.message}</p>}
+            <LigneFichier l={q.data} num={num} cible={cible} points={points}
+              modifs={{ ...decision?.valeurs, ...modifs }} onModifie={q.data.brut ? modifier : undefined} enCours={occupe} />
+            {q.data.brut && (
+              <div className="actions-point">
+                {proposees && (
+                  <label className="decision">
+                    <span>{proposees.question}</span>
+                    <select value={choisi} disabled={occupe} onChange={(e) => setChoisi(Number(e.target.value))}>
+                      <option value={-1}>Ignorer la valeur (ne rien changer)</option>
+                      {proposees.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
+                    </select>
+                  </label>
+                )}
+                {site && (
+                  <label className="decision">
+                    <span>Type du nouveau site</span>
+                    <select value={typeSite} disabled={occupe} onChange={(e) => setTypeSite(e.target.value)}>
+                      <option value="" disabled>Choisir…</option>
+                      {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
+                    </select>
+                  </label>
+                )}
+                <span className="muted">Cliquez sur une cellule pour changer sa valeur.</span>
+                <Bouton className="enregistrer-point" disabled={!pret} onClick={() => enregistrer.mutate()}>
+                  {occupe ? 'Enregistrement…' : 'Enregistrer'}
+                </Bouton>
+              </div>
+            )}
+            {enregistrer.error && <p className="champ-erreur admin-erreur" role="alert">{enregistrer.error.message}</p>}
           </>
         )
           : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
@@ -289,24 +314,20 @@ interface LigneProps {
   num: number
   cible: string | null
   points: AnomalieLot[]
+  /** Valeurs changées, pas encore enregistrées. */
+  modifs?: Record<string, string | null>
   /** Absent : ligne en lecture seule (lot analysé avant les corrections sur place). */
-  onCorrige?: (colonne: string, valeur: string | null) => void
+  onModifie?: (colonne: string, valeur: string | null) => void
   enCours?: boolean
-  /** Ouvre l'édition d'une cellule depuis un bouton d'action : chaque demande a un numéro différent. */
-  demande?: { col: string; n: number }
 }
 
-function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: LigneProps) {
+function LigneFichier({ l, num, cible, points, modifs = {}, onModifie, enCours }: LigneProps) {
   const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
     ferme.current = false
-    setEdition({ col: n, valeur: l.brut?.[n] ?? '', actif: -1 })
+    setEdition({ col: n, valeur: (n in modifs ? modifs[n] : l.brut?.[n]) ?? '', actif: -1 })
   }
-  useEffect(() => {
-    if (demande?.n) ouvrir(demande.col)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demande?.n])
   // Comme la grille de saisie : valeur vide ou connue, toutes les valeurs ; sinon celles qui la contiennent.
   const toutes = edition ? (edition.col === 'MOIS' ? MOIS : l.choix?.[edition.col]) ?? [] : []
   const tape = sansAccents(edition?.valeur.trim() ?? '')
@@ -318,7 +339,7 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: Li
     ferme.current = true
     const v = (choisie ?? edition.valeur).trim()
     setEdition(null)
-    if (garder && v !== (l.brut?.[edition.col] ?? '').trim()) onCorrige?.(edition.col, v || null)
+    if (garder) onModifie?.(edition.col, v || null)
   }
   const parColonne = new Map(points.map((p) => [p.colonne, p]))
   const rubriques = [...new Set([...Object.keys(l.montants), ...points.map((p) => p.colonne ?? '')])]
@@ -358,11 +379,14 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: Li
         </thead>
         <tbody>
           <tr>
-            {cellules.map(([n, v], i) => {
+            {cellules.map(([n, brute], i) => {
+              const change = n in modifs
+              const v = change ? modifs[n] : brute
               const p = parColonne.get(n)
-              const classe = [p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), n === cible && 'cellule-cible', i < FIGEES && 'fige']
+              const classe = [p && !change && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), change && 'cellule-modifiee',
+                n === cible && 'cellule-cible', i < FIGEES && 'fige']
                 .filter(Boolean).join(' ')
-              const modifiable = onCorrige != null && l.brut != null && n in l.brut && !enCours
+              const modifiable = onModifie != null && l.brut != null && n in l.brut && !enCours
               if (edition?.col === n) {
                 const ouverte = options.length > 0
                 const touche = (e: KeyboardEvent) => {
@@ -377,7 +401,7 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: Li
                 return (
                   <td key={n} ref={setAncre} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
                     {/* Valeur gardée, invisible : la cellule garde sa taille, le champ se pose dessus. */}
-                    <span className="fantome" aria-hidden="true">{v ?? p?.valeur ?? ''}</span>
+                    <span className="fantome" aria-hidden="true">{change ? v : v ?? p?.valeur ?? ''}</span>
                     <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur}
                       {...(toutes.length ? {
                         role: 'combobox', 'aria-autocomplete': 'list' as const, 'aria-expanded': ouverte,
@@ -395,7 +419,7 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours, demande }: Li
               }
               return (
                 <td key={n} className={[classe, modifiable && 'modifiable'].filter(Boolean).join(' ') || undefined} title={p?.message}
-                  onClick={modifiable ? () => ouvrir(n) : undefined}>{v ?? p?.valeur ?? ''}</td>
+                  onClick={modifiable ? () => ouvrir(n) : undefined}>{change ? v : v ?? p?.valeur ?? ''}</td>
               )
             })}
           </tr>

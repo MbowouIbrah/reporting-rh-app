@@ -308,36 +308,39 @@ COLONNES_REF = {"Type Contrat": ("type_contrat", TypeContrat, "type_contrat_id")
 def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     """Aide à la décision pour chaque point : lignes du doublon, valeur du mois précédent,
     liste où ajouter une valeur inconnue. Clé : id du point."""
+    ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code == "DOUBLON" or (a.code == "VALEUR_MANQUANTE" and a.colonne in COLONNES_REF))}
+        a.code == "DOUBLON" or (a.code in ref and a.colonne in COLONNES_REF))}
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
     out: dict[int, dict] = {}
     for a in anos:
+        prop: dict = {}
         if a.code == "REFERENTIEL_INCONNU" and a.colonne in COLONNES_REF:
-            out[a.id] = {"dimension": COLONNES_REF[a.colonne][0]}
-            continue
+            prop["dimension"] = COLONNES_REF[a.colonne][0]
         r = rows.get(a.num_ligne)
-        if r is None or r.annee is None or r.mois is None or not r.matricule:
-            continue
-        if a.code == "DOUBLON":
-            q = select(StagingLigne.num_ligne).where(
-                StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
-                StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
-            out[a.id] = {"lignes": sorted(db.scalars(q))}
-        elif a.code == "VALEUR_MANQUANTE" and a.colonne in COLONNES_REF:
-            _, model, attr = COLONNES_REF[a.colonne]
-            q = (select(model.libelle, Periode.annee, Periode.mois)
-                 .select_from(SituationMensuelle)
-                 .join(Periode, Periode.id == SituationMensuelle.periode_id)
-                 .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
-                 .join(model, model.id == getattr(SituationMensuelle, attr))
-                 .where(Salarie.matricule_norm == r.matricule.casefold(),
-                        (Periode.annee < r.annee) | ((Periode.annee == r.annee) & (Periode.mois < r.mois)))
-                 .order_by(Periode.annee.desc(), Periode.mois.desc()).limit(1))
-            trouve = db.execute(q).first()
-            if trouve:
-                out[a.id] = {"valeur": trouve[0], "periode": f"{MOIS[trouve[2] - 1].lower()} {trouve[1]}"}
+        if r is not None and r.annee is not None and r.mois is not None and r.matricule:
+            if a.code == "DOUBLON":
+                q = select(StagingLigne.num_ligne).where(
+                    StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
+                    StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
+                prop["lignes"] = sorted(db.scalars(q))
+            elif a.code in ref and a.colonne in COLONNES_REF:
+                # Valeur du dernier mois enregistré avant celui de la ligne : candidate au remplacement.
+                _, model, attr = COLONNES_REF[a.colonne]
+                q = (select(model.libelle, Periode.annee, Periode.mois)
+                     .select_from(SituationMensuelle)
+                     .join(Periode, Periode.id == SituationMensuelle.periode_id)
+                     .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
+                     .join(model, model.id == getattr(SituationMensuelle, attr))
+                     .where(Salarie.matricule_norm == r.matricule.casefold(),
+                            (Periode.annee < r.annee) | ((Periode.annee == r.annee) & (Periode.mois < r.mois)))
+                     .order_by(Periode.annee.desc(), Periode.mois.desc()).limit(1))
+                trouve = db.execute(q).first()
+                if trouve:
+                    prop |= {"valeur": trouve[0], "periode": f"{MOIS[trouve[2] - 1].lower()} {trouve[1]}"}
+        if prop:
+            out[a.id] = prop
     return out
 
 

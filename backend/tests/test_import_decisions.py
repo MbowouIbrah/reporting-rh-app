@@ -67,6 +67,17 @@ def test_valeur_manquante_reprise_du_mois_precedent(make_client):
     assert r.json()["statut"] == "pret"
 
 
+def test_site_inconnu_propose_le_site_du_mois_precedent(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne()]).json()
+    assert c.post(f"{API}/imports/{prec['id']}/valider").json()["statut"] == "valide"
+    lot = up(c, [ligne(MOIS="Février", Site="Kribi")]).json()
+    ano = anomalies(c, lot["id"])[0]
+    assert ano["code"] == "REFERENTIEL_INCONNU"
+    assert ano["proposition"]["dimension"] == "site" and ano["proposition"]["periode"] == "janvier 2026"
+    assert ano["proposition"]["valeur"]
+
+
 def test_valeur_manquante_sans_historique_pas_de_proposition(make_client):
     c = make_client(ADMIN)
     lot = up(c, [ligne(Service=None)]).json()
