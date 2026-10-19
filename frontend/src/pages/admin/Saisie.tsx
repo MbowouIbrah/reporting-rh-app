@@ -81,7 +81,7 @@ export default function Saisie() {
             Mois
             <select value={mois} onChange={(e) => setChoixPeriode([annee, Number(e.target.value)])}>
               {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              <option value={0}>Plusieurs mois (dates lues dans le fichier)</option>
+              <option value={0}>Plusieurs mois (mois indiqué sur chaque ligne du fichier)</option>
             </select>
           </label>
           {derniere.data && (

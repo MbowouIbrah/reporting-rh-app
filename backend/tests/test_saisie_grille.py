@@ -138,3 +138,15 @@ def test_modele_suit_la_selection_et_la_saisie(make_client):
     br = entete.index(BR)
     assert [r[2] for r in rangs] == ["E2", None] and [r[3] for r in rangs] == ["Bob", "Sans Mat"]
     assert rangs[0][8] == "SAV PL" and Decimal(str(rangs[0][br])) == Decimal("1000.5")
+
+
+def test_apercu_ignore_ligne_sans_mois(make_client):
+    # Ligne « TOTAL » ajoutée sous le tableau : bloquante, mais l'aperçu reste lisible.
+    from tests.test_donnees_api import XLSX
+    from tests.test_import_regles import xlsx
+    c = make_client(ADMIN)
+    total = ligne(**{"ANNÉE": None, "MOIS": None, "MATRICULE": None, "Noms": "TOTAL", BR: 1000})
+    r = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx([ligne(**{BR: 1000}), total]), XLSX)})
+    lot_id = r.json()["id"]
+    ap = c.get(f"{API}/imports/{lot_id}/apercu")
+    assert ap.status_code == 200 and [x["matricule"] for x in ap.json()["lignes"]] == ["EMP001"]

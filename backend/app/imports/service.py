@@ -171,6 +171,8 @@ def apercu(db: Session, lot_id: int) -> dict:
     lot = _get_lot(db, lot_id)
     rows = list(db.scalars(select(StagingLigne).where(StagingLigne.lot_id == lot.id)
                            .order_by(StagingLigne.num_ligne)))
+    # Ligne sans mois lisible (ligne « TOTAL » en bas du fichier…) : déjà bloquante, rien à comparer.
+    rows = [r for r in rows if r.annee and r.mois]
     existantes = _situations_existantes(db, rows)
     rub = {r.id: r.libelle for r in db.scalars(select(Rubrique))}
     lib = {a: {r.id: r.libelle for r in db.scalars(select(m))} for a, _c, m, _f in ATTRS_APERCU}
