@@ -225,7 +225,7 @@ test('modèle Excel calqué sur la sélection et la saisie ; liste de valeurs de
 
   // Personne de coché : modèle vide.
   fireEvent.click(await screen.findByRole('button', { name: 'Tout décocher' }))
-  fireEvent.click(screen.getByRole('button', { name: /Remplir plutôt dans Excel/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Télécharger un modèle prérempli/ }))
   await waitFor(() => expect(modele()).toEqual({ annee: 2026, mois: 2, lignes: [] }))
   // Modèle téléchargé, rien de changé : le lien propose d'importer le fichier rempli.
   expect(await screen.findByRole('button', { name: 'Importer le fichier rempli (.xlsx)' })).toBeInTheDocument()
@@ -248,7 +248,7 @@ test('modèle Excel calqué sur la sélection et la saisie ; liste de valeurs de
 
   // Le modèle de la grille reprend les lignes et les valeurs tapées.
   fireEvent.change(screen.getByRole('textbox', { name: 'Brut Réel, Ann' }), { target: { value: '1200' } })
-  fireEvent.click(screen.getByRole('button', { name: /Remplir plutôt dans Excel/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Télécharger un modèle prérempli/ }))
   await waitFor(() => expect(modele().lignes.map((l) => l.matricule)).toEqual(['E1', 'E2']))
   expect(modele().lignes[0]).toMatchObject({ site: 'Douala', montants: { 'Brut Réel': '1200' } })
 })

@@ -222,7 +222,7 @@ export default function ChoixEmployes({ prepa, selection, brouillon, onValider, 
       <div className="saisie-pied">
         <LienModele annee={prepa.annee} mois={prepa.mois} title={total ? undefined : 'Aucun employé coché : modèle vide'} onImporter={onImporter}
           lignes={() => lignesSelection(prepa, choisis, [...(brouillon?.lignes.filter((l) => l._connu) ?? []), ...nouveaux]).map((l) => versApi(l, rubriques))}>
-          Remplir plutôt dans Excel (modèle des employés cochés)
+          Télécharger un modèle prérempli avec les employés sélectionnés
         </LienModele>
         <Bouton disabled={total === 0} onClick={() => onValider(choisis, nouveaux)}>
           Continuer : saisir les montants ({total}) →

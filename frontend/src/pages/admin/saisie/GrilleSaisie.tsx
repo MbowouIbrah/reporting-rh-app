@@ -482,7 +482,7 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
       <div className="saisie-pied" role="toolbar" aria-label="Actions de saisie">
         <LienModele annee={annee} mois={mois} lignes={() => lignes.map((l) => versApi(l, rubriques))} onImporter={onImporter}
           title="Ces lignes et les valeurs déjà tapées, à compléter dans Excel puis importer">
-          Remplir plutôt dans Excel (modèle de ces lignes)
+          Télécharger un modèle prérempli avec ces lignes
         </LienModele>
         <Bouton onClick={enregistrer} disabled={!pret}>Enregistrer…</Bouton>
       </div>
