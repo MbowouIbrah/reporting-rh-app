@@ -118,6 +118,8 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
   fireEvent.click([...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Kribi')!)
   const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
+  // Valeur inconnue du fichier : toute la liste est proposée dès l'ouverture.
+  expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Bertoua', 'Douala'])
   // Valeur inconnue tapée : la liste ne garde que les valeurs qui la contiennent.
   fireEvent.change(site, { target: { value: 'dou' } })
   expect(within(screen.getByRole('listbox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['Douala'])

@@ -33,6 +33,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 **G5. Noms à vérifier** : « Même personne, garder le nom enregistré » / « Mettre à jour le nom » ; pour un nom proche d'un autre employé : « C'est <nom> (EMPxxx) : reprendre son matricule » ou « Personne différente ».
 
 **G6. Valeurs corrigées automatiquement** : « Conserver » / « Refuser » par ligne, « Tout conserver ». Refuser remet la valeur d'origine en *À corriger* (ex. « 45.000 » lu 45).
+- Intention évidente devinée et proposée (« Corriger en 1 250 000 ») au lieu d'un simple refus : points comme séparateurs de milliers (« 1.250.000 »), espaces en trop au début, à la fin ou en double (texte et référentiels), unité ou devise collée (« 25 000 FCFA »), virgule décimale, casse ou accent différents d'une valeur de la liste, et autres fautes de saisie de ce genre.
 
 **G7. Montants et référentiels** : montant négatif « Régularisation confirmée » / corriger ; poste nouveau « Créer le poste » ou « Remplacer par <poste le plus proche> ».
 

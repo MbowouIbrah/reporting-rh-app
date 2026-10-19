@@ -440,16 +440,18 @@ interface LigneProps {
 }
 
 function LigneFichier({ l, num, cible, points, restants, modifs = {}, onModifie, enCours }: LigneProps) {
-  const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number } | null>(null)
+  const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number; saisi?: boolean } | null>(null)
   const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
     ferme.current = false
     setEdition({ col: n, valeur: (n in modifs ? modifs[n] : l.brut?.[n]) ?? '', actif: -1 })
   }
   // Comme la grille de saisie : valeur vide ou connue, toutes les valeurs ; sinon celles qui la contiennent.
+  // À l'ouverture ou sans valeur qui corresponde (valeur inconnue du fichier), la liste entière reste proposée.
   const toutes = edition ? (edition.col === 'MOIS' ? MOIS : l.choix?.[edition.col]) ?? [] : []
   const tape = sansAccents(edition?.valeur.trim() ?? '')
-  const options = !tape || toutes.some((o) => sansAccents(o) === tape) ? toutes : toutes.filter((o) => sansAccents(o).includes(tape))
+  const filtrees = toutes.filter((o) => sansAccents(o).includes(tape))
+  const options = !edition?.saisi || !tape || !filtrees.length || toutes.some((o) => sansAccents(o) === tape) ? toutes : filtrees
   // Échap ou Entrée retire le champ, ce qui déclenche aussi sa perte de focus : une seule fermeture compte.
   const ferme = useRef(false)
   const fermer = (garder: boolean, choisie?: string) => {
@@ -530,7 +532,7 @@ function LigneFichier({ l, num, cible, points, restants, modifs = {}, onModifie,
                         'aria-controls': ouverte ? ID_LISTE : undefined,
                         'aria-activedescendant': ouverte && edition.actif >= 0 ? idOption(edition.actif) : undefined,
                       } : {})}
-                      onChange={(e) => setEdition({ col: n, valeur: e.target.value, actif: -1 })} onBlur={() => fermer(true)}
+                      onChange={(e) => setEdition({ col: n, valeur: e.target.value, actif: -1, saisi: true })} onBlur={() => fermer(true)}
                       onKeyDown={touche} />
                     {ouverte && ancre && (
                       <ListeChoix ancre={ancre} options={options} actif={edition.actif} valeur={edition.valeur}
