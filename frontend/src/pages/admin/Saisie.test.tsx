@@ -115,8 +115,12 @@ test('mois proposé, cases, grille avec collage Excel, aperçu et choix « garde
   fireEvent.click(enregistrer)
 
   // Aperçu : synthèse employés / absents, puis la ligne existante de Bob est gardée telle quelle.
-  expect(await screen.findByRole('region', { name: 'Employés' })).toHaveTextContent('présent le mois précédent')
-  expect(screen.getByText(/Absents de cette saisie \(1\)/)).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Employés' })).toHaveTextContent('oubli ou départ (présent le mois précédent, sans ligne ici)')
+  // Oublis ou départs : prioritaires, ouverts d'office ; un seul volet ouvert à la fois.
+  const oublis = screen.getByRole('button', { name: /^Oublis ou départs/ })
+  expect(oublis).toHaveAttribute('aria-expanded', 'true')
+  fireEvent.click(screen.getByRole('button', { name: /^Lignes à mettre à jour/ }))
+  expect(oublis).toHaveAttribute('aria-expanded', 'false')
   const ligneBob = (await screen.findByRole('rowheader', { name: /Bob/ })).closest('tr')!
   expect(ligneBob).toHaveTextContent('500 → 600')
   fireEvent.click(within(ligneBob).getByRole('radio', { name: 'Garder' }))

@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import type { AnomalieLot } from '../../../api/saisie'
-import PointsAttention, { repartir } from './PointsAttention'
+import PointsAttention, { repartir, VOLET_ERREURS } from './PointsAttention'
 
 function anomalie(code: string, gravite: AnomalieLot['gravite'] = 'avertissement', message = code): AnomalieLot {
   return { ligne: 4, colonne: 'NOM', code, gravite, valeur: 'Jhon', message }
@@ -15,10 +16,14 @@ test('repartir : groupes dans l’ordre, codes inconnus dans « Autres points »
   ])
 })
 
-test('erreurs bloquantes à part avec la valeur ; noms à vérifier ouverts, autres groupes repliés', () => {
-  const { container } = render(
-    <PointsAttention
-      afficherLigne
+function Volets({ anomalies, afficherLigne = true }: { anomalies: AnomalieLot[]; afficherLigne?: boolean }) {
+  const [ouvert, setOuvert] = useState<string>(VOLET_ERREURS)
+  return <PointsAttention anomalies={anomalies} afficherLigne={afficherLigne} ouvert={ouvert} onOuvrir={setOuvert} />
+}
+
+test('erreurs bloquantes à part avec la valeur ; un seul volet ouvert à la fois', () => {
+  render(
+    <Volets
       anomalies={[
         anomalie('NOM_HOMONYME', 'bloquant', 'Nom porté par plusieurs employés'),
         anomalie('NOM_PROCHE', 'avertissement', 'Proche de John (E1)'),
@@ -26,26 +31,27 @@ test('erreurs bloquantes à part avec la valeur ; noms à vérifier ouverts, aut
       ]}
     />,
   )
-  const sections = container.querySelectorAll('details')
-  expect(sections).toHaveLength(3)
-  const [erreurs, noms, corrigees] = sections
+  const erreurs = screen.getByRole('button', { name: /^Erreurs à corriger/ })
+  const noms = screen.getByRole('button', { name: /^Noms à vérifier/ })
+  expect(screen.getByRole('button', { name: /^Valeurs corrigées automatiquement/ })).toHaveAttribute('aria-expanded', 'false')
 
-  expect(erreurs).toHaveAttribute('open')
-  expect(within(erreurs).getByText('Erreurs à corriger (1)')).toBeInTheDocument()
-  expect(within(erreurs).getByRole('columnheader', { name: 'Valeur' })).toBeInTheDocument()
-  expect(within(erreurs).getByRole('row', { name: /4 NOM Jhon Nom porté par plusieurs employés/ })).toBeInTheDocument()
+  expect(erreurs).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('columnheader', { name: 'Valeur' })).toBeInTheDocument()
+  expect(screen.getByRole('row', { name: /4 NOM Jhon Nom porté par plusieurs employés/ })).toBeInTheDocument()
 
-  expect(noms).toHaveAttribute('open')
-  expect(within(noms).getByText('Noms à vérifier (1)')).toBeInTheDocument()
-  expect(within(noms).queryByRole('columnheader', { name: 'Valeur' })).toBeNull()
-  expect(within(noms).getByText('Proche de John (E1)')).toBeInTheDocument()
+  fireEvent.click(noms)
+  expect(erreurs).toHaveAttribute('aria-expanded', 'false')
+  expect(noms).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.queryByRole('columnheader', { name: 'Valeur' })).toBeNull()
+  expect(screen.getByText('Proche de John (E1)')).toBeInTheDocument()
 
-  expect(corrigees).not.toHaveAttribute('open')
-  expect(within(corrigees).getByText('Valeurs corrigées automatiquement (1)')).toBeInTheDocument()
+  // Comme le compte rendu : cliquer le volet ouvert le laisse ouvert.
+  fireEvent.click(noms)
+  expect(noms).toHaveAttribute('aria-expanded', 'true')
 })
 
 test('saisie en grille : pas de colonne Ligne', () => {
-  render(<PointsAttention afficherLigne={false} anomalies={[anomalie('MUTATION')]} />)
+  render(<Volets afficherLigne={false} anomalies={[anomalie('MUTATION')]} />)
   expect(screen.queryByRole('columnheader', { name: 'Ligne' })).toBeNull()
-  expect(screen.getByText('Changements d’affectation (1)')).toBeInTheDocument()
+  expect(screen.getByText('Changements d’affectation')).toBeInTheDocument()
 })

@@ -706,9 +706,32 @@ html, body { overscroll-behavior: none; }
 .saisie-synthese section { background: var(--paper); border: 1px solid var(--rule-strong); padding: var(--sp-2) var(--sp-3); }
 .saisie-synthese h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-md); text-transform: uppercase; color: var(--navy); }
 .saisie-synthese ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: var(--fs-md); }
-.saisie-apercu .section > summary .note { flex: 2; font-weight: 400; }
-.saisie-sous-titre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0; padding: 8px 12px; font-size: var(--fs-md); color: var(--navy); background: var(--rapport-entete); }
-.saisie-tout { margin-left: auto; display: flex; gap: var(--sp-2); }
+.saisie-synthese .saisie-total { margin: 0; align-self: center; justify-self: end; text-align: right; font-size: var(--fs-md); }
+.saisie-synthese .saisie-total strong { display: block; font-size: var(--fs-lg); color: var(--navy); }
+.saisie-oubli { color: var(--red-deep); font-weight: var(--fw-bold); }
+.saisie-tout { margin: 0; padding: var(--sp-2) var(--sp-3); display: flex; justify-content: flex-end; gap: var(--sp-2); }
+/* Volets : un seul ouvert, titres toujours visibles, seul le contenu du volet ouvert défile */
+.page-ecran.saisie-apercu .panneau-corps.volets { overflow: hidden; border: 0; }
+/* Volets : copie des blocs du compte rendu cfaoacademy (.cr-bloc), un seul ouvert, seul son contenu défile */
+.volets { display: flex; flex-direction: column; gap: 12px; }
+.volet { flex: none; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); overflow: hidden; }
+.volet-ouvert { border-color: var(--muted-2); display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.page .volet-titre { margin: 0; font-size: inherit; }
+.volet-bouton { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 16px; border: 0; background: var(--paper-2); font-family: inherit; text-align: left; cursor: pointer; transition: background .14s; }
+.volet-bouton:hover { background: var(--paper-3); }
+.volet-bouton:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+.volet-ouvert .volet-bouton { background: var(--paper); border-bottom: 1px solid var(--rule); }
+.volet-fleche { flex: none; color: var(--muted-2); font-size: 11px; transition: transform .16s ease; }
+.volet-ouvert .volet-fleche { transform: rotate(90deg); color: var(--red); }
+.volet-nom { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink); }
+.volet-resume { flex: none; font-size: 12.5px; font-weight: 400; color: var(--muted-2); }
+.volet-valeur { flex: none; font-family: var(--font-mono); font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 6px; background: var(--paper-3); color: var(--muted); display: inline-block; white-space: nowrap; }
+.volet-valeur-ok { background: #E6F6EC; color: #147a41; }
+.volet-valeur-ko { background: var(--red-soft); color: var(--red-deep); }
+.volet-corps { padding: 16px; flex: 1; min-height: 0; overflow: auto; }
+.page-ecran.rapport-excel:not(.graphes-excel) .panneau .volet-corps table.dense thead th { top: -16px; }
+.volet-corps > table.dense { margin: 0; }
+.page-ecran.rapport-excel .volet-corps table.dense thead th { top: -16px; }
 .saisie-apercu table.dense { width: 100%; }
 .saisie-apercu table.dense th, .saisie-apercu table.dense td { vertical-align: top; white-space: normal; }
 .saisie-apercu table.dense thead th:not(.num) { text-align: left; }
@@ -718,7 +741,6 @@ html, body { overscroll-behavior: none; }
 .saisie-apercu tr.gardee td:not(:first-child), .saisie-apercu tr.gardee th { opacity: .55; }
 .saisie-changements { list-style: none; margin: 0; padding: 0; }
 .saisie-changements li.efface { color: var(--red-deep); }
-.saisie-apercu .section { margin-top: var(--sp-3); }
 .saisie-avert { margin: 0; padding: var(--sp-2) var(--sp-5); font-size: var(--fs-sm); color: var(--muted); }
 
 /* ── Habillage portail : fond photo voilé, navigation à icônes, titres affirmés, surfaces blanches à angles droits ──
@@ -991,7 +1013,6 @@ table.tableau-squelette td { height: 2.1em; }
 .rapport-excel.saisie-apercu .panneau table.dense th, .rapport-excel.saisie-apercu .panneau table.dense td { border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule); }
 .rapport-excel.saisie-apercu .panneau table.dense tbody th { text-align: left; font-weight: 600; color: var(--navy); }
 .rapport-excel.saisie-apercu .panneau table.dense tbody tr:hover td, .rapport-excel.saisie-apercu .panneau table.dense tbody tr:hover th { background: var(--surface-hover); }
-.saisie-apercu .panneau .section > table.dense { margin: 0 var(--sp-3) var(--sp-3); width: calc(100% - 2 * var(--sp-3)); }
 /* Retour sur DONNEES après un enregistrement */
 .bandeau-enregistre { align-items: center; }
 .bandeau-enregistre .bouton-lien { padding: 0; height: auto; text-decoration: underline; }

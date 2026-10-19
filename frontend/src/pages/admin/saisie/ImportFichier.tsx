@@ -6,7 +6,7 @@ import Etat from '../../../components/Etat'
 import { ChoixFichier } from '../../../components/Kit'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
-import PointsAttention from './PointsAttention'
+import PointsAttention, { VOLET_ERREURS } from './PointsAttention'
 
 const ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -20,6 +20,7 @@ interface Props {
 /** Analyse d'un fichier : prêt -> aperçu ; refusé -> erreurs à corriger dans Excel, rapport téléchargeable. */
 export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Props) {
   const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string }>({})
+  const [volet, setVolet] = useState<string>(VOLET_ERREURS)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -61,8 +62,8 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       )}
       {lot && (
         <div className="panneau">
-          <div className="panneau-corps" role="region" aria-label="Erreurs du fichier">
-            {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne />}
+          <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
           </div>
         </div>
       )}

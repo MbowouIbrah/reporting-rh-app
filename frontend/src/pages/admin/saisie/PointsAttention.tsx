@@ -1,5 +1,5 @@
 import type { AnomalieLot } from '../../../api/saisie'
-import { Badge } from '../../../components/Kit'
+import Volet from './Volet'
 
 interface Groupe {
   titre: string
@@ -31,31 +31,31 @@ interface Props {
   anomalies: AnomalieLot[]
   /** Numéro de ligne du fichier : sans objet pour une saisie en grille. */
   afficherLigne: boolean
+  /** Volet ouvert, partagé avec le reste de l'aperçu : un seul à la fois. */
+  ouvert: string | null
+  onOuvrir: (id: string) => void
 }
 
+/** Identifiant du volet des erreurs bloquantes, pour l'ouvrir d'office. */
+export const VOLET_ERREURS = 'erreurs'
+
 /** Erreurs puis avertissements, regroupés par nature avec une phrase d'explication. */
-export default function PointsAttention({ anomalies, afficherLigne }: Props) {
+export default function PointsAttention({ anomalies, afficherLigne, ouvert, onOuvrir }: Props) {
   const erreurs = anomalies.filter((a) => a.gravite === 'bloquant')
   const groupes = repartir(anomalies.filter((a) => a.gravite !== 'bloquant'))
   return (
     <>
       {erreurs.length > 0 && (
-        <details className="section" open>
-          <summary>
-            <span className="section-titre">Erreurs à corriger ({erreurs.length})</span>
-            <Badge ton="erreur">Bloquant</Badge>
-          </summary>
+        <Volet titre="Erreurs à corriger" valeur={erreurs.length} ton="ko"
+          resume="bloquant : à corriger avant d’enregistrer" ouvert={ouvert === VOLET_ERREURS} onOuvrir={() => onOuvrir(VOLET_ERREURS)}>
           <Tableau lignes={erreurs} afficherLigne={afficherLigne} valeur />
-        </details>
+        </Volet>
       )}
       {groupes.map((g) => (
-        <details key={g.titre} className="section" open={g.codes.includes('NOM_PROCHE')}>
-          <summary>
-            <span className="section-titre">{g.titre} ({g.lignes.length})</span>
-            <span className="note">{g.aide}</span>
-          </summary>
+        <Volet key={g.titre} titre={g.titre} valeur={g.lignes.length} resume={g.aide}
+          ouvert={ouvert === g.titre} onOuvrir={() => onOuvrir(g.titre)}>
           <Tableau lignes={g.lignes} afficherLigne={afficherLigne} />
-        </details>
+        </Volet>
       ))}
     </>
   )

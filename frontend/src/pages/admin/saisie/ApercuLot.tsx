@@ -7,10 +7,12 @@ import { Badge, Bouton } from '../../../components/Kit'
 import { matriculeAffiche, MOIS, valeurBrute } from '../../../lib/format'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
-import PointsAttention from './PointsAttention'
+import PointsAttention, { VOLET_ERREURS } from './PointsAttention'
+import Volet from './Volet'
 
 const cle = (l: LigneApercu) => `${l.annee}-${l.mois}-${l.matricule}`
 const periode = (l: { annee: number; mois: number }) => `${MOIS[l.mois - 1]} ${l.annee}`
+const s = (n: number) => (n > 1 ? 's' : '')
 const val = (v: string | null) => (v === null ? '(vide)' : /^-?\d/.test(v) ? valeurBrute(v) : v)
 
 interface Props {
@@ -31,6 +33,8 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
   })
   const [gardees, setGardees] = useState<Set<string>>(new Set())
   const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string }>({ cours: false })
+  // Volet ouvert : le plus prioritaire tant que l'utilisateur n'en a pas choisi un autre.
+  const [choixVolet, setChoixVolet] = useState<string>()
   const d = q.data
 
   if (q.isLoading) return <Etat type="chargement" />
@@ -38,6 +42,15 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
 
   const modifiees = d.lignes.filter((l) => l.statut === 'modifiee')
   const nouvelles = d.lignes.filter((l) => l.statut === 'nouvelle')
+  const ouvert = choixVolet !== undefined ? choixVolet
+    : d.nb_absents > 0 ? 'absents'
+    : lot.nb_bloquants > 0 ? VOLET_ERREURS
+    : modifiees.length > 0 ? 'modifiees'
+    : nouvelles.length > 0 ? 'nouvelles' : null
+  // Effectif du mois : employés distincts ayant une ligne, pour chaque mois couvert.
+  const effectifs = Object.entries(
+    d.lignes.reduce<Record<string, Set<string>>>((acc, l) => ((acc[periode(l)] ??= new Set()).add(l.matricule), acc), {}),
+  ).map(([p, m]) => [p, m.size] as const)
   const aEcrire = nouvelles.length + modifiees.length - gardees.size
   const choisir = (k: string, garder: boolean) =>
     setGardees((g) => {
@@ -71,45 +84,58 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
         <section aria-label="Lignes">
           <h3>Lignes ({d.lignes.length})</h3>
           <ul>
-            <li><Badge ton="succes">{d.nouvelle}</Badge> nouvelle{d.nouvelle > 1 ? 's' : ''}</li>
-            <li><Badge ton="alerte">{d.modifiee}</Badge> déjà présente{d.modifiee > 1 ? 's' : ''}, différente{d.modifiee > 1 ? 's' : ''}</li>
-            <li><Badge>{d.identique}</Badge> identique{d.identique > 1 ? 's' : ''} (rien ne change)</li>
-            <li>Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</li>
+            <li><Badge ton="succes">{d.nouvelle}</Badge> à ajouter (pas encore enregistrée{s(d.nouvelle)})</li>
+            <li><Badge ton="alerte">{d.modifiee}</Badge> à mettre à jour (déjà enregistrée{s(d.modifiee)}, montants différents)</li>
+            <li><Badge>{d.identique}</Badge> déjà enregistrée{s(d.identique)} à l’identique (ignorée{s(d.identique)})</li>
           </ul>
         </section>
         <section aria-label="Employés">
           <h3>Employés ({d.employes.total})</h3>
           <ul>
-            <li><Badge>{d.employes.existants}</Badge> déjà connu{d.employes.existants > 1 ? 's' : ''}</li>
-            <li><Badge ton={d.employes.nouveaux ? 'info' : 'neutre'}>{d.employes.nouveaux}</Badge> nouvel{d.employes.nouveaux > 1 ? 's' : ''} employé{d.employes.nouveaux > 1 ? 's' : ''}</li>
-            <li><Badge ton={d.nb_absents ? 'alerte' : 'neutre'}>{d.nb_absents}</Badge> présent{d.nb_absents > 1 ? 's' : ''} le mois précédent, absent{d.nb_absents > 1 ? 's' : ''} ici</li>
+            {effectifs.map(([p, n]) => <li key={p}>Effectif {p} : <strong>{n}</strong></li>)}
+            <li><Badge>{d.employes.existants}</Badge> déjà connu{s(d.employes.existants)}</li>
+            <li><Badge ton={d.employes.nouveaux ? 'info' : 'neutre'}>{d.employes.nouveaux}</Badge> nouvel{s(d.employes.nouveaux)} employé{s(d.employes.nouveaux)} (à créer)</li>
+            <li><Badge ton={d.nb_absents ? 'erreur' : 'neutre'}>{d.nb_absents}</Badge> <span className="saisie-oubli">oubli{s(d.nb_absents)}</span> ou départ{s(d.nb_absents)} (présent{s(d.nb_absents)} le mois précédent, sans ligne ici)</li>
           </ul>
         </section>
         <section aria-label="Contrôles">
           <h3>Contrôles</h3>
           <ul>
-            <li><Badge ton={lot.nb_bloquants ? 'erreur' : 'succes'}>{lot.nb_bloquants}</Badge> erreur{lot.nb_bloquants > 1 ? 's' : ''}</li>
-            <li><Badge ton={lot.nb_avert ? 'alerte' : 'succes'}>{lot.nb_avert}</Badge> point{lot.nb_avert > 1 ? 's' : ''} d’attention</li>
-            <li><Badge ton={d.effaces ? 'erreur' : 'neutre'}>{d.effaces}</Badge> montant{d.effaces > 1 ? 's' : ''} effacé{d.effaces > 1 ? 's' : ''} si remplacement</li>
+            <li><Badge ton={lot.nb_bloquants ? 'erreur' : 'succes'}>{lot.nb_bloquants}</Badge> erreur{s(lot.nb_bloquants)} bloquante{s(lot.nb_bloquants)}</li>
+            <li><Badge ton={lot.nb_avert ? 'alerte' : 'succes'}>{lot.nb_avert}</Badge> point{s(lot.nb_avert)} d’attention</li>
+            <li><Badge ton={d.effaces ? 'erreur' : 'neutre'}>{d.effaces}</Badge> montant{s(d.effaces)} enregistré{s(d.effaces)} vidé{s(d.effaces)} en cas de remplacement</li>
           </ul>
         </section>
+        <p className="saisie-total">Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</p>
       </div>
       {d.effaces > 0 && (
         <p className="bandeau ko" role="alert">
-          {d.effaces} montant{d.effaces > 1 ? 's' : ''} existant{d.effaces > 1 ? 's' : ''} {d.effaces > 1 ? 'seront' : 'sera'} effacé{d.effaces > 1 ? 's' : ''} (cellule vide dans la saisie) si vous remplacez la ligne.
+          {d.effaces} montant{s(d.effaces)} existant{s(d.effaces)} {d.effaces > 1 ? 'seront' : 'sera'} effacé{s(d.effaces)} (cellule vide dans la saisie) si vous remplacez la ligne.
         </p>
       )}
       <div className="panneau">
-        <div className="panneau-corps" role="region" aria-label="Détail de l'aperçu">
+        <div className="panneau-corps volets" role="region" aria-label="Détail de l'aperçu">
+          {d.nb_absents > 0 && (
+            <Volet titre={<><span className="saisie-oubli">Oublis</span> ou départs</>} valeur={d.nb_absents} ton="ko"
+              resume="présents le mois précédent, sans ligne ici : à ajouter si oubli, sinon départ"
+              ouvert={ouvert === 'absents'} onOuvrir={() => setChoixVolet('absents')}>
+              <table className="dense">
+                <thead><tr><th scope="col">Matricule</th><th scope="col">Nom</th><th scope="col">Mois</th></tr></thead>
+                <tbody>
+                  {d.absents.map((a) => (
+                    <tr key={`${a.annee}-${a.mois}-${a.matricule}`}><td>{matriculeAffiche(a.matricule) || "—"}</td><td>{a.nom}</td><td>{periode(a)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </Volet>
+          )}
           {modifiees.length > 0 && (
-            <>
-              <h3 className="saisie-sous-titre">
-                Lignes déjà présentes : remplacer par la saisie ou garder l’existant ?
-                <span className="saisie-tout">
-                  <button type="button" className="bouton bouton-lien" onClick={() => setGardees(new Set())}>Tout remplacer</button>
-                  <button type="button" className="bouton bouton-lien" onClick={() => setGardees(new Set(modifiees.map(cle)))}>Tout garder</button>
-                </span>
-              </h3>
+            <Volet titre="Lignes à mettre à jour" valeur={modifiees.length} resume="remplacer par la saisie ou garder l’existant ?"
+              ouvert={ouvert === 'modifiees'} onOuvrir={() => setChoixVolet('modifiees')}>
+              <p className="saisie-tout">
+                <button type="button" className="bouton bouton-lien" onClick={() => setGardees(new Set())}>Tout remplacer</button>
+                <button type="button" className="bouton bouton-lien" onClick={() => setGardees(new Set(modifiees.map(cle)))}>Tout garder</button>
+              </p>
               <table className="dense">
                 <thead>
                   <tr>
@@ -152,11 +178,11 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
                   })}
                 </tbody>
               </table>
-            </>
+            </Volet>
           )}
           {nouvelles.length > 0 && (
-            <details className="section" open={modifiees.length === 0}>
-              <summary><span className="section-titre">Lignes nouvelles ({nouvelles.length})</span></summary>
+            <Volet titre="Lignes à ajouter" valeur={nouvelles.length} ton="ok" resume="pas encore enregistrées"
+              ouvert={ouvert === 'nouvelles'} onOuvrir={() => setChoixVolet('nouvelles')}>
               <table className="dense">
                 <thead>
                   <tr><th scope="col">Employé</th><th scope="col">Mois</th><th scope="col" className="num">Total</th></tr>
@@ -171,14 +197,11 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
                   ))}
                 </tbody>
               </table>
-            </details>
+            </Volet>
           )}
           {d.nouveaux_salaries.length > 0 && (
-            <details className="section">
-              <summary>
-                <span className="section-titre">Nouveaux employés ({d.nouveaux_salaries.length})</span>
-                <span className="note">absents de la base : ils seront créés à l’enregistrement</span>
-              </summary>
+            <Volet titre="Nouveaux employés" valeur={d.nouveaux_salaries.length} resume="absents de la base : créés à l’enregistrement"
+              ouvert={ouvert === 'salaries'} onOuvrir={() => setChoixVolet('salaries')}>
               <table className="dense">
                 <thead><tr><th scope="col">Matricule</th><th scope="col">Nom</th></tr></thead>
                 <tbody>
@@ -187,25 +210,9 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
                   ))}
                 </tbody>
               </table>
-            </details>
+            </Volet>
           )}
-          {d.nb_absents > 0 && (
-            <details className="section">
-              <summary>
-                <span className="section-titre">Absents de cette saisie ({d.nb_absents})</span>
-                <span className="note">présents le mois précédent : départ, ou oubli ?</span>
-              </summary>
-              <table className="dense">
-                <thead><tr><th scope="col">Matricule</th><th scope="col">Nom</th><th scope="col">Mois</th></tr></thead>
-                <tbody>
-                  {d.absents.map((a) => (
-                    <tr key={`${a.annee}-${a.mois}-${a.matricule}`}><td>{matriculeAffiche(a.matricule) || "—"}</td><td>{a.nom}</td><td>{periode(a)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          )}
-          {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne={parcours === 'fichier'} />}
+          {anomalies.data && <PointsAttention anomalies={anomalies.data} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} />}
         </div>
       </div>
       <div className="saisie-pied">
