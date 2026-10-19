@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { corrigerLigne, lireLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
 import { MOIS, valeurBrute } from '../../../lib/format'
+import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
 import Volet from './Volet'
 
 type Niveau = 'corriger' | 'confirmer' | 'auto'
@@ -164,6 +165,7 @@ const ATTRIBUTS: [string, (l: LigneLot) => string | null][] = [
 
 /** ANNÉE, MOIS, MATRICULE, Noms restent visibles pendant le défilement. */
 const FIGEES = 4
+const sansAccents = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 interface DetailProps {
   lotId: number
@@ -211,18 +213,22 @@ interface LigneProps {
 }
 
 function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps) {
-  const [edition, setEdition] = useState<{ col: string; valeur: string } | null>(null)
-  const choix = (n: string) => (n === 'MOIS' ? MOIS : l.choix?.[n])
+  const [edition, setEdition] = useState<{ col: string; valeur: string; actif: number } | null>(null)
+  const [ancre, setAncre] = useState<HTMLElement | null>(null)
   const ouvrir = (n: string) => {
     ferme.current = false
-    setEdition({ col: n, valeur: l.brut?.[n] ?? '' })
+    setEdition({ col: n, valeur: l.brut?.[n] ?? '', actif: -1 })
   }
+  // Comme la grille de saisie : valeur vide ou connue, toutes les valeurs ; sinon celles qui la contiennent.
+  const toutes = edition ? (edition.col === 'MOIS' ? MOIS : l.choix?.[edition.col]) ?? [] : []
+  const tape = sansAccents(edition?.valeur.trim() ?? '')
+  const options = !tape || toutes.some((o) => sansAccents(o) === tape) ? toutes : toutes.filter((o) => sansAccents(o).includes(tape))
   // Échap ou Entrée retire le champ, ce qui déclenche aussi sa perte de focus : une seule fermeture compte.
   const ferme = useRef(false)
-  const fermer = (garder: boolean) => {
+  const fermer = (garder: boolean, choisie?: string) => {
     if (!edition || ferme.current) return
     ferme.current = true
-    const v = edition.valeur.trim()
+    const v = (choisie ?? edition.valeur).trim()
     setEdition(null)
     if (garder && v !== (l.brut?.[edition.col] ?? '').trim()) onCorrige?.(edition.col, v || null)
   }
@@ -251,7 +257,7 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps)
     if (!td) return
     const visible = div.clientWidth - gauche
     const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    const minuterie = window.setTimeout(() => div.scrollTo({
+    const minuterie = window.setTimeout(() => div.scrollTo?.({
       left: td.offsetLeft - gauche - (visible - td.offsetWidth) / 2, behavior: doux ? 'smooth' : 'auto',
     }), doux ? 250 : 0)
     return () => window.clearTimeout(minuterie)
@@ -270,15 +276,32 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps)
                 .filter(Boolean).join(' ')
               const modifiable = onCorrige != null && l.brut != null && n in l.brut && !enCours
               if (edition?.col === n) {
-                const liste = choix(n)
+                const ouverte = options.length > 0
+                const touche = (e: KeyboardEvent) => {
+                  // Liste ouverte : les flèches parcourent les valeurs, Entrée retient celle en surbrillance.
+                  if (ouverte && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                    e.preventDefault()
+                    const k = options.length, pas = e.key === 'ArrowDown' ? 1 : -1
+                    setEdition({ ...edition, actif: edition.actif < 0 && pas < 0 ? k - 1 : (edition.actif + pas + k) % k })
+                  } else if (e.key === 'Enter') fermer(true, ouverte && edition.actif >= 0 ? options[edition.actif] : undefined)
+                  else if (e.key === 'Escape') fermer(false)
+                }
                 return (
-                  <td key={n} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
+                  <td key={n} ref={setAncre} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
                     {/* Valeur gardée, invisible : la cellule garde sa taille, le champ se pose dessus. */}
                     <span className="fantome" aria-hidden="true">{v ?? p?.valeur ?? ''}</span>
-                    <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur} list={liste ? `choix-${num}-${i}` : undefined}
-                      onChange={(e) => setEdition({ col: n, valeur: e.target.value })} onBlur={() => fermer(true)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') fermer(true); else if (e.key === 'Escape') fermer(false) }} />
-                    {liste && <datalist id={`choix-${num}-${i}`}>{liste.map((c) => <option key={c} value={c} />)}</datalist>}
+                    <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur}
+                      {...(toutes.length ? {
+                        role: 'combobox', 'aria-autocomplete': 'list' as const, 'aria-expanded': ouverte,
+                        'aria-controls': ouverte ? ID_LISTE : undefined,
+                        'aria-activedescendant': ouverte && edition.actif >= 0 ? idOption(edition.actif) : undefined,
+                      } : {})}
+                      onChange={(e) => setEdition({ col: n, valeur: e.target.value, actif: -1 })} onBlur={() => fermer(true)}
+                      onKeyDown={touche} />
+                    {ouverte && ancre && (
+                      <ListeChoix ancre={ancre} options={options} actif={edition.actif} valeur={edition.valeur}
+                        onChoisir={(o) => fermer(true, o)} onSurvol={(k) => setEdition({ ...edition, actif: k })} />
+                    )}
                   </td>
                 )
               }

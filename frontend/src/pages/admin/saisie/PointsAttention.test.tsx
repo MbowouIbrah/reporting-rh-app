@@ -107,7 +107,11 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   expect(corriger).not.toHaveBeenCalled()
   fireEvent.click([...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Kribi')!)
   const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
-  expect([...document.querySelectorAll('datalist option')].map((o) => o.getAttribute('value'))).toEqual(['Bertoua', 'Douala'])
+  // Valeur inconnue tapée : la liste ne garde que les valeurs qui la contiennent.
+  fireEvent.change(site, { target: { value: 'dou' } })
+  expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Douala'])
+  fireEvent.change(site, { target: { value: '' } })
+  expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Bertoua', 'Douala'])
   fireEvent.change(site, { target: { value: 'Limbé' } })
   fireEvent.keyDown(site, { key: 'Enter' })
   await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 4, { Site: 'Limbé' }))

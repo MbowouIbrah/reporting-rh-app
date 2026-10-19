@@ -57,7 +57,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {!lot && !etat.erreur && <Etat type="chargement" />}
       {(lot || etat.erreur) && (
         <p className="bandeau ko" role="alert">
-          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger : ouvrez la ligne (▸) et cliquez la cellule, ou corrigez le fichier dans Excel puis importez-le de nouveau. Rien n’a été enregistré.`}
+          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`}
         </p>
       )}
       {lot && (
