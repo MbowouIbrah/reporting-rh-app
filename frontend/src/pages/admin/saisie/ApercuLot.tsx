@@ -216,13 +216,14 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
               </table>
             </Volet>
           )}
-          {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot.id} onLot={setLot} onAttente={setEnAttente} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} pied={pied} />}
+          {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot.id} onLot={setLot} onAttente={setEnAttente} afficherLigne={parcours === 'fichier'} lectureSeule ouvert={ouvert} onOuvrir={setChoixVolet} pied={pied} />}
         </div>
       </div>
       <div className="saisie-pied">
         {envoi.erreur && <span className="champ-erreur" role="alert">{envoi.erreur}</span>}
         {enAttente > 0 && <span className="muted">Enregistrez ou annulez d’abord les corrections.</span>}
         <span ref={setPied} className="pied-actions" />
+        <Bouton variante="secondaire" onClick={onRetour} disabled={envoi.cours}>Revenir à l’étape précédente</Bouton>
         <Bouton onClick={enregistrer} disabled={envoi.cours || enAttente > 0}>
           {aEcrire > 0 ? `Enregistrer ${aEcrire} ligne${aEcrire > 1 ? 's' : ''}` : 'Terminer sans rien changer'}
         </Bouton>

@@ -400,10 +400,15 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                     f"({fr(b.normalize())}). Choisir la bonne lecture.")
                 continue
             res = nombre(v)
+            if res is None and lectures:
+                # Intention évidente (« 25 000 FCFA », « 1.250.000 ») : seul le nombre est gardé.
+                res = (lectures[0][0], False)
+                unite = RE_UNITE.fullmatch(texte(v))[2]
+                add(num, nom, "TEXTE_CONVERTI", AVERT, v, f"« {texte(v)} » lu {fr(res[0])} : " + (
+                    f"un montant est un nombre seul, « {unite} » n'est pas gardé." if unite
+                    else "les séparateurs de milliers ne sont pas gardés."))
             if res is None:
-                add(num, nom, "NON_NUMERIQUE", BLOQUANT, v,
-                    f"« {texte(v)} » n'est pas un nombre valide ; lecture probable : {fr(lectures[0][0])}." if lectures
-                    else "Nombre attendu, sans texte ni unité (ex. 25 000).")
+                add(num, nom, "NON_NUMERIQUE", BLOQUANT, v, "Nombre attendu, sans texte ni unité (ex. 25 000).")
                 continue
             val, converti = res
             # Valeur montrée dans le point : le texte saisi tel quel, un nombre au format de l'écran.

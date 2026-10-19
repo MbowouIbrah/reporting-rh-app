@@ -74,6 +74,8 @@ interface Props {
   onOuvrir: (id: string) => void
   /** Pied de l'écran où placer « Annuler (n modifications) » et « Enregistrer ». */
   pied?: HTMLElement | null
+  /** Écran de vérification : rien ne se modifie, on revient à l'étape précédente pour corriger. */
+  lectureSeule?: boolean
 }
 
 const cle = (a: { ligne: number | null; colonne: string | null; code: string }) => `${a.ligne}|${a.colonne}|${a.code}`
@@ -126,10 +128,11 @@ interface Edition {
   restants: Set<string>
   occupe: boolean
   setPlan: (f: (p: Plan) => Plan) => void
+  lectureSeule?: boolean
 }
 
 /** Points regroupés par nature et par niveau (à corriger, à confirmer, corrigé automatiquement). */
-export default function PointsAttention({ anomalies, lotId, onLot, onAttente, afficherLigne, ouvert, onOuvrir, pied }: Props) {
+export default function PointsAttention({ anomalies, lotId, onLot, onAttente, afficherLigne, ouvert, onOuvrir, pied, lectureSeule }: Props) {
   const [plan, setPlan] = useState<Plan>(VIDE)
   const qc = useQueryClient()
   // Un point réglé reste affiché (en vert) : la liste ne bouge pas sous les yeux.
@@ -168,10 +171,10 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
   const restants = new Set((envoi && simulation.data ? simulation.data.anomalies : anomalies).map(cle))
   const occupe = enregistrer.isPending
   const sansType = envoi?.ajouts.some((a) => a.dimension === 'site' && !a.type_site) ?? false
-  const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan }
+  const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan, lectureSeule }
   const erreur = enregistrer.error ?? (envoi ? simulation.error : null)
   // Barre des corrections : dans le pied de l'écran quand il est fourni, sinon sous les volets.
-  const barre = lotId != null && afficherLigne && (n > 0 || erreur) ? (
+  const barre = lotId != null && afficherLigne && !lectureSeule && (n > 0 || erreur) ? (
     <span className="corrections-pied">
       {n > 0 && (sansType || (envoi && simulation.isFetching)) && (
         <span className="muted" aria-live="polite">
@@ -426,12 +429,16 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
               rangs={ordre.map((n, i) => {
                 const d = qs[i].data!
                 return { num: n, l: d, points: points.filter((x) => x.ligne === n), modifs: edition.lignes[n],
-                  onModifie: d.brut ? modifier(n, d.brut) : undefined }
+                  onModifie: d.brut && !edition.lectureSeule ? modifier(n, d.brut) : undefined }
               })} />
             {q.data!.brut && (regle
               ? <p className="actions-point regle">Point réglé.</p>
+              : edition.lectureSeule
+                ? <p className="actions-point">Valeur lue gardée. Pour la changer, revenez à l'étape précédente et corrigez le fichier.</p>
               : !(proposees || ignorable(point))
-                ? <p className="actions-point">Veuillez saisir une valeur conforme : cliquez sur la cellule en cause pour la corriger.</p>
+                ? <p className="actions-point">{point.gravite === 'bloquant'
+                  ? 'Veuillez saisir une valeur conforme : cliquez sur la cellule en cause pour la corriger.'
+                  : 'Valeur lue gardée. Pour la changer, cliquez sur la cellule en cause.'}</p>
                 : (
                 <div className="actions-point">
                   <label className="decision">

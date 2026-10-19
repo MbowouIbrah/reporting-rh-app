@@ -75,7 +75,7 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         ligne(MATRICULE="E9", ANNÉE="x"),                                           # 11
         ligne(MATRICULE="E10", Formation="1 200,5"),                                # 12
         ligne(MATRICULE="E11", Formation=-5),                                       # 13
-        ligne(MATRICULE="E12", Formation="1.200,5"),                                # 14 ambigu
+        ligne(MATRICULE="E12", Formation="1.200,5"),                                # 14 milliers + décimales
         ligne(MATRICULE="E 13"),                                                    # 15 espace
         ligne(MATRICULE="E14", Formation=10**15),                                   # 16 bornes
         ligne(MATRICULE="E15", MOIS="Mars"),                                        # 17 autre mois
@@ -93,14 +93,14 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (11, "ANNÉE", "ANNEE_INVALIDE"),
         (12, "Formation", "TEXTE_CONVERTI"),
         (13, "Formation", "MONTANT_NEGATIF"),
-        (14, "Formation", "NON_NUMERIQUE"),
+        (14, "Formation", "TEXTE_CONVERTI"),
         (15, "MATRICULE", "MATRICULE_ESPACE"),
         (16, "Formation", "MONTANT_HORS_BORNES"),
         (18, "Formation", "PRECISION_TRONQUEE"),
         (18, "Formation", "TEXTE_CONVERTI"),
     }
     bloq = {x.num for x in L if x.bloquant}
-    assert bloq == {2, 3, 4, 5, 10, 11, 14, 15, 16}
+    assert bloq == {2, 3, 4, 5, 10, 11, 15, 16}
     by = {x.num: x for x in L}
     assert str(by[12].montants["Formation"]) == "1200.500"
     assert str(by[18].montants["Formation"]) == "1.235"
@@ -344,6 +344,12 @@ def test_lecture_des_nombres_mal_ecrits():
     assert (2, "Formation", "SEPARATEUR_AMBIGU") in ens
     assert msg[(2, "SEPARATEUR_AMBIGU")] == ("« 45.000 » : le point peut séparer les milliers (45 000) "
                                             "ou les décimales (45). Choisir la bonne lecture.")
-    assert msg[(3, "NON_NUMERIQUE")] == "« 1.250.000 » n'est pas un nombre valide ; lecture probable : 1 250 000."
+    # Intention évidente : lue d'office, simple point d'attention, la ligne n'est pas bloquée.
+    assert msg[(3, "TEXTE_CONVERTI")] == "« 1.250.000 » lu 1 250 000 : les séparateurs de milliers ne sont pas gardés."
+    assert {x.num: x for x in L}[3].montants["Formation"] == Decimal("1250000") and not {x.num: x for x in L}[3].bloquant
+    L2, _, anos2, _ = run([ligne(MATRICULE="E5", Formation="25 000 FCFA")], postes={"p"})
+    assert [a.message for a in anos2 if a.code == "TEXTE_CONVERTI"] == [
+        "« 25 000 FCFA » lu 25 000 : un montant est un nombre seul, « FCFA » n'est pas gardé."]
+    assert L2[0].montants["Formation"] == Decimal("25000") and not L2[0].bloquant
     assert msg[(4, "PRECISION_TRONQUEE")] == "138 700,4853 a 4 décimales ; les montants gardent 3 décimales : 138 700,485."
     assert not any(c == "Noms" for _, c, _ in ens) and {x.num: x for x in L}[5].nom == "Jean Dupont"
