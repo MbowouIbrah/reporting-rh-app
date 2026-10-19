@@ -262,7 +262,10 @@ test('plusieurs mois : modèle vide sans date, saisie dans l’application rése
   expect(lien.getAttribute('href')).toMatch(/modele\.xlsx\?$/)
   expect(screen.queryByRole('button', { name: /Étape 1/ })).toBeNull()
   expect(screen.getByText('Choisissez un mois précis pour saisir dans l’application.')).toBeInTheDocument()
-  expect(screen.queryByRole('heading', { name: /PILOTAGE/ })).toBeNull()
+  expect(screen.getByRole('heading', { name: 'PILOTAGE DU MOIS' })).toBeInTheDocument()
+  expect(screen.getByText('Choisissez un mois précis pour saisir le CA et la marge.')).toBeInTheDocument()
+  expect(screen.getByText('Choisissez un mois précis pour saisir les budgets.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Enregistrer le CA|Saisir les budgets/ })).toBeNull()
 })
 
 test('nouvel employé : ajouté depuis le choix des employés, matricule unique, repris dans la grille', async () => {

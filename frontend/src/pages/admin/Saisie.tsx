@@ -108,35 +108,44 @@ export default function Saisie() {
           </Carte>
           <Carte titre="Remplir un fichier Excel">
             <ol className="saisie-deux-temps">
+              <li><span>Téléchargez le modèle vide (sans la liste des employés).</span></li>
               <li>
                 <span>
                   {plusieurs
-                    ? 'Téléchargez le modèle vide (sans la liste des employés) : une ligne par employé et par mois, avec son année et son mois.'
-                    : `Téléchargez le modèle vide (sans la liste des employés) : une ligne par employé de ${periode}.`}
+                    ? 'Remplissez-le dans Excel : une ligne par employé et par mois, avec son année et son mois.'
+                    : `Remplissez-le dans Excel : une ligne par employé de ${periode}.`}
                 </span>
-                <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
-                  <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
-                </a>
               </li>
-              <li>
-                <span>Importez le fichier rempli. Rien n’est enregistré avant l’aperçu.</span>
-                <ChoixFichier libelle="Importer un fichier (.xlsx)" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
-              </li>
+              <li><span>Importez le fichier rempli. Rien n’est enregistré avant l’aperçu.</span></li>
             </ol>
+            <div className="saisie-carte-action">
+              <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
+                <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
+              </a>
+              <ChoixFichier libelle="Importer un fichier (.xlsx)" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
+            </div>
           </Carte>
         </div>
-        {!plusieurs && (
-          <>
-            <h3 className="saisie-sous-bandeau">PILOTAGE DE {periode.toUpperCase()}</h3>
-            {pilotage.data ? (
-              <div className="saisie-cartes">
-                <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
-                <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
-              </div>
-            ) : (
-              <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
-            )}
-          </>
+        <h3 className="saisie-sous-bandeau">{plusieurs ? 'PILOTAGE DU MOIS' : `PILOTAGE DE ${periode.toUpperCase()}`}</h3>
+        {plusieurs ? (
+          /* CA, marge et budgets se rattachent à un seul mois : cartes visibles, action remplacée par la raison. */
+          <div className="saisie-cartes saisie-cartes-depart">
+            <Carte titre="Chiffre d’affaires et marge">
+              <p className="note">Montants globaux du mois en FCFA, saisis mois par mois.</p>
+              <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir le CA et la marge.</p></div>
+            </Carte>
+            <Carte titre="Budgets du mois">
+              <p className="note">Budgets par axe du MENSUEL, saisis mois par mois.</p>
+              <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir les budgets.</p></div>
+            </Carte>
+          </div>
+        ) : pilotage.data ? (
+          <div className="saisie-cartes">
+            <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
+            <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
+          </div>
+        ) : (
+          <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
         )}
       </section>
     )
