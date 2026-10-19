@@ -1,6 +1,8 @@
 import io
 import os
+import re
 import time
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -99,10 +101,53 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (18, "Formation", "TEXTE_CONVERTI"),
     }
     bloq = {x.num for x in L if x.bloquant}
-    assert bloq == {2, 3, 4, 5, 6, 10, 11, 14, 15, 16}
+    assert bloq == {2, 3, 4, 5, 10, 11, 14, 15, 16}  # erreur Excel : lue comme vide
     by = {x.num: x for x in L}
     assert str(by[12].montants["Formation"]) == "1200.500"
     assert str(by[18].montants["Formation"]) == "1.235"
+
+
+def test_lecture_tolerante_erreurs_excel_formules_et_tirets():
+    vide = [None] * len(ENTETES)
+    rows = [
+        ligne(MATRICULE="E1", MOIS="#N/A", Formation="#REF!"),                      # 2
+        ligne(MATRICULE="E2", Formation="=B3*2", Bonus=" - "),                      # 3 formule jamais calculée
+        ligne(MATRICULE="E3", Formation="néant", Bonus="N/A", **{"Absences (nb)": "/"}),  # 4
+        ligne(MATRICULE="E4", Formation="#VALEUR!"),                                # 5 collé en texte (fr)
+        [("#N/A" if e == "Noms" else "=A6" if e == "Bonus" else None) for e in ENTETES],  # 6 formules prolongées
+        vide,
+    ]
+    L, ens, anos, st = run(rows, postes={"p"})
+    assert ens == {
+        (2, "MOIS", "ERREUR_EXCEL"), (2, "MOIS", "VALEUR_MANQUANTE"), (2, "Formation", "ERREUR_EXCEL"),
+        (3, "Formation", "FORMULE_SANS_VALEUR"), (3, "Bonus", "SANS_MONTANT"),
+        (4, "Formation", "SANS_MONTANT"), (4, "Bonus", "SANS_MONTANT"), (4, "Absences (nb)", "SANS_MONTANT"),
+        (5, "Formation", "ERREUR_EXCEL"),
+    }
+    assert st["lignes"] == 4 and {x.num for x in L if x.bloquant} == {2}
+    assert all("Formation" not in x.montants and "Bonus" not in x.montants for x in L)
+    assert next(a for a in anos if a.code == "FORMULE_SANS_VALEUR").valeur == "=B3*2"
+
+
+def test_formule_calculee_lue_par_sa_valeur():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DONNEES"
+    ws.append(ENTETES)
+    ws.append(ligne(Formation="=1+1"))
+    buf = io.BytesIO()
+    wb.save(buf)
+    # Valeur calculée posée comme Excel l'enregistre (<v> à côté de <f>).
+    src = zipfile.ZipFile(io.BytesIO(buf.getvalue()))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        for n in src.namelist():
+            d = src.read(n)
+            if n == "xl/worksheets/sheet1.xml":
+                d = re.sub(rb"<f>1\+1</f><v\s*/>|<f>1\+1</f>(<v></v>)?", b"<f>1+1</f><v>2</v>", d)
+            z.writestr(n, d)
+    L, anos = valider(lire(out.getvalue()), refs(postes={"p"}))[:2]
+    assert str(L[0].montants["Formation"]) == "2.000" and not [a for a in anos if a.code == "FORMULE_SANS_VALEUR"]
 
 
 def test_alias_variable():

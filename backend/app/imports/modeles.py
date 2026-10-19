@@ -39,7 +39,10 @@ def listes(wb: Workbook, colonnes: dict[str, list[str]]) -> dict[str, str]:
 
 
 def liste_deroulante(ws, plage: str, colonne: int, premiere: int, derniere: int) -> None:
-    dv = DataValidation(type="list", formula1=plage, allow_blank=True)
+    # Avertissement seulement : une valeur hors liste (collée, ou nouvelle) reste possible, l'import la contrôle.
+    dv = DataValidation(type="list", formula1=plage, allow_blank=True, errorStyle="warning",
+                        error="Valeur hors de la liste : elle sera vérifiée à l'import.",
+                        errorTitle="Valeur inconnue")
     ws.add_data_validation(dv)
     lettre = get_column_letter(colonne)
     dv.add(f"{lettre}{premiere}:{lettre}{derniere}")

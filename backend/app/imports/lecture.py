@@ -43,10 +43,28 @@ class Feuille:
     ligne_ignoree: int | None = None  # 1re ligne remplie après MAX_LIGNES_VIDES lignes vides
 
 
+# Valeurs d'erreur d'Excel (codes du fichier, et leur version française collée en texte).
+RE_ERREUR_EXCEL = re.compile(r"^#(N/A|N/D|REF!|VALUE!|VALEUR!|DIV/0!|NAME\?|NOM\?|NUM!|NOMBRE!|NULL!|NUL!"
+                             r"|SPILL!|CALC!|GETTING_DATA)$", re.IGNORECASE)
+
+
+def erreur_excel(v) -> bool:
+    return isinstance(v, str) and RE_ERREUR_EXCEL.match(v.strip()) is not None
+
+
+def formule(v) -> bool:
+    """Formule sans valeur calculée (fichier jamais enregistré par Excel) : la lecture garde son texte."""
+    return isinstance(v, str) and v.startswith("=")
+
+
+def cellule_vide(v) -> bool:
+    return v is None or str(v).strip() == "" or erreur_excel(v) or formule(v)
+
+
 def ligne_vide(row, utiles) -> bool:
     """Vide si aucune colonne utile n'est remplie : les formules prolongées sous les données
-    (colonnes calculées seules) ne comptent pas."""
-    return all(j >= len(row) or row[j] is None or str(row[j]).strip() == "" for j in utiles)
+    (colonnes calculées seules, erreurs Excel, formules jamais calculées) ne comptent pas."""
+    return all(j >= len(row) or cellule_vide(row[j]) for j in utiles)
 
 
 def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
@@ -56,12 +74,15 @@ def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
         raise FichierIllisible("Fichier trop volumineux (20 Mo maximum).")
     try:
         wb = load_workbook(io.BytesIO(contenu), read_only=True, data_only=True)
+        wbf = load_workbook(io.BytesIO(contenu), read_only=True)  # formules, pour celles sans valeur
     except Exception as e:  # zip invalide, format inconnu
         raise FichierIllisible("Fichier xlsx illisible.") from e
     try:
         if "DONNEES" not in wb.sheetnames:
             raise FichierIllisible("Feuille DONNEES introuvable.")
-        it = wb["DONNEES"].iter_rows(values_only=True)
+        it = (tuple(f if v is None and formule(f) else v for v, f in zip(r, rf, strict=False))
+              for r, rf in zip(wb["DONNEES"].iter_rows(values_only=True),
+                               wbf["DONNEES"].iter_rows(values_only=True), strict=False))
         entete, entete_ligne = None, 0
         for num, row in enumerate(it, start=1):
             if num > LIGNES_ENTETE:
@@ -94,3 +115,4 @@ def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
         return Feuille(entete_ligne, entete, lignes, ignoree)
     finally:
         wb.close()
+        wbf.close()

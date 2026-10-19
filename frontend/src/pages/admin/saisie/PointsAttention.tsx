@@ -37,9 +37,9 @@ const GROUPES: Groupe[] = [
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
-    aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
-    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
-  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, postes nouveaux ou vides',
+    aide: 'espaces, casse, nombres en texte, arrondis, erreurs Excel lues comme vides, colonnes ignorées',
+    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ERREUR_EXCEL', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
+  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, tirets ou formules lus comme vides, postes nouveaux ou vides',
     retenir: () => true },
 ]
 

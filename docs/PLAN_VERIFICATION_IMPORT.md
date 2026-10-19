@@ -16,7 +16,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - Nom de l'employé sur chaque erreur, notamment les changements d'affectation.
 - Niveaux et ancrage vers la ligne ; plus de rubrique « Autres points » (chaque code a son groupe).
 
-**G2. Lecture plus tolérante et modèle**
+**G2. Lecture plus tolérante et modèle** — livré (codes `ERREUR_EXCEL`, `FORMULE_SANS_VALEUR`, `SANS_MONTANT`, avertissements). La valeur par défaut (vide) s'applique d'office ; la correction sur place permet de saisir le montant. Les boutons de décision (« Ignorer (vide) ») arrivent avec le socle G3.
 - `#N/A`, `#REF!`… : cellule traitée comme vide, signalée pour information.
 - Formule : la valeur calculée par Excel est déjà lue. Si le fichier n'a pas de valeur calculée (fichier produit par un outil, ou jamais ouvert dans Excel) : *À confirmer*, avec la consigne « ouvrir et enregistrer dans Excel, ou copier puis Collage spécial › Valeurs ».
 - `-`, `/`, `néant`, `n/a`, `x`… dans un montant : plus bloquant, *À confirmer* avec l'action « Ignorer (vide) ».

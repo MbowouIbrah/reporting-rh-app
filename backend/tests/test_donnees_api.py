@@ -124,5 +124,7 @@ def test_modele_vide_d_un_mois_ou_de_plusieurs_mois(make_client):
     assert not any(any(row) for row in ws.iter_rows(min_row=4, values_only=True))
     assert "Plusieurs mois" in ws["A2"].value and "plusieurs_mois" in r.headers["content-disposition"]
     assert any("B4:B" in str(dv.sqref) for dv in ws.data_validations.dataValidation)
+    # Liste proposée, pas imposée : une valeur collée hors liste ne déclenche qu'un avertissement.
+    assert all(dv.errorStyle == "warning" for dv in ws.data_validations.dataValidation)
     assert c.get(f"{API}/donnees/modele.xlsx", params={"annee": 2026}).status_code == 422
     assert c.get(f"{API}/donnees/modele.xlsx", params={"matricules": ["E1"]}).status_code == 422

@@ -12,7 +12,15 @@ from itertools import combinations
 
 from openpyxl.utils import get_column_letter
 
-from app.imports.lecture import MAX_LIGNES_VIDES, Feuille, calculee, ligne_vide, norm
+from app.imports.lecture import (
+    MAX_LIGNES_VIDES,
+    Feuille,
+    calculee,
+    erreur_excel,
+    formule,
+    ligne_vide,
+    norm,
+)
 from app.imports.similarite import SEUIL_NOM_PROCHE, SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
 
 BLOQUANT, AVERT = "bloquant", "avertissement"
@@ -25,6 +33,8 @@ ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # NUMERIC(18,3) : 15 chiffres entiers
 RE_NOMBRE = re.compile(r"^-?\d{1,3}(?: ?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
 TROIS = Decimal("0.001")
+# Textes qui signifient « pas de montant » (tiret, barre, néant…) : lus comme une cellule vide.
+SANS_MONTANT = {"-", "--", "–", "—", "/", ".", "x", "n/a", "na", "neant", "nil", "rien", "aucun", "sans"}
 
 
 @dataclass
@@ -206,12 +216,25 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         if ligne_vide(row, utiles):
             continue  # seules des colonnes non lues (calculées, inconnues) sont remplies
 
+        L = Ligne(num)
+        nb_avant = nb_bloq
+
+        # Erreur Excel ou formule jamais calculée : cellule lue comme vide, signalée.
+        row = list(row)
+        for nom, j in cols.items():
+            v = row[j] if j < len(row) else None
+            if erreur_excel(v):
+                add(num, nom, "ERREUR_EXCEL", AVERT, v, f"Erreur Excel {v.strip()} : cellule lue comme vide.")
+                row[j] = None
+            elif formule(v):
+                add(num, nom, "FORMULE_SANS_VALEUR", AVERT, v,
+                    "Formule sans valeur calculée, cellule lue comme vide : ouvrir le fichier dans Excel puis "
+                    "l'enregistrer, ou copier les cellules puis Collage spécial › Valeurs.")
+                row[j] = None
+
         def g(nom, row=row):
             j = cols[nom]
             return row[j] if j < len(row) else None
-
-        L = Ligne(num)
-        nb_avant = nb_bloq
 
         a = g("ANNÉE")
         r = nombre(a) if a is not None else None
@@ -290,8 +313,9 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             v = g(nom)
             if v is None or (isinstance(v, str) and not v.strip()):
                 continue  # cellule vide : pas de montant
-            if isinstance(v, str) and v.strip().startswith("#"):
-                add(num, nom, "ERREUR_EXCEL", BLOQUANT, v, f"Erreur Excel {v.strip()} au lieu d'un nombre : corriger la formule ou vider la cellule.")
+            if isinstance(v, str) and norm(v) in SANS_MONTANT:
+                add(num, nom, "SANS_MONTANT", AVERT, v,
+                    f"« {v.strip()} » lu comme vide (aucun montant). Sinon, saisir le montant.")
                 continue
             res = nombre(v)
             if res is None:
