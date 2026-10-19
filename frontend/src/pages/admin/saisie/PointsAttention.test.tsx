@@ -60,7 +60,7 @@ test('niveaux, employé nommé, un seul volet ouvert à la fois', () => {
   expect(noms).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('la ligne se déplie comme le détail par contrat, cellule en cause surlignée', async () => {
+test('▸ déplie la ligne du fichier (en-tête et valeurs), la ligne elle-même n’est pas cliquable', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
     ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
     activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' },
@@ -69,14 +69,17 @@ test('la ligne se déplie comme le détail par contrat, cellule en cause surlign
   const deplier = screen.getByRole('button', { name: 'Détail de la ligne 4' })
   expect(deplier).toHaveAttribute('aria-expanded', 'false')
   fireEvent.click(screen.getByText('Valeur inconnue.'))
-  expect(deplier).toHaveAttribute('aria-expanded', 'true')
-  expect(await screen.findByRole('row', { name: /^MOIS Août/ })).toBeInTheDocument()
-  expect(screen.getByRole('rowheader', { name: 'Détail de la ligne 4 du fichier' })).toBeInTheDocument()
-  expect(saisie.lireLigne).toHaveBeenCalledWith(7, 4)
-  const site = screen.getByRole('row', { name: /^Site Jhon/ })
-  expect(site.querySelectorAll('td')[1]).toHaveClass('cellule-ko', 'cellule-cible')
+  expect(deplier).toHaveAttribute('aria-expanded', 'false')
   fireEvent.click(deplier)
-  expect(screen.queryByRole('row', { name: /^MOIS Août/ })).toBeNull()
+  expect(deplier).toHaveAttribute('aria-expanded', 'true')
+  const ligne = await screen.findByRole('table', { name: 'Ligne 4 du fichier' })
+  expect(screen.queryByText(/Détail de la ligne/)).toBeNull()
+  expect(saisie.lireLigne).toHaveBeenCalledWith(7, 4)
+  const cellule = [...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Jhon')!
+  expect(cellule).toHaveClass('cellule-ko', 'cellule-cible')
+  expect(ligne).toHaveTextContent('Août')
+  fireEvent.click(deplier)
+  expect(screen.queryByRole('table', { name: 'Ligne 4 du fichier' })).toBeNull()
 })
 
 test('saisie en grille : pas de colonne Ligne', () => {

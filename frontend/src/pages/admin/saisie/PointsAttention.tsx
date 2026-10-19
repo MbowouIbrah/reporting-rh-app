@@ -72,7 +72,7 @@ export default function PointsAttention({ anomalies, lotId, afficherLigne, ouver
         <Volet key={g.id} titre={g.titre} valeur={g.lignes.length} ton={NIVEAUX[g.niveau].ton}
           resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
           ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
-          <Tableau lignes={g.lignes} tous={anomalies} lotId={lotId} afficherLigne={afficherLigne} />
+          <Tableau lignes={g.lignes} tous={anomalies} lotId={lotId} afficherLigne={afficherLigne} ton={NIVEAUX[g.niveau].ton} />
         </Volet>
       ))}
     </>
@@ -90,12 +90,14 @@ interface TableauProps {
   tous: AnomalieLot[]
   lotId?: number
   afficherLigne: boolean
+  /** Couleur de la bordure du détail déplié : celle du niveau du volet. */
+  ton?: 'ko' | 'attention'
 }
 
-function Tableau({ lignes, tous, lotId, afficherLigne }: TableauProps) {
+function Tableau({ lignes, tous, lotId, afficherLigne, ton }: TableauProps) {
   const [deplie, setDeplie] = useState<number | null>(null)
   return (
-    <table className="dense points">
+    <table className={ton ? `dense points bord-${ton}` : 'dense points'}>
       <thead>
         <tr>
           {afficherLigne && <th scope="col" className="num">Ligne</th>}
@@ -109,16 +111,14 @@ function Tableau({ lignes, tous, lotId, afficherLigne }: TableauProps) {
         {lignes.map((a, i) => {
           const depliable = afficherLigne && lotId != null && ancrable(a)
           const ouvert = depliable && deplie === i
-          // Comme le détail par contrat du compte rendu : un clic n'importe où sur la ligne la déplie ou la replie.
-          const clic = depliable ? () => setDeplie(ouvert ? null : i) : undefined
-          const classe = depliable ? 'depliable' : undefined
           return (
             <Fragment key={i}>
-              <tr className={classe} onClick={clic}>
+              <tr>
                 {afficherLigne && (
                   <td className={ouvert ? 'num ouvert' : 'num'}>
                     {depliable ? (
-                      <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail de la ligne ${a.ligne}`}>
+                      <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail de la ligne ${a.ligne}`}
+                        onClick={() => setDeplie(ouvert ? null : i)}>
                         <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {a.ligne}
                       </button>
                     ) : (a.ligne ?? '')}
@@ -130,7 +130,7 @@ function Tableau({ lignes, tous, lotId, afficherLigne }: TableauProps) {
                 <td>{a.message}</td>
               </tr>
               {ouvert && (
-                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} classe={classe!} clic={clic!}
+                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne}
                   points={tous.filter((x) => x.ligne === a.ligne)} />
               )}
             </Fragment>
@@ -158,23 +158,22 @@ interface DetailProps {
   num: number
   cible: string | null
   points: AnomalieLot[]
-  classe: string
-  clic: () => void
 }
 
-/** Lignes ajoutées sous le point : une par colonne du fichier, cellules en cause surlignées (rouge à corriger, orange à confirmer). */
-function DetailLigne({ lotId, num, cible, points, classe, clic }: DetailProps) {
+/** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
+function DetailLigne({ lotId, num, cible, points }: DetailProps) {
   const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
-  const libelle = `Détail de la ligne ${num} du fichier`
-  if (!q.isSuccess) {
-    return (
-      <tr className={`${classe} detail-contrat`} onClick={clic}>
-        <EnteteDetail libelle={libelle} lignes={1} />
-        <td colSpan={3} className="retrait muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</td>
-      </tr>
-    )
-  }
-  const l = q.data
+  return (
+    <tr className="detail-contrat">
+      <td colSpan={5}>
+        {q.isSuccess ? <LigneFichier l={q.data} num={num} cible={cible} points={points} />
+          : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
+      </td>
+    </tr>
+  )
+}
+
+function LigneFichier({ l, num, cible, points }: { l: LigneLot; num: number; cible: string | null; points: AnomalieLot[] }) {
   const parColonne = new Map(points.map((p) => [p.colonne, p]))
   const rubriques = [...new Set([...Object.keys(l.montants), ...points.map((p) => p.colonne ?? '')])]
     .filter((c) => c && !ATTRIBUTS.some(([n]) => n === c))
@@ -183,27 +182,22 @@ function DetailLigne({ lotId, num, cible, points, classe, clic }: DetailProps) {
     ...rubriques.map((r): [string, string | null] => [r, l.montants[r] != null ? valeurBrute(l.montants[r]) : null]),
   ]
   return (
-    <>
-      {cellules.map(([n, v], i) => {
-        const p = parColonne.get(n)
-        const ton = p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention')
-        const valeur = [ton, n === cible && 'cellule-cible'].filter(Boolean).join(' ')
-        return (
-          <tr key={n} className={`${classe} detail-contrat`} onClick={clic}>
-            {i === 0 && <EnteteDetail libelle={libelle} lignes={cellules.length} />}
-            <td className="retrait">{n}</td>
-            <td className={valeur || undefined}>{v ?? p?.valeur ?? ''}</td>
-            <td className={ton || undefined}>{p?.message ?? ''}</td>
+    <div className="ligne-fichier">
+      <table className="dense points" aria-label={`Ligne ${num} du fichier`}>
+        <thead>
+          <tr>{cellules.map(([n]) => <th key={n} scope="col">{n}</th>)}</tr>
+        </thead>
+        <tbody>
+          <tr>
+            {cellules.map(([n, v]) => {
+              const p = parColonne.get(n)
+              const classe = [p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), n === cible && 'cellule-cible']
+                .filter(Boolean).join(' ')
+              return <td key={n} className={classe || undefined} title={p?.message}>{v ?? p?.valeur ?? ''}</td>
+            })}
           </tr>
-        )
-      })}
-    </>
+        </tbody>
+      </table>
+    </div>
   )
 }
-
-/** Comme le compte rendu : cellule qui couvre les colonnes Ligne et Employé sur toute la hauteur du détail. */
-const EnteteDetail = ({ libelle, lignes }: { libelle: string; lignes: number }) => (
-  <th scope="rowgroup" rowSpan={lignes} colSpan={2} className="service detail">
-    <span className="detail-libelle">{libelle}</span>
-  </th>
-)

@@ -155,7 +155,7 @@ a.bouton:not(.bouton-lien) { text-decoration: none; }
 table.dense { margin: 0; }
 table.dense thead th { position: sticky; top: 0; z-index: 2; }
 table.dense tbody th[scope='row'] { position: sticky; left: 0; background: var(--surface); text-align: left; z-index: 1; border-right: 1px solid var(--rule); }
-table.dense tbody tr:hover td, table.dense tbody tr:hover th { background: var(--surface-hover); }
+table.dense:not(.points) tbody tr:hover td, table.dense:not(.points) tbody tr:hover th { background: var(--surface-hover); }
 table.dense tr.total th, table.dense tr.total td { font-weight: var(--fw-bold); background: var(--paper-3); border-top: 2px solid var(--navy-3); }
 table.dense tr.groupe th, table.dense tr.groupe td { font-weight: var(--fw-bold); background: var(--paper-2); }
 table.dense tr.sous th { padding-left: var(--sp-5); font-weight: var(--fw-regular); }
@@ -731,10 +731,15 @@ html, body { overscroll-behavior: none; }
 .volet-valeur-ko { background: var(--red-soft); color: var(--red-deep); }
 .volet-valeur-attention { background: var(--warning-soft); color: var(--warning); }
 .volet-niveau { font-weight: 600; color: var(--ink); }
-table.points th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); vertical-align: top; text-align: left; padding-left: calc(12px + var(--sp-1)); }
-table.points th.service.detail .detail-libelle { display: inline-flex; align-items: baseline; font-size: 0.62rem; color: var(--navy); }
-table.points th.service.detail .detail-libelle::before { content: "↳"; display: inline-block; width: 1rem; font-size: .8rem; line-height: 1; }
-table.points td.ouvert { border-left: 3px solid var(--navy); }
+table.points { --bord: var(--navy); }
+table.points.bord-ko { --bord: var(--red-deep); }
+table.points.bord-attention { --bord: var(--warning); }
+table.points td.ouvert { border-left: 3px solid var(--bord); }
+table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.detail-contrat > td { padding: 0; max-width: 0; border-left: 3px solid var(--bord); }
+.ligne-fichier { overflow-x: auto; }
+.ligne-fichier table.dense { width: auto; margin: 0; }
+.page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
+.ligne-fichier table.dense td { white-space: nowrap; }
 table.points td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
 table.points td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
 table.points td.cellule-cible { outline: 2px solid currentColor; outline-offset: -2px; }
@@ -1020,7 +1025,7 @@ table.tableau-squelette td { height: 2.1em; }
 .rapport-excel.saisie-apercu .panneau table.dense thead th { background: var(--navy); color: #fff; border-right: 1px solid rgba(255, 255, 255, .18); border-bottom: 1px solid var(--navy); }
 .rapport-excel.saisie-apercu .panneau table.dense th, .rapport-excel.saisie-apercu .panneau table.dense td { border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule); }
 .rapport-excel.saisie-apercu .panneau table.dense tbody th { text-align: left; font-weight: 600; color: var(--navy); }
-.rapport-excel.saisie-apercu .panneau table.dense tbody tr:hover td, .rapport-excel.saisie-apercu .panneau table.dense tbody tr:hover th { background: var(--surface-hover); }
+.rapport-excel.saisie-apercu .panneau table.dense:not(.points) tbody tr:hover td, .rapport-excel.saisie-apercu .panneau table.dense:not(.points) tbody tr:hover th { background: var(--surface-hover); }
 /* Retour sur DONNEES après un enregistrement */
 .bandeau-enregistre { align-items: center; }
 .bandeau-enregistre .bouton-lien { padding: 0; height: auto; text-decoration: underline; }
