@@ -16,7 +16,7 @@ import SaisieBudgets from './saisie/SaisieBudgets'
 import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } from './saisie/brouillon'
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
-import GrilleSaisie, { lignesSelection, ligneVide } from './saisie/GrilleSaisie'
+import GrilleSaisie, { lignesSelection } from './saisie/GrilleSaisie'
 import ImportFichier, { ACCEPT } from './saisie/ImportFichier'
 
 type Etape =
@@ -45,7 +45,9 @@ export default function Saisie() {
   const fichierRef = useRef<HTMLInputElement>(null)
 
   const prepa = usePreparation(annee, mois, etape.e === 'choix' || etape.e === 'grille')
-  const pilotage = usePilotage(annee, mois, etape.e === 'depart' || etape.e === 'budgets')
+  // Mois 0 : plusieurs mois dans un même fichier, chaque ligne porte son année et son mois.
+  const plusieurs = mois === 0
+  const pilotage = usePilotage(annee, mois, !plusieurs && (etape.e === 'depart' || etape.e === 'budgets'))
   const periode = `${MOIS[mois - 1]} ${annee}`
   const cle = cleBrouillon(annee, mois)
   const [brouillon, setBrouillon] = useState(() => lireBrouillon(cle))
@@ -71,7 +73,7 @@ export default function Saisie() {
         <div className="filtres saisie-periode" role="group" aria-label="Période à renseigner">
           <label>
             Année
-            <select value={annee} onChange={(e) => setChoixPeriode([Number(e.target.value), mois])}>
+            <select value={annee} disabled={plusieurs} onChange={(e) => setChoixPeriode([Number(e.target.value), mois])}>
               {annees.map((a) => <option key={a}>{a}</option>)}
             </select>
           </label>
@@ -79,45 +81,62 @@ export default function Saisie() {
             Mois
             <select value={mois} onChange={(e) => setChoixPeriode([annee, Number(e.target.value)])}>
               {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              <option value={0}>Plusieurs mois (dates lues dans le fichier)</option>
             </select>
           </label>
           {derniere.data && (
             <span className="note">Dernier mois saisi : {MOIS[derniere.data.mois - 1]} {derniere.data.annee} ({derniere.data.lignes} lignes)</span>
           )}
         </div>
-        <div className="saisie-cartes">
+        <div className="saisie-cartes saisie-cartes-depart">
           <Carte titre="Saisir dans l’application">
-            <p className="note">Cochez les employés concernés, puis tapez ou collez les montants dans une grille.</p>
+            <ol className="saisie-deux-temps">
+              <li><span>Choisissez les employés du mois : décochez ceux qui sont partis, ajoutez les arrivées avec « Nouvel employé ».</span></li>
+              <li><span>Tapez ou collez les montants dans la grille.</span></li>
+              <li><span>Vérifiez l’aperçu, puis enregistrez.</span></li>
+            </ol>
             <div className="saisie-carte-action">
-              {/* Mois figé : un rafraîchissement du « dernier mois saisi » ne doit plus le déplacer. */}
-              <Bouton onClick={() => { setChoixPeriode([annee, mois]); setSelection(null); setBrouillon(lireBrouillon(cle)); setEtape({ e: 'choix' }) }}>
-                Saisir les montants de {periode} →
-              </Bouton>
+              {plusieurs ? (
+                <p className="note">Choisissez un mois précis pour saisir dans l’application.</p>
+              ) : (
+                /* Mois figé : un rafraîchissement du « dernier mois saisi » ne doit plus le déplacer. */
+                <Bouton onClick={() => { setChoixPeriode([annee, mois]); setSelection(null); setBrouillon(lireBrouillon(cle)); setEtape({ e: 'choix' }) }}>
+                  Étape 1 : choisir les employés de {periode} →
+                </Bouton>
+              )}
             </div>
           </Carte>
           <Carte titre="Remplir un fichier Excel">
             <ol className="saisie-deux-temps">
               <li>
-                <span>Téléchargez le modèle, déjà rempli avec les employés de {periode}.</span>
-                <a className="bouton bouton-secondaire" href={urlModele(annee, mois)} download>
-                  <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle de {periode}
+                <span>
+                  {plusieurs
+                    ? 'Téléchargez le modèle vide (sans la liste des employés) : une ligne par employé et par mois, avec son année et son mois.'
+                    : `Téléchargez le modèle vide (sans la liste des employés) : une ligne par employé de ${periode}.`}
+                </span>
+                <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
+                  <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
                 </a>
               </li>
               <li>
-                <span>Importez le fichier rempli : il peut couvrir plusieurs mois. Rien n’est enregistré avant l’aperçu.</span>
+                <span>Importez le fichier rempli. Rien n’est enregistré avant l’aperçu.</span>
                 <ChoixFichier libelle="Importer un fichier (.xlsx)" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
               </li>
             </ol>
           </Carte>
         </div>
-        <h3 className="saisie-sous-bandeau">PILOTAGE DE {periode.toUpperCase()}</h3>
-        {pilotage.data ? (
-          <div className="saisie-cartes">
-            <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
-            <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
-          </div>
-        ) : (
-          <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+        {!plusieurs && (
+          <>
+            <h3 className="saisie-sous-bandeau">PILOTAGE DE {periode.toUpperCase()}</h3>
+            {pilotage.data ? (
+              <div className="saisie-cartes">
+                <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
+                <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
+              </div>
+            ) : (
+              <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+            )}
+          </>
         )}
       </section>
     )
@@ -150,15 +169,12 @@ export default function Saisie() {
         onRetour={() => setEtape({ e: 'depart' })}
         onReprendre={() => brouillon && setEtape({ e: 'grille', lignes: brouillon.lignes, brouillonId: brouillon.id })}
         onOublier={() => { effacerBrouillon(cle); setBrouillon(null) }}
-        onValider={(mats) => {
+        onImporter={choisirFichier}
+        onValider={(mats, nouveaux) => {
           setSelection(mats)
-          // Saisie en cours : on garde ce qui est déjà tapé, on ajoute les nouveaux cochés, on retire les décochés.
-          const lignes = lignesSelection(p, mats, brouillon?.lignes)
-          setEtape({
-            e: 'grille',
-            lignes: lignes.length ? lignes : [ligneVide(p.rubriques.map((r) => r.libelle))],
-            brouillonId: brouillon?.id ?? nouveauBrouillonId(),
-          })
+          // Saisie en cours : on garde ce qui est déjà tapé, on ajoute les cochés et les nouveaux employés, on retire les décochés.
+          const enCours = [...(brouillon?.lignes.filter((l) => l._connu) ?? []), ...nouveaux]
+          setEtape({ e: 'grille', lignes: lignesSelection(p, mats, enCours), brouillonId: brouillon?.id ?? nouveauBrouillonId() })
         }}
       />
     )
@@ -170,6 +186,7 @@ export default function Saisie() {
       prepa={p}
       lignesInitiales={etape.lignes}
       brouillonId={etape.brouillonId}
+      onImporter={choisirFichier}
       onRetour={() => { setBrouillon(lireBrouillon(cle)); setEtape({ e: 'choix' }) }}
       onLot={(lot) => {
         grille.current = { lignes: lireBrouillon(cle)?.lignes ?? etape.lignes, brouillonId: etape.brouillonId }

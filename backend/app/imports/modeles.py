@@ -67,12 +67,13 @@ def modele_employes(refs: dict[str, list[str]], exemples: list[list] | None = No
     return out.getvalue()
 
 
-def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, list[str]],
-                   lignes: list[list]) -> bytes:
+def modele_mensuel(annee: int | None, mois: int | None, rubriques: list[str],
+                   refs: dict[str, list[str]], lignes: list[list]) -> bytes:
     """Feuille DONNEES identique à celle de l'Excel REPORTING RH : titre ligne 1, consigne ligne 2,
     en-tête ligne 3, rubriques dans l'ordre de l'Excel (pas l'ordre d'affichage de l'application).
 
     lignes : [matricule, nom, poste, contrat, activité, site, service, *montants (rubriques)].
+    annee et mois à None : modèle vide pour plusieurs mois, ANNÉE et MOIS saisis sur chaque ligne.
     """
     from app.imports.regles import ATTRIBUTS, MOIS
     from app.referentiels_init import RUBRIQUES
@@ -89,9 +90,16 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
     ws.title = "DONNEES"
     ws["A1"] = "FEUILLE DE DONNÉES CENTRALE — une ligne par employé et par mois"
     ws["A1"].font = Font(bold=True, size=13)
-    ws["A2"] = (f"Données de {MOIS[mois - 1]} {annee}. Ne pas modifier les colonnes ANNÉE et MOIS. "
-                "MATRICULE : clé unique (ex. EMP001). Cellule vide = pas de montant. Importer "
-                "ensuite ce fichier dans Administration > Données mensuelles.")
+    if mois is None:
+        periode = ("Plusieurs mois possibles : renseigner ANNÉE (ex. 2026) et MOIS (liste déroulante) "
+                   "sur chaque ligne, une ligne par employé et par mois.")
+    elif lignes:
+        periode = f"Données de {MOIS[mois - 1]} {annee}. Ne pas modifier les colonnes ANNÉE et MOIS."
+    else:
+        periode = (f"Données de {MOIS[mois - 1]} {annee} : renseigner ANNÉE = {annee} et "
+                   f"MOIS = {MOIS[mois - 1]} sur chaque ligne ajoutée.")
+    ws["A2"] = (f"{periode} MATRICULE : clé unique (ex. EMP001). Cellule vide = pas de montant. "
+                "Importer ensuite ce fichier dans Administration > Données mensuelles.")
     ws["A2"].font = Font(italic=True)
     entete(ws, 3, ATTRIBUTS + rubriques)
     for i, ligne in enumerate(lignes, start=4):
@@ -102,9 +110,9 @@ def modele_mensuel(annee: int, mois: int, rubriques: list[str], refs: dict[str, 
             c = ws.cell(i, j, v)
             if j > len(ATTRIBUTS):
                 c.number_format = "#,##0.###"
-    plages = listes(wb, refs)
+    plages = listes(wb, {**refs, "MOIS": MOIS})
     derniere = max(500, len(lignes) + 3)
-    for col, nom in ((5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):
+    for col, nom in ((2, "MOIS"), (5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):
         liste_deroulante(ws, plages[nom], col, 4, derniere)
     filtre(ws, 3, len(ATTRIBUTS) + len(rubriques), derniere)
     ws.freeze_panes = "E4"

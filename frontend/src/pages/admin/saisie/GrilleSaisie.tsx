@@ -15,7 +15,7 @@ import Etapes from './Etapes'
 import LienModele from './LienModele'
 import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
 
-const TITRES: Record<string, string> = {
+export const TITRES: Record<string, string> = {
   matricule: 'MATRICULE', nom: 'Noms', poste: 'Poste', type_contrat: 'Type Contrat',
   activite: 'Activité', site: 'Site', service: 'Service',
 }
@@ -106,9 +106,10 @@ interface Props {
   brouillonId: string
   onRetour: () => void
   onLot: (lot: Lot) => void
+  onImporter: (f: File) => void
 }
 
-export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRetour, onLot }: Props) {
+export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRetour, onLot, onImporter }: Props) {
   const { annee, mois } = prepa
   const [lignes, setLignes] = useState<Ligne[]>(lignesInitiales)
   const [verif, setVerif] = useState<{ ids: string[]; v: Verification } | null>(null)
@@ -351,10 +352,6 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
     }
   }
 
-  const ajouter = () => {
-    changer([...courant.current, nouvelle()])
-    setTimeout(() => aller(ordreRef.current.length - 1, 0))
-  }
   const retirer = useCallback((r: number) => {
     const i = ordreRef.current[r]
     changer(courant.current.filter((_, k) => k !== i))
@@ -466,9 +463,6 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
               onSurvol={(i) => setMenu((m) => m && { ...m, actif: i })} />
           )}
         </div>
-        <div className="saisie-ajout">
-          <button type="button" className="bouton bouton-lien" onClick={ajouter}>+ Ajouter une ligne</button>
-        </div>
       </div>
       <p className={`bandeau ${nbBloquants || envoi || echecVerif ? 'ko' : 'ok'}`} role="status">
         <span>{envoyees.length} ligne{envoyees.length > 1 ? 's' : ''} à enregistrer</span>
@@ -486,7 +480,7 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
         {anoFocus && <span className="saisie-message">{anoFocus.message}</span>}
       </p>
       <div className="saisie-pied" role="toolbar" aria-label="Actions de saisie">
-        <LienModele annee={annee} mois={mois} lignes={() => lignes.map((l) => versApi(l, rubriques))}
+        <LienModele annee={annee} mois={mois} lignes={() => lignes.map((l) => versApi(l, rubriques))} onImporter={onImporter}
           title="Ces lignes et les valeurs déjà tapées, à compléter dans Excel puis importer">
           Remplir plutôt dans Excel (modèle de ces lignes)
         </LienModele>

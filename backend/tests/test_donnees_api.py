@@ -37,7 +37,7 @@ def test_donnees_du_mois_et_fiche_creee_a_l_import(make_client):
 def test_modele_mensuel_aller_retour(make_client):
     c = make_client(ADMIN)
     charger(c, [ligne(MATRICULE="E1", Noms="Ann", **{BR: 1000})])
-    r = c.get(f"{API}/donnees/modele.xlsx", params={"annee": 2026, "mois": 2})
+    r = c.get(f"{API}/donnees/modele.xlsx", params={"annee": 2026, "mois": 2, "matricules": ["E1"]})
     assert r.status_code == 200
     wb = load_workbook(io.BytesIO(r.content))
     ws = wb["DONNEES"]
@@ -106,3 +106,23 @@ def test_modele_mensuel_rubriques_hors_liste_excel_en_fin_dans_l_ordre_recu():
                               *range(len(app))]])))["DONNEES"]
     assert [x.value for x in ws[3]][len(ATTRIBUTS):] == [*v5, "Nouvelle prime", "Autre prime"]
     assert ws.cell(4, len(ATTRIBUTS) + len(v5) + 1).value == 1  # le montant suit sa colonne
+
+
+def test_modele_vide_d_un_mois_ou_de_plusieurs_mois(make_client):
+    c = make_client(ADMIN)
+    charger(c, [ligne(MATRICULE="E1", Noms="Ann", **{BR: 1000})])
+
+    def feuille(**params):
+        r = c.get(f"{API}/donnees/modele.xlsx", params=params)
+        assert r.status_code == 200
+        return r, load_workbook(io.BytesIO(r.content))["DONNEES"]
+
+    r, ws = feuille(annee=2026, mois=2)  # sans la liste des employés
+    assert not any(any(row) for row in ws.iter_rows(min_row=4, values_only=True))
+    assert "MOIS = Février" in ws["A2"].value and "2026_02" in r.headers["content-disposition"]
+    r, ws = feuille()
+    assert not any(any(row) for row in ws.iter_rows(min_row=4, values_only=True))
+    assert "Plusieurs mois" in ws["A2"].value and "plusieurs_mois" in r.headers["content-disposition"]
+    assert any("B4:B" in str(dv.sqref) for dv in ws.data_validations.dataValidation)
+    assert c.get(f"{API}/donnees/modele.xlsx", params={"annee": 2026}).status_code == 422
+    assert c.get(f"{API}/donnees/modele.xlsx", params={"matricules": ["E1"]}).status_code == 422

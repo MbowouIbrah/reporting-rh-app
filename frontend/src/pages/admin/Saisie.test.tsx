@@ -70,14 +70,14 @@ function rendu() {
     </QueryClientProvider>,
   )
 }
-const saisirLeMois = async () => fireEvent.click(await screen.findByRole('button', { name: 'Saisir les montants de Février 2026 →' }))
+const saisirLeMois = async () => fireEvent.click(await screen.findByRole('button', { name: 'Étape 1 : choisir les employés de Février 2026 →' }))
 afterEach(() => vi.restoreAllMocks())
 
 test('mois proposé, cases, grille avec collage Excel, aperçu et choix « garder »', async () => {
   rendu()
   // Mois suivant le dernier saisi proposé par défaut.
   await waitFor(() => expect(screen.getByLabelText('Mois')).toHaveValue('2'))
-  expect(screen.getByRole('link', { name: /Télécharger le modèle de Février 2026/ })).toHaveAttribute('href', expect.stringContaining('annee=2026'))
+  expect(screen.getByRole('link', { name: /Télécharger le modèle vide/ })).toHaveAttribute('href', expect.stringContaining('annee=2026&mois=2'))
   await saisirLeMois()
   expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent('EMPLOYÉS CONCERNÉS — FÉVRIER 2026')
 
@@ -227,8 +227,12 @@ test('modèle Excel calqué sur la sélection et la saisie ; liste de valeurs de
   fireEvent.click(await screen.findByRole('button', { name: 'Tout décocher' }))
   fireEvent.click(screen.getByRole('button', { name: /Remplir plutôt dans Excel/ }))
   await waitFor(() => expect(modele()).toEqual({ annee: 2026, mois: 2, lignes: [] }))
+  // Modèle téléchargé, rien de changé : le lien propose d'importer le fichier rempli.
+  expect(await screen.findByRole('button', { name: 'Importer le fichier rempli (.xlsx)' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Continuer : saisir les montants (0) →' })).toBeDisabled()
 
   fireEvent.click(screen.getByRole('button', { name: 'Tout cocher' }))
+  expect(screen.queryByRole('button', { name: 'Importer le fichier rempli (.xlsx)' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Continuer : saisir les montants (2) →' }))
   const site = await screen.findByRole('combobox', { name: 'Site, Ann' })
 
@@ -247,4 +251,36 @@ test('modèle Excel calqué sur la sélection et la saisie ; liste de valeurs de
   fireEvent.click(screen.getByRole('button', { name: /Remplir plutôt dans Excel/ }))
   await waitFor(() => expect(modele().lignes.map((l) => l.matricule)).toEqual(['E1', 'E2']))
   expect(modele().lignes[0]).toMatchObject({ site: 'Douala', montants: { 'Brut Réel': '1200' } })
+})
+
+test('plusieurs mois : modèle vide sans date, saisie dans l’application réservée à un mois précis', async () => {
+  rendu()
+  await waitFor(() => expect(screen.getByLabelText('Mois')).toHaveValue('2'))
+  fireEvent.change(screen.getByLabelText('Mois'), { target: { value: '0' } })
+  expect(screen.getByLabelText('Année')).toBeDisabled()
+  const lien = screen.getByRole('link', { name: /Télécharger le modèle vide/ })
+  expect(lien.getAttribute('href')).toMatch(/modele\.xlsx\?$/)
+  expect(screen.queryByRole('button', { name: /Étape 1/ })).toBeNull()
+  expect(screen.getByText('Choisissez un mois précis pour saisir dans l’application.')).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /PILOTAGE/ })).toBeNull()
+})
+
+test('nouvel employé : ajouté depuis le choix des employés, matricule unique, repris dans la grille', async () => {
+  rendu()
+  await saisirLeMois()
+  fireEvent.click(await screen.findByRole('button', { name: '+ Nouvel employé' }))
+  const fiche = screen.getByRole('form', { name: 'Nouvel employé' })
+  fireEvent.change(within(fiche).getByLabelText('MATRICULE'), { target: { value: 'e1' } })
+  fireEvent.change(within(fiche).getByLabelText('Noms'), { target: { value: 'Cléo' } })
+  fireEvent.click(within(fiche).getByRole('button', { name: 'Ajouter' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('existe déjà')
+  fireEvent.change(within(fiche).getByLabelText('MATRICULE'), { target: { value: 'E3' } })
+  fireEvent.change(within(fiche).getByLabelText('Site'), { target: { value: 'Douala' } })
+  fireEvent.click(within(fiche).getByRole('button', { name: 'Ajouter' }))
+  expect(screen.queryByRole('form', { name: 'Nouvel employé' })).toBeNull()
+  expect(screen.getByRole('rowgroup', { name: 'Nouveaux employés' })).toHaveTextContent('Cléo')
+  fireEvent.click(screen.getByRole('button', { name: 'Continuer : saisir les montants (2) →' }))
+  expect(await screen.findByRole('textbox', { name: 'Brut Réel, Cléo' })).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Site, Cléo' })).toHaveValue('Douala')
+  expect(screen.queryByRole('button', { name: /Ajouter une ligne/ })).toBeNull()
 })

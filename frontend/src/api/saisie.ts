@@ -140,8 +140,8 @@ export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { m
 
 export const urlRapport = (id: number) => `${BASE}/imports/${id}/rapport.xlsx`
 
-/** Modèle xlsx du mois avec tous les employés actifs (page de départ de l'assistant). */
-export const urlModele = (annee: number, mois: number) => `${BASE}/donnees/modele.xlsx${qs({ annee, mois })}`
+/** Modèle xlsx vide d'un mois ; sans année ni mois : modèle de plusieurs mois (dates lues dans le fichier). */
+export const urlModele = (annee?: number, mois?: number) => `${BASE}/donnees/modele.xlsx${qs({ annee, mois })}`
 
 /** Modèle xlsx du mois avec exactement ces lignes, valeurs comprises ; aucune ligne : modèle vide. */
 export const telechargerModele = (annee: number, mois: number, lignes: LigneSaisie[]) =>

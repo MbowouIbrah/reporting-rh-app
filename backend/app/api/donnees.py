@@ -116,22 +116,28 @@ def tableau(annee: int | None = Query(None, ge=2000, le=2100),
 
 
 @router.get("/modele.xlsx")
-def modele_mensuel(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le=12),
+def modele_mensuel(annee: int | None = Query(None, ge=2000, le=2100),
+                   mois: int | None = Query(None, ge=1, le=12),
                    matricules: list[str] | None = Query(None),
                    p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Sans matricules : modèle vide. Sans annee ni mois : modèle de plusieurs mois."""
     authorize(p, "saisie:write")
+    if (annee is None) != (mois is None) or (matricules and annee is None):
+        raise HTTPException(422, "Préciser l'année et le mois ensemble.")
     rubriques = [r.libelle for r in sorted(_rubriques(db), key=lambda r: r.id)]  # ordre de création
     refs = {k: sorted(_libelles(db, m).values()) for k, m in REFS.items()}
+    if not matricules:
+        nom = f"donnees_{annee}_{mois:02d}.xlsx" if annee else "donnees_plusieurs_mois.xlsx"
+        return Response(modeles.modele_mensuel(annee, mois, rubriques, refs, []), media_type=XLSX,
+                        headers={"Content-Disposition": f'attachment; filename="{nom}"'})
     existantes = {x["matricule"]: x for x in _lignes(db, annee, mois)}
     fiche = [(m, c, _libelles(db, m)) for m, c in (
         (Poste, "poste_id"), (TypeContrat, "type_contrat_id"), (Activite, "activite_id"),
         (Site, "site_id"), (Service, "service_id"))]
     lignes = []
-    q = select(Salarie).order_by(Salarie.matricule)
-    if matricules:  # employés cochés dans l'assistant de saisie
-        q = q.where(Salarie.matricule_norm.in_({m.strip().casefold() for m in matricules}))
-    else:
-        q = q.where(Salarie.actif)
+    # Employés cochés dans l'assistant de saisie.
+    q = select(Salarie).order_by(Salarie.matricule).where(
+        Salarie.matricule_norm.in_({m.strip().casefold() for m in matricules}))
     for sal in db.scalars(q):
         e = existantes.get(sal.matricule)
         if e:

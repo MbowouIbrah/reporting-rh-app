@@ -696,8 +696,6 @@ html, body { overscroll-behavior: none; }
 @media (max-width: 720px) { .saisie-excel table.dense .fige-3 { left: auto; } }
 /* Grille : le tableau occupe la hauteur, état et actions restent en bas de page */
 .saisie-excel .panneau { flex: 0 1 auto; }
-.saisie-ajout { flex: none; padding: 6px 12px; border: 1px solid var(--rule-strong); border-top: 0; background: var(--paper); }
-.saisie-ajout .bouton-lien { text-decoration: none; font-weight: 700; color: var(--navy); }
 .saisie-excel > .bandeau { margin: auto 0 0; }
 .saisie-excel .saisie-pied, .saisie-choix .saisie-pied, .saisie-depart > .saisie-pied { border-top: 1px solid var(--rule); margin-top: auto; padding-top: var(--sp-3); }
 .saisie-excel .saisie-pied { margin-top: var(--sp-2); }
@@ -960,6 +958,20 @@ table.tableau-squelette td { height: 2.1em; }
 .saisie-deux-temps li { counter-increment: temps; display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-1) var(--sp-2); align-items: start; font-size: var(--fs-sm); color: var(--muted); }
 .saisie-deux-temps li::before { content: counter(temps); grid-row: span 2; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; }
 .saisie-deux-temps li > .bouton { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
+.saisie-deux-temps li > span:only-child { grid-column: 2; align-self: center; }
+/* Départ : cartes de même hauteur, actions alignées en bas */
+.saisie-cartes-depart .carte > .saisie-deux-temps { flex: 1 1 auto; align-content: start; }
+.saisie-cartes-depart .carte:last-child > .saisie-deux-temps { align-content: space-between; }
+.saisie-cartes-depart .saisie-carte-action { margin-top: auto; padding-top: var(--sp-3); border-top: 1px solid var(--rule); }
+/* Choix des employés : consigne, fiche « Nouvel employé », modèle téléchargé à importer */
+.saisie-consigne { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+.saisie-nouvel { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2) var(--sp-3); align-items: end; margin: 0 0 var(--sp-3); padding: var(--sp-3); border: 1px solid var(--rule-strong); background: var(--surface); }
+.saisie-nouvel label { display: grid; gap: 4px; font-size: var(--fs-sm); font-weight: 600; color: var(--navy); }
+.saisie-nouvel-actions { display: flex; align-items: center; gap: var(--sp-2); }
+.saisie-nouvel :is(input, select) { height: 36px; padding: 0 10px; min-width: 0; border: 1px solid var(--rule-strong); background-color: var(--paper); color: var(--ink); font: inherit; font-weight: 400; }
+.saisie-nouvel :is(input, select):focus { outline: none; border-color: var(--red); box-shadow: var(--anneau-focus); }
+.saisie-nouvel .champ-erreur { grid-column: 1 / -1; margin: 0; }
+.saisie-lien-modele { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 /* Employés concernés : seuls les en-têtes de service sont grisés, les lignes restent blanches */
 .rapport-excel.saisie-choix .panneau table.saisie-liste tbody tr:not(.saisie-service) td { background: var(--surface); color: var(--ink); }
 .rapport-excel.saisie-choix .panneau table.saisie-liste tbody tr:not(.saisie-service):hover td { background: var(--surface-hover); }
