@@ -7,12 +7,13 @@ import { MOIS, valeurBrute } from '../../../lib/format'
 import ListeChoix, { ID_LISTE, idOption } from './ListeChoix'
 import Volet from './Volet'
 
-type Niveau = 'corriger' | 'confirmer' | 'auto'
+type Niveau = 'corriger' | 'confirmer' | 'auto' | 'info'
 
 const NIVEAUX: Record<Niveau, { libelle: string; ton?: 'ko' | 'attention' }> = {
   corriger: { libelle: 'À corriger', ton: 'ko' },
   confirmer: { libelle: 'À confirmer', ton: 'attention' },
   auto: { libelle: 'Corrigé automatiquement' },
+  info: { libelle: 'Pour information' },
 }
 
 interface Groupe {
@@ -38,8 +39,8 @@ const GROUPES: Groupe[] = [
       || (a.code === 'VALEUR_MANQUANTE' && a.colonne === 'Noms') },
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
-  { id: 'liaisons', titre: 'Cellules liées à un autre fichier', niveau: 'confirmer',
-    aide: 'valeurs reprises du dernier calcul d’Excel : vérifiez qu’elles sont à jour', retenir: codes('LIAISON_EXTERNE') },
+  { id: 'liaisons', titre: 'Cellules liées à un autre fichier', niveau: 'info',
+    aide: 'valeurs reprises du dernier calcul d’Excel, rien à faire ici', retenir: codes('LIAISON_EXTERNE') },
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
     aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
     retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
@@ -47,8 +48,8 @@ const GROUPES: Groupe[] = [
     retenir: () => true },
 ]
 
-/** Ordre d'affichage : à corriger, à confirmer, corrigé automatiquement. */
-const ORDRE: Niveau[] = ['corriger', 'confirmer', 'auto']
+/** Ordre d'affichage : à corriger, à confirmer, corrigé automatiquement, pour information. */
+const ORDRE: Niveau[] = ['corriger', 'confirmer', 'auto', 'info']
 
 export function repartir(anomalies: AnomalieLot[]) {
   const lignes = new Map(GROUPES.map((g) => [g.id, [] as AnomalieLot[]]))
@@ -195,7 +196,7 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
             resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
             ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
             <Tableau lignes={g.lignes} tous={tous} lotId={lotId} afficherLigne={afficherLigne}
-              ton={NIVEAUX[g.niveau].ton} edition={lotId != null ? edition : undefined} />
+              ton={NIVEAUX[g.niveau].ton} edition={lotId != null && g.niveau !== 'info' ? edition : undefined} />
           </Volet>
         )
       })}
