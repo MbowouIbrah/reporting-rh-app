@@ -572,6 +572,7 @@ html, body { overscroll-behavior: none; }
 
 /* DONNEES : TOTAL CHARGES puis Total des colonnes exclues, figées à droite */
 .donnees-excel { --dx: 128px; }
+.donnees-excel.saisie-excel { --dx: 0px; } /* grille de saisie : pas de colonne des exclus, TOTAL collé au bord */
 .donnees-excel table.dense .total { position: sticky; right: var(--dx); z-index: 1; width: 150px; min-width: 150px; max-width: 150px; }
 .donnees-excel table.dense .fige-dx { position: sticky; right: 0; z-index: 1; width: var(--dx); min-width: var(--dx); max-width: var(--dx); }
 .donnees-excel.rapport-excel .panneau table.dense tbody td.fige-dx { background-color: var(--surface); }
