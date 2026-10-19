@@ -103,7 +103,11 @@ export interface AnomalieLot {
   matricule?: string | null
   nom?: string | null
   /** Aide à la décision : lignes du doublon, valeur du mois précédent, liste où ajouter une valeur inconnue. */
-  proposition?: { lignes?: number[]; valeur?: string; periode?: string; dimension?: string } | null
+  proposition?: {
+    lignes?: number[]; valeur?: string; periode?: string; dimension?: string
+    /** Nombre mal écrit : lecture(s) devinée(s), deux si le séparateur est ambigu. */
+    corrections?: { valeur: string; libelle: string }[]
+  } | null
 }
 
 /** Ligne du fichier telle que lue : une valeur refusée est absente. */

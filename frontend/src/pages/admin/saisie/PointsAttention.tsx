@@ -342,6 +342,12 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
         ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...precedent],
     }
   }
+  if (prop?.corrections?.length) {
+    return {
+      question: point.code === 'SEPARATEUR_AMBIGU' ? `« ${point.valeur} » : quelle lecture ?` : `« ${point.valeur} » : que faire ?`,
+      choix: prop.corrections.map((c) => ({ libelle: c.libelle, valeurs: { [col]: c.valeur } })),
+    }
+  }
   if (point.code === 'VALEUR_MANQUANTE' && precedent.length) return { question: `${col} vide : que faire ?`, choix: precedent }
   if (point.code === 'DOUBLON' && prop?.lignes && prop.lignes.length > 1) {
     return {
@@ -359,7 +365,7 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
 }
 
 /** Montants illisibles ou douteux : la cellule peut rester vide. */
-const MONTANT_VIDE = ['SANS_MONTANT', 'NON_NUMERIQUE', 'MONTANT_HORS_BORNES']
+const MONTANT_VIDE = ['SANS_MONTANT', 'NON_NUMERIQUE', 'SEPARATEUR_AMBIGU', 'MONTANT_HORS_BORNES']
 
 /** Seules les cellules qui peuvent rester vides s'ignorent (montants, nom, poste) ; jamais une colonne obligatoire. */
 function ignorable(a: AnomalieLot) {

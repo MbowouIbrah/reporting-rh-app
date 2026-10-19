@@ -42,7 +42,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
   2. Si le fichier source n'est plus accessible : « Enregistrer sous » une copie pour l'import, sélectionner les cellules, Copier puis Collage spécial › Valeurs (LibreOffice : Collage spécial › Valeurs seulement ; Google Sheets : Ctrl+Maj+V). Le fichier d'origine garde ses formules.
 - Remplace le traitement de G2 (`ERREUR_EXCEL`, `FORMULE_SANS_VALEUR` passent de « à confirmer » à refus du fichier).
 
-**G5. Lecture intelligente des valeurs saisies** : intention évidente devinée et proposée (« Corriger en 1 250 000 ») ; toutes les valeurs affichées au même format (espace pour les milliers, virgule pour les décimales).
+**G5. Lecture intelligente des valeurs saisies** — livré, à valider (`regles.py` `interpretations()`, `fr()` ; code `SEPARATEUR_AMBIGU` ; `service.propositions()` renvoie les `corrections` proposées dans la liste ; espaces en double retirés des noms et postes sans alerte ; fichier de test `Downloads/G5 nombres mal ecrits.xlsx`) : intention évidente devinée et proposée (« Corriger en 1 250 000 ») ; toutes les valeurs affichées au même format (espace pour les milliers, virgule pour les décimales).
 - Points comme séparateurs de milliers (« 1.250.000 ») ; cas ambigu (« 45.000 ») : deux solutions, « 45 000 (point = milliers) » ou « 45 (point = décimale) », avec l'explication.
 - Devise ou unité collée (« 25 000 FCFA », « 25000 F », « XAF », « jours ») : « Corriger en 25 000 ».
 - Espaces en trop au début, à la fin ou en double (texte et référentiels) ; virgule décimale ; casse ou accent différents d'une valeur de la liste.

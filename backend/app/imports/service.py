@@ -18,6 +18,7 @@ from app.imports.regles import (
     colonnes,
     entetes_reconnus,
     est_sans_matricule,
+    interpretations,
     nombre,
     norm,
     texte,
@@ -385,7 +386,7 @@ COLONNES_REF = {"Type Contrat": ("type_contrat", TypeContrat, "type_contrat_id")
 
 def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     """Aide à la décision pour chaque point : lignes du doublon, valeur du mois précédent,
-    liste où ajouter une valeur inconnue. Clé : id du point."""
+    liste où ajouter une valeur inconnue, lecture d'un nombre mal écrit. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
         a.code == "DOUBLON" or (a.code in ref and a.colonne in COLONNES_REF))}
@@ -394,6 +395,11 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     out: dict[int, dict] = {}
     for a in anos:
         prop: dict = {}
+        if a.code in ("NON_NUMERIQUE", "SEPARATEUR_AMBIGU"):
+            # Nombre mal écrit : lecture(s) devinée(s), proposée(s) comme correction.
+            lectures = interpretations(a.valeur)
+            if lectures:
+                prop["corrections"] = [{"valeur": str(d), "libelle": lib} for d, lib in lectures]
         if a.code == "REFERENTIEL_INCONNU" and a.colonne in COLONNES_REF:
             prop["dimension"] = COLONNES_REF[a.colonne][0]
         r = rows.get(a.num_ligne)

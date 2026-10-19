@@ -321,3 +321,29 @@ def test_employe_sans_matricule_identifie_par_son_nom():
                        noms_connus={"e1": "awa ngono", "e2": "awa ngono"},
                        annuaire={"e1": ("E1", "Awa Ngono"), "e2": ("E2", "Awa Ngono")})
     assert (2, "MATRICULE", "NOM_HOMONYME") in ens
+
+
+def test_lecture_des_nombres_mal_ecrits():
+    from decimal import Decimal
+
+    from app.imports.regles import fr, interpretations
+    assert fr(Decimal("1250000.5")) == "1 250 000,5" and fr(Decimal("-45")) == "-45"
+    assert interpretations("1.250.000") == [(Decimal("1250000"), "Corriger en 1 250 000")]
+    assert interpretations("1,250,000.50")[0][0] == Decimal("1250000.50")
+    assert interpretations("25 000 FCFA")[0][0] == Decimal("25000")
+    assert interpretations("25000 F")[0][0] == Decimal("25000")
+    assert interpretations("3 jours")[0][0] == Decimal("3")
+    assert [d for d, _ in interpretations("45.000")] == [Decimal("45000"), Decimal("45.000")]
+    assert interpretations("45.000")[1][1] == "45 (le point sépare les décimales)"
+    assert interpretations("abc") == [] and interpretations("1.2.3") == [] and interpretations(12) == []
+
+    rows = [ligne(MATRICULE="E1", Formation="45.000"), ligne(MATRICULE="E2", Formation="1.250.000"),
+            ligne(MATRICULE="E3", Formation="138700.4853"), ligne(MATRICULE="E4", Noms="Jean  Dupont")]
+    L, ens, anos, _ = run(rows, postes={"p"})
+    msg = {(a.ligne, a.code): a.message for a in anos}
+    assert (2, "Formation", "SEPARATEUR_AMBIGU") in ens
+    assert msg[(2, "SEPARATEUR_AMBIGU")] == ("« 45.000 » : le point peut séparer les milliers (45 000) "
+                                            "ou les décimales (45). Choisir la bonne lecture.")
+    assert msg[(3, "NON_NUMERIQUE")] == "« 1.250.000 » n'est pas un nombre valide ; lecture probable : 1 250 000."
+    assert msg[(4, "PRECISION_TRONQUEE")] == "138 700,4853 a 4 décimales ; les montants gardent 3 décimales : 138 700,485."
+    assert not any(c == "Noms" for _, c, _ in ens) and {x.num: x for x in L}[5].nom == "Jean Dupont"

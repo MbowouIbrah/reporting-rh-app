@@ -160,6 +160,48 @@ def nombre(v) -> tuple[Decimal, bool] | None:
         return None
 
 
+def fr(d: Decimal) -> str:
+    """Nombre tel qu'affiché à l'écran : espace pour les milliers, virgule pour les décimales."""
+    s = f"{d:f}"
+    signe, s = ("-", s[1:]) if s.startswith("-") else ("", s)
+    e, _, dec = s.partition(".")
+    return f"{signe}{int(e):,}".replace(",", " ") + (f",{dec}" if dec else "")
+
+
+# Nombre suivi d'une devise ou d'une unité : « 25 000 FCFA », « 25000 F », « 3 jours ».
+RE_UNITE = re.compile(r"(-?[\d\s.,]*\d)\s*(f\s?cfa|cfa|xaf|frs?|francs?|f|jours?|jrs?|j)?\.?", re.I)
+# Milliers séparés par un point ou une virgule, décimales éventuelles avec l'autre signe.
+RE_MILLIERS = re.compile(r"(-?\d{1,3}([.,])\d{3}(?:\2\d{3})*)(?:([.,])(\d+))?")
+# Un seul séparateur suivi de trois chiffres : milliers ou décimales.
+RE_AMBIGU = re.compile(r"-?[1-9]\d{0,2}([.,])\d{3}")
+SIGNE = {".": "point", ",": "virgule"}
+
+
+def interpretations(v) -> list[tuple[Decimal, str]]:
+    """Lectures possibles d'un nombre saisi en texte, avec le libellé de la correction :
+    une si l'intention est évidente, deux si le séparateur est ambigu (« 45.000 »), aucune sinon."""
+    if not isinstance(v, str):
+        return []
+    m = RE_UNITE.fullmatch(texte(v) or "")
+    if not m:
+        return []
+    s = re.sub(r"\s", "", m[1])
+    if RE_AMBIGU.fullmatch(s):
+        sep = SIGNE[s[-4]]
+        milliers, decimale = Decimal(s[:-4] + s[-3:]), Decimal(f"{s[:-4]}.{s[-3:]}")
+        return [(milliers, f"{fr(milliers)} (le {sep} sépare les milliers)"),
+                (decimale, f"{fr(decimale.normalize())} (le {sep} sépare les décimales)")]
+    if re.fullmatch(r"-?\d+(?:[.,]\d+)?", s):
+        d = Decimal(s.replace(",", "."))
+    else:
+        mm = RE_MILLIERS.fullmatch(s)
+        if not mm or mm[3] == mm[2] or (not mm[3] and mm[1].count(mm[2]) == 1):
+            return []
+        entier = re.sub(r"[.,]", "", mm[1])
+        d = Decimal(f"{entier}.{mm[4]}" if mm[3] else entier)
+    return [(d, f"Corriger en {fr(d)}")]
+
+
 def entetes_reconnus(refs: Refs) -> set[str]:
     """En-têtes normalisés lus par les règles : seuls eux décident si une ligne est vide."""
     return {norm(a) for a in ATTRIBUTS} | {norm(r) for r, _ in refs.rubriques} | set(refs.rubrique_alias)
@@ -324,6 +366,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         for nom, attr, libelle in (("Noms", "nom", "Le nom de l’employé est vide."),
                                       ("Poste", "poste", "Le poste est vide.")):
             t = texte(g(nom))
+            t = t and re.sub(r"\s+", " ", t)  # espaces en double retirés sans signalement
             if not t:
                 add(num, nom, "VALEUR_MANQUANTE", AVERT, None, libelle)
             elif len(t) > 200:
@@ -348,25 +391,37 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, nom, "SANS_MONTANT", AVERT, v,
                     f"« {v.strip()} » lu comme vide (aucun montant). Sinon, saisir le montant.")
                 continue
+            lectures = interpretations(v)
+            if len(lectures) == 2:
+                (a, _), (b, _) = lectures
+                sep = "point" if "." in v else "virgule"
+                add(num, nom, "SEPARATEUR_AMBIGU", BLOQUANT, v,
+                    f"« {texte(v)} » : le {sep} peut séparer les milliers ({fr(a)}) ou les décimales "
+                    f"({fr(b.normalize())}). Choisir la bonne lecture.")
+                continue
             res = nombre(v)
             if res is None:
                 add(num, nom, "NON_NUMERIQUE", BLOQUANT, v,
-                    "Nombre attendu, sans texte ni unité (ex. 25000).")
+                    f"« {texte(v)} » n'est pas un nombre valide ; lecture probable : {fr(lectures[0][0])}." if lectures
+                    else "Nombre attendu, sans texte ni unité (ex. 25 000).")
                 continue
             val, converti = res
+            # Valeur montrée dans le point : le texte saisi tel quel, un nombre au format de l'écran.
+            vu = v if isinstance(v, str) else fr(val)
             if converti:
-                add(num, nom, "TEXTE_CONVERTI", AVERT, v, f"Nombre saisi en texte, lu {val}.")
+                add(num, nom, "TEXTE_CONVERTI", AVERT, v, f"Nombre saisi en texte, lu {fr(val)}.")
             if abs(val) >= BORNE:
-                add(num, nom, "MONTANT_HORS_BORNES", BLOQUANT, v, "Nombre trop grand : 15 chiffres au plus avant la virgule.")
+                add(num, nom, "MONTANT_HORS_BORNES", BLOQUANT, vu, "Nombre trop grand : 15 chiffres au plus avant la virgule.")
                 continue
             q = val.quantize(TROIS, rounding=ROUND_HALF_UP)
             if q != val:
-                add(num, nom, "PRECISION_TRONQUEE", AVERT, v, f"Plus de 3 décimales, arrondi à {q.normalize():f}.")
+                add(num, nom, "PRECISION_TRONQUEE", AVERT, vu,
+                    f"{fr(val)} a {-val.as_tuple().exponent} décimales ; les montants gardent 3 décimales : {fr(q.normalize())}.")
             if unite == "jours":
                 if q < 0 or q > ABSENCES_MAX:
-                    add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, v, f"Nombre de jours attendu, de 0 à {ABSENCES_MAX}.")
+                    add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, vu, f"Nombre de jours attendu, de 0 à {ABSENCES_MAX}.")
             elif q < 0:
-                add(num, nom, "MONTANT_NEGATIF", AVERT, v, "Montant négatif : régularisation ou erreur de signe ?")
+                add(num, nom, "MONTANT_NEGATIF", AVERT, vu, "Montant négatif : régularisation ou erreur de signe ?")
             L.montants[nom] = q
 
         L.bloquant = nb_bloq > nb_avant
