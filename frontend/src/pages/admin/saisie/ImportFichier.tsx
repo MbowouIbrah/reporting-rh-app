@@ -68,7 +68,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
           </div>
         </div>
       )}
-      {/* Liens à gauche ; à droite, « Annuler les changements » et « Enregistrer » des corrections. */}
+      {/* Liens à gauche ; à droite, « Annuler (n modifications) » et « Enregistrer » des corrections. */}
       <div className="saisie-pied">
         <span className="pied-liens">
           {lot && <a className="bouton bouton-lien" href={urlRapport(lot.id)} download>Télécharger le rapport d’erreurs (xlsx)</a>}

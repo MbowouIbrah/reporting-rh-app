@@ -69,7 +69,7 @@ interface Props {
   /** Volet ouvert, partagé avec le reste de l'aperçu : un seul à la fois. */
   ouvert: string | null
   onOuvrir: (id: string) => void
-  /** Pied de l'écran où placer « Annuler les changements » et « Enregistrer ». */
+  /** Pied de l'écran où placer « Annuler (n modifications) » et « Enregistrer ». */
   pied?: HTMLElement | null
 }
 
@@ -170,14 +170,13 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
   // Barre des corrections : dans le pied de l'écran quand il est fourni, sinon sous les volets.
   const barre = lotId != null && afficherLigne && (n > 0 || erreur) ? (
     <span className="corrections-pied">
-      {n > 0 && (
+      {n > 0 && (sansType || (envoi && simulation.isFetching)) && (
         <span className="muted" aria-live="polite">
-          {`${n} changement${n > 1 ? 's' : ''} en attente${sansType ? ' : choisir le type du nouveau site' : ''}`}
-          {envoi && simulation.isFetching ? ' · vérification…' : ''}
+          {sansType ? 'Choisir le type du nouveau site' : 'Vérification…'}
         </span>
       )}
       {erreur && <span className="champ-erreur" role="alert">{erreur.message}</span>}
-      {n > 0 && <Bouton variante="lien" disabled={occupe} onClick={() => setPlan(() => VIDE)}>Annuler les changements</Bouton>}
+      {n > 0 && <Bouton variante="secondaire" className="bouton-annuler" disabled={occupe} onClick={() => setPlan(() => VIDE)}>{`Annuler (${n} modification${n > 1 ? 's' : ''})`}</Bouton>}
       {n > 0 && (
         <Bouton disabled={occupe || sansType} onClick={() => enregistrer.mutate()}>
           {occupe ? 'Enregistrement…' : 'Enregistrer'}

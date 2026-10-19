@@ -130,7 +130,7 @@ test('cellule de la ligne corrigée sur place, liste proposée sans obligation, 
   // Rien ne part avant « Enregistrer ».
   expect(appliquer).not.toHaveBeenCalled()
   expect(within(ligne).getByText('Limbé')).toHaveClass('cellule-modifiee')
-  expect(screen.getByText(/1 changement en attente/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Annuler (1 modification)' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 4: { Site: 'Limbé' } } })))
   expect(appliquer).toHaveBeenCalledTimes(1)

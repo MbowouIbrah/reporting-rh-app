@@ -119,6 +119,7 @@ tr.sous th { padding-left: 28px; }
 .bouton-primaire:hover { background: var(--red-deep); }
 .bouton-secondaire { background: var(--surface); color: var(--navy); border-color: var(--rule-strong); }
 .bouton-secondaire:hover { background: var(--surface-hover); }
+.bouton-secondaire.bouton-annuler { background: #fff; color: var(--red-deep); }
 .bouton-lien { background: none; color: var(--red-deep); text-decoration: underline; padding: 6px 8px; }
 a.bouton:not(.bouton-lien) { text-decoration: none; }
 .bouton:disabled { opacity: 0.6; cursor: default; }
