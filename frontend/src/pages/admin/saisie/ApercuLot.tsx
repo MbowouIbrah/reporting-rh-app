@@ -88,7 +88,7 @@ export default function ApercuLot({ lot, parcours, onRetour, onFini }: Props) {
             <li><Badge ton="alerte">{d.modifiee}</Badge> à mettre à jour (déjà enregistrée{s(d.modifiee)}, montants différents)</li>
             <li><Badge>{d.identique}</Badge> déjà enregistrée{s(d.identique)} à l’identique (ignorée{s(d.identique)})</li>
           </ul>
-          <p className="saisie-chiffre">Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</p>
+          <p className="saisie-chiffre"><span>Total des charges : <strong>{valeurBrute(d.total_lot)}</strong> FCFA</span></p>
         </section>
         <section aria-label="Employés" className="saisie-carte-chiffre">
           <h3>Employés ({d.employes.total})</h3>
