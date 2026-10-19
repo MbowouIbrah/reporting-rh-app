@@ -957,6 +957,7 @@ table.tableau-squelette td { height: 2.1em; }
 .saisie-deux-temps { margin: 0; padding: 0; list-style: none; counter-reset: temps; display: grid; gap: var(--sp-3); }
 .saisie-deux-temps li { counter-increment: temps; display: grid; grid-template-columns: 24px 1fr; gap: var(--sp-1) var(--sp-2); align-items: start; font-size: var(--fs-sm); color: var(--muted); }
 .saisie-deux-temps li::before { content: counter(temps); grid-row: span 2; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; }
+.saisie-depart .saisie-carte-action:has(.bouton) { justify-content: flex-end; }
 .saisie-carte-action > a.bouton { display: inline-flex; align-items: center; gap: 6px; }
 .saisie-deux-temps li > .bouton { justify-self: start; display: inline-flex; align-items: center; gap: 6px; }
 .saisie-deux-temps li > span:only-child { grid-column: 2; align-self: center; }

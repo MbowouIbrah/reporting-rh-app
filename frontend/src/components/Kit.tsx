@@ -22,15 +22,17 @@ export function ChoixFichier({
   accept,
   inputRef,
   onFichier,
+  variante = 'secondaire',
 }: {
   libelle: string
+  variante?: 'primaire' | 'secondaire'
   accept: string
   inputRef: RefObject<HTMLInputElement | null>
   onFichier: (f: File | undefined) => void
 }) {
   return (
     <>
-      <Bouton variante="secondaire" onClick={() => inputRef.current?.click()}>
+      <Bouton variante={variante} onClick={() => inputRef.current?.click()}>
         {libelle}
       </Bouton>
       <input ref={inputRef} type="file" accept={accept} hidden tabIndex={-1} aria-hidden="true" onChange={(e) => onFichier(e.target.files?.[0])} />

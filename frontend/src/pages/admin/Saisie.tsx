@@ -91,7 +91,7 @@ export default function Saisie() {
         <div className="saisie-cartes saisie-cartes-depart">
           <Carte titre="Saisir dans l’application">
             <ol className="saisie-deux-temps">
-              <li><span>Choisissez les employés du mois : décochez ceux qui sont partis, ajoutez les arrivées avec « Nouvel employé ».</span></li>
+              <li><span>Choisissez les employés : décochez les départs, ajoutez les arrivées (« Nouvel employé »).</span></li>
               <li><span>Tapez ou collez les montants dans la grille.</span></li>
               <li><span>Vérifiez l’aperçu, puis enregistrez.</span></li>
             </ol>
@@ -112,7 +112,7 @@ export default function Saisie() {
               <li>
                 <span>
                   {plusieurs
-                    ? 'Remplissez-le dans Excel : une ligne par employé et par mois, avec son année et son mois.'
+                    ? 'Remplissez-le dans Excel : une ligne par employé et par mois.'
                     : `Remplissez-le dans Excel : une ligne par employé de ${periode}.`}
                 </span>
               </li>
@@ -122,7 +122,7 @@ export default function Saisie() {
               <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
                 <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
               </a>
-              <ChoixFichier libelle="Importer un fichier (.xlsx)" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
+              <ChoixFichier libelle="Importer un fichier (.xlsx)" variante="primaire" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
             </div>
           </Carte>
         </div>
