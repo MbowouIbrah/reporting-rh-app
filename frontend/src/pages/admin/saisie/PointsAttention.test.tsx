@@ -60,7 +60,7 @@ test('niveaux, employé nommé, un seul volet ouvert à la fois', () => {
   expect(noms).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('▸ déplie la ligne du fichier (en-tête et valeurs), la ligne elle-même n’est pas cliquable', async () => {
+test('un clic sur la ligne du point déplie la ligne du fichier (en-tête et valeurs)', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
     ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
     activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' }, brut: null, choix: null,
@@ -69,8 +69,6 @@ test('▸ déplie la ligne du fichier (en-tête et valeurs), la ligne elle-même
   const deplier = screen.getByRole('button', { name: 'Détail de la ligne 4' })
   expect(deplier).toHaveAttribute('aria-expanded', 'false')
   fireEvent.click(screen.getByText('Valeur inconnue.'))
-  expect(deplier).toHaveAttribute('aria-expanded', 'false')
-  fireEvent.click(deplier)
   expect(deplier).toHaveAttribute('aria-expanded', 'true')
   const ligne = await screen.findByRole('table', { name: 'Ligne 4 du fichier' })
   expect(screen.queryByText(/Détail de la ligne/)).toBeNull()

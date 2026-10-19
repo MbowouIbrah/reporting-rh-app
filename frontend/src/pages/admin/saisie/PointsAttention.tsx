@@ -121,12 +121,13 @@ function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProp
           const ouvert = depliable && iDeplie === i
           return (
             <Fragment key={`${cle(a)}|${i}`}>
-              <tr>
+              {/* Toute la ligne ouvre le détail ; le bouton ▸ reçoit le clic au clavier (il remonte jusqu'à la ligne). */}
+              <tr className={depliable ? 'depliable' : undefined}
+                onClick={depliable ? () => setDeplie(ouvert ? null : { ligne: a.ligne!, cle: cle(a) }) : undefined}>
                 {afficherLigne && (
                   <td className={ouvert ? 'num ouvert' : 'num'}>
                     {depliable ? (
-                      <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail de la ligne ${a.ligne}`}
-                        onClick={() => setDeplie(ouvert ? null : { ligne: a.ligne!, cle: cle(a) })}>
+                      <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail de la ligne ${a.ligne}`}>
                         <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {a.ligne}
                       </button>
                     ) : (a.ligne ?? '')}
@@ -212,9 +213,7 @@ interface LigneProps {
 function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps) {
   const [edition, setEdition] = useState<{ col: string; valeur: string } | null>(null)
   const choix = (n: string) => (n === 'MOIS' ? MOIS : l.choix?.[n])
-  const ouvrir = (td: HTMLElement, n: string) => {
-    // La cellule garde sa largeur pendant la saisie.
-    td.style.minWidth = `${td.offsetWidth}px`
+  const ouvrir = (n: string) => {
     ferme.current = false
     setEdition({ col: n, valeur: l.brut?.[n] ?? '' })
   }
@@ -274,6 +273,8 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps)
                 const liste = choix(n)
                 return (
                   <td key={n} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
+                    {/* Valeur gardée, invisible : la cellule garde sa taille, le champ se pose dessus. */}
+                    <span className="fantome" aria-hidden="true">{v ?? p?.valeur ?? ''}</span>
                     <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur} list={liste ? `choix-${num}-${i}` : undefined}
                       onChange={(e) => setEdition({ col: n, valeur: e.target.value })} onBlur={() => fermer(true)}
                       onKeyDown={(e) => { if (e.key === 'Enter') fermer(true); else if (e.key === 'Escape') fermer(false) }} />
@@ -283,7 +284,7 @@ function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps)
               }
               return (
                 <td key={n} className={[classe, modifiable && 'modifiable'].filter(Boolean).join(' ') || undefined} title={p?.message}
-                  onClick={modifiable ? (e) => ouvrir(e.currentTarget, n) : undefined}>{v ?? p?.valeur ?? ''}</td>
+                  onClick={modifiable ? () => ouvrir(n) : undefined}>{v ?? p?.valeur ?? ''}</td>
               )
             })}
           </tr>
