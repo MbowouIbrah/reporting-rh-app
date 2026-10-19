@@ -748,6 +748,11 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { border-right-color: rgba(255, 255, 255, .18); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
 .ligne-fichier table.dense td { white-space: nowrap; }
+/* Cellule corrigible : un clic l'ouvre en saisie, la liste proposée n'oblige à rien. */
+.ligne-fichier table.dense td.modifiable { cursor: text; }
+.ligne-fichier table.dense td.en-saisie { padding: 0; }
+.ligne-fichier table.dense td.en-saisie input { width: 100%; min-width: 8ch; box-sizing: border-box; border: 0; border-radius: 0;
+  padding: inherit; font: inherit; color: var(--ink); background: var(--surface); outline: 2px solid var(--focus); outline-offset: -2px; }
 table.points td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
 table.points td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
 /* Cellule en cause : un cadre arrive de plus loin et se resserre sur elle, une fois le défilement fini. */

@@ -139,6 +139,19 @@ def entetes_reconnus(refs: Refs) -> set[str]:
     return {norm(a) for a in ATTRIBUTS} | {norm(r) for r, _ in refs.rubriques} | set(refs.rubrique_alias)
 
 
+def colonnes(entetes: list, refs: Refs) -> dict[str, int]:
+    """Position de chaque colonne reconnue, par nom de référence (la première en cas de doublon)."""
+    rub_canon = {norm(r): r for r, _ in refs.rubriques} | refs.rubrique_alias
+    attr_canon = {norm(a): a for a in ATTRIBUTS}
+    cols: dict[str, int] = {}
+    for j, v in enumerate(entetes):
+        if v is not None and str(v).strip() != "":
+            canon = attr_canon.get(norm(v)) or rub_canon.get(norm(v))
+            if canon is not None:
+                cols.setdefault(canon, j)
+    return cols
+
+
 def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], dict]:
     anos: list[Anomalie] = []
     nb_bloq = 0

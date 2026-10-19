@@ -96,6 +96,24 @@ def test_lot_rejete_non_validable_et_anomalies_localisees(make_client, db):
     assert nb_sit(db) == 0
 
 
+def test_correction_sur_place_relance_les_controles(make_client, db):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Service="Inconnu", Formation=100)]).json()
+    u = f"{API}/imports/{lot['id']}/lignes/2"
+    vue = c.get(u).json()
+    assert vue["brut"]["Service"] == "Inconnu" and vue["brut"]["Formation"] == "100"
+    assert "SAV PL" in vue["choix"]["Service"]
+    assert c.put(u, json={"valeurs": {"Inexistante": "x"}}).status_code == 422
+    r = c.put(u, json={"valeurs": {"Service": "sav pl", "Formation": "250"}})
+    assert r.status_code == 200 and r.json()["statut"] == "pret" and r.json()["nb_bloquants"] == 0
+    vue = c.get(u).json()
+    assert vue["service"] == "SAV PL" and vue["montants"]["Formation"] in ("250", "250.000")
+    assert db.scalar(select(func.count()).select_from(AuditEvent)
+                     .where(AuditEvent.action == "import_correction")) == 1
+    assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
+    assert c.put(u, json={"valeurs": {"Service": "SAV PL"}}).status_code == 409
+
+
 def test_fichier_illisible_422(make_client):
     c = make_client(ADMIN)
     r = c.post(f"{API}/imports", files={"fichier": ("x.xlsx", b"pas un xlsx", XLSX)})

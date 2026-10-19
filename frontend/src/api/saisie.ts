@@ -117,6 +117,10 @@ export interface LigneLot {
   site: string | null
   service: string | null
   montants: Record<string, string>
+  /** Valeurs telles qu'écrites dans le fichier, par colonne : absent pour un lot analysé avant les corrections sur place. */
+  brut: Record<string, string | null> | null
+  /** Valeurs proposées par colonne (on peut en taper une autre). */
+  choix: Record<string, string[]> | null
 }
 
 export type Cle = { annee: number; mois: number; matricule: string }
@@ -154,6 +158,8 @@ export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)
 export const lireAnomalies = (id: number, gravite?: string) =>
   api<AnomalieLot[]>(`/imports/${id}/anomalies${qs({ gravite, limit: 1000 })}`)
 export const lireLigne = (id: number, num: number) => api<LigneLot>(`/imports/${id}/lignes/${num}`)
+export const corrigerLigne = (id: number, num: number, valeurs: Record<string, string | null>) =>
+  api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'PUT', body: JSON.stringify({ valeurs }) })
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 

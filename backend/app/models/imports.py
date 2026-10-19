@@ -49,6 +49,8 @@ class LotImport(Base):
     nb_bloquants: Mapped[int] = mapped_column(Integer, default=0)
     nb_avert: Mapped[int] = mapped_column(Integer, default=0)
     stats: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Feuille lue (en-têtes, valeurs brutes) : contrôles relancés après une correction sur place.
+    feuille: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class StagingLigne(Base):

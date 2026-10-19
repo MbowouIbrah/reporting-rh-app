@@ -82,6 +82,19 @@ def ligne(lot_id: int, num: int, p: Principal = Depends(current_principal),
     return service.ligne_du_lot(db, lot_id, num)
 
 
+class CorrectionIn(BaseModel):
+    valeurs: dict[str, str | None]  # nom de colonne -> valeur saisie (vide = cellule vidée)
+
+
+@router.put("/{lot_id}/lignes/{num}")
+def corriger(lot_id: int, num: int, corps: CorrectionIn, p: Principal = Depends(current_principal),
+             db: Session = Depends(get_db)):
+    """Corrige des cellules d'une ligne du fichier ; les contrôles du lot sont relancés."""
+    authorize(p, "import:write")
+    _lot(db, lot_id)
+    return service.lot_dict(service.corriger_ligne(db, p.user_id, lot_id, num, corps.valeurs))
+
+
 @router.get("/{lot_id}/rapport.xlsx")
 def rapport(lot_id: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "import:read")

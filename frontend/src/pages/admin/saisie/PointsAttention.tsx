@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { lireLigne, type AnomalieLot, type LigneLot } from '../../../api/saisie'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { corrigerLigne, lireLigne, type AnomalieLot, type LigneLot, type Lot } from '../../../api/saisie'
 import { MOIS, valeurBrute } from '../../../lib/format'
 import Volet from './Volet'
 
@@ -57,6 +57,8 @@ interface Props {
   anomalies: AnomalieLot[]
   /** Lot importé : permet de rouvrir la ligne du fichier. Absent pour une saisie en grille. */
   lotId?: number
+  /** Lot renvoyé après une correction sur place (contrôles relancés). */
+  onLot?: (lot: Lot) => void
   /** Numéro de ligne du fichier : sans objet pour une saisie en grille. */
   afficherLigne: boolean
   /** Volet ouvert, partagé avec le reste de l'aperçu : un seul à la fois. */
@@ -65,14 +67,14 @@ interface Props {
 }
 
 /** Points regroupés par nature et par niveau (à corriger, à confirmer, corrigé automatiquement). */
-export default function PointsAttention({ anomalies, lotId, afficherLigne, ouvert, onOuvrir }: Props) {
+export default function PointsAttention({ anomalies, lotId, onLot, afficherLigne, ouvert, onOuvrir }: Props) {
   return (
     <>
       {repartir(anomalies).map((g) => (
         <Volet key={g.id} titre={g.titre} valeur={g.lignes.length} ton={NIVEAUX[g.niveau].ton}
           resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
           ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
-          <Tableau lignes={g.lignes} tous={anomalies} lotId={lotId} afficherLigne={afficherLigne} ton={NIVEAUX[g.niveau].ton} />
+          <Tableau lignes={g.lignes} tous={anomalies} lotId={lotId} onLot={onLot} afficherLigne={afficherLigne} ton={NIVEAUX[g.niveau].ton} />
         </Volet>
       ))}
     </>
@@ -89,13 +91,19 @@ interface TableauProps {
   lignes: AnomalieLot[]
   tous: AnomalieLot[]
   lotId?: number
+  onLot?: (lot: Lot) => void
   afficherLigne: boolean
   /** Couleur de la bordure du détail déplié : celle du niveau du volet. */
   ton?: 'ko' | 'attention'
 }
 
-function Tableau({ lignes, tous, lotId, afficherLigne, ton }: TableauProps) {
-  const [deplie, setDeplie] = useState<number | null>(null)
+const cle = (a: AnomalieLot) => `${a.ligne}|${a.colonne}|${a.code}`
+
+function Tableau({ lignes, tous, lotId, onLot, afficherLigne, ton }: TableauProps) {
+  // Point déplié repéré par sa clé : après une correction, s'il a disparu, la même ligne reste ouverte sur le point suivant.
+  const [deplie, setDeplie] = useState<{ ligne: number; cle: string } | null>(null)
+  const meme = deplie ? lignes.findIndex((a) => cle(a) === deplie.cle) : -1
+  const iDeplie = meme >= 0 || !deplie ? meme : lignes.findIndex((a) => a.ligne === deplie.ligne)
   return (
     <table className={ton ? `dense points bord-${ton}` : 'dense points'}>
       <thead>
@@ -110,15 +118,15 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton }: TableauProps) {
       <tbody>
         {lignes.map((a, i) => {
           const depliable = afficherLigne && lotId != null && ancrable(a)
-          const ouvert = depliable && deplie === i
+          const ouvert = depliable && iDeplie === i
           return (
-            <Fragment key={i}>
+            <Fragment key={`${cle(a)}|${i}`}>
               <tr>
                 {afficherLigne && (
                   <td className={ouvert ? 'num ouvert' : 'num'}>
                     {depliable ? (
                       <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail de la ligne ${a.ligne}`}
-                        onClick={() => setDeplie(ouvert ? null : i)}>
+                        onClick={() => setDeplie(ouvert ? null : { ligne: a.ligne!, cle: cle(a) })}>
                         <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {a.ligne}
                       </button>
                     ) : (a.ligne ?? '')}
@@ -130,7 +138,7 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton }: TableauProps) {
                 <td>{a.message}</td>
               </tr>
               {ouvert && (
-                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne}
+                <DetailLigne lotId={lotId!} num={a.ligne!} cible={a.colonne} onLot={onLot}
                   points={tous.filter((x) => x.ligne === a.ligne)} />
               )}
             </Fragment>
@@ -161,22 +169,64 @@ interface DetailProps {
   num: number
   cible: string | null
   points: AnomalieLot[]
+  onLot?: (lot: Lot) => void
 }
 
 /** Sous le point, comme le détail par contrat : la ligne du fichier (en-tête et valeurs), cellules en cause surlignées. */
-function DetailLigne({ lotId, num, cible, points }: DetailProps) {
+function DetailLigne({ lotId, num, cible, points, onLot }: DetailProps) {
   const q = useQuery({ queryKey: ['saisie', 'ligne', lotId, num], queryFn: () => lireLigne(lotId, num) })
+  const qc = useQueryClient()
+  const corriger = useMutation({
+    mutationFn: (valeurs: Record<string, string | null>) => corrigerLigne(lotId, num, valeurs),
+    onSuccess: (lot) => {
+      void qc.invalidateQueries({ queryKey: ['saisie'] })
+      onLot?.(lot)
+    },
+  })
   return (
     <tr className="detail-contrat">
       <td colSpan={5}>
-        {q.isSuccess ? <LigneFichier l={q.data} num={num} cible={cible} points={points} />
+        {q.isSuccess ? (
+          <>
+            <LigneFichier l={q.data} num={num} cible={cible} points={points}
+              onCorrige={q.data.brut ? (col, v) => corriger.mutate({ [col]: v }) : undefined} enCours={corriger.isPending} />
+            {corriger.isError && <p className="champ-erreur admin-erreur" role="alert">{corriger.error.message}</p>}
+          </>
+        )
           : <span className="muted">{q.isPending ? 'Chargement…' : 'Contenu indisponible.'}</span>}
       </td>
     </tr>
   )
 }
 
-function LigneFichier({ l, num, cible, points }: { l: LigneLot; num: number; cible: string | null; points: AnomalieLot[] }) {
+interface LigneProps {
+  l: LigneLot
+  num: number
+  cible: string | null
+  points: AnomalieLot[]
+  /** Absent : ligne en lecture seule (lot analysé avant les corrections sur place). */
+  onCorrige?: (colonne: string, valeur: string | null) => void
+  enCours?: boolean
+}
+
+function LigneFichier({ l, num, cible, points, onCorrige, enCours }: LigneProps) {
+  const [edition, setEdition] = useState<{ col: string; valeur: string } | null>(null)
+  const choix = (n: string) => (n === 'MOIS' ? MOIS : l.choix?.[n])
+  const ouvrir = (td: HTMLElement, n: string) => {
+    // La cellule garde sa largeur pendant la saisie.
+    td.style.minWidth = `${td.offsetWidth}px`
+    ferme.current = false
+    setEdition({ col: n, valeur: l.brut?.[n] ?? '' })
+  }
+  // Échap ou Entrée retire le champ, ce qui déclenche aussi sa perte de focus : une seule fermeture compte.
+  const ferme = useRef(false)
+  const fermer = (garder: boolean) => {
+    if (!edition || ferme.current) return
+    ferme.current = true
+    const v = edition.valeur.trim()
+    setEdition(null)
+    if (garder && v !== (l.brut?.[edition.col] ?? '').trim()) onCorrige?.(edition.col, v || null)
+  }
   const parColonne = new Map(points.map((p) => [p.colonne, p]))
   const rubriques = [...new Set([...Object.keys(l.montants), ...points.map((p) => p.colonne ?? '')])]
     .filter((c) => c && !ATTRIBUTS.some(([n]) => n === c))
@@ -219,7 +269,22 @@ function LigneFichier({ l, num, cible, points }: { l: LigneLot; num: number; cib
               const p = parColonne.get(n)
               const classe = [p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), n === cible && 'cellule-cible', i < FIGEES && 'fige']
                 .filter(Boolean).join(' ')
-              return <td key={n} className={classe || undefined} title={p?.message}>{v ?? p?.valeur ?? ''}</td>
+              const modifiable = onCorrige != null && l.brut != null && n in l.brut && !enCours
+              if (edition?.col === n) {
+                const liste = choix(n)
+                return (
+                  <td key={n} className={[classe, 'en-saisie'].filter(Boolean).join(' ')} title={p?.message}>
+                    <input autoFocus aria-label={`${n}, ligne ${num}`} value={edition.valeur} list={liste ? `choix-${num}-${i}` : undefined}
+                      onChange={(e) => setEdition({ col: n, valeur: e.target.value })} onBlur={() => fermer(true)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') fermer(true); else if (e.key === 'Escape') fermer(false) }} />
+                    {liste && <datalist id={`choix-${num}-${i}`}>{liste.map((c) => <option key={c} value={c} />)}</datalist>}
+                  </td>
+                )
+              }
+              return (
+                <td key={n} className={[classe, modifiable && 'modifiable'].filter(Boolean).join(' ') || undefined} title={p?.message}
+                  onClick={modifiable ? (e) => ouvrir(e.currentTarget, n) : undefined}>{v ?? p?.valeur ?? ''}</td>
+              )
             })}
           </tr>
         </tbody>

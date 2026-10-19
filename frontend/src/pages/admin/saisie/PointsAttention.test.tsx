@@ -63,7 +63,7 @@ test('niveaux, employé nommé, un seul volet ouvert à la fois', () => {
 test('▸ déplie la ligne du fichier (en-tête et valeurs), la ligne elle-même n’est pas cliquable', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
     ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
-    activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' },
+    activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' }, brut: null, choix: null,
   })
   render(<Volets lotId={7} anomalies={[anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site')]} />)
   const deplier = screen.getByRole('button', { name: 'Détail de la ligne 4' })
@@ -80,6 +80,41 @@ test('▸ déplie la ligne du fichier (en-tête et valeurs), la ligne elle-même
   expect(ligne).toHaveTextContent('Août')
   fireEvent.click(deplier)
   expect(screen.queryByRole('table', { name: 'Ligne 4 du fichier' })).toBeNull()
+})
+
+test('cellule de la ligne corrigée sur place, liste proposée sans obligation, lot renvoyé', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue({
+    ligne: 4, annee: 2026, mois: 8, matricule: 'EMP004', nom: 'John Doe', poste: 'Vendeur', type_contrat: 'CDI',
+    activite: 'VN', site: null, service: 'SAV PL', montants: { Bonus: '1000' },
+    brut: { 'ANNÉE': '2026', MOIS: 'Août', MATRICULE: 'EMP004', Noms: 'John Doe', Site: 'Kribi', Bonus: '1000' },
+    choix: { Site: ['Bertoua', 'Douala'] },
+  })
+  const lot = { id: 7, statut: 'pret' } as saisie.Lot
+  const corriger = vi.spyOn(saisie, 'corrigerLigne').mockResolvedValue(lot)
+  const onLot = vi.fn()
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <PointsAttention lotId={7} onLot={onLot} afficherLigne ouvert={VOLET_ERREURS} onOuvrir={() => {}}
+        anomalies={[{ ...anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site'), valeur: 'Kribi' },
+          anomalie('NOM_PROCHE', 'bloquant', 'Nom proche.', 'Noms')]} />
+    </QueryClientProvider>,
+  )
+  fireEvent.click(screen.getAllByRole('button', { name: 'Détail de la ligne 4' })[0])
+  const ligne = await screen.findByRole('table', { name: 'Ligne 4 du fichier' })
+  // Autre colonne que celle du point : modifiable aussi.
+  fireEvent.click([...ligne.querySelectorAll('td')].find((td) => /^1\D?000/.test(td.textContent ?? ''))!)
+  const bonus = screen.getByRole('textbox', { name: 'Bonus, ligne 4' })
+  fireEvent.change(bonus, { target: { value: '1200' } })
+  fireEvent.keyDown(bonus, { key: 'Escape' })
+  expect(corriger).not.toHaveBeenCalled()
+  fireEvent.click([...ligne.querySelectorAll('td')].find((td) => td.textContent === 'Kribi')!)
+  const site = screen.getByRole('combobox', { name: 'Site, ligne 4' })
+  expect([...document.querySelectorAll('datalist option')].map((o) => o.getAttribute('value'))).toEqual(['Bertoua', 'Douala'])
+  fireEvent.change(site, { target: { value: 'Limbé' } })
+  fireEvent.keyDown(site, { key: 'Enter' })
+  await vi.waitFor(() => expect(corriger).toHaveBeenCalledWith(7, 4, { Site: 'Limbé' }))
+  expect(corriger).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
 })
 
 test('saisie en grille : pas de colonne Ligne', () => {

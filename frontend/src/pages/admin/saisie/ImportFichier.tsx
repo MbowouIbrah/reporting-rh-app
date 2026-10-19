@@ -57,13 +57,13 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {!lot && !etat.erreur && <Etat type="chargement" />}
       {(lot || etat.erreur) && (
         <p className="bandeau ko" role="alert">
-          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger dans Excel, puis importez-le de nouveau. Rien n’a été enregistré.`}
+          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger : ouvrez la ligne (▸) et cliquez la cellule, ou corrigez le fichier dans Excel puis importez-le de nouveau. Rien n’a été enregistré.`}
         </p>
       )}
       {lot && (
         <div className="panneau">
           <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
-            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => (l.statut === 'pret' ? onLot(l) : setEtat({ lot: l }))} afficherLigne ouvert={volet} onOuvrir={setVolet} />}
           </div>
         </div>
       )}

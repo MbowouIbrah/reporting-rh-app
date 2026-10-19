@@ -9,7 +9,18 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.imports.lecture import Feuille, FichierIllisible, lire
-from app.imports.regles import BLOQUANT, Refs, entetes_reconnus, est_sans_matricule, norm, valider
+from app.imports.regles import (
+    ATTRIBUTS,
+    BLOQUANT,
+    Refs,
+    colonnes,
+    entetes_reconnus,
+    est_sans_matricule,
+    nombre,
+    norm,
+    texte,
+    valider,
+)
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
@@ -89,14 +100,36 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes) -> LotImport:
 def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha: str,
                      taille: int, refs: Refs | None = None) -> LotImport:
     lignes, anos, stats = valider(feuille, refs or charger_refs(db))
-    nb_b = sum(1 for a in anos if a.gravite == BLOQUANT)
-    lot = LotImport(
-        fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,
-        statut="rejete" if nb_b else "pret", nb_lignes=len(lignes), nb_bloquants=nb_b,
-        nb_avert=len(anos) - nb_b, stats=stats,
-    )
+    lot = LotImport(fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,
+                    statut=_statut(anos), feuille=_feuille_json(feuille))
     db.add(lot)
     db.flush()
+    _ecrire(db, lot, lignes, anos, stats)
+    audit.record(db, user_id, "import_analyse", "lot_import", lot.id, None,
+                 {"statut": lot.statut, "fichier": lot.fichier_nom, **(stats or {})})
+    db.commit()
+    return lot
+
+
+def _statut(anos) -> str:
+    return "rejete" if any(a.gravite == BLOQUANT for a in anos) else "pret"
+
+
+def _feuille_json(f: Feuille) -> dict:
+    """Valeurs JSON telles quelles ; une date ou une heure est gardée comme la lisent les règles (texte)."""
+    def v(x):
+        return x if x is None or isinstance(x, str | int | float | bool) else str(x)
+    return {"entete_ligne": f.entete_ligne, "entetes": [v(x) for x in f.entetes],
+            "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree}
+
+
+def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
+    """Lignes et points du lot remplacés par le résultat des contrôles, compteurs et statut à jour."""
+    nb_b = sum(1 for a in anos if a.gravite == BLOQUANT)
+    lot.statut, lot.nb_lignes, lot.nb_bloquants, lot.nb_avert, lot.stats = (
+        _statut(anos), len(lignes), nb_b, len(anos) - nb_b, stats)
+    db.execute(delete(StagingLigne).where(StagingLigne.lot_id == lot.id))
+    db.execute(delete(ImportAnomalie).where(ImportAnomalie.lot_id == lot.id))
     if lignes:
         db.execute(insert(StagingLigne), [{
             "lot_id": lot.id, "num_ligne": L.num, "annee": L.annee, "mois": L.mois,
@@ -109,10 +142,88 @@ def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha:
         db.execute(insert(ImportAnomalie), [{
             "lot_id": lot.id, "num_ligne": a.ligne, "colonne": a.colonne, "code": a.code,
             "gravite": a.gravite, "valeur": a.valeur, "message": a.message} for a in anos])
-    audit.record(db, user_id, "import_analyse", "lot_import", lot.id, None,
-                 {"statut": lot.statut, "fichier": lot.fichier_nom, **(stats or {})})
+
+
+def _saisie(v: str | None, numerique: bool):
+    """Valeur saisie dans l'écran : un nombre est rangé comme un nombre d'Excel, pas comme du texte."""
+    s = texte(v)
+    if not s:
+        return None
+    r = nombre(s) if numerique else None
+    if r is None:
+        return s
+    return int(r[0]) if r[0] == r[0].to_integral_value() else float(r[0])
+
+
+def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
+                   valeurs: dict[str, str | None]) -> LotImport:
+    """Corrige des cellules d'une ligne du fichier puis relance tous les contrôles (doublons,
+    noms proches… dépendent des autres lignes). Rien n'est écrit hors du lot."""
+    lot = _get_lot(db, lot_id, verrou=True)
+    if lot.statut not in ("pret", "rejete"):
+        raise HTTPException(409, f"Lot au statut « {lot.statut} » : correction impossible")
+    if not lot.feuille:
+        raise HTTPException(409, "Fichier analysé avant les corrections sur place : "
+                                 "le corriger dans Excel puis l'importer de nouveau.")
+    f = lot.feuille
+    feuille = Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
+                      f["ligne_ignoree"])
+    k = next((k for k, (n, _) in enumerate(feuille.lignes) if n == num), None)
+    if k is None:
+        raise HTTPException(404, "Ligne introuvable")
+    refs = charger_refs(db)
+    cols = colonnes(feuille.entetes, refs)
+    texte_libre = set(ATTRIBUTS) - {"ANNÉE"}
+    row, avant = list(feuille.lignes[k][1]), {}
+    for col, v in valeurs.items():
+        j = cols.get(col)
+        if j is None:
+            raise HTTPException(422, f"Colonne « {col} » absente du fichier")
+        row += [None] * (j + 1 - len(row))
+        avant[col] = row[j]
+        row[j] = _saisie(v, col not in texte_libre)
+    feuille.lignes[k] = (num, tuple(row))
+    lignes, anos, stats = valider(feuille, refs)
+    if lot.statut == "rejete" and _statut(anos) == "pret" and db.scalar(select(LotImport.id).where(
+            LotImport.sha256 == lot.sha256, LotImport.id != lot.id,
+            LotImport.statut.in_(("pret", "valide")))) is not None:
+        raise HTTPException(409, "Ce fichier est déjà en vérification ou importé : reprendre ce lot-là.")
+    lot.feuille = _feuille_json(feuille)
+    _ecrire(db, lot, lignes, anos, stats)
+    audit.record(db, user_id, "import_correction", "lot_import", lot.id,
+                 {"ligne": num, **avant}, {"ligne": num, **valeurs})
     db.commit()
     return lot
+
+
+def _brut(x) -> str | None:
+    """Valeur du fichier telle qu'on la retape : 1000.0 s'écrit 1000."""
+    if isinstance(x, float) and x.is_integer():
+        x = int(x)
+    return None if x is None else str(x)
+
+
+def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
+    """Ligne lue (valeurs comprises par les contrôles), avec, si le lot garde le fichier, les valeurs
+    brutes à corriger et les listes de valeurs proposées (sans obligation : on peut taper autre chose)."""
+    row = db.scalar(select(StagingLigne).where(StagingLigne.lot_id == lot_id, StagingLigne.num_ligne == num))
+    lot = _get_lot(db, lot_id)
+    brut = choix = None
+    if lot.feuille:
+        cells = next((r for n, r in lot.feuille["lignes"] if n == num), None)
+        if cells is not None:
+            refs = charger_refs(db)
+            brut = {c: _brut(cells[j]) if j < len(cells) else None
+                    for c, j in colonnes(lot.feuille["entetes"], refs).items()}
+            choix = {c: sorted(set(d.values()), key=norm) for c, d in (
+                ("Type Contrat", refs.contrats), ("Activité", refs.activites),
+                ("Site", refs.sites), ("Service", refs.services))}
+    if row is None and brut is None:
+        raise HTTPException(404, "Ligne introuvable")
+    lu = ({"annee": row.annee, "mois": row.mois, "matricule": row.matricule, **row.donnees} if row else
+          {"annee": None, "mois": None, "matricule": None, "nom": None, "poste": None, "type_contrat": None,
+           "activite": None, "site": None, "service": None, "montants": {}})
+    return {"ligne": num, **lu, "brut": brut, "choix": choix}
 
 
 def employes_des_lignes(db: Session, lot_id: int, nums: set[int]) -> dict[int, dict]:
@@ -128,13 +239,6 @@ def employes_des_lignes(db: Session, lot_id: int, nums: set[int]) -> dict[int, d
         "matricule": None if est_sans_matricule(r.matricule) else r.matricule,
         "nom": (r.donnees or {}).get("nom") or connus.get((r.matricule or "").casefold()),
     } for r in rows}
-
-
-def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
-    row = db.scalar(select(StagingLigne).where(StagingLigne.lot_id == lot_id, StagingLigne.num_ligne == num))
-    if row is None:
-        raise HTTPException(404, "Ligne introuvable")
-    return {"ligne": num, "annee": row.annee, "mois": row.mois, "matricule": row.matricule, **row.donnees}
 
 
 def _get_lot(db: Session, lot_id: int, *, verrou: bool = False) -> LotImport:
