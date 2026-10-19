@@ -743,14 +743,23 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .ligne-fichier table.dense td.fige:not(.cellule-ko):not(.cellule-attention) { background: var(--surface); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th.fige, .ligne-fichier table.dense thead th.fige { position: sticky; z-index: 2; }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense .fige:nth-child(4), .ligne-fichier table.dense .fige:nth-child(4) { border-right: 2px solid var(--navy); }
-.page-ecran.rapport-excel .panneau .ligne-fichier table.dense, .ligne-fichier table.dense { width: auto; margin: 0; border-collapse: separate; border-spacing: 0; }
+.page-ecran.rapport-excel .panneau .ligne-fichier table.dense, .ligne-fichier table.dense { width: auto; min-width: 100%; margin: 0; border-collapse: separate; border-spacing: 0; }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense th, .page-ecran.rapport-excel .panneau .ligne-fichier table.dense td, .ligne-fichier table.dense th, .ligne-fichier table.dense td { border: 0; border-right: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { border-right-color: rgba(255, 255, 255, .18); }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
 .ligne-fichier table.dense td { white-space: nowrap; }
 table.points td.cellule-ko { background: var(--red-soft); color: var(--red-deep); font-weight: 600; }
 table.points td.cellule-attention { background: var(--warning-soft); color: var(--warning); }
-table.points td.cellule-cible { outline: 2px solid currentColor; outline-offset: -2px; }
+/* Cellule en cause : un cadre arrive de plus loin et se resserre sur elle, une fois le défilement fini. */
+table.points td.cellule-cible:not(.fige) { position: relative; }
+table.points td.cellule-cible::after {
+  content: ""; position: absolute; inset: 0; border: 2px solid var(--red-deep); pointer-events: none;
+  animation: cellule-cible-entoure .5s .7s cubic-bezier(.2, .7, .3, 1) both, cellule-cible-pulse .6s 1.2s ease-in-out 2;
+}
+table.points td.cellule-attention.cellule-cible::after { border-color: var(--warning); }
+@keyframes cellule-cible-entoure { from { opacity: 0; transform: scale(1.8); } }
+@keyframes cellule-cible-pulse { 50% { box-shadow: inset 0 0 0 3px currentColor; } }
+@media (prefers-reduced-motion: reduce) { table.points td.cellule-cible::after { animation: none; } }
 .volet-corps { flex: 1; min-height: 0; overflow: auto; }
 .page-ecran.saisie-apercu .volet-corps > table.dense { margin: 0; border: 0; border-collapse: separate; border-spacing: 0; }
 .saisie-apercu table.dense { width: 100%; }
