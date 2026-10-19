@@ -17,6 +17,22 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 
+
+class MontantExact(sa.types.TypeDecorator):
+    """Montant gardé tel qu'importé, toutes ses décimales (NUMERIC sans échelle fixe).
+
+    Relu avec au moins 3 décimales, zéros ajoutés, jamais arrondi : « 1000.500 », « 138700.4853 ».
+    """
+
+    impl = Numeric
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        v = Decimal(str(value)).normalize()
+        return v if v.as_tuple().exponent <= -3 else v.quantize(Decimal("0.001"))
+
 # SQLite n'autoincrémente que INTEGER PRIMARY KEY : variante pour les tests.
 BigId = BigInteger().with_variant(Integer(), "sqlite")
 
@@ -78,4 +94,4 @@ class Montant(Base):
         ForeignKey("situation_mensuelle.id", ondelete="CASCADE"), primary_key=True
     )
     rubrique_id: Mapped[int] = mapped_column(ForeignKey("rubrique.id"), primary_key=True)
-    valeur: Mapped[Decimal] = mapped_column(Numeric(18, 3))
+    valeur: Mapped[Decimal] = mapped_column(MontantExact())

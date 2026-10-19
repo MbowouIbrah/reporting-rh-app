@@ -24,7 +24,7 @@ export function fcfa(v: Val | number | undefined): string {
   return espacer(NF.format(Number(v)))
 }
 
-/** Valeur saisie telle quelle (jusqu'à 3 décimales), formatée sans flottant ; cellule vide si absente. */
+/** Valeur saisie telle quelle (toutes ses décimales), formatée sans flottant ; cellule vide si absente. */
 export function valeurBrute(v: string | undefined): string {
   if (v == null) return ''
   const [e, d] = sansZerosFinaux(v).split('.')

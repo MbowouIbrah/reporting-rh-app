@@ -7,7 +7,7 @@ import hashlib
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 from itertools import combinations
 
 from openpyxl.utils import get_column_letter
@@ -30,9 +30,8 @@ ATTRIBUTS = ["ANNÉE", "MOIS", "MATRICULE", "Noms", "Poste", "Type Contrat", "Ac
              "Service"]
 ANNEE_MIN, ANNEE_MAX = 2000, 2100
 ABSENCES_MAX = 31
-BORNE = Decimal(10) ** 15  # NUMERIC(18,3) : 15 chiffres entiers
+BORNE = Decimal(10) ** 15  # 15 chiffres avant la virgule ; décimales gardées telles quelles
 RE_NOMBRE = re.compile(r"^-?\d{1,3}(?: ?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
-TROIS = Decimal("0.001")
 # Référence à un autre classeur : ='[1]Feuil1'!A1, ='C:\dossier\[source.xlsx]Feuil1'!A1.
 RE_LIAISON = re.compile(r"\[[^\]]+\][^!\[]*!")
 # Formule ou erreur sans valeur utilisable : fichier refusé avant toute correction.
@@ -418,10 +417,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             if abs(val) >= BORNE:
                 add(num, nom, "MONTANT_HORS_BORNES", BLOQUANT, vu, "Nombre trop grand : 15 chiffres au plus avant la virgule.")
                 continue
-            q = val.quantize(TROIS, rounding=ROUND_HALF_UP)
-            if q != val:
-                add(num, nom, "PRECISION_TRONQUEE", AVERT, vu,
-                    f"{fr(val)} a {-val.as_tuple().exponent} décimales ; les montants gardent 3 décimales : {fr(q.normalize())}.")
+            # Montant gardé tel qu'il vient, sans arrondi ; au moins 3 décimales (zéros ajoutés).
+            q = val if val.as_tuple().exponent <= -3 else val.quantize(Decimal("0.001"))
             if unite == "jours":
                 if q < 0 or q > ABSENCES_MAX:
                     add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, vu, f"Nombre de jours attendu, de 0 à {ABSENCES_MAX}.")

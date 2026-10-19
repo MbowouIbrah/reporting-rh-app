@@ -43,7 +43,7 @@ const GROUPES: Groupe[] = [
     aide: 'valeurs reprises du dernier calcul d’Excel, rien à faire ici', retenir: codes('LIAISON_EXTERNE') },
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
     aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
-    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
+    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
   { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, tirets lus comme vides, postes nouveaux ou vides',
     retenir: () => true },
 ]

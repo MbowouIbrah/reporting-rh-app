@@ -3,6 +3,7 @@ import os
 import re
 import time
 import zipfile
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -96,14 +97,13 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (14, "Formation", "TEXTE_CONVERTI"),
         (15, "MATRICULE", "MATRICULE_ESPACE"),
         (16, "Formation", "MONTANT_HORS_BORNES"),
-        (18, "Formation", "PRECISION_TRONQUEE"),
         (18, "Formation", "TEXTE_CONVERTI"),
     }
     bloq = {x.num for x in L if x.bloquant}
     assert bloq == {2, 3, 4, 5, 10, 11, 15, 16}
     by = {x.num: x for x in L}
-    assert str(by[12].montants["Formation"]) == "1200.500"
-    assert str(by[18].montants["Formation"]) == "1.235"
+    assert by[12].montants["Formation"] == Decimal("1200.5")
+    assert by[18].montants["Formation"] == Decimal("1.23456")
 
 
 def test_tirets_et_mots_lus_comme_vides():
@@ -351,5 +351,6 @@ def test_lecture_des_nombres_mal_ecrits():
     assert [a.message for a in anos2 if a.code == "TEXTE_CONVERTI"] == [
         "« 25 000 FCFA » lu 25 000 : un montant est un nombre seul, « FCFA » n'est pas gardé."]
     assert L2[0].montants["Formation"] == Decimal("25000") and not L2[0].bloquant
-    assert msg[(4, "PRECISION_TRONQUEE")] == "138 700,4853 a 4 décimales ; les montants gardent 3 décimales : 138 700,485."
+    # Décimales gardées telles qu'elles viennent, sans point d'attention.
+    assert {x.num: x for x in L}[4].montants["Formation"] == Decimal("138700.4853") and (4, "Formation", "PRECISION_TRONQUEE") not in ens
     assert not any(c == "Noms" for _, c, _ in ens) and {x.num: x for x in L}[5].nom == "Jean Dupont"

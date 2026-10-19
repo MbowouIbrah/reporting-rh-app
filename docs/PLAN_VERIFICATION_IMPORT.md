@@ -46,7 +46,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - Points comme séparateurs de milliers (« 1.250.000 ») ; cas ambigu (« 45.000 ») : deux solutions, « 45 000 (point = milliers) » ou « 45 (point = décimale) », avec l'explication.
 - Devise ou unité collée (« 25 000 FCFA », « 25000 F », « XAF », « jours ») ou points de milliers (« 1.250.000 ») : lu d'office, point d'attention « l'unité n'est pas gardée ».
 - Espaces en trop au début, à la fin ou en double (texte et référentiels) ; virgule décimale ; casse ou accent différents d'une valeur de la liste.
-- Messages précis : « 138 700,4853 a 4 décimales ; les montants gardent 3 décimales : 138 700,485 » (information, refusable).
+- Décimales : gardées telles qu'elles viennent, quel que soit leur nombre (« 138 700,4853 » reste 138 700,4853), sans point d'attention.
 
 **G6. Valeurs obligatoires vides** : solutions proposées dans la liste.
 - « Reprendre la valeur du mois précédent (CDD, juillet 2026) » quand l'employé est connu.

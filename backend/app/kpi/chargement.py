@@ -124,6 +124,12 @@ def _dec(v) -> Decimal | None:
     return None if v is None else Decimal(str(v))
 
 
+def texte_montant(v: Decimal) -> str:
+    """Montant en texte, toutes ses décimales, au moins 3 (zéros ajoutés, jamais d'arrondi)."""
+    v = Decimal(v).normalize()
+    return f"{v if v.as_tuple().exponent <= -3 else v.quantize(Decimal('0.001')):f}"
+
+
 def rubriques_exclues(db: Session) -> frozenset[str]:
     """Rubriques exclues du TOTAL sur au moins une période (colonnes isolées dans DONNEES)."""
     q = (select(Rubrique.libelle).join(RubriqueRegle, RubriqueRegle.rubrique_id == Rubrique.id)
@@ -171,7 +177,6 @@ def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
         for sid, rub, val in db.execute(mq):
             montants[sid][rub] = Decimal(str(val))
     exclues: dict[tuple[int, int], frozenset[str]] = {}
-    mille = Decimal("0.001")
     out = []
     for sid, a, m, mat, nom, poste, ctr, act, site_, srv in rows:
         ex = exclues.get((a, m))
@@ -181,9 +186,9 @@ def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
         out.append({
             "annee": a, "mois": m, "matricule": mat, "nom": nom, "poste": poste,
             "type_contrat": ctr, "activite": act, "site": site_, "service": srv,
-            "montants": {k: str(v.quantize(mille)) for k, v in mt.items()},
-            "total": str(total_ligne(mt, ex).quantize(mille)),
-            "exclusions": str(exclusions_ligne(mt, ex).quantize(mille)),
+            "montants": {k: texte_montant(v) for k, v in mt.items()},
+            "total": texte_montant(total_ligne(mt, ex)),
+            "exclusions": texte_montant(exclusions_ligne(mt, ex)),
         })
     return out
 

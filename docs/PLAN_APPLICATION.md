@@ -3,7 +3,7 @@
 ## Décisions
 - Stack : FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL 16 dédié (aucun port publié) / React 19 + TS + Vite + react-query + recharts. Calquée sur Academy (qui est FastAPI, pas Django).
 - Design : tokens et composants de cfaoacademy (DESIGN_SYSTEM.md §1-3, 5, 7, 9-12) réécrits en TSX + extension « tableaux denses » (zébrure, chiffres à droite, fr-FR, négatifs en rouge, total sur --red-soft).
-- Données en format long : situation_mensuelle x rubrique -> montant NUMERIC(18,3). Nouvelle rubrique ou exclusion = une ligne de référentiel (rubrique_regle datée).
+- Données en format long : situation_mensuelle x rubrique -> montant NUMERIC (décimales gardées telles qu'importées). Nouvelle rubrique ou exclusion = une ligne de référentiel (rubrique_regle datée).
 - KPI : module Python de fonctions pures sur agrégats SQL, calcul à la volée.
 - Import xlsx : staging -> validation par ligne -> rapport d'anomalies -> validation explicite -> lot annulable, idempotent (sha256 + période/matricule).
 - Pas de clôture de période (retirée en 07e) : un mois reste modifiable ; chaque écriture est tracée au journal d'audit (avant/après).

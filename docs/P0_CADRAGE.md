@@ -4,7 +4,7 @@ Statut : validé par le commanditaire (« je valide tout »). Les points marqué
 
 ## 1. Dictionnaire des KPI
 
-Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC(18,3)`, arrondi à l'affichage seulement.
+Unité : FCFA sauf mention. Calcul côté serveur sur montants `NUMERIC` gardés tels qu'importés (toutes leurs décimales), arrondi à l'affichage seulement.
 
 | KPI | Définition | Règle « vide / zéro » |
 |---|---|---|
