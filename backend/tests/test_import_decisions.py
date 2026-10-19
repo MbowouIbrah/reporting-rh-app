@@ -2,8 +2,9 @@ import pytest
 from sqlalchemy import select
 
 from app.models.donnees import SituationMensuelle
+from app.models.imports import LotImport
 from app.models.referentiel import Site
-from tests.test_import_api import ADMIN, API, DRH, up
+from tests.test_import_api import ADMIN, API, DRH, XLSX, up, xlsx
 from tests.test_import_regles import ligne
 
 
@@ -112,3 +113,53 @@ def test_decisions_simulees_puis_appliquees_en_une_fois(make_client, db):
     tous = c.get(f"{API}/imports/{lot['id']}/anomalies").json()
     assert not any(a["ligne"] == 3 and a["colonne"] == "Poste" for a in tous)
     assert c.get(f"{API}/imports/{lot['id']}/lignes/2").json()["brut"]["Poste"] == "Chef"
+
+
+def test_ligne_de_total_un_seul_point_et_supprimable(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(), ligne(MATRICULE=None, Noms="TOTAL", Poste=None)]).json()
+    assert lot["statut"] == "rejete"
+    anos = anomalies(c, lot["id"])
+    assert [(a["code"], a["ligne"], a["proposition"]) for a in anos] == [("LIGNE_TOTAL", 3, {"lignes": [3]})]
+    r = c.delete(f"{API}/imports/{lot['id']}/lignes/3")
+    assert r.status_code == 200 and r.json()["statut"] == "pret" and r.json()["nb_lignes"] == 1
+
+
+@pytest.mark.parametrize("col, vide, attendu", [("MOIS", {"MOIS": None}, "Janvier"), ("ANNÉE", {"ANNÉE": None}, "2026")])
+def test_periode_vide_propose_celle_des_autres_lignes(make_client, col, vide, attendu):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(), ligne(MATRICULE="EMP002", **vide)]).json()
+    ano = next(a for a in anomalies(c, lot["id"]) if a["colonne"] == col)
+    assert ano["proposition"] == {"corrections": [
+        {"valeur": attendu, "libelle": f"{attendu}, comme les autres lignes du fichier"}]}
+    r = c.put(f"{API}/imports/{lot['id']}/lignes/3", json={"valeurs": {col: attendu}})
+    assert r.json()["statut"] == "pret", r.text
+
+
+def test_meme_fichier_sans_modification_repart_de_zero(make_client, db):
+    c = make_client(ADMIN)
+    ancien = up(c, [ligne(Site="Kribi")]).json()
+    r = up(c, [ligne(Site="Kribi")])
+    assert r.status_code == 201 and r.json()["id"] != ancien["id"], r.text
+    assert db.get(LotImport, ancien["id"]).statut == "annule"
+
+
+@pytest.mark.parametrize("choix", ["reprendre", "recommencer"])
+def test_meme_fichier_avec_modifications_reprise_ou_tout_annuler(make_client, db, choix):
+    c = make_client(ADMIN)
+    rows = [ligne(Site="Kribi"), ligne(MATRICULE="EMP002", Noms="C D", Site="Kribi")]
+    lot = up(c, rows).json()
+    u = f"{API}/imports/{lot['id']}/lignes/2"
+    assert c.put(u, json={"valeurs": {"Site": "Douala"}}).status_code == 200
+    r = up(c, rows)
+    assert r.status_code == 409 and r.json()["detail"] | {"message": None} == {
+        "message": None, "lot_id": lot["id"], "reprise": True, "modifications": 1}
+    r = c.post(f"{API}/imports?reprise={choix}", files={"fichier": ("f.xlsx", xlsx(rows), XLSX)})
+    assert r.status_code == 201, r.text
+    lignes_ko = {a["ligne"] for a in anomalies(c, r.json()["id"])}
+    db.expire_all()
+    if choix == "reprendre":
+        assert r.json()["id"] == lot["id"] and lignes_ko == {3}  # la correction de la ligne 2 est gardée
+    else:
+        assert r.json()["id"] != lot["id"] and lignes_ko == {2, 3}
+        assert db.get(LotImport, lot["id"]).statut == "annule"

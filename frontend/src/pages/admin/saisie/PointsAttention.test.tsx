@@ -185,11 +185,34 @@ test('valeur manquante : « Remplacer » envoie la valeur du mois précédent', 
   pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'bloquant', 'Obligatoire.', 'Type Contrat'), ligne: 40, valeur: null,
     proposition: { valeur: 'CDD', periode: 'juillet 2026' } })
   const liste = await screen.findByRole('combobox', { name: 'Type Contrat vide : que faire ?' })
+  expect(within(liste).getByRole('option', { name: 'Reprendre la valeur du mois précédent (CDD, juillet 2026)' })).toBeInTheDocument()
   fireEvent.change(liste, { target: { value: '0' } })
   // La valeur reprise s'affiche dans la cellule avant l'enregistrement.
   expect(within(screen.getByRole('table', { name: 'Ligne 40 du fichier' })).getByText('CDD')).toHaveClass('cellule-modifiee')
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { 'Type Contrat': 'CDD' } } })))
+})
+
+test('mois vide : le mois des autres lignes du fichier est proposé', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'bloquant', 'Le mois est vide.', 'MOIS'), ligne: 40, valeur: null,
+    proposition: { corrections: [{ valeur: 'Août', libelle: 'Août, comme les autres lignes du fichier' }] } })
+  const liste = await screen.findByRole('combobox', { name: 'MOIS vide : que faire ?' })
+  fireEvent.change(liste, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { MOIS: 'Août' } } })))
+})
+
+test('ligne de total : « Supprimer la ligne » la retire du lot', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('LIGNE_TOTAL', 'bloquant', 'Ligne de total.', 'Noms'), ligne: 40, valeur: 'TOTAL',
+    proposition: { lignes: [40] } })
+  const liste = await screen.findByRole('combobox', { name: 'Ligne de total : que faire ?' })
+  fireEvent.change(liste, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ retirees: [40] })))
 })
 
 test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis envoyé avec le type', async () => {

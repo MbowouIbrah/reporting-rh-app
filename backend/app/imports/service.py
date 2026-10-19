@@ -24,6 +24,7 @@ from app.imports.regles import (
     texte,
     valider,
 )
+from app.models.auth import AuditEvent
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
@@ -85,14 +86,41 @@ def lot_dict(lot: LotImport) -> dict:
     }
 
 
-def analyser(db: Session, user_id: int, nom: str, contenu: bytes) -> LotImport:
+ACTIONS_MODIF = ("import_correction", "import_ajout_referentiel", "import_ligne_retiree", "import_ignore")
+
+
+def _nb_modifications(db: Session, lot: LotImport) -> int:
+    return db.scalar(select(func.count()).select_from(AuditEvent).where(
+        AuditEvent.entite == "lot_import", AuditEvent.entite_id == str(lot.id),
+        AuditEvent.action.in_(ACTIONS_MODIF))) or 0
+
+
+def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str | None = None) -> LotImport:
+    """Fichier déjà en vérification : avec des modifications enregistrées, `reprise` choisit de les
+    reprendre (« reprendre ») ou de tout annuler (« recommencer ») ; sans modification, l'ancien lot
+    est abandonné et le fichier analysé comme neuf."""
     sha = hashlib.sha256(contenu).hexdigest()
-    existant = db.scalar(select(LotImport).where(
-        LotImport.sha256 == sha, LotImport.statut.in_(("pret", "valide"))))
-    if existant is not None:
-        if existant.statut == "valide":
-            raise HTTPException(409, {"message": "Fichier déjà importé", "lot_id": existant.id})
-        return existant
+    lots = list(db.scalars(select(LotImport).where(LotImport.sha256 == sha).order_by(LotImport.id.desc())))
+    valide = next((x for x in lots if x.statut == "valide"), None)
+    if valide is not None:
+        raise HTTPException(409, {"message": "Fichier déjà importé", "lot_id": valide.id})
+    en_cours = [x for x in lots if x.statut in ("pret", "rejete")]
+    repris = next((x for x in en_cours if x.feuille and _nb_modifications(db, x)), None)
+    if repris is not None and reprise not in ("reprendre", "recommencer"):
+        raise HTTPException(409, {"message": "Vérification en cours pour ce fichier", "lot_id": repris.id,
+                                  "reprise": True, "modifications": _nb_modifications(db, repris)})
+    if reprise != "reprendre":
+        repris = None
+    for x in en_cours:
+        if x is not repris:
+            x.statut, x.annule_par, x.annule_le = "annule", user_id, _now()
+            audit.record(db, user_id, "import_abandonne", "lot_import", x.id, None, {"statut": "annule"})
+    if repris is not None:
+        # Contrôles relancés avec les règles du jour ; les modifications enregistrées sont gardées.
+        _relancer(db, repris, _feuille_du_lot(repris), _refs_du_lot(db, repris))
+        db.commit()
+        return repris
+    db.flush()
     refs = charger_refs(db)
     try:
         feuille = lire(contenu, entetes_reconnus(refs))
@@ -384,20 +412,44 @@ COLONNES_REF = {"Type Contrat": ("type_contrat", TypeContrat, "type_contrat_id")
                 "Site": ("site", Site, "site_id"), "Service": ("service", Service, "service_id")}
 
 
+PRECEDENT = {c: (m, f) for c, (_d, m, f) in COLONNES_REF.items()} | {"Poste": (Poste, "poste_id")}
+
+
+def _periode_du_fichier(db: Session, lot_id: int, col: str) -> list[dict]:
+    """ANNÉE ou MOIS vide : valeurs des autres lignes du lot, la plus fréquente d'abord."""
+    champ = StagingLigne.annee if col == "ANNÉE" else StagingLigne.mois
+    vus = db.execute(select(champ, func.count()).where(StagingLigne.lot_id == lot_id, champ.is_not(None))
+                     .group_by(champ).order_by(func.count().desc(), champ)).all()
+    texte = (lambda v: str(v)) if col == "ANNÉE" else (lambda v: MOIS[v - 1])
+    if len(vus) == 1:
+        return [{"valeur": texte(vus[0][0]), "libelle": f"{texte(vus[0][0])}, comme les autres lignes du fichier"}]
+    return [{"valeur": texte(v), "libelle": f"{texte(v)} ({n} ligne{'s' if n > 1 else ''} du fichier)"}
+            for v, n in vus]
+
+
 def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     """Aide à la décision pour chaque point : lignes du doublon, valeur du mois précédent,
-    liste où ajouter une valeur inconnue, lectures d'un nombre ambigu. Clé : id du point."""
+    liste où ajouter une valeur inconnue, lectures d'un nombre ambigu, période des autres lignes,
+    ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code == "DOUBLON" or (a.code in ref and a.colonne in COLONNES_REF))}
+        a.code == "DOUBLON" or (a.code in ref and a.colonne in PRECEDENT))}
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
+    periodes: dict[str, list[dict]] = {}
     out: dict[int, dict] = {}
     for a in anos:
         prop: dict = {}
         if a.code == "SEPARATEUR_AMBIGU":
             # « 45.000 » : les deux lectures possibles, proposées comme correction.
             prop["corrections"] = [{"valeur": str(d), "libelle": lib} for d, lib in interpretations(a.valeur)]
+        if a.colonne in ("ANNÉE", "MOIS") and a.code in ("ANNEE_INVALIDE", "VALEUR_MANQUANTE") and not a.valeur:
+            if a.colonne not in periodes:
+                periodes[a.colonne] = _periode_du_fichier(db, lot_id, a.colonne)
+            if periodes[a.colonne]:
+                prop["corrections"] = periodes[a.colonne]
+        if a.code == "LIGNE_TOTAL":
+            prop["lignes"] = [a.num_ligne]
         if a.code == "REFERENTIEL_INCONNU" and a.colonne in COLONNES_REF:
             prop["dimension"] = COLONNES_REF[a.colonne][0]
         r = rows.get(a.num_ligne)
@@ -407,9 +459,9 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
                     StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
                     StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
                 prop["lignes"] = sorted(db.scalars(q))
-            elif a.code in ref and a.colonne in COLONNES_REF:
+            elif a.code in ref and a.colonne in PRECEDENT:
                 # Valeur du dernier mois enregistré avant celui de la ligne : candidate au remplacement.
-                _, model, attr = COLONNES_REF[a.colonne]
+                model, attr = PRECEDENT[a.colonne]
                 q = (select(model.libelle, Periode.annee, Periode.mois)
                      .select_from(SituationMensuelle)
                      .join(Periode, Periode.id == SituationMensuelle.periode_id)

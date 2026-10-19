@@ -48,10 +48,11 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - Espaces en trop au début, à la fin ou en double (texte et référentiels) ; virgule décimale ; casse ou accent différents d'une valeur de la liste.
 - Décimales : gardées telles qu'elles viennent, quel que soit leur nombre (« 138 700,4853 » reste 138 700,4853), sans point d'attention.
 
-**G6. Valeurs obligatoires vides** : solutions proposées dans la liste.
+**G6. Valeurs obligatoires vides** — validé (`service.propositions()` : `PRECEDENT` avec le poste, `_periode_du_fichier()` ; code `LIGNE_TOTAL` dans `regles.py`) : solutions proposées dans la liste.
 - « Reprendre la valeur du mois précédent (CDD, juillet 2026) » quand l'employé est connu.
 - ANNÉE ou MOIS vide : proposer la valeur des autres lignes du fichier (toutes en août 2026 → « Août »), sinon la liste des valeurs présentes sur les lignes justes.
 - Ligne de total ou ligne parasite (« TOTAL », formules =SUM) : « Supprimer la ligne ».
+- Reprise d'un fichier déjà en vérification (même fichier réimporté) : avec des modifications enregistrées, « Reprendre la vérification » (modifications gardées, contrôles relancés) ou « Tout annuler et recommencer » ; sans modification, l'ancienne vérification est abandonnée et le fichier analysé comme neuf (`service.analyser()`, paramètre `reprise`).
 
 **G7. Changements d'affectation** : phrase complète par employé nommé ; « Changement à partir de ce mois » ou « Erreur : garder <valeur enregistrée> ».
 

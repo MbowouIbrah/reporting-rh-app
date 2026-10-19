@@ -154,10 +154,11 @@ export const verifier = (annee: number, mois: number, lignes: LigneSaisie[], sig
 export const creerLotSaisie = (brouillon_id: string, annee: number, mois: number, lignes: LigneSaisie[]) =>
   api<Lot>('/donnees/lots', json({ brouillon_id, annee, mois, lignes }))
 
-export function envoyerFichier(f: File) {
+/** `reprise` : réponse au refus 409 d'un fichier déjà en vérification avec des modifications enregistrées. */
+export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer') {
   const fd = new FormData()
   fd.append('fichier', f)
-  return api<Lot>('/imports', { method: 'POST', body: fd })
+  return api<Lot>(reprise ? `/imports${qs({ reprise })}` : '/imports', { method: 'POST', body: fd })
 }
 
 export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)

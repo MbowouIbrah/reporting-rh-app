@@ -233,7 +233,18 @@ function Tableau({ lignes, tous, lotId, afficherLigne, ton, edition }: TableauPr
     const tr = deplie && table.current?.querySelector<HTMLElement>('tr[data-ouvert]')
     if (!tr) return
     tr.style.scrollMarginTop = `${table.current!.tHead?.offsetHeight ?? 0}px`
-    tr.scrollIntoView?.({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    tr.scrollIntoView?.({ block: 'start', behavior: doux ? 'smooth' : 'auto' })
+    // Le détail se charge après coup et agrandit le volet : la ligne est replacée quand il arrive.
+    if (typeof ResizeObserver === 'undefined') return
+    let premier = true
+    const suivi = new ResizeObserver(() => {
+      if (premier) { premier = false; return }
+      tr.scrollIntoView?.({ block: 'start', behavior: doux ? 'smooth' : 'auto' })
+    })
+    suivi.observe(table.current!)
+    const fin = window.setTimeout(() => suivi.disconnect(), 2000)
+    return () => { suivi.disconnect(); window.clearTimeout(fin) }
   }, [deplie])
   return (
     <table ref={table} className={ton ? `dense points bord-${ton}` : 'dense points'}>
@@ -335,8 +346,11 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
   const col = point.colonne ?? ''
   const prop = point.proposition
   const precedent: Decision[] = prop?.valeur
-    ? [{ libelle: `Remplacer par la valeur de ${prop.periode} : « ${prop.valeur} »`, valeurs: { [col]: prop.valeur } }]
+    ? [{ libelle: `Reprendre la valeur du mois précédent (${prop.valeur}, ${prop.periode})`, valeurs: { [col]: prop.valeur } }]
     : []
+  if (point.code === 'LIGNE_TOTAL') {
+    return { question: 'Ligne de total : que faire ?', choix: [{ libelle: 'Supprimer la ligne', retirer: [point.ligne!] }] }
+  }
   const liste = LISTES[col]
   if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {
     return {
@@ -347,7 +361,8 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
   }
   if (prop?.corrections?.length) {
     return {
-      question: point.code === 'SEPARATEUR_AMBIGU' ? `« ${point.valeur} » : quelle lecture ?` : `« ${point.valeur} » : que faire ?`,
+      question: point.code === 'SEPARATEUR_AMBIGU' ? `« ${point.valeur} » : quelle lecture ?`
+        : point.valeur ? `« ${point.valeur} » : que faire ?` : `${col} vide : que faire ?`,
       choix: prop.corrections.map((c) => ({ libelle: c.libelle, valeurs: { [col]: c.valeur } })),
     }
   }

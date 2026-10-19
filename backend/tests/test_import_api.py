@@ -76,10 +76,11 @@ def test_cycle_import_valide_et_idempotent(make_client, db):
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 409
 
 
-def test_fichier_pret_renvoye_tel_quel(make_client):
+def test_fichier_pret_sans_modification_analyse_de_nouveau(make_client):
     c = make_client(ADMIN)
     a, b = up(c, fichier_a()).json(), up(c, fichier_a()).json()
-    assert a["id"] == b["id"]
+    assert a["id"] != b["id"] and b["statut"] == "pret"
+    assert c.get(f"{API}/imports/{a['id']}").json()["statut"] == "annule"
 
 
 def test_lot_rejete_non_validable_et_anomalies_localisees(make_client, db):

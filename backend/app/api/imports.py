@@ -20,11 +20,12 @@ router = APIRouter(prefix="/imports", tags=["imports"])
 
 @router.post("", status_code=201)
 async def creer_lot(
-    fichier: UploadFile, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+    fichier: UploadFile, reprise: str | None = Query(None, pattern="^(reprendre|recommencer)$"),
+    p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     authorize(p, "import:write")
     contenu = await fichier.read(MAX_OCTETS + 1)
-    lot = service.analyser(db, p.user_id, fichier.filename or "import.xlsx", contenu)
+    lot = service.analyser(db, p.user_id, fichier.filename or "import.xlsx", contenu, reprise)
     return service.lot_dict(lot)
 
 

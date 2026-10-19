@@ -38,6 +38,9 @@ RE_LIAISON = re.compile(r"\[[^\]]+\][^!\[]*!")
 CODES_FORMULE = ("FORMULE_SANS_VALEUR", "ERREUR_EXCEL", "LIAISON_ERREUR")
 # Textes qui signifient « pas de montant » (tiret, barre, néant…) : lus comme une cellule vide.
 SANS_MONTANT = {"-", "--", "–", "—", "/", ".", "x", "n/a", "na", "neant", "nil", "rien", "aucun", "sans"}
+# Ligne de total : « TOTAL », « Sous-total »… dans une colonne d'attribut, ou somme Excel sans matricule.
+RE_TOTAL = re.compile(r"(sous[\s-]?)?tota(l|ux)\b")
+RE_SOMME = re.compile(r"\b(SUM|SOMME|SUBTOTAL|SOUS\.TOTAL)\s*\(", re.I)
 
 
 @dataclass
@@ -134,6 +137,23 @@ def _qui(matricule: str) -> str:
 
 def texte(v):
     return None if v is None else str(v).replace(" ", " ").strip()
+
+
+def ligne_de_total(row, cols, formules) -> tuple[str, str] | None:
+    """(colonne, valeur) qui montre qu'une ligne est un total et non un employé, sinon None."""
+    def g(nom):
+        return row[cols[nom]] if cols[nom] < len(row) else None
+    mat = texte(g("MATRICULE"))
+    for nom in ATTRIBUTS:
+        t = texte(g(nom))
+        if t and RE_TOTAL.match(norm(t)) and (not mat or nom == "MATRICULE"):
+            return nom, t
+    if not mat:
+        par_j = {j: nom for nom, j in cols.items()}
+        for j, f in sorted(formules.items()):
+            if j in par_j and RE_SOMME.search(f):
+                return par_j[j], f
+    return None
 
 
 def nombre(v) -> tuple[Decimal, bool] | None:
@@ -306,6 +326,15 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         def g(nom, row=row):
             j = cols[nom]
             return row[j] if j < len(row) else None
+
+        total = ligne_de_total(row, cols, feuille.formules.get(num, {}))
+        if total:
+            # Un seul point pour la ligne : ses cellules vides ne sont pas des oublis.
+            add(num, total[0], "LIGNE_TOTAL", BLOQUANT, total[1],
+                "Ligne de total : elle ne concerne aucun employé et ne peut pas être importée.")
+            L.bloquant = True
+            lignes.append(L)
+            continue
 
         a = g("ANNÉE")
         r = nombre(a) if a is not None else None

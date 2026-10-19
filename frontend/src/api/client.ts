@@ -2,6 +2,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Objet `detail` renvoyé par l'API, quand il en porte un. */
+    public info?: Record<string, unknown>,
   ) {
     super(message)
   }
@@ -28,19 +30,19 @@ function refresh(): Promise<boolean> {
   return refreshing
 }
 
-async function detail(r: Response): Promise<string> {
+async function detail(r: Response): Promise<[string, Record<string, unknown>?]> {
   try {
     const j = await r.json()
     const d = j.detail
-    if (typeof d === 'string') return d
+    if (typeof d === 'string') return [d]
     if (d && typeof d.message === 'string') {
       const anos: { ligne?: number; colonne?: string; message: string }[] = d.anomalies ?? []
       const lignes = anos.slice(0, 5).map((a) => [a.ligne && `ligne ${a.ligne}`, a.colonne, a.message].filter(Boolean).join(' · '))
-      return [d.message, ...lignes, anos.length > 5 ? `… +${anos.length - 5} autres` : ''].filter(Boolean).join('\n')
+      return [[d.message, ...lignes, anos.length > 5 ? `… +${anos.length - 5} autres` : ''].filter(Boolean).join('\n'), d]
     }
-    return r.statusText
+    return [r.statusText]
   } catch {
-    return r.statusText
+    return [r.statusText]
   }
 }
 
@@ -52,7 +54,7 @@ async function requete(path: string, init: RequestInit, retry: boolean): Promise
     // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
     if (!path.startsWith('/auth/')) onUnauthorized()
   }
-  if (!r.ok) throw new ApiError(r.status, await detail(r))
+  if (!r.ok) throw new ApiError(r.status, ...(await detail(r)))
   return r
 }
 
