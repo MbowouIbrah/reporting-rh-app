@@ -1210,5 +1210,12 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 .formules-refusees { padding: var(--sp-3); background: #fff; border: 1px solid var(--rule-strong); margin-bottom: auto; }
 .formules-refusees td.formule { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
 .formules-refusees h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-md); }
-.formules-refusees ol { margin: 0; padding-left: 20px; max-width: 80ch; }
-.formules-refusees li + li { margin-top: var(--sp-2); }
+.marche-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--sp-3); }
+.marche-options section { border: 1px solid var(--rule-strong); padding: var(--sp-3); }
+.marche-options h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); color: var(--navy); }
+.marche { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.marche li { display: flex; gap: var(--sp-2); align-items: flex-start; }
+.marche .saisie-etape-num { flex: none; background: var(--red); border-color: var(--red); color: #fff; }
+.marche kbd { font-family: inherit; font-size: var(--fs-xs); border: 1px solid var(--rule-strong); padding: 0 4px; background: var(--paper-2); }
+.bandeau.alerte { background: var(--warning-soft); color: var(--warning); font-weight: 600; }
+.saisie-apercu > .formules-refusees { margin-bottom: var(--sp-3); }

@@ -14,6 +14,9 @@ test('formules refusées : tableau des cellules et marche à suivre', () => {
     "4Bonus='[paie.xlsx]Feuil1'!B2La liaison donne #REF!.",
     '5Formation=A1*2Formule sans valeur.',
   ])
-  expect(screen.getByText(/Mettre à jour les liaisons/)).toBeInTheDocument()
-  expect(screen.getByText(/Collage spécial › Valeurs/)).toBeInTheDocument()
+  const cas = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+  expect(cas).toEqual(['Le fichier source est disponible', 'Le fichier source n’est plus disponible'])
+  const etapes = within(screen.getByRole('region', { name: 'Le fichier source est disponible' })).getAllByRole('listitem')
+  expect(etapes[1]).toHaveTextContent('2Cliquez sur « Mettre à jour les liaisons »')
+  expect(screen.getByText('Collage spécial › Valeurs')).toBeInTheDocument()
 })

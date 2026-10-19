@@ -153,8 +153,10 @@ def test_liaison_externe():
     rows = [ligne(MATRICULE="E1", Formation="='[1]Paie'!C2"), ligne(MATRICULE="E2", Bonus="=[1]Paie!D3")]
     ok = calcule(xlsx(rows), {"'[1]Paie'!C2": "1500", "[1]Paie!D3": "20"})
     L, anos = valider(lire(ok), refs(postes={"p"}))[:2]
-    assert [(a.code, a.gravite) for a in anos] == [("LIAISON_EXTERNE", "avertissement")]
-    assert "2 cellules liées" in anos[0].message and str(L[0].montants["Formation"]) == "1500.000"
+    assert [(a.ligne, a.colonne, a.code, a.gravite, a.valeur) for a in anos] == [
+        (2, "Formation", "LIAISON_EXTERNE", "avertissement", "='[1]Paie'!C2"),
+        (3, "Bonus", "LIAISON_EXTERNE", "avertissement", "=[1]Paie!D3")]
+    assert "Valeur lue : 1500" in anos[0].message and str(L[0].montants["Formation"]) == "1500.000"
     ko = calcule(xlsx(rows), {"'[1]Paie'!C2": "#REF!", "[1]Paie!D3": "20"})
     L, anos = valider(lire(ko), refs(postes={"p"}))[:2]
     assert L == [] and [(a.ligne, a.colonne, a.code, a.valeur) for a in anos] == [

@@ -224,7 +224,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         return [], anos, {"lignes": 0}
 
     # ---- formules : seule la valeur enregistrée par Excel est lue, jamais la formule
-    liaisons = 0
+    liaisons: list[tuple] = []
     for num, row in feuille.lignes:
         if ligne_vide(row, utiles):
             continue
@@ -241,15 +241,14 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             elif erreur_excel(v):
                 add(num, nom, "ERREUR_EXCEL", BLOQUANT, f or v, f"La formule donne l'erreur {v.strip()}." if f
                     else f"La cellule contient l'erreur Excel {v.strip()}, sans formule.")
-            else:
-                liaisons += lien
+            elif lien:
+                liaisons.append((num, nom, f, v))
     if any(a.code in CODES_FORMULE for a in anos):
         return [], anos, {"lignes": 0}
-    if liaisons:
-        add(None, None, "LIAISON_EXTERNE", AVERT, None,
-            f"{liaisons} cellule{'s' if liaisons > 1 else ''} liée{'s' if liaisons > 1 else ''} à un autre fichier : "
-            "valeurs lues telles qu'Excel les a calculées à la dernière ouverture. "
-            "Vérifiez que le fichier source était à jour.")
+    for num, nom, f, v in liaisons:
+        lu = "vide" if v is None or str(v).strip() == "" else (f"{v:g}" if isinstance(v, float) else str(v))
+        add(num, nom, "LIAISON_EXTERNE", AVERT, f, f"Valeur lue : {lu}, telle qu'Excel l'a calculée à la "
+            "dernière ouverture. Vérifiez qu'elle est à jour.")
 
     lignes: list[Ligne] = []
     cles: dict[tuple, list[int]] = defaultdict(list)

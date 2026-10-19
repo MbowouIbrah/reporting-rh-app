@@ -7,6 +7,7 @@ import { Badge, Bouton } from '../../../components/Kit'
 import { matriculeAffiche, MOIS, valeurBrute } from '../../../lib/format'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
+import { CellulesFormules } from './FormulesRefusees'
 import PointsAttention, { VOLET_ERREURS } from './PointsAttention'
 import Volet from './Volet'
 
@@ -33,6 +34,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
     enabled: lot.nb_avert + lot.nb_bloquants > 0,
     retry: queryRetry,
   })
+  const liaisons = (anomalies.data ?? []).filter((a) => a.code === 'LIAISON_EXTERNE')
   const [gardees, setGardees] = useState<Set<string>>(new Set())
   const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string }>({ cours: false })
   // Volet ouvert : le plus prioritaire tant que l'utilisateur n'en a pas choisi un autre.
@@ -117,6 +119,12 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
           {d.effaces} montant{s(d.effaces)} existant{s(d.effaces)} {d.effaces > 1 ? 'seront' : 'sera'} effacé{s(d.effaces)} (cellule vide dans la saisie) si vous remplacez la ligne.
         </p>
       )}
+      {liaisons.length > 0 && <>
+        <p className="bandeau alerte" role="status">
+          {liaisons.length} cellule{s(liaisons.length)} liée{s(liaisons.length)} à un autre fichier : valeur{s(liaisons.length)} reprise{s(liaisons.length)} du dernier calcul d’Excel. Vérifiez-les avant d’enregistrer ; si une valeur n’est pas à jour, corrigez le fichier puis importez-le de nouveau.
+        </p>
+        <CellulesFormules anomalies={liaisons} libelle="Cellules liées à un autre fichier" consigne="Si une valeur n’est pas à jour" />
+      </>}
       <div className="panneau">
         <div className="panneau-corps volets" role="region" aria-label="Détail de l'aperçu">
           {d.nb_absents > 0 && (
@@ -216,7 +224,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
               </table>
             </Volet>
           )}
-          {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot.id} onLot={setLot} onAttente={setEnAttente} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} pied={pied} />}
+          {anomalies.data && <PointsAttention anomalies={anomalies.data.filter((a) => a.code !== 'LIAISON_EXTERNE')} lotId={lot.id} onLot={setLot} onAttente={setEnAttente} afficherLigne={parcours === 'fichier'} ouvert={ouvert} onOuvrir={setChoixVolet} pied={pied} />}
         </div>
       </div>
       <div className="saisie-pied">
