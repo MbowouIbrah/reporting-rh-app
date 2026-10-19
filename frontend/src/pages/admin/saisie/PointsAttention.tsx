@@ -364,11 +364,13 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
     ...p, ignores: p.ignores.filter((x) => x !== c),
     choix: { ...p.choix, [k]: { index: i, decision: proposees!.choix[i], ligne: num } },
   }))
-  const basculer = () => setPlan((p) => {
+  const ignorer = () => setPlan((p) => {
     const choix = { ...p.choix }
     delete choix[k]
-    return { ...p, choix, ignores: ignore ? p.ignores.filter((x) => x !== c) : [...p.ignores, c] }
+    return { ...p, choix, ignores: [...p.ignores.filter((x) => x !== c), c] }
   })
+  const question = proposees?.question
+    ?? `${point.colonne}${point.valeur ? ` « ${point.valeur} »` : ' vide'} : que faire ?`
   // Revenir à la valeur du fichier efface la modification ; saisir une valeur annule « ignorer » sur la cellule.
   const modifier = (col: string, v: string | null) => setPlan((p) => {
     const ligne = { ...p.modifs[num] }
@@ -389,15 +391,15 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
               ? <p className="actions-point regle">Point réglé.</p>
               : (proposees || ignorable(point)) && (
                 <div className="actions-point">
-                  {proposees && (
-                    <label className="decision">
-                      <span>{proposees.question}</span>
-                      <select value={choisi?.index ?? ''} disabled={occupe} onChange={(e) => choisir(Number(e.target.value))}>
-                        <option value="" disabled>Choisir une solution…</option>
-                        {proposees.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
-                      </select>
-                    </label>
-                  )}
+                  <label className="decision">
+                    <span>{question}</span>
+                    <select value={ignore ? 'ignorer' : (choisi?.index ?? '')} disabled={occupe}
+                      onChange={(e) => (e.target.value === 'ignorer' ? ignorer() : choisir(Number(e.target.value)))}>
+                      <option value="" disabled>Choisir une solution…</option>
+                      {proposees?.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
+                      {ignorable(point) && <option value="ignorer">Ignorer la valeur (laisser vide)</option>}
+                    </select>
+                  </label>
                   {nouveauSite && (
                     <label className="decision">
                       <span>Type du nouveau site</span>
@@ -407,11 +409,6 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
                         {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
                       </select>
                     </label>
-                  )}
-                  {ignorable(point) && (
-                    <Bouton variante="secondaire" aria-pressed={ignore} disabled={occupe} onClick={basculer}>
-                      {ignore ? 'Ne plus ignorer' : 'Ignorer la valeur (laisser vide)'}
-                    </Bouton>
                   )}
                 </div>
               ))}

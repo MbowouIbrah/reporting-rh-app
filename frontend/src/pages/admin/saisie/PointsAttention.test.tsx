@@ -166,8 +166,6 @@ test('doublon : aucune solution choisie d’office ; « Garder la ligne 41 » en
   expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
     'Choisir une solution…', 'Garder la ligne 40 (celle-ci), retirer la ligne 41', 'Garder la ligne 41, retirer la ligne 40'])
   expect(liste).toHaveValue('')
-  // Matricule obligatoire : pas de bouton pour l'ignorer.
-  expect(screen.queryByRole('button', { name: /Ignorer la valeur/ })).toBeNull()
   const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
   expect(enregistrer).toBeDisabled()
   fireEvent.change(liste, { target: { value: '1' } })
@@ -211,13 +209,15 @@ test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le po
   pointsOuverts({ ...anomalie('ERREUR_EXCEL', 'bloquant', 'Erreur Excel.', 'Bonus'), ligne: 40, valeur: '#N/A' })
   const point = screen.getByText('Erreur Excel.').closest('tr')!
   expect(point).not.toHaveClass('point-regle')
-  fireEvent.click(await screen.findByRole('button', { name: 'Ignorer la valeur (laisser vide)' }))
+  const liste = await screen.findByRole('combobox', { name: 'Bonus « #N/A » : que faire ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choisir une solution…', 'Ignorer la valeur (laisser vide)'])
+  fireEvent.change(liste, { target: { value: 'ignorer' } })
   const attendu = decisions({ lignes: { 40: { Bonus: null } }, ignores: ['40|Bonus'] })
   // Vérification sans enregistrer : le point n'est plus renvoyé, il passe au vert.
   await vi.waitFor(() => expect(simuler).toHaveBeenCalledWith(7, attendu))
   await vi.waitFor(() => expect(screen.getByText('Erreur Excel.').closest('tr')).toHaveClass('point-regle'))
   expect(appliquer).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: 'Ne plus ignorer' })).toHaveAttribute('aria-pressed', 'true')
+  expect(liste).toHaveValue('ignorer')
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, attendu))
 })
