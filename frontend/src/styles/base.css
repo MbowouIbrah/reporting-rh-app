@@ -736,7 +736,13 @@ table.points.bord-ko { --bord: var(--red-deep); }
 table.points.bord-attention { --bord: var(--warning); }
 table.points td.ouvert { border-left: 3px solid var(--bord); }
 table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.detail-contrat > td { padding: 0; max-width: 0; border-left: 3px solid var(--bord); }
-.ligne-fichier { overflow-x: auto; }
+.ligne-fichier { overflow-x: auto; position: sticky; left: 0; animation: ligne-fichier-ouvre .2s ease-out; }
+@keyframes ligne-fichier-ouvre { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ligne-fichier { animation: none; } }
+.ligne-fichier table.dense td.fige { position: sticky; z-index: 1; }
+.ligne-fichier table.dense td.fige:not(.cellule-ko):not(.cellule-attention) { background: var(--surface); }
+.page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th.fige, .ligne-fichier table.dense thead th.fige { position: sticky; z-index: 2; }
+.ligne-fichier table.dense .fige:nth-child(4) { box-shadow: 2px 0 0 var(--navy); }
 .ligne-fichier table.dense { width: auto; margin: 0; }
 .page-ecran.rapport-excel .panneau .ligne-fichier table.dense thead th, .ligne-fichier table.dense thead th { position: static; background: var(--navy); color: #fff; text-align: left; }
 .ligne-fichier table.dense td { white-space: nowrap; }

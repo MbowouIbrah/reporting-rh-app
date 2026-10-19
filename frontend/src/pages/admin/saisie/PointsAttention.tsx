@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { lireLigne, type AnomalieLot, type LigneLot } from '../../../api/saisie'
 import { MOIS, valeurBrute } from '../../../lib/format'
@@ -153,6 +153,9 @@ const ATTRIBUTS: [string, (l: LigneLot) => string | null][] = [
   ['Service', (l) => l.service],
 ]
 
+/** ANNÉE, MOIS, MATRICULE, Noms restent visibles pendant le défilement. */
+const FIGEES = 4
+
 interface DetailProps {
   lotId: number
   num: number
@@ -181,17 +184,40 @@ function LigneFichier({ l, num, cible, points }: { l: LigneLot; num: number; cib
     ...ATTRIBUTS.map(([n, f]): [string, string | null] => [n, f(l)]),
     ...rubriques.map((r): [string, string | null] => [r, l.montants[r] != null ? valeurBrute(l.montants[r]) : null]),
   ]
+  const cadre = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const div = cadre.current
+    if (!div) return
+    // Le tableau des points peut être plus large que son volet : la ligne du fichier se limite à la partie visible.
+    const volet = div.closest<HTMLElement>('.volet-corps')
+    if (volet) div.style.width = `${volet.clientWidth - 3}px`
+    // Colonnes figées : chacune se cale à droite des précédentes.
+    const entetes = [...div.querySelectorAll<HTMLElement>('thead th')]
+    for (let i = 0; i < FIGEES; i++) {
+      div.querySelectorAll<HTMLElement>(`tr > :nth-child(${i + 1})`).forEach((c) => { c.style.left = `${entetes[i].offsetLeft}px` })
+    }
+    const gauche = entetes[FIGEES].offsetLeft
+    // Défilement horizontal animé jusqu'à centrer la cellule en cause dans la partie non figée.
+    const td = div.querySelector<HTMLElement>('td.cellule-cible:not(.fige)')
+    if (!td) return
+    const visible = div.clientWidth - gauche
+    const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const minuterie = window.setTimeout(() => div.scrollTo({
+      left: td.offsetLeft - gauche - (visible - td.offsetWidth) / 2, behavior: doux ? 'smooth' : 'auto',
+    }), doux ? 250 : 0)
+    return () => window.clearTimeout(minuterie)
+  }, [])
   return (
-    <div className="ligne-fichier">
+    <div className="ligne-fichier" ref={cadre}>
       <table className="dense points" aria-label={`Ligne ${num} du fichier`}>
         <thead>
-          <tr>{cellules.map(([n]) => <th key={n} scope="col">{n}</th>)}</tr>
+          <tr>{cellules.map(([n], i) => <th key={n} scope="col" className={i < FIGEES ? 'fige' : undefined}>{n}</th>)}</tr>
         </thead>
         <tbody>
           <tr>
-            {cellules.map(([n, v]) => {
+            {cellules.map(([n, v], i) => {
               const p = parColonne.get(n)
-              const classe = [p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), n === cible && 'cellule-cible']
+              const classe = [p && (p.gravite === 'bloquant' ? 'cellule-ko' : 'cellule-attention'), n === cible && 'cellule-cible', i < FIGEES && 'fige']
                 .filter(Boolean).join(' ')
               return <td key={n} className={classe || undefined} title={p?.message}>{v ?? p?.valeur ?? ''}</td>
             })}
