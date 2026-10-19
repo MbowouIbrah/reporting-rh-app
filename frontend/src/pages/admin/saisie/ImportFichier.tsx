@@ -6,6 +6,7 @@ import Etat from '../../../components/Etat'
 import { ChoixFichier } from '../../../components/Kit'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
+import FormulesRefusees, { CODES_FORMULE } from './FormulesRefusees'
 import PointsAttention, { VOLET_ERREURS } from './PointsAttention'
 
 const ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -48,6 +49,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
     enabled: !!lot,
     retry: queryRetry,
   })
+  const formules = !!anomalies.data?.some((a) => CODES_FORMULE.includes(a.code))
 
   return (
     <section className="page-ecran rapport-excel saisie-apercu">
@@ -58,10 +60,11 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {!lot && !etat.erreur && <Etat type="chargement" />}
       {(lot || etat.erreur) && (
         <p className="bandeau ko" role="alert">
-          {etat.erreur ?? `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`}
+          {etat.erreur ?? (formules ? 'Fichier refusé : des formules n’ont pas de valeur utilisable. Corrigez le fichier dans Excel, puis importez-le de nouveau. Rien n’est enregistré.' : `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`)}
         </p>
       )}
-      {lot && (
+      {lot && formules && <FormulesRefusees anomalies={anomalies.data!} />}
+      {lot && !formules && (
         <div className="panneau">
           <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
             {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => (l.statut === 'pret' ? onLot(l) : setEtat({ lot: l }))} afficherLigne ouvert={volet} onOuvrir={setVolet} pied={pied} />}

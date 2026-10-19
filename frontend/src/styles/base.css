@@ -1207,3 +1207,8 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
   .rapport-pdf .snap-section + .snap-section { break-before: page; }
   .rapport-pdf * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.formules-refusees { padding: var(--sp-3); background: #fff; border: 1px solid var(--rule-strong); margin-bottom: auto; }
+.formules-refusees td.formule { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+.formules-refusees h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-md); }
+.formules-refusees ol { margin: 0; padding-left: 20px; max-width: 80ch; }
+.formules-refusees li + li { margin-top: var(--sp-2); }

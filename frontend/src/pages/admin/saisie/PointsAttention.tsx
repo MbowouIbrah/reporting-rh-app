@@ -39,9 +39,9 @@ const GROUPES: Groupe[] = [
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
-    aide: 'espaces, casse, nombres en texte, arrondis, erreurs Excel lues comme vides, colonnes ignorées',
-    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'ERREUR_EXCEL', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
-  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, tirets ou formules lus comme vides, postes nouveaux ou vides',
+    aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées, cellules liées à un autre fichier',
+    retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'PRECISION_TRONQUEE', 'LIAISON_EXTERNE', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
+  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, tirets lus comme vides, postes nouveaux ou vides',
     retenir: () => true },
 ]
 
@@ -356,7 +356,7 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
 }
 
 /** Montants illisibles ou douteux : la cellule peut rester vide. */
-const MONTANT_VIDE = ['ERREUR_EXCEL', 'FORMULE_SANS_VALEUR', 'SANS_MONTANT', 'NON_NUMERIQUE', 'MONTANT_HORS_BORNES']
+const MONTANT_VIDE = ['SANS_MONTANT', 'NON_NUMERIQUE', 'MONTANT_HORS_BORNES']
 
 /** Seules les cellules qui peuvent rester vides s'ignorent (montants, nom, poste) ; jamais une colonne obligatoire. */
 function ignorable(a: AnomalieLot) {

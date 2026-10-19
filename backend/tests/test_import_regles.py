@@ -67,7 +67,7 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         ligne(MATRICULE="E1"), ligne(MATRICULE="E1"),                               # 2,3 doublon
         ligne(MATRICULE="E2", Service="Inconnu"),                                   # 4
         ligne(MATRICULE="E3", **{"Primes sur ventes": "abc"}),                      # 5
-        ligne(MATRICULE="E4", Bonus="#N/A"),                                        # 6
+        ligne(MATRICULE="E4"),                                                      # 6
         ligne(MATRICULE="E5", MOIS="  fevrier "),                                   # 7
         ligne(MATRICULE="E6 "),                                                # 8
         ligne(MATRICULE=7),                                                         # 9
@@ -86,7 +86,6 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (2, "MATRICULE", "DOUBLON"),
         (4, "Service", "REFERENTIEL_INCONNU"),
         (5, "Primes sur ventes", "NON_NUMERIQUE"),
-        (6, "Bonus", "ERREUR_EXCEL"),
         (7, "MOIS", "NORMALISE"),
         (8, "MATRICULE", "NORMALISE"),
         (9, "MATRICULE", "MATRICULE_NUMERIQUE"),
@@ -101,32 +100,72 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         (18, "Formation", "TEXTE_CONVERTI"),
     }
     bloq = {x.num for x in L if x.bloquant}
-    assert bloq == {2, 3, 4, 5, 10, 11, 14, 15, 16}  # erreur Excel : lue comme vide
+    assert bloq == {2, 3, 4, 5, 10, 11, 14, 15, 16}
     by = {x.num: x for x in L}
     assert str(by[12].montants["Formation"]) == "1200.500"
     assert str(by[18].montants["Formation"]) == "1.235"
 
 
-def test_lecture_tolerante_erreurs_excel_formules_et_tirets():
-    vide = [None] * len(ENTETES)
+def test_tirets_et_mots_lus_comme_vides():
     rows = [
-        ligne(MATRICULE="E1", MOIS="#N/A", Formation="#REF!"),                      # 2
-        ligne(MATRICULE="E2", Formation="=B3*2", Bonus=" - "),                      # 3 formule jamais calculée
-        ligne(MATRICULE="E3", Formation="néant", Bonus="N/A", **{"Absences (nb)": "/"}),  # 4
-        ligne(MATRICULE="E4", Formation="#VALEUR!"),                                # 5 collé en texte (fr)
-        [("#N/A" if e == "Noms" else "=A6" if e == "Bonus" else None) for e in ENTETES],  # 6 formules prolongées
-        vide,
+        ligne(MATRICULE="E2", Bonus=" - "),                                         # 2
+        ligne(MATRICULE="E3", Formation="néant", Bonus="N/A", **{"Absences (nb)": "/"}),  # 3
+        [("#N/A" if e == "Noms" else "=A6" if e == "Bonus" else None) for e in ENTETES],  # 4 formules prolongées
     ]
     L, ens, anos, st = run(rows, postes={"p"})
-    assert ens == {
-        (2, "MOIS", "ERREUR_EXCEL"), (2, "MOIS", "VALEUR_MANQUANTE"), (2, "Formation", "ERREUR_EXCEL"),
-        (3, "Formation", "FORMULE_SANS_VALEUR"), (3, "Bonus", "SANS_MONTANT"),
-        (4, "Formation", "SANS_MONTANT"), (4, "Bonus", "SANS_MONTANT"), (4, "Absences (nb)", "SANS_MONTANT"),
-        (5, "Formation", "ERREUR_EXCEL"),
-    }
-    assert st["lignes"] == 4 and {x.num for x in L if x.bloquant} == {2}
+    assert ens == {(2, "Bonus", "SANS_MONTANT"), (3, "Formation", "SANS_MONTANT"), (3, "Bonus", "SANS_MONTANT"),
+                   (3, "Absences (nb)", "SANS_MONTANT")}
+    assert st["lignes"] == 2 and not any(x.bloquant for x in L)
     assert all("Formation" not in x.montants and "Bonus" not in x.montants for x in L)
+
+
+def test_formules_sans_valeur_refusent_le_fichier_avant_tout():
+    rows = [
+        ligne(MATRICULE="E1", MOIS="#N/A", Service="Inconnu"),                      # 2 erreur sans formule
+        ligne(MATRICULE="E2", Formation="=B3*2"),                                   # 3 formule jamais calculée
+        ligne(MATRICULE="E4", Formation="#VALEUR!"),                                # 4 collé en texte (fr)
+        ligne(MATRICULE="E1"),                                                      # 5 doublon : pas encore contrôlé
+    ]
+    L, ens, anos, st = run(rows, postes={"p"})
+    assert ens == {(2, "MOIS", "ERREUR_EXCEL"), (3, "Formation", "FORMULE_SANS_VALEUR"), (4, "Formation", "ERREUR_EXCEL")}
+    assert L == [] and st == {"lignes": 0} and all(a.gravite == BLOQUANT for a in anos)
     assert next(a for a in anos if a.code == "FORMULE_SANS_VALEUR").valeur == "=B3*2"
+
+
+def calcule(contenu: bytes, valeurs: dict[str, str]) -> bytes:
+    """Pose la valeur calculée de chaque formule comme Excel l'enregistre (<v> à côté de <f>, t="e" pour une erreur)."""
+    src = zipfile.ZipFile(io.BytesIO(contenu))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        for n in src.namelist():
+            d = src.read(n)
+            if n == "xl/worksheets/sheet1.xml":
+                for f, v in valeurs.items():
+                    t = b' t="e"' if v.startswith("#") else b""
+                    fx = re.escape(f.encode())
+                    d = re.sub(rb'(<c r="[A-Z]+\d+")(>)<f>' + fx + rb"</f>(?:<v\s*/>|<v></v>)?",
+                               rb"\1" + t + rb"\2<f>" + f.encode() + rb"</f><v>" + v.encode() + rb"</v>", d)
+            z.writestr(n, d)
+    return out.getvalue()
+
+
+def test_liaison_externe():
+    rows = [ligne(MATRICULE="E1", Formation="='[1]Paie'!C2"), ligne(MATRICULE="E2", Bonus="=[1]Paie!D3")]
+    ok = calcule(xlsx(rows), {"'[1]Paie'!C2": "1500", "[1]Paie!D3": "20"})
+    L, anos = valider(lire(ok), refs(postes={"p"}))[:2]
+    assert [(a.code, a.gravite) for a in anos] == [("LIAISON_EXTERNE", "avertissement")]
+    assert "2 cellules liées" in anos[0].message and str(L[0].montants["Formation"]) == "1500.000"
+    ko = calcule(xlsx(rows), {"'[1]Paie'!C2": "#REF!", "[1]Paie!D3": "20"})
+    L, anos = valider(lire(ko), refs(postes={"p"}))[:2]
+    assert L == [] and [(a.ligne, a.colonne, a.code, a.valeur) for a in anos] == [
+        (2, "Formation", "LIAISON_ERREUR", "='[1]Paie'!C2")]
+    assert "#REF!" in anos[0].message
+
+
+def test_formule_en_erreur():
+    ko = calcule(xlsx([ligne(Formation="=1/0")]), {"1/0": "#DIV/0!"})
+    anos = valider(lire(ko), refs(postes={"p"}))[1]
+    assert [(a.code, a.valeur, a.message) for a in anos] == [("ERREUR_EXCEL", "=1/0", "La formule donne l'erreur #DIV/0!.")]
 
 
 def test_formule_calculee_lue_par_sa_valeur():

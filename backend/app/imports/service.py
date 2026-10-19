@@ -12,6 +12,7 @@ from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
     ATTRIBUTS,
     BLOQUANT,
+    CODES_FORMULE,
     MOIS,
     Refs,
     colonnes,
@@ -122,7 +123,8 @@ def _feuille_json(f: Feuille) -> dict:
     def v(x):
         return x if x is None or isinstance(x, str | int | float | bool) else str(x)
     return {"entete_ligne": f.entete_ligne, "entetes": [v(x) for x in f.entetes],
-            "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree}
+            "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree,
+            "formules": [[n, j, t] for n, fs in f.formules.items() for j, t in fs.items()]}
 
 
 def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
@@ -165,13 +167,20 @@ def _lot_modifiable(db: Session, lot_id: int) -> LotImport:
     if not lot.feuille:
         raise HTTPException(409, "Fichier analysé avant les corrections sur place : "
                                  "le corriger dans Excel puis l'importer de nouveau.")
+    if db.scalar(select(ImportAnomalie.id).where(ImportAnomalie.lot_id == lot.id,
+                                                 ImportAnomalie.code.in_(CODES_FORMULE)).limit(1)):
+        raise HTTPException(409, "Formules sans valeur utilisable : corriger le fichier dans Excel "
+                                 "puis l'importer de nouveau.")
     return lot
 
 
 def _feuille_du_lot(lot: LotImport) -> Feuille:
     f = lot.feuille
+    formules: dict[int, dict[int, str]] = {}
+    for n, j, t in f.get("formules", []):
+        formules.setdefault(n, {})[j] = t
     return Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
-                   f["ligne_ignoree"])
+                   f["ligne_ignoree"], formules)
 
 
 DIM_REFS = {"service": "services", "activite": "activites", "site": "sites", "type_contrat": "contrats"}

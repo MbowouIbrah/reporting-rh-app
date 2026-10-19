@@ -211,16 +211,16 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
 test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le point passe au vert sans quitter la liste', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
   const { simuler, appliquer } = serveur()
-  pointsOuverts({ ...anomalie('ERREUR_EXCEL', 'bloquant', 'Erreur Excel.', 'Bonus'), ligne: 40, valeur: '#N/A' })
-  const point = screen.getByText('Erreur Excel.').closest('tr')!
+  pointsOuverts({ ...anomalie('NON_NUMERIQUE', 'bloquant', 'Montant illisible.', 'Bonus'), ligne: 40, valeur: 'n.c.' })
+  const point = screen.getByText('Montant illisible.').closest('tr')!
   expect(point).not.toHaveClass('point-regle')
-  const liste = await screen.findByRole('combobox', { name: 'Bonus « #N/A » : que faire ?' })
+  const liste = await screen.findByRole('combobox', { name: 'Bonus « n.c. » : que faire ?' })
   expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choisir une solution…', 'Ignorer la valeur (laisser vide)'])
   fireEvent.change(liste, { target: { value: 'ignorer' } })
   const attendu = decisions({ lignes: { 40: { Bonus: null } }, ignores: ['40|Bonus'] })
   // Vérification sans enregistrer : le point n'est plus renvoyé, il passe au vert.
   await vi.waitFor(() => expect(simuler).toHaveBeenCalledWith(7, attendu))
-  await vi.waitFor(() => expect(screen.getByText('Erreur Excel.').closest('tr')).toHaveClass('point-regle'))
+  await vi.waitFor(() => expect(screen.getByText('Montant illisible.').closest('tr')).toHaveClass('point-regle'))
   expect(appliquer).not.toHaveBeenCalled()
   expect(liste).toHaveValue('ignorer')
   // La colonne reste affichée, sa cellule passe au vert, comme le liseré de la ligne.
@@ -236,8 +236,8 @@ test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le po
 test('un choix s’annule seul : « Annuler ce choix » rend la liste à « Choisir une solution… »', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
   serveur()
-  pointsOuverts({ ...anomalie('ERREUR_EXCEL', 'bloquant', 'Erreur Excel.', 'Bonus'), ligne: 40, valeur: '#N/A' })
-  const liste = await screen.findByRole('combobox', { name: 'Bonus « #N/A » : que faire ?' })
+  pointsOuverts({ ...anomalie('NON_NUMERIQUE', 'bloquant', 'Montant illisible.', 'Bonus'), ligne: 40, valeur: 'n.c.' })
+  const liste = await screen.findByRole('combobox', { name: 'Bonus « n.c. » : que faire ?' })
   fireEvent.change(liste, { target: { value: 'ignorer' } })
   expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled()
   fireEvent.change(liste, { target: { value: '' } })

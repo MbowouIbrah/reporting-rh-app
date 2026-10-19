@@ -168,3 +168,13 @@ def test_alias_referentiel(make_client):
     lot = up(c, [ligne(Site="dla")]).json()
     assert lot["statut"] == "pret"
     assert c.get(f"{API}/referentiels/inconnu").status_code == 404
+
+
+def test_formule_sans_valeur_refuse_le_lot_sans_correction(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Formation="=A1*2")]).json()
+    assert lot["statut"] == "rejete"
+    anos = c.get(f"{API}/imports/{lot['id']}/anomalies").json()
+    assert [a["code"] for a in anos] == ["FORMULE_SANS_VALEUR"]
+    r = c.put(f"{API}/imports/{lot['id']}/lignes/2", json={"valeurs": {"Formation": "100"}})
+    assert r.status_code == 409

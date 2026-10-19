@@ -33,6 +33,10 @@ ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # NUMERIC(18,3) : 15 chiffres entiers
 RE_NOMBRE = re.compile(r"^-?\d{1,3}(?: ?\d{3})*(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
 TROIS = Decimal("0.001")
+# Référence à un autre classeur : ='[1]Feuil1'!A1, ='C:\dossier\[source.xlsx]Feuil1'!A1.
+RE_LIAISON = re.compile(r"\[[^\]]+\][^!\[]*!")
+# Formule ou erreur sans valeur utilisable : fichier refusé avant toute correction.
+CODES_FORMULE = ("FORMULE_SANS_VALEUR", "ERREUR_EXCEL", "LIAISON_ERREUR")
 # Textes qui signifient « pas de montant » (tiret, barre, néant…) : lus comme une cellule vide.
 SANS_MONTANT = {"-", "--", "–", "—", "/", ".", "x", "n/a", "na", "neant", "nil", "rien", "aucun", "sans"}
 
@@ -219,6 +223,34 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     if manquants:
         return [], anos, {"lignes": 0}
 
+    # ---- formules : seule la valeur enregistrée par Excel est lue, jamais la formule
+    liaisons = 0
+    for num, row in feuille.lignes:
+        if ligne_vide(row, utiles):
+            continue
+        fs = feuille.formules.get(num, {})
+        for nom, j in cols.items():
+            v, f = (row[j] if j < len(row) else None), fs.get(j)
+            lien = f is not None and RE_LIAISON.search(f) is not None
+            if formule(v):
+                add(num, nom, "FORMULE_SANS_VALEUR", BLOQUANT, v, "La formule n'a pas de valeur calculée : "
+                    "le fichier n'a pas été enregistré par Excel après le calcul.")
+            elif erreur_excel(v) and lien:
+                add(num, nom, "LIAISON_ERREUR", BLOQUANT, f, f"La liaison vers un autre fichier donne l'erreur "
+                    f"{v.strip()} : le fichier source était introuvable au dernier calcul.")
+            elif erreur_excel(v):
+                add(num, nom, "ERREUR_EXCEL", BLOQUANT, f or v, f"La formule donne l'erreur {v.strip()}." if f
+                    else f"La cellule contient l'erreur Excel {v.strip()}, sans formule.")
+            else:
+                liaisons += lien
+    if any(a.code in CODES_FORMULE for a in anos):
+        return [], anos, {"lignes": 0}
+    if liaisons:
+        add(None, None, "LIAISON_EXTERNE", AVERT, None,
+            f"{liaisons} cellule{'s' if liaisons > 1 else ''} liée{'s' if liaisons > 1 else ''} à un autre fichier : "
+            "valeurs lues telles qu'Excel les a calculées à la dernière ouverture. "
+            "Vérifiez que le fichier source était à jour.")
+
     lignes: list[Ligne] = []
     cles: dict[tuple, list[int]] = defaultdict(list)
     par_matricule: dict[str, list[tuple[int, str, dict]]] = defaultdict(list)
@@ -230,19 +262,6 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
 
         L = Ligne(num)
         nb_avant = nb_bloq
-
-        # Erreur Excel ou formule jamais calculée : cellule lue comme vide, signalée.
-        row = list(row)
-        for nom, j in cols.items():
-            v = row[j] if j < len(row) else None
-            if erreur_excel(v):
-                add(num, nom, "ERREUR_EXCEL", AVERT, v, f"Erreur Excel {v.strip()} : cellule lue comme vide.")
-                row[j] = None
-            elif formule(v):
-                add(num, nom, "FORMULE_SANS_VALEUR", AVERT, v,
-                    "Formule sans valeur calculée, cellule lue comme vide : ouvrir le fichier dans Excel puis "
-                    "l'enregistrer, ou copier les cellules puis Collage spécial › Valeurs.")
-                row[j] = None
 
         def g(nom, row=row):
             j = cols[nom]

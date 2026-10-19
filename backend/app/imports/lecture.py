@@ -3,7 +3,7 @@
 import io
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from openpyxl import load_workbook
 
@@ -41,6 +41,7 @@ class Feuille:
     entetes: list  # valeurs brutes de la ligne d'en-tête, par position réelle
     lignes: list[tuple[int, tuple]]  # (numéro de ligne Excel, valeurs)
     ligne_ignoree: int | None = None  # 1re ligne remplie après MAX_LIGNES_VIDES lignes vides
+    formules: dict[int, dict[int, str]] = field(default_factory=dict)  # ligne -> {position: formule}
 
 
 # Valeurs d'erreur d'Excel (codes du fichier, et leur version française collée en texte).
@@ -59,6 +60,18 @@ def formule(v) -> bool:
 
 def cellule_vide(v) -> bool:
     return v is None or str(v).strip() == "" or erreur_excel(v) or formule(v)
+
+
+def _fusion(r, rf) -> tuple[tuple, dict[int, str]]:
+    """Valeur calculée par Excel ; à défaut, le texte de la formule. Formules gardées par position."""
+    vals, fs = [], {}
+    for j, (v, f) in enumerate(zip(r, rf, strict=False)):
+        if formule(f):
+            fs[j] = f
+            if v is None:
+                v = f
+        vals.append(v)
+    return tuple(vals), fs
 
 
 def ligne_vide(row, utiles) -> bool:
@@ -80,9 +93,17 @@ def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
     try:
         if "DONNEES" not in wb.sheetnames:
             raise FichierIllisible("Feuille DONNEES introuvable.")
-        it = (tuple(f if v is None and formule(f) else v for v, f in zip(r, rf, strict=False))
-              for r, rf in zip(wb["DONNEES"].iter_rows(values_only=True),
-                               wbf["DONNEES"].iter_rows(values_only=True), strict=False))
+        formules: dict[int, dict[int, str]] = {}
+
+        def fusionnees():
+            for n, (r, rf) in enumerate(zip(wb["DONNEES"].iter_rows(values_only=True),
+                                            wbf["DONNEES"].iter_rows(values_only=True), strict=False), start=1):
+                row, fs = _fusion(r, rf)
+                if fs:
+                    formules[n] = fs
+                yield row
+
+        it = fusionnees()
         entete, entete_ligne = None, 0
         for num, row in enumerate(it, start=1):
             if num > LIGNES_ENTETE:
@@ -112,7 +133,7 @@ def lire(contenu: bytes, reconnues: set[str] | None = None) -> Feuille:
                 if not ligne_vide(row, utiles):
                     ignoree = k
                     break
-        return Feuille(entete_ligne, entete, lignes, ignoree)
+        return Feuille(entete_ligne, entete, lignes, ignoree, {n: formules[n] for n, _ in lignes if n in formules})
     finally:
         wb.close()
         wbf.close()
