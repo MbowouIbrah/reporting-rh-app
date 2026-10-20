@@ -38,11 +38,18 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
   // Volet ouvert : le plus prioritaire tant que l'utilisateur n'en a pas choisi un autre.
   const [choixVolet, setChoixVolet] = useState<string>()
   const volets = useRef<HTMLDivElement>(null)
-  // Volet déplié par l'utilisateur : amené en haut de l'écran, le reste de la page défile autour.
+  // Volet déplié par l'utilisateur : amené en haut de la liste des volets, qui défile seule.
   useEffect(() => {
     if (choixVolet === undefined) return
     const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    volets.current?.querySelector('.volet-ouvert')?.scrollIntoView?.({ block: 'start', behavior: doux ? 'smooth' : 'auto' })
+    const cadre = volets.current
+    const v = cadre?.querySelector('.volet-ouvert')
+    if (!cadre || !v) return
+    const comportement = doux ? 'smooth' : 'auto'
+    // Grand écran : seule la liste des volets défile, la page ne bouge pas.
+    if (cadre.scrollHeight > cadre.clientHeight)
+      cadre.scrollTo?.({ top: cadre.scrollTop + v.getBoundingClientRect().top - cadre.getBoundingClientRect().top - 12, behavior: comportement })
+    else v.scrollIntoView?.({ block: 'start', behavior: comportement })
   }, [choixVolet])
   const [enAttente, setEnAttente] = useState(0)
   const [pied, setPied] = useState<HTMLElement | null>(null)
@@ -58,10 +65,10 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
     : lot.nb_bloquants > 0 ? VOLET_ERREURS
     : modifiees.length > 0 ? 'modifiees'
     : nouvelles.length > 0 ? 'nouvelles' : null
-  // Effectif du mois : employés distincts ayant une ligne, pour chaque mois couvert.
-  const effectifs = Object.entries(
-    d.lignes.reduce<Record<string, Set<string>>>((acc, l) => ((acc[periode(l)] ??= new Set()).add(l.matricule), acc), {}),
-  ).map(([p, m]) => [p, m.size] as const)
+  // Effectif du dernier mois couvert : employés distincts ayant une ligne ce mois-là.
+  const dernier = d.lignes.reduce<{ annee: number; mois: number } | undefined>(
+    (m, l) => (!m || l.annee * 12 + l.mois > m.annee * 12 + m.mois ? l : m), undefined)
+  const effectif = dernier && new Set(d.lignes.filter((l) => l.annee === dernier.annee && l.mois === dernier.mois).map((l) => l.matricule)).size
   const aEcrire = nouvelles.length + modifiees.length - gardees.size
   const choisir = (k: string, garder: boolean) =>
     setGardees((g) => {
@@ -108,7 +115,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
             <li><Badge ton={d.employes.nouveaux ? 'info' : 'neutre'}>{d.employes.nouveaux}</Badge> nouvel{s(d.employes.nouveaux)} employé{s(d.employes.nouveaux)} (à créer)</li>
             <li><Badge ton={d.nb_absents ? 'erreur' : 'neutre'}>{d.nb_absents}</Badge> <span className="saisie-oubli">oubli{s(d.nb_absents)}</span> ou départ{s(d.nb_absents)} (présent{s(d.nb_absents)} le mois précédent, sans ligne ici)</li>
           </ul>
-          <p className="saisie-chiffre">{effectifs.map(([p, n]) => <span key={p}>Effectif {p} : <strong>{n}</strong></span>)}</p>
+          {dernier && <p className="saisie-chiffre"><span>Effectif {periode(dernier)} : <strong>{effectif}</strong></span></p>}
         </section>
         <section aria-label="Contrôles">
           <h3>Contrôles</h3>
