@@ -68,6 +68,16 @@ def test_valeur_manquante_reprise_du_mois_precedent(make_client):
     assert r.json()["statut"] == "pret"
 
 
+def test_nom_vide_propose_le_nom_enregistre(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne()]).json()
+    assert c.post(f"{API}/imports/{prec['id']}/valider").json()["statut"] == "valide"
+    lot = up(c, [ligne(MOIS="Février", Noms=None)]).json()
+    anos = c.get(f"{API}/imports/{lot['id']}/anomalies").json()
+    ano = next(a for a in anos if a["code"] == "VALEUR_MANQUANTE" and a["colonne"] == "Noms")
+    assert ano["proposition"]["corrections"] == [{"valeur": "A B", "libelle": "Reprendre le nom enregistré (A B)"}]
+
+
 def test_site_inconnu_propose_le_site_du_mois_precedent(make_client):
     c = make_client(ADMIN)
     prec = up(c, [ligne()]).json()

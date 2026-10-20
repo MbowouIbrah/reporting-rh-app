@@ -521,7 +521,8 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code in ("DOUBLON", "MUTATION", "BRUT_REEL_ECART", *FACTEURS, *CODES_NOMS) or (a.code in ref and a.colonne in PRECEDENT))}
+        a.code in ("DOUBLON", "MUTATION", "BRUT_REEL_ECART", *FACTEURS, *CODES_NOMS)
+        or (a.code in ref and (a.colonne in PRECEDENT or a.colonne == "Noms")))}
     annuaire: dict[str, tuple[str, str]] | None = None
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
@@ -568,6 +569,11 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
                     StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
                     StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
                 prop["lignes"] = sorted(db.scalars(q))
+            elif a.code == "VALEUR_MANQUANTE" and a.colonne == "Noms":
+                # Nom vide d'un matricule connu : le nom enregistré est la correction quasi sûre.
+                nom = db.scalar(select(Salarie.nom).where(Salarie.matricule_norm == r.matricule.casefold()))
+                if nom:
+                    prop["corrections"] = [{"valeur": nom, "libelle": f"Reprendre le nom enregistré ({nom})"}]
             elif a.code == "MUTATION" and a.colonne in COLONNES_REF and (
                     avant := _valeur_avant_dans_lot(db, lot_id, r, COLONNES_REF[a.colonne][0])):
                 # Changement entre deux mois du fichier : la valeur du mois d'avant, candidate si c'est une erreur.

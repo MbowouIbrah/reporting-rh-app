@@ -594,7 +594,8 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
                         ? <option value="">Annuler ce choix (garder la valeur du fichier)</option>
                         : <option value="" disabled>Choisir une solution…</option>}
                       {proposees?.choix.map((d, i) => <option key={d.libelle} value={i}>{d.libelle}</option>)}
-                      {ignorable(point) && <option value="ignorer">Ignorer la valeur (laisser vide)</option>}
+                      {/* Une décision « Laisser vide » existe déjà : pas de second choix au même effet. */}
+                      {ignorable(point) && !proposees?.choix.some((d) => d.libelle.startsWith('Laisser vide')) && <option value="ignorer">Ignorer la valeur (laisser vide)</option>}
                     </select>
                   </label>
                   {nouveauSite && (

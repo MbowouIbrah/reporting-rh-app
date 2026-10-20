@@ -193,6 +193,26 @@ test('valeur manquante : « Remplacer » envoie la valeur du mois précédent', 
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { 'Type Contrat': 'CDD' } } })))
 })
 
+test('nom vide : le nom enregistré est proposé', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  serveur()
+  pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'avertissement', 'Nom vide.', 'Noms'), ligne: 40, valeur: null,
+    proposition: { corrections: [{ valeur: 'John Doe', libelle: 'Reprendre le nom enregistré (John Doe)' }] } }, vi.fn(), 'noms')
+  const liste = await screen.findByRole('combobox', { name: 'Noms vide : que faire ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent))
+    .toEqual(['Choisir une solution…', 'Reprendre le nom enregistré (John Doe)', 'Ignorer la valeur (laisser vide)'])
+})
+
+test('poste vide : « Laisser vide » n’est pas doublé par « Ignorer la valeur »', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  serveur()
+  pointsOuverts({ ...anomalie('VALEUR_MANQUANTE', 'avertissement', 'Poste vide.', 'Poste'), ligne: 40, valeur: null,
+    proposition: { valeur: 'Comptable', periode: 'juillet 2026' } }, vi.fn(), 'montants')
+  const liste = await screen.findByRole('combobox', { name: 'Poste vide : que faire ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent))
+    .toEqual(['Choisir une solution…', 'Reprendre la valeur du mois précédent (Comptable, juillet 2026)', 'Laisser vide'])
+})
+
 const MUTATION: AnomalieLot = { ...anomalie('MUTATION', 'avertissement',
   'Le service de John Doe passe de « Commerce » (juillet 2026) à « SAV PL » (août 2026) : mutation ou erreur ?', 'Service'),
 ligne: 40, valeur: 'SAV PL', proposition: { valeur: 'Commerce', periode: 'juillet 2026' } }
