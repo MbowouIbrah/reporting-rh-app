@@ -54,7 +54,10 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - Ligne de total ou ligne parasite (« TOTAL », formules =SUM) : « Supprimer la ligne ».
 - Reprise d'un fichier déjà en vérification (même fichier réimporté) : avec des modifications enregistrées, « Reprendre la vérification » (modifications gardées, contrôles relancés) ou « Tout annuler et recommencer » ; sans modification, l'ancienne vérification est abandonnée et le fichier analysé comme neuf (`service.analyser()`, paramètre `reprise`).
 
-**G7. Changements d'affectation** : phrase complète par employé nommé ; « Changement à partir de ce mois » ou « Erreur : garder <valeur enregistrée> ».
+**G7. Changements d'affectation** — livré, à valider (`regles.py` : `Refs.historique` chargé par `service.charger_refs()`, comparaison avec le dernier mois enregistré avant le fichier ; un point par changement, sur la ligne du nouveau mois ; `service.propositions()` : valeur d'avant prise au mois précédent du fichier, sinon en base) : phrase complète par employé nommé ; « Changement à partir de ce mois » ou « Erreur : garder <valeur enregistrée> ».
+- Exemple : « Le service de Didier Nkolo passe de « SAV PL » (juillet 2026, déjà enregistré) à « Commerce Pièces » (août 2026) : mutation ou erreur ? ».
+- « Changement à partir de ce mois » accepte le point sans rien changer (clé `ignores`) ; « Erreur » remet la valeur d'avant dans la cellule.
+- Choix sur l'écran de refus ; sur l'écran de vérification (lecture seule), le changement est gardé par défaut.
 
 **G8. Noms et matricules** :
 - Matricule douteux (« 20 », « emp046 ») : recherche rapide parmi les employés connus (index par chiffres du matricule et par nom) ; « C'est Noel Essomba (EMP020) : reprendre son matricule ».

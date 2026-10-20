@@ -103,7 +103,9 @@ function corps(p: Plan): Decisions {
   const lignes: Decisions['lignes'] = {}
   const ajouts = new Map<string, Decisions['ajouts'][number]>()
   const retirees = new Set<number>()
+  const acceptes: string[] = []
   for (const { decision: d, ligne } of Object.values(p.choix)) {
+    if (d.accepter) acceptes.push(d.accepter)
     if (d.valeurs) lignes[ligne] = { ...lignes[ligne], ...d.valeurs }
     if (d.ajout) {
       const typeSite = d.ajout.dimension === 'site' ? p.typeSite[d.ajout.valeur] ?? null : null
@@ -117,7 +119,7 @@ function corps(p: Plan): Decisions {
     lignes[+n] = { ...lignes[+n], [col]: null }
   }
   for (const n of retirees) delete lignes[n]
-  return { lignes, ajouts: [...ajouts.values()], retirees: [...retirees], ignores: p.ignores }
+  return { lignes, ajouts: [...ajouts.values()], retirees: [...retirees], ignores: [...p.ignores, ...acceptes] }
 }
 
 /** Ce que le détail d'un point lit et change dans le plan commun. */
@@ -339,6 +341,8 @@ interface Decision {
   valeurs?: Record<string, string | null>
   ajout?: { dimension: string; valeur: string }
   retirer?: number[]
+  /** « ligne|colonne » : valeur du fichier gardée, point accepté sans rien changer. */
+  accepter?: string
 }
 
 /** Question posée par la liste et décisions proposées, selon le code du point. Aucune n'est choisie d'office. */
@@ -350,6 +354,13 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
     : []
   if (point.code === 'LIGNE_TOTAL') {
     return { question: 'Ligne de total : que faire ?', choix: [{ libelle: 'Supprimer la ligne', retirer: [point.ligne!] }] }
+  }
+  if (point.code === 'MUTATION' && prop?.valeur && point.ligne != null) {
+    return {
+      question: 'Mutation ou erreur ?',
+      choix: [{ libelle: 'Changement à partir de ce mois', accepter: `${point.ligne}|${col}` },
+        { libelle: `Erreur : garder « ${prop.valeur} » (${prop.periode})`, valeurs: { [col]: prop.valeur } }],
+    }
   }
   const liste = LISTES[col]
   if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {

@@ -79,6 +79,25 @@ def test_site_inconnu_propose_le_site_du_mois_precedent(make_client):
     assert ano["proposition"]["valeur"]
 
 
+def test_mutation_propose_la_valeur_enregistree_puis_acceptee(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne()]).json()
+    assert c.post(f"{API}/imports/{prec['id']}/valider").json()["statut"] == "valide"
+    lot = up(c, [ligne(MOIS="Février", Service="Pneumatique")]).json()
+    mut = [a for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json() if a["code"] == "MUTATION"]
+    assert [(a["ligne"], a["colonne"]) for a in mut] == [(2, "Service")]
+    assert mut[0]["proposition"] == {"valeur": "SAV PL", "periode": "janvier 2026"}
+    sim = c.post(f"{API}/imports/{lot['id']}/decisions", json={"ignores": ["2|Service"], "simuler": True})
+    assert not any(a["code"] == "MUTATION" for a in sim.json()["anomalies"])
+
+
+def test_mutation_dans_le_fichier_propose_le_mois_precedent_du_fichier(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(), ligne(MOIS="Février", Service="Pneumatique")]).json()
+    mut = [a for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json() if a["code"] == "MUTATION"]
+    assert [(a["ligne"], a["proposition"]) for a in mut] == [(3, {"valeur": "SAV PL", "periode": "janvier 2026"})]
+
+
 def test_valeur_manquante_sans_historique_pas_de_proposition(make_client):
     c = make_client(ADMIN)
     lot = up(c, [ligne(Service=None)]).json()

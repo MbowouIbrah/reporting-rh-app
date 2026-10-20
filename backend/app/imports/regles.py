@@ -56,6 +56,8 @@ class Refs:
     postes: set[str] = field(default_factory=set)  # normalisés
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
     annuaire: dict[str, tuple[str, str]] = field(default_factory=dict)  # matricule casefold -> (matricule, nom)
+    # matricule casefold -> mois enregistrés (année, mois, {colonne: libellé}), du plus ancien au plus récent
+    historique: dict[str, list[tuple[int, int, dict[str, str]]]] = field(default_factory=dict)
 
 
 @dataclass
@@ -493,25 +495,32 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(occ[0][0], "Noms", "NOM_SIMILAIRE", AVERT, occ[0][4],
                     f"Nouvel employé « {occ[0][3]} » ({_qui(occ[0][4])}) : nom très proche de « {trouve[1]} » "
                     f"({_qui(trouve[0])}). Même personne avec un matricule ou un nom mal saisi ?")
+        qui = next((o[3] for o in occ if o[3]), None) or refs.annuaire.get(mat, ("", ""))[1] or _qui(mat)
+        debut = min((by_num[o[0]].annee, by_num[o[0]].mois) for o in occ)
+        # Dernier mois déjà enregistré avant le premier mois du fichier : point de départ des changements.
+        avant = next((h for h in reversed(refs.historique.get(mat, [])) if (h[0], h[1]) < debut), None)
         for champ in ("Service", "Site", "Type Contrat", "Activité"):
-            vals = {o[2].get(champ) for o in occ if o[2].get(champ)}
-            if len(vals) > 1:
-                # Valeurs dans l'ordre des mois, puis du fichier : « passe de X (juillet) à Y (août) ».
-                suite = sorted((o for o in occ if o[2].get(champ)),
-                               key=lambda o: (by_num[o[0]].annee or 0, by_num[o[0]].mois or 0, o[0]))
-                etapes: list[tuple[str, str, int]] = []
-                for o in suite:
-                    if not etapes or etapes[-1][0] != o[2][champ]:
-                        etapes.append((o[2][champ], _periode(by_num[o[0]]), o[0]))
-                qui = occ[0][3] or _qui(mat)
-                if len({e[1] for e in etapes}) == 1:
-                    detail = ", ".join(f"« {v} » (ligne {n})" for v, _p, n in etapes)
-                    msg = f"{SUJETS[champ]} de {qui} diffère d’une ligne à l’autre en {etapes[0][1]} : {detail}."
-                else:
-                    detail = " puis ".join(f"« {v} » ({p})" for v, p, _n in etapes[1:])
-                    msg = (f"{SUJETS[champ]} de {qui} passe de « {etapes[0][0]} » ({etapes[0][1]}) à {detail} : "
-                           "mutation ou erreur ?")
-                add(occ[0][0], champ, "MUTATION", AVERT, mat, msg)
+            # Valeurs dans l'ordre des mois, puis du fichier : « passe de X (juillet) à Y (août) ».
+            suite = sorted((o for o in occ if o[2].get(champ)),
+                           key=lambda o: (by_num[o[0]].annee, by_num[o[0]].mois, o[0]))
+            etapes: list[tuple[str, str, int | None]] = []
+            if avant and avant[2].get(champ):
+                etapes.append((avant[2][champ], f"{MOIS[avant[1] - 1].lower()} {avant[0]}, déjà enregistré", None))
+            for o in suite:
+                if not etapes or norm(etapes[-1][0]) != norm(o[2][champ]):
+                    etapes.append((o[2][champ], _periode(by_num[o[0]]), o[0]))
+            if len(etapes) < 2:
+                continue
+            if len({e[1] for e in etapes}) == 1:
+                detail = ", ".join(f"« {v} » (ligne {n})" for v, _p, n in etapes)
+                add(etapes[0][2], champ, "MUTATION", AVERT, etapes[0][0],
+                    f"{SUJETS[champ]} de {qui} diffère d’une ligne à l’autre en {etapes[0][1]} : {detail}.")
+                continue
+            # Un point par changement, sur la ligne du nouveau mois : changement voulu ou erreur de saisie.
+            for prec, (v, p, n) in zip(etapes, etapes[1:], strict=False):
+                add(n, champ, "MUTATION", AVERT, v,
+                    f"{SUJETS[champ]} de {qui} passe de « {prec[0]} » ({prec[1]}) à « {v} » ({p}) : "
+                    "mutation ou erreur ?")
 
     if not lignes:
         add(feuille.entete_ligne + 1, "DONNEES", "FICHIER_VIDE", BLOQUANT, None, "Aucune ligne de données.")

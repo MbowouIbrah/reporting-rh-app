@@ -267,7 +267,25 @@ def test_fichier_vide_et_illisible():
 def test_mutation_et_nom_incoherent_avec_base():
     _, ens, _, _ = run([ligne(), ligne(MOIS="Février", Service="Pneumatique")], postes={"p"},
                        noms_connus={"emp001": "autre nom"})
-    assert (2, "Service", "MUTATION") in ens and (2, "Noms", "NOM_INCOHERENT") in ens
+    assert (3, "Service", "MUTATION") in ens and (2, "Noms", "NOM_INCOHERENT") in ens
+
+
+def test_mutation_comparee_au_mois_enregistre_phrase_complete():
+    _, ens, anos, _ = run([ligne(MOIS="Février", Noms="Didier Nkolo", Service="Pneumatique")],
+                          postes={"p"}, historique={"emp001": [(2025, 12, {"Service": "SAV PL"}),
+                                                               (2026, 1, {"Service": "SAV PL"})]})
+    a = next(a for a in anos if a.code == "MUTATION")
+    assert (a.ligne, a.colonne, a.valeur) == (2, "Service", "Pneumatique")
+    assert "Didier Nkolo" in a.message and "« SAV PL » (janvier 2026, déjà enregistré)" in a.message
+    assert "« Pneumatique » (février 2026)" in a.message
+
+
+def test_mutation_un_point_par_changement():
+    _, ens, _, _ = run([ligne(), ligne(MOIS="Février", Service="Pneumatique"),
+                        ligne(MOIS="Mars", Service="Pneumatique"), ligne(MOIS="Avril", Service="SAV PL")],
+                       postes={"p"})
+    muts = {e for e in ens if e[2] == "MUTATION"}
+    assert muts == {(3, "Service", "MUTATION"), (5, "Service", "MUTATION")}
 
 
 @pytest.mark.skipif(not V4.exists(), reason="V4 non versionné")

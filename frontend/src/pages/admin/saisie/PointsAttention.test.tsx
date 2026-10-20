@@ -150,10 +150,10 @@ const LIGNE_BRUTE = {
   choix: { Site: ['Douala'], 'Type Contrat': ['CDD', 'CDI'] },
 }
 
-function pointsOuverts(a: AnomalieLot, onLot = vi.fn()) {
+function pointsOuverts(a: AnomalieLot, onLot = vi.fn(), volet = VOLET_ERREURS) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PointsAttention lotId={7} onLot={onLot} afficherLigne ouvert={VOLET_ERREURS} onOuvrir={() => {}} anomalies={[a]} />
+      <PointsAttention lotId={7} onLot={onLot} afficherLigne ouvert={volet} onOuvrir={() => {}} anomalies={[a]} />
     </QueryClientProvider>,
   )
   fireEvent.click(screen.getByRole('button', { name: `Détail de la ligne ${a.ligne}` }))
@@ -191,6 +191,31 @@ test('valeur manquante : « Remplacer » envoie la valeur du mois précédent', 
   expect(within(screen.getByRole('table', { name: 'Ligne 40 du fichier' })).getByText('CDD')).toHaveClass('cellule-modifiee')
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { 'Type Contrat': 'CDD' } } })))
+})
+
+const MUTATION: AnomalieLot = { ...anomalie('MUTATION', 'avertissement',
+  'Le service de John Doe passe de « Commerce » (juillet 2026) à « SAV PL » (août 2026) : mutation ou erreur ?', 'Service'),
+ligne: 40, valeur: 'SAV PL', proposition: { valeur: 'Commerce', periode: 'juillet 2026' } }
+
+test('changement d’affectation : « Changement à partir de ce mois » accepte le point sans vider la cellule', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts(MUTATION, vi.fn(), 'affectation')
+  const liste = await screen.findByRole('combobox', { name: 'Mutation ou erreur ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Choisir une solution…', 'Changement à partir de ce mois', 'Erreur : garder « Commerce » (juillet 2026)'])
+  fireEvent.change(liste, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ ignores: ['40|Service'] })))
+})
+
+test('changement d’affectation : « Erreur » reprend la valeur enregistrée', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts(MUTATION, vi.fn(), 'affectation')
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Mutation ou erreur ?' }), { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { Service: 'Commerce' } } })))
 })
 
 test('mois vide : le mois des autres lignes du fichier est proposé', async () => {

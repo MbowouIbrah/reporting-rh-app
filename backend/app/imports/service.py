@@ -66,12 +66,22 @@ def charger_refs(db: Session) -> Refs:
              if a.cible_id in par_id}
     salaries = list(db.scalars(select(Salarie)))
     noms = {s.matricule_norm: norm(s.nom) for s in salaries if s.nom}
+    lib = {c: libelles(m) for c, (_d, m, _f) in COLONNES_REF.items()}
+    historique: dict[str, list] = {}
+    for r in db.execute(select(Salarie.matricule_norm, Periode.annee, Periode.mois,
+                               *(getattr(SituationMensuelle, f) for _d, _m, f in COLONNES_REF.values()))
+                        .join(SituationMensuelle, SituationMensuelle.salarie_id == Salarie.id)
+                        .join(Periode, Periode.id == SituationMensuelle.periode_id)
+                        .order_by(Periode.annee, Periode.mois)):
+        historique.setdefault(r[0], []).append(
+            (r[1], r[2], {c: lib[c].get(i) for c, i in zip(COLONNES_REF, r[3:], strict=True)}))
     return Refs(
         services=index("service", Service), activites=index("activite", Activite),
         sites=index("site", Site), contrats=index("type_contrat", TypeContrat),
         rubriques=[(r.libelle, r.unite) for r in rubs], rubrique_alias=alias,
         postes=set(index("poste", Poste)), noms_connus=noms,
         annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
+        historique=historique,
     )
 
 
@@ -427,13 +437,25 @@ def _periode_du_fichier(db: Session, lot_id: int, col: str) -> list[dict]:
             for v, n in vus]
 
 
+def _valeur_avant_dans_lot(db: Session, lot_id: int, r: StagingLigne, cle: str) -> dict | None:
+    """Valeur de la même colonne pour le même employé, au dernier mois du lot avant celui de la ligne."""
+    q = (select(StagingLigne).where(
+        StagingLigne.lot_id == lot_id, func.lower(StagingLigne.matricule) == r.matricule.casefold(),
+        (StagingLigne.annee < r.annee) | ((StagingLigne.annee == r.annee) & (StagingLigne.mois < r.mois)))
+        .order_by(StagingLigne.annee.desc(), StagingLigne.mois.desc(), StagingLigne.num_ligne.desc()))
+    for p in db.scalars(q):
+        if (p.donnees or {}).get(cle):
+            return {"valeur": p.donnees[cle], "periode": f"{MOIS[p.mois - 1].lower()} {p.annee}"}
+    return None
+
+
 def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     """Aide à la décision pour chaque point : lignes du doublon, valeur du mois précédent,
     liste où ajouter une valeur inconnue, lectures d'un nombre ambigu, période des autres lignes,
     ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code == "DOUBLON" or (a.code in ref and a.colonne in PRECEDENT))}
+        a.code in ("DOUBLON", "MUTATION") or (a.code in ref and a.colonne in PRECEDENT))}
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
     periodes: dict[str, list[dict]] = {}
@@ -459,7 +481,11 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
                     StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
                     StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
                 prop["lignes"] = sorted(db.scalars(q))
-            elif a.code in ref and a.colonne in PRECEDENT:
+            elif a.code == "MUTATION" and a.colonne in COLONNES_REF and (
+                    avant := _valeur_avant_dans_lot(db, lot_id, r, COLONNES_REF[a.colonne][0])):
+                # Changement entre deux mois du fichier : la valeur du mois d'avant, candidate si c'est une erreur.
+                prop |= avant
+            elif (a.code in ref or a.code == "MUTATION") and a.colonne in PRECEDENT:
                 # Valeur du dernier mois enregistré avant celui de la ligne : candidate au remplacement.
                 model, attr = PRECEDENT[a.colonne]
                 q = (select(model.libelle, Periode.annee, Periode.mois)
