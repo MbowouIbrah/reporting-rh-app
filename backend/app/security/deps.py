@@ -11,6 +11,7 @@ def to_principal(user: Utilisateur) -> Principal:
     return Principal(
         user_id=user.id,
         email=user.email,
+        nom=user.nom,
         assignments=tuple(Assignment(r.role, r.perimetre_id, r.nominatif) for r in user.roles),
     )
 

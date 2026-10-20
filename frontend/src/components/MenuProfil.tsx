@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { ROLES } from '../lib/roles'
 
-/** Icône profil de la barre : ouvre un menu avec l'adresse, le rôle et la déconnexion. */
+/** Icône profil de la barre : ouvre un menu avec le nom, l'adresse, le rôle et la déconnexion. */
 export default function MenuProfil() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
@@ -48,8 +48,16 @@ export default function MenuProfil() {
       </button>
       {ouvert && (
         <div id="profil-menu" className="profil-menu">
-          <span className="profil-email">{me?.email}</span>
-          {role && <span className="badge badge-neutre">{ROLES[role as keyof typeof ROLES]?.libelle ?? role}</span>}
+          <div className="profil-identite">
+            <span className="profil-nom">{me?.nom || me?.email}</span>
+            {me?.nom && <span className="profil-email">{me.email}</span>}
+          </div>
+          {role && (
+            <div className="profil-role">
+              <span className="profil-libelle">Rôle</span>
+              <span className="badge badge-neutre">{ROLES[role as keyof typeof ROLES]?.libelle ?? role}</span>
+            </div>
+          )}
           <button
             type="button"
             className="btn-link profil-sortie"

@@ -41,6 +41,7 @@ class Principal:
     user_id: int
     email: str
     assignments: tuple[Assignment, ...] = field(default_factory=tuple)
+    nom: str = ""
 
     @property
     def is_global(self) -> bool:

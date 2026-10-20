@@ -46,6 +46,7 @@ def _me(p: Principal) -> dict:
     return {
         "id": p.user_id,
         "email": p.email,
+        "nom": p.nom,
         "roles": [
             {"role": a.role, "perimetre_id": a.perimetre_id, "nominatif": a.nominatif}
             for a in p.assignments

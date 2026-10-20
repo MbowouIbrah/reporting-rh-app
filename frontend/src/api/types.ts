@@ -19,6 +19,7 @@ export interface Cell {
 export interface Me {
   id: number
   email: string
+  nom: string
   roles: { role: string; perimetre_id: number | null; nominatif: boolean }[]
   permissions: string[]
 }
