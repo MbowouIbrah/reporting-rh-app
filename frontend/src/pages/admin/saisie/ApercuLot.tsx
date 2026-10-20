@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { lireAnomalies, lireApercu, validerLot, type Cle, type LigneApercu, type Lot } from '../../../api/saisie'
 import { queryRetry } from '../../../api/client'
 import Etat, { etatErreur } from '../../../components/Etat'
@@ -37,6 +37,13 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
   const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string }>({ cours: false })
   // Volet ouvert : le plus prioritaire tant que l'utilisateur n'en a pas choisi un autre.
   const [choixVolet, setChoixVolet] = useState<string>()
+  const volets = useRef<HTMLDivElement>(null)
+  // Volet déplié par l'utilisateur : amené en haut de l'écran, le reste de la page défile autour.
+  useEffect(() => {
+    if (choixVolet === undefined) return
+    const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    volets.current?.querySelector('.volet-ouvert')?.scrollIntoView?.({ block: 'start', behavior: doux ? 'smooth' : 'auto' })
+  }, [choixVolet])
   const [enAttente, setEnAttente] = useState(0)
   const [pied, setPied] = useState<HTMLElement | null>(null)
   const d = q.data
@@ -79,7 +86,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
   const objet = parcours === 'fichier' ? lot.fichier_nom : [...new Set(d.lignes.map(periode))].join(', ').toUpperCase()
 
   return (
-    <section className="page-ecran rapport-excel saisie-apercu">
+    <section className="page-ecran rapport-excel saisie-apercu saisie-verif">
       <BarreParcours libelle={parcours === 'grille' ? 'Saisie des montants' : 'Choix du fichier'} onRetour={onRetour} desactive={envoi.cours}>
         <Etapes parcours={parcours} actuelle={parcours === 'grille' ? 3 : 1} />
       </BarreParcours>
@@ -118,7 +125,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
         </p>
       )}
       <div className="panneau">
-        <div className="panneau-corps volets" role="region" aria-label="Détail de l'aperçu">
+        <div ref={volets} className="panneau-corps volets" role="region" aria-label="Détail de l'aperçu">
           {d.nb_absents > 0 && (
             <Volet titre={<><span className="saisie-oubli">Oublis</span> ou départs</>} valeur={d.nb_absents} ton="ko"
               resume="présents le mois précédent, sans ligne ici : à ajouter si oubli, sinon départ"

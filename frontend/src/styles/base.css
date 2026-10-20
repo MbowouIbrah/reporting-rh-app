@@ -1237,3 +1237,14 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
   .saisie-depart .saisie-cartes-depart .saisie-carte-action { padding-top: var(--v); }
   .saisie-depart .pilotage-resume li { padding-block: calc(var(--v) * .45); }
 }
+/* Vérification >= 1100 px : le volet déplié est prioritaire (hauteur d'écran presque entière), la page défile dans son cadre, pied toujours visible */
+@media (min-width: 1100px) {
+  .layout-ecran:has(.saisie-verif) { height: 100dvh; display: flex; flex-direction: column; }
+  .layout-ecran:has(.saisie-verif) > .page { flex: 1; min-height: 0; width: 100%; padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+  .page-ecran.saisie-verif { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; overflow-y: auto; }
+  .page-ecran.saisie-verif .panneau { flex: 1 0 auto; }
+  .page-ecran.saisie-verif .panneau-corps.volets { overflow: visible; scroll-margin-top: 0; }
+  .page-ecran.saisie-verif .volet-ouvert { flex: none; scroll-margin-top: var(--sp-2); }
+  .page-ecran.saisie-verif .volet-ouvert .volet-corps { max-height: calc(100dvh - 250px); }
+  .page-ecran.saisie-verif > .saisie-pied { position: sticky; bottom: 0; z-index: 4; background: var(--surface-sunken); padding-block: var(--sp-2); }
+}
