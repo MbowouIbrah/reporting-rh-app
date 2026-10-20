@@ -1,7 +1,7 @@
 import type { Val } from '../api/types'
 
 const NF = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 })
-const NF1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const NF1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
 
 /** Séparateur de milliers : espace insécable pleine largeur (l'espace fine de fr-FR colle les groupes à l'écran). */
 export const SEP = '\u00a0'

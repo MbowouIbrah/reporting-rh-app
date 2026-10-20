@@ -8,7 +8,7 @@ test('fcfa : séparateur, absent et n/a', () => {
 })
 
 test('pct : multiplie le ratio par 100', () => {
-  expect(pct('0.05')).toMatch(/^5,0\s%$/)
+  expect(pct('0.05')).toMatch(/^5\s%$/)
   expect(pct('-0.172')).toMatch(/^-17,2\s%$/)
   expect(pct(null)).toBe('—')
 })

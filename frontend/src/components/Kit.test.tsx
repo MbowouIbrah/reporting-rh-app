@@ -7,14 +7,14 @@ import Tuile, { Variation } from './Tuile'
 test('Variation : flèche, signe et texte, pas la couleur seule', () => {
   const { container } = render(<Variation v="-0.05" />)
   expect(container).toHaveTextContent('▼')
-  expect(container).toHaveTextContent('-5,0 % vs M-1')
+  expect(container).toHaveTextContent('-5 % vs M-1')
   expect(container).toHaveTextContent('(baisse)')
   expect(container.querySelector('.neg')).not.toBeNull()
 })
 
 test('Variation positive : signe +', () => {
   const { container } = render(<Variation v="0.1" />)
-  expect(container).toHaveTextContent('+10,0 %')
+  expect(container).toHaveTextContent('+10 %')
 })
 
 test('Tuile vide : explication de l’absence', () => {

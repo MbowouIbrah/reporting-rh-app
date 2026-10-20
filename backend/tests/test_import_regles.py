@@ -349,6 +349,7 @@ def test_lecture_des_nombres_mal_ecrits():
 
     from app.imports.regles import fr, interpretations
     assert fr(Decimal("1250000.5")) == "1 250 000,5" and fr(Decimal("-45")) == "-45"
+    assert fr(Decimal("433674.000")) == "433 674" and fr(Decimal("138700.4850")) == "138 700,485"
     assert interpretations("1.250.000") == [(Decimal("1250000"), "Corriger en 1 250 000")]
     assert interpretations("1,250,000.50")[0][0] == Decimal("1250000.50")
     assert interpretations("25 000 FCFA")[0][0] == Decimal("25000")

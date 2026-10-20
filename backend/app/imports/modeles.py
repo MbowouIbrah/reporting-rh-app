@@ -1,6 +1,7 @@
 """Modèles Excel téléchargeables (employés, données mensuelles)."""
 
 import io
+from decimal import Decimal
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -112,7 +113,9 @@ def modele_mensuel(annee: int | None, mois: int | None, rubriques: list[str],
         for j, v in enumerate(valeurs, start=1):
             c = ws.cell(i, j, v)
             if j > len(ATTRIBUTS):
-                c.number_format = "#,##0.###"
+                # Décimales seulement si nécessaires : « #,##0.### » laisse une virgule seule après un entier.
+                entier = v is None or Decimal(str(v)) == Decimal(str(v)).to_integral_value()
+                c.number_format = "#,##0" if entier else "#,##0.###"
     plages = listes(wb, {**refs, "MOIS": MOIS})
     derniere = max(500, len(lignes) + 3)
     for col, nom in ((2, "MOIS"), (5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):

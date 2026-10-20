@@ -100,7 +100,7 @@ test('Résumé : effectif global de fin, évolution et répartition par contrat 
 test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salariale par contrat', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/MAD GLOBAUX2Pourcentage MAD sites déportés1 · 50,0/)
+  expect(tuile).toHaveTextContent(/MAD GLOBAUX2Pourcentage MAD sites déportés1 · 50\s%/)
   expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
   const ms = screen.getByText('MASSE SALARIALE', { selector: '.micro' }).closest('.tuile')!
   expect(ms.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)

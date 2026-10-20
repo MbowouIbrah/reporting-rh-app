@@ -221,6 +221,7 @@ def fr(d: Decimal) -> str:
     s = f"{d:f}"
     signe, s = ("-", s[1:]) if s.startswith("-") else ("", s)
     e, _, dec = s.partition(".")
+    dec = dec.rstrip("0")  # « 433 674,000 » s'affiche « 433 674 »
     return f"{signe}{int(e):,}".replace(",", " ") + (f",{dec}" if dec else "")
 
 

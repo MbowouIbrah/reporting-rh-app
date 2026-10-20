@@ -153,7 +153,7 @@ test('pilotage du mois : CA et marge saisis ensemble, résumé des budgets', asy
   const envoi = appels.find((a) => a.url.includes('/pilotage/ca-marge'))!
   expect(envoi.corps).toEqual({ annee: 2026, mois: 2, ca: '1000000', marge: '-50000' })
   // Taux calculé par le serveur ; champs remis au format affiché.
-  expect(screen.getByText('Taux de marge enregistré').nextSibling).toHaveTextContent(/-5,0\s%/)
+  expect(screen.getByText('Taux de marge enregistré').nextSibling).toHaveTextContent(/-5\s%/)
   expect(ca).toHaveValue('1 000 000')
   // Budgets : nombre saisi et total par axe.
   const services = screen.getByText('Services').closest('li')!
