@@ -161,7 +161,7 @@ def main() -> None:
 
     from app.db.session import SessionLocal
     from app.main import app
-    from app.models.auth import Perimetre
+    from app.models.auth import Perimetre, Utilisateur
     from app.models.referentiel import Rubrique, Service, Site
     from app.seed import _user, run
 
@@ -169,8 +169,11 @@ def main() -> None:
         run(db, admins[0]["email"], mdp(admins[0]["email"]), None)
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
-            _user(db, c["email"].strip().lower(), c["nom"], mdp(c["email"]), c["role"],
+            email = c["email"].strip().lower()
+            _user(db, email, c["nom"], mdp(c["email"]), c["role"],
                   perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui")
+            # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
+            db.scalar(select(Utilisateur).where(Utilisateur.email == email)).nom = c["nom"]
         db.commit()
         cibles = {
             "service": {s.libelle: s.id for s in db.scalars(select(Service))},
