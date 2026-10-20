@@ -226,8 +226,6 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('création refusée : adresse e-mail invalide', async ({ page }) => {
-    // Défaut de l'application : le format de l'adresse n'est pas contrôlé (compte créé avec « pas-un-email »).
-    test.fail()
     const rep = await creer(page.request, 'pas-un-email', 'Adresse invalide', [{ role: 'lecteur_global' }])
     if (rep.status() === 201) await page.request.delete(`api/v1/users/${((await rep.json()) as User).id}`)
     expect(rep.status()).toBe(422)

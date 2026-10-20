@@ -35,3 +35,11 @@ def test_audit_filtres_et_pagination(db, make_client):
     assert len(u) == 2 and all(e["entite_id"] == str(uid) for e in u)
     page = c.get(f"{API}/audit", params={"limit": 1, "offset": 1}).json()
     assert [e["id"] for e in page] == [tout[1]["id"]]
+
+
+def test_creation_email_invalide_refusee(db, make_client):
+    c = make_client(ADMIN)
+    for email in ["pas-un-email", "a@b", "a b@exemple.invalid", "@exemple.invalid"]:
+        r = c.post(f"{API}/users", json={"email": email, "nom": "X", "password": PW,
+                                         "roles": [{"role": "lecteur_global"}]})
+        assert r.status_code == 422, email

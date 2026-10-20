@@ -1,7 +1,8 @@
+import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,11 +31,21 @@ class RoleIn(BaseModel):
     nominatif: bool = False
 
 
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class UserIn(BaseModel):
     email: str
     nom: str
     password: str
     roles: list[RoleIn]
+
+    @field_validator("email")
+    @classmethod
+    def email_valide(cls, v: str) -> str:
+        if not EMAIL_RE.match(v.strip()):
+            raise ValueError("Adresse e-mail invalide")
+        return v
 
 
 class UserPatch(BaseModel):
