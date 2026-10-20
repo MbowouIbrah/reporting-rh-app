@@ -216,12 +216,6 @@ export default function Resume() {
               </Case>
             )}
           </div>
-          {aCa && (
-            <p className="regle">
-              Le CA et la marge sont saisis chaque mois par l’administration RH. Un mois non saisi reste
-              vide ; le taux de marge ne porte que sur les mois où les deux sont connus.
-            </p>
-          )}
           {filtre && (
             <p className="regle">
               Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne s’affichent pas
@@ -233,6 +227,9 @@ export default function Resume() {
       {a && (
         <>
           <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
+          {aCa && (
+            <p className="regle">CA et marge saisis chaque mois par les RH ; % marge calculé sur les mois où les deux sont saisis.</p>
+          )}
           <div className="table-scroll">
             <table className="dense suivi">
               <thead>

@@ -343,10 +343,10 @@ table.dense td.num { text-align: right; }
 /* Mensuel et Annuel : onglet Excel, sections empilées pleine largeur, page défilante */
 .rapport-excel { --gris-bandeau: var(--rapport-titre); --gris-section: var(--rapport-section); --gris-etiq: var(--rapport-entete); --brun: var(--navy); --peche: var(--rapport-total); --pointille: var(--rule-strong); max-width: calc(var(--page-max) - 2 * var(--page-gutter)); margin-inline: auto; width: 100%; padding-bottom: var(--sp-6); }
 .rapport-excel .bandeau-titre { background: var(--gris-bandeau); color: var(--paper); font-family: var(--font-body); font-size: var(--fs-lg); font-weight: 700; letter-spacing: 0; padding: 9px 20px; margin: 0 0 var(--sp-3); }
-.rapport-excel .filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0 0 var(--sp-3); padding: 0; position: static; }
-.rapport-excel .filtres label { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
-.rapport-excel .filtres select { height: 36px; border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-size: var(--fs-md); font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; letter-spacing: 0; min-width: 96px; }
-.rapport-excel .filtres > a.bouton, .rapport-excel .filtres input { height: 36px; }
+:is(.rapport-excel, .resume-excel) .filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); margin: 0 0 var(--sp-3); padding: 0; position: static; }
+:is(.rapport-excel, .resume-excel) .filtres label { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
+:is(.rapport-excel, .resume-excel) .filtres select { height: 36px; border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-size: var(--fs-md); font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; letter-spacing: 0; min-width: 96px; }
+:is(.rapport-excel, .resume-excel) .filtres > a.bouton, :is(.rapport-excel, .resume-excel) .filtres input { height: 36px; }
 .rapport-excel .bandeau { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-6); padding: 8px 14px; margin: 0 0 var(--sp-3); border-radius: 0; font-size: var(--fs-sm); background: var(--paper-3); color: var(--navy); }
 .rapport-excel .bandeau.ko { background: var(--red-soft); color: var(--red-deep); }
 .rapport-excel .grille-rapport { display: flex; flex-direction: column; gap: var(--sp-4); }
@@ -372,7 +372,7 @@ table.dense td.num { text-align: right; }
 /* Damier par service : chaque bloc (service, activités, budget fusionnés) forme une seule bande */
 .rapport-excel .panneau table.dense.services tbody tr:not(.total) > td, .rapport-excel .panneau table.dense.services tbody tr:not(.total) > th { background: var(--surface); }
 .rapport-excel .panneau table.dense.services tbody tr.bande > td, .rapport-excel .panneau table.dense.services tbody tr.bande > th { background: var(--rapport-zebre); }
-@media (max-width: 720px) { .rapport-excel .filtres label { width: 100%; justify-content: space-between; } }
+@media (max-width: 720px) { :is(.rapport-excel, .resume-excel) .filtres label { width: 100%; justify-content: space-between; } }
 
 
 /* Mensuel et Annuel >= 1100 px : une section par écran, accrochage vertical, rail de navigation à droite */
@@ -380,9 +380,9 @@ table.dense td.num { text-align: right; }
 @media (min-width: 1360px) {
   .rapport-excel { padding-bottom: 0; --v: clamp(4px, 1.1vh, 14px); }
   .rapport-excel .bandeau-titre { padding: calc(var(--v) * .6) 20px; margin-bottom: var(--v); font-size: var(--fs-lg); }
-  .rapport-excel .filtres { margin-bottom: var(--v); }
-  .rapport-excel .filtres label { font-size: var(--fs-xs); }
-  .rapport-excel .filtres select, .rapport-excel .filtres input, .rapport-excel .filtres > a.bouton { height: clamp(26px, 4vh, 36px); font-size: var(--fs-md); }
+  :is(.rapport-excel, .resume-excel) .filtres { margin-bottom: var(--v); }
+  :is(.rapport-excel, .resume-excel) .filtres label { font-size: var(--fs-xs); }
+  :is(.rapport-excel, .resume-excel) .filtres select, :is(.rapport-excel, .resume-excel) .filtres input, :is(.rapport-excel, .resume-excel) .filtres > a.bouton { height: clamp(26px, 4vh, 36px); font-size: var(--fs-md); }
   .rapport-excel .bandeau { margin-bottom: var(--v); padding: calc(var(--v) * .5) 14px; font-size: var(--fs-sm); }
   .snap-zone { flex: 1; min-height: 0; position: relative; }
   .snap-scroll { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scroll-behavior: smooth; overscroll-behavior: contain; scrollbar-width: none; }
@@ -441,8 +441,8 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
   .page-ecran.rapport-excel:not(.graphes-excel) .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
   .page-ecran.rapport-excel:not(.graphes-excel) .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; }
 }
-.rapport-excel .filtres input { border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-size: var(--fs-md); font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; width: 140px; }
-.rapport-excel .filtres input::placeholder { color: var(--brun); opacity: .55; font-weight: 400; }
+:is(.rapport-excel, .resume-excel) .filtres input { border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-size: var(--fs-md); font-weight: 700; padding: 0 12px; border-radius: 0; text-transform: none; width: 140px; }
+:is(.rapport-excel, .resume-excel) .filtres input::placeholder { color: var(--brun); opacity: .55; font-weight: 400; }
 .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { white-space: nowrap; }
 .individuel-excel table.individuel tr.sous th, .individuel-excel table.individuel tr.sous td { color: var(--muted); background: var(--paper); }
 @media (min-width: 1100px) { .individuel-excel table.individuel { font-size: var(--fs-xs); } .individuel-excel table.individuel thead th { white-space: normal; vertical-align: bottom; } }
@@ -479,8 +479,8 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 /* Filtres : Employé et Réinitialiser restent toujours sur la même ligne */
 .filtres-fin { display: flex; flex: 1 1 360px; align-items: center; gap: var(--sp-2); min-width: 0; }
 .filtres-fin .filtre { flex: 1 1 auto; min-width: 0; }
-.rapport-excel .filtres .filtres-fin .choix-salarie { flex: 1; min-width: 0; }
-.rapport-excel .filtres .filtres-fin .choix-salarie input { width: 100%; max-width: 320px; }
+:is(.rapport-excel, .resume-excel) .filtres .filtres-fin .choix-salarie { flex: 1; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres .filtres-fin .choix-salarie input { width: 100%; max-width: 320px; }
 .filtres .bouton-lien { flex: none; white-space: nowrap; }
 /* Colonnes ANNÉE à Noms figées au défilement horizontal */
 .donnees-excel { --f1: 62px; --f2: 96px; --f3: 104px; --f4: 190px; }
@@ -514,9 +514,9 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 :is(.donnees-excel, .individuel-excel) .legende-exclu { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--red-deep); }
 :is(.donnees-excel, .individuel-excel) .legende-exclu::before { content: ''; width: 18px; height: 12px; border-left: 2px solid var(--red-deep); background: var(--red-soft) var(--hachure); }
 /* Filtre Employé : même étiquette que les autres filtres, liste déroulante avec recherche */
-.rapport-excel .filtres .filtre { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
+:is(.rapport-excel, .resume-excel) .filtres .filtre { display: inline-flex; align-items: center; gap: 12px; background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-left: 16px; }
 .choix-salarie { position: relative; }
-.rapport-excel .filtres .choix-salarie input { width: 260px; text-transform: none; letter-spacing: 0; }
+:is(.rapport-excel, .resume-excel) .filtres .choix-salarie input { width: 260px; text-transform: none; letter-spacing: 0; }
 .choix-salarie [role='listbox'] { position: absolute; top: calc(100% + 2px); left: 0; z-index: calc(var(--z-sticky) + 5); width: max(100%, 300px); max-height: 320px; overflow-y: auto; list-style: none; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgba(26, 31, 60, .15); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--navy); }
 .choix-salarie li { display: flex; gap: var(--sp-3); padding: 6px 12px; cursor: pointer; }
 .choix-salarie li.actif { background: var(--surface-hover); }
@@ -529,8 +529,8 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .liste-choix li.actif { background: var(--surface-hover); color: var(--navy); }
 .liste-choix li[aria-selected='true'] { border-left-color: var(--navy); font-weight: 600; color: var(--navy); }
 @media (max-width: 720px) {
-  .rapport-excel .filtres .filtre { width: 100%; justify-content: space-between; }
-  .rapport-excel .filtres .choix-salarie input { width: min(260px, 60vw); }
+  :is(.rapport-excel, .resume-excel) .filtres .filtre { width: 100%; justify-content: space-between; }
+  :is(.rapport-excel, .resume-excel) .filtres .choix-salarie input { width: min(260px, 60vw); }
 }
 /* Mobile : champs à 16 px pour éviter le zoom automatique au focus (iOS) */
 @media (max-width: 720px) { input, select, textarea { font-size: var(--fs-base) !important; } }
@@ -641,8 +641,8 @@ html, body { overscroll-behavior: none; }
 .saisie-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-2) var(--sp-3); margin-top: auto; padding-top: var(--sp-2); }
 .saisie-pied > :first-child:not(:only-child) { margin-right: auto; }
 .saisie-pied .bouton-lien, .saisie-actions .bouton-lien { text-decoration: underline; }
-.rapport-excel .filtres.saisie-actions .bouton { height: 36px; padding-block: 0; }
-.rapport-excel .filtres.saisie-actions > .bouton-primaire { margin-left: auto; }
+:is(.rapport-excel, .resume-excel) .filtres.saisie-actions .bouton { height: 36px; padding-block: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.saisie-actions > .bouton-primaire { margin-left: auto; }
 .saisie-compte { margin-left: auto; font-weight: 700; color: var(--navy); }
 .rapport-excel .bandeau .bouton { padding-block: 2px; }
 .bandeau .bandeau-action { margin-left: auto; }
@@ -855,12 +855,12 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 
 
 /* Filtres : étiquette discrète puis champ, angles droits, focus rouge */
-.rapport-excel .filtres label, .rapport-excel .filtres .filtre { background: none; padding-left: 0; gap: var(--sp-2); color: var(--muted); }
-.rapport-excel .filtres label + label, .rapport-excel .filtres label + .filtre, .rapport-excel .filtres .filtre + label { margin-left: var(--sp-2); }
-.filtres select, .filtres input, .rapport-excel .filtres select, .rapport-excel .filtres input, .champ input, .champ select, .champ textarea, .field input, .selecteur-annee select {
+:is(.rapport-excel, .resume-excel) .filtres label, :is(.rapport-excel, .resume-excel) .filtres .filtre { background: none; padding-left: 0; gap: var(--sp-2); color: var(--muted); }
+:is(.rapport-excel, .resume-excel) .filtres label + label, :is(.rapport-excel, .resume-excel) .filtres label + .filtre, :is(.rapport-excel, .resume-excel) .filtres .filtre + label { margin-left: var(--sp-2); }
+.filtres select, .filtres input, :is(.rapport-excel, .resume-excel) .filtres select, :is(.rapport-excel, .resume-excel) .filtres input, .champ input, .champ select, .champ textarea, .field input, .selecteur-annee select {
   border: 1px solid var(--rule-strong); border-radius: 0; background-color: var(--paper); color: var(--ink); transition: border-color var(--dur), box-shadow var(--dur);
 }
-.rapport-excel .filtres select, .rapport-excel .filtres input { font-weight: 600; }
+:is(.rapport-excel, .resume-excel) .filtres select, :is(.rapport-excel, .resume-excel) .filtres input { font-weight: 600; }
 :is(.filtres select, .filtres input, .champ input, .champ select, .champ textarea, .field input, .selecteur-annee select):focus { outline: none; border-color: var(--red); box-shadow: var(--anneau-focus); }
 .saisie-cartes .filtres { background: none; }
 
@@ -1040,7 +1040,7 @@ table.tableau-squelette td { height: 2.1em; }
 .barre-retour:disabled { opacity: .5; cursor: not-allowed; }
 .barre-parcours .saisie-etapes { margin: 0; }
 /* Départ : mois concerné au-dessus des deux façons de faire, action principale dans chaque carte */
-.rapport-excel .filtres.saisie-periode { margin-bottom: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.saisie-periode { margin-bottom: 0; }
 .saisie-periode .note { font-size: var(--fs-sm); }
 .saisie-carte-action { margin-top: auto; }
 .saisie-deux-temps { margin: 0; padding: 0; list-style: none; counter-reset: temps; display: grid; gap: var(--sp-3); }
@@ -1086,27 +1086,27 @@ table.tableau-squelette td { height: 2.1em; }
 
 /* Barre de filtres des rapports, compacte : titre « Filtres », étiquette au-dessus du champ,
    champs à la largeur de leur contenu, tout sur une ligne sur un écran courant. */
-.rapport-excel .filtres.filtres-rapport { align-items: end; gap: var(--sp-2); }
-.rapport-excel .filtres.filtres-rapport > :is(label, .filtre) {
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport { align-items: end; gap: var(--sp-2); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(label, .filtre) {
   display: grid; gap: 2px; margin-left: 0; font-size: 11px; letter-spacing: .06em;
 }
-.rapport-excel .filtres.filtres-rapport :is(select, input) {
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport :is(select, input) {
   height: 32px; min-width: 0; padding: 0 8px; font-size: var(--fs-sm);
 }
-.rapport-excel .filtres.filtres-rapport select { max-width: 125px; }
-.rapport-excel .filtres.filtres-rapport .choix-salarie input { width: 150px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport select { max-width: 125px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie input { width: 150px; }
 /* Réinitialiser et Exporter restent ensemble, calés à droite, même quand la barre passe à la ligne. */
 .filtres-actions { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; flex: none; }
-.rapport-excel .filtres.filtres-rapport .filtres-actions > :is(a.bouton, .reinitialiser) {
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .filtres-actions > :is(a.bouton, .reinitialiser) {
   display: inline-flex; align-items: center; height: 32px; padding-block: 0; padding-inline: var(--sp-3); margin: 0; text-decoration: none;
 }
 /* Écran large : une seule ligne ; les champs cèdent un peu de largeur plutôt que de passer à la ligne. */
 @media (min-width: 1360px) {
-  .rapport-excel .filtres.filtres-rapport { flex-wrap: nowrap; }
-  .rapport-excel .filtres.filtres-rapport > :is(label, .filtre) { flex: none; white-space: nowrap; }
-  .rapport-excel .filtres.filtres-rapport > .souple { flex: 0 1 auto; min-width: 0; }
-  .rapport-excel .filtres.filtres-rapport > .souple :is(select, input) { width: 100%; min-width: 72px; }
-  .rapport-excel .filtres.filtres-rapport .choix-salarie { min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport { flex-wrap: nowrap; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(label, .filtre) { flex: none; white-space: nowrap; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple { flex: 0 1 auto; min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple :is(select, input) { width: 100%; min-width: 72px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie { min-width: 0; }
 }
 .filtres-titre {
   display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px;
