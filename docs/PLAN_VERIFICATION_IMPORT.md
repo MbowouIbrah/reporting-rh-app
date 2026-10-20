@@ -64,14 +64,16 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - Nom proche d'un autre employé : « C'est <nom> (EMPxxx) : remplacer par cet employé » ou « Personne différente ».
 - Même matricule, nom différent : « Garder le nom enregistré » / « Mettre à jour le nom ».
 
-**G9. Nouvelles valeurs (poste, site, service…)** : jamais créées sans validation explicite (« Créer le poste … » ou « Remplacer par <valeur la plus proche> ») ; une seule ligne par valeur, avec le nombre de lignes concernées (« Agent logistiquee : 3 lignes »).
+**G9. Nouvelles valeurs (poste, site, service…)** — livré, à valider : jamais créées sans validation explicite (« Créer le poste … » ou « Remplacer par <valeur la plus proche> ») ; une seule ligne par valeur, avec le nombre de lignes concernées (« Agent logistiquee : 3 lignes »).
 
-**G10. Valeurs corrigées automatiquement** : « Conserver » / « Refuser » par ligne, « Tout conserver ». Refuser remet la valeur d'origine en *À corriger*.
+**G10. Valeurs corrigées automatiquement** — livré, à valider (refus = `CORRECTION_REFUSEE` bloquant) : « Conserver » / « Refuser » par ligne, « Tout conserver ». Refuser remet la valeur d'origine en *À corriger*.
 
-**G11. Montants** : montant négatif « Régularisation confirmée » / corriger.
+**G11. Montants** — livré, à valider : montant négatif « Régularisation confirmée » / corriger.
 
-**G12. Contrôles manquants** (backlog B-017) : MOIS ou ANNÉE différents du mois choisi, montant ×10 ou en milliers par rapport au mois précédent, Brut Réel ≠ somme, ligne sans aucun montant, nouvel employé sans matricule.
+**G12. Contrôles manquants** (backlog B-017) — livré, à valider (`PERIODE_ISOLEE`, `MONTANT_X10`/`MONTANT_DIV10`/`MONTANT_MILLIERS`, `BRUT_REEL_ECART`, `LIGNE_SANS_MONTANT`, `SANS_MATRICULE`) : MOIS ou ANNÉE différents du mois choisi, montant ×10 ou en milliers par rapport au mois précédent, Brut Réel ≠ somme, ligne sans aucun montant, nouvel employé sans matricule.
 
-**G13. Rapport Excel annoté** : le fichier d'erreurs reprend le fichier importé, lignes et cellules en cause surlignées (rouge à corriger, orange à confirmer) avec le message en commentaire.
+**G13. Rapport Excel annoté** — livré, à valider (feuille « FICHIER ANNOTÉ » + feuille « ANOMALIES ») : le fichier d'erreurs reprend le fichier importé, lignes et cellules en cause surlignées (rouge à corriger, orange à confirmer) avec le message en commentaire.
 
 Règle pour tous les groupes : chaque point propose au moins une solution dans la liste ; la saisie libre reste toujours possible.
+
+**Blocage de l'avance** — livré, à valider : un lot prêt qui garde des points « à confirmer » sans solution reste sur l'écran « POINTS À CONFIRMER » (`ImportFichier.tsx` `avancer`, `PointsAttention.tsx` `aConfirmer`).
