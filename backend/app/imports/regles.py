@@ -293,7 +293,9 @@ def _periodes_isolees(lignes: list[Ligne], add) -> None:
 
 def _ecarts_mois_precedent(par_matricule, by_num: dict[int, Ligne], refs: Refs, add) -> None:
     """Montant 10 fois plus grand, 10 fois plus petit ou en milliers par rapport au mois précédent de l'employé
-    (dans le fichier, sinon le dernier mois enregistré)."""
+    (dans le fichier, sinon le dernier mois enregistré). Un montant déjà signalé ne sert pas de base au mois
+    suivant : on corrige d'abord le mois en cause, sans faux écart en cascade."""
+    signales: set[tuple[int, str]] = set()
     for mat, occ in par_matricule.items():
         suite = sorted((by_num[o[0]] for o in occ), key=lambda L: (L.annee, L.mois))
         for i, L in enumerate(suite):
@@ -308,12 +310,14 @@ def _ecarts_mois_precedent(par_matricule, by_num: dict[int, Ligne], refs: Refs, 
                 base, per = refs.montants.get((mat, h[0], h[1]), {}), f"{MOIS[h[1] - 1].lower()} {h[0]}"
             for nom, unite in refs.rubriques:
                 v, p = L.montants.get(nom), base.get(nom)
-                if unite == "jours" or not v or not p or v <= 0 or p <= 0:
+                if unite == "jours" or not v or not p or v <= 0 or p <= 0 or (
+                        avant is not None and (avant.num, nom) in signales):
                     continue
                 r = v / p
                 for code, bas, haut, texte_ in ECARTS:
                     if bas <= r <= haut:
                         add(L.num, nom, code, AVERT, fr(v), f"{nom} : {fr(v)}, " + texte_.format(p=per, v=fr(p)))
+                        signales.add((L.num, nom))
                         break
 
 

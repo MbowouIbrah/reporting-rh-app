@@ -15,7 +15,9 @@ from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
     ATTRIBUTS,
     BLOQUANT,
+    BRUT,
     CODES_FORMULE,
+    COMPOSANTES_BRUT,
     FACTEURS,
     MOIS,
     Refs,
@@ -321,6 +323,8 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
             raise HTTPException(404, f"Ligne {num} introuvable")
         k = next(k for k, (n, _) in enumerate(feuille.lignes) if n == num)
         row, avant = list(feuille.lignes[k][1]), {}
+        s0, b0 = _somme_composantes(row, cols), _montant(row, cols, BRUT)
+        brut_juste = s0 is not None and b0 is not None and abs(b0 - s0) < 1
         for col, v in valeurs.items():
             j = cols.get(col)
             if j is None:
@@ -328,6 +332,12 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
             row += [None] * (j + 1 - len(row))
             avant[col] = _brut(row[j])
             row[j] = _saisie(v, col not in texte_libre)
+        if brut_juste and BRUT not in valeurs and set(valeurs) & set(COMPOSANTES_BRUT) and (
+                s := _somme_composantes(row, cols)) is not None:
+            # Brut Réel juste avant la correction d'une composante : il suit, sinon un nouvel écart apparaîtrait.
+            avant[BRUT] = _brut(row[cols[BRUT]])
+            row[cols[BRUT]] = _saisie(format(s.normalize(), "f"), True)
+            valeurs = {**valeurs, BRUT: format(s.normalize(), "f")}
         feuille.lignes[k] = (num, tuple(row))
         traces.append(("import_correction", {"ligne": num, **avant}, {"ligne": num, **valeurs}))
     for num in retirees:
@@ -335,9 +345,10 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
             raise HTTPException(404, f"Ligne {num} introuvable")
         traces.append(("import_ligne_retiree", {"ligne": num}, None))
     feuille.lignes = [(n, r) for n, r in feuille.lignes if n not in set(retirees)]
-    # Une cellule corrigée à la main n'a plus de correction automatique refusée.
-    saisies = {f"!{n}|{c}" for n, v in corrections.items() for c in v}
-    tous_ignores = sorted({*lot.feuille.get("ignores", []), *ignores} - saisies)
+    # Une cellule corrigée à la main perd ses décisions passées (correction refusée, avertissement accepté) :
+    # un nouveau problème sur la valeur saisie doit se voir.
+    saisies = {f"{p}{n}|{c}" for n, v in corrections.items() for c in v for p in ("", "!")}
+    tous_ignores = sorted(set(lot.feuille.get("ignores", [])) - saisies | set(ignores))
     if simuler:
         _, anos, _ = _controler(feuille, refs, tous_ignores)
         db.rollback()
@@ -423,6 +434,28 @@ def retirer_ligne(db: Session, user_id: int, lot_id: int, num: int) -> LotImport
     audit.record(db, user_id, "import_ligne_retiree", "lot_import", lot.id, avant, None)
     db.commit()
     return lot
+
+
+def _montant(row, cols, col) -> Decimal | None:
+    j = cols.get(col)
+    if j is None or j >= len(row):
+        return None
+    r = nombre(row[j])
+    return r[0] if r else None
+
+
+def _somme_composantes(row, cols) -> Decimal | None:
+    """Somme des composantes du Brut Réel ; None si une cellule remplie n'est pas un nombre."""
+    if BRUT not in cols or any(c not in cols for c in COMPOSANTES_BRUT):
+        return None
+    total = Decimal(0)
+    for c in COMPOSANTES_BRUT:
+        j = cols[c]
+        if j < len(row) and texte(row[j]):
+            if (m := _montant(row, cols, c)) is None:
+                return None
+            total += m
+    return total
 
 
 def _brut(x) -> str | None:
@@ -521,7 +554,7 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code in ("DOUBLON", "MUTATION", "BRUT_REEL_ECART", *FACTEURS, *CODES_NOMS)
+        a.code in ("DOUBLON", "MUTATION", "BRUT_REEL_ECART", "PERIODE_ISOLEE", *FACTEURS, *CODES_NOMS)
         or (a.code in ref and (a.colonne in PRECEDENT or a.colonne == "Noms")))}
     annuaire: dict[str, tuple[str, str]] | None = None
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
@@ -544,14 +577,24 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
         if a.code == "PERIODE_ISOLEE":
             if a.colonne not in periodes:
                 periodes[a.colonne] = _periode_du_fichier(db, lot_id, a.colonne)
-            if periodes[a.colonne]:
-                v = periodes[a.colonne][0]["valeur"]
+            # Période où l'employé a déjà sa ligne : la proposer créerait un doublon.
+            r_iso = rows.get(a.num_ligne)
+            prises = {MOIS[o.mois - 1] if a.colonne == "MOIS" else str(o.annee) for o in db.scalars(select(StagingLigne).where(
+                StagingLigne.lot_id == lot_id, StagingLigne.num_ligne != a.num_ligne,
+                func.lower(StagingLigne.matricule) == r_iso.matricule.casefold(),
+                (StagingLigne.annee == r_iso.annee) if a.colonne == "MOIS" else (StagingLigne.mois == r_iso.mois)))
+                if o.annee is not None and o.mois is not None} if r_iso is not None and r_iso.matricule else set()
+            if v := next((p["valeur"] for p in periodes[a.colonne] if p["valeur"] not in prises), None):
                 prop["corrections"] = [{"valeur": v, "libelle": f"Corriger en {v}, comme les autres lignes"}]
         r_g12 = rows.get(a.num_ligne)
         if r_g12 is not None and a.colonne and (a.code in FACTEURS or a.code == "BRUT_REEL_ECART"):
             m = {k: Decimal(x) for k, x in (r_g12.donnees.get("montants") or {}).items()}
             juste = somme_brut(m) if a.code == "BRUT_REEL_ECART" else (
                 m[a.colonne] * FACTEURS[a.code] if a.colonne in m else None)
+            if a.colonne == BRUT and a.code in FACTEURS and BRUT in m and abs(m[BRUT] - somme_brut(m)) < 1:
+                # Brut Réel juste mais composante aussi signalée : la bonne valeur est la somme corrigée.
+                f = {b.colonne: FACTEURS[b.code] for b in anos if b.num_ligne == a.num_ligne and b.code in FACTEURS}
+                juste = somme_brut({k: v * f.get(k, 1) for k, v in m.items()})
             if juste is not None:
                 prop["corrections"] = [{"valeur": format(juste.normalize(), "f"), "libelle": f"Corriger en {fr(juste)}"}]
         if a.code in NOUVELLES and a.valeur:

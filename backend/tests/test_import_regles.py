@@ -426,3 +426,9 @@ def test_ligne_sans_montant_et_employe_sans_matricule():
     _, _, anos, _ = run(rows)
     assert [n for n, _ in _codes(anos, "LIGNE_SANS_MONTANT")] == [3]
     assert _codes(anos, "SANS_MATRICULE") == [(4, "MATRICULE")]
+
+
+def test_ecart_signale_ne_sert_pas_de_base_au_mois_suivant():
+    rows = [ligne(Bonus=1000), ligne(MOIS="Février", Bonus=10000), ligne(MOIS="Mars", Bonus=1000)]
+    _, _, anos, _ = run(rows)
+    assert _codes(anos, "MONTANT_X10") == [(3, "Bonus")] and not _codes(anos, "MONTANT_DIV10")

@@ -278,3 +278,49 @@ def test_rapport_reprend_le_fichier_annote(make_client):
     site, poste = ws.cell(2, col["Site"]), ws.cell(3, col["Poste"])
     assert site.value == "Kribi" and site.fill.fgColor.rgb.endswith("FFC7CE") and "Kribi" in site.comment.text
     assert poste.fill.fgColor.rgb.endswith("FFE4B5") and poste.comment is not None
+
+
+def test_cellule_corrigee_perd_son_avertissement_accepte(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Bonus=-50, Formation=10)]).json()
+    u = f"{API}/imports/{lot['id']}/decisions"
+    assert c.post(u, json={"ignores": ["2|Bonus"]}).status_code == 200
+    assert not any(a["code"] == "MONTANT_NEGATIF" for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json())
+    sim = c.post(u, json={"lignes": {"2": {"Bonus": "-70"}}, "simuler": True}).json()["anomalies"]
+    assert (2, "Bonus", "MONTANT_NEGATIF") in {(a["ligne"], a["colonne"], a["code"]) for a in sim}
+
+
+def test_composante_corrigee_le_brut_reel_suit(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(**{"Salaire brut garantie": 1000, "Bonus": 2000, "Brut Réel": 3000})]).json()
+    r = c.post(f"{API}/imports/{lot['id']}/decisions", json={"lignes": {"2": {"Bonus": "200"}}})
+    assert r.status_code == 200, r.text
+    assert not any(a["code"] == "BRUT_REEL_ECART" for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json())
+    assert c.get(f"{API}/imports/{lot['id']}/lignes/2").json()["brut"]["Brut Réel"] == "1200"
+
+
+def test_brut_reel_deja_faux_n_est_pas_recalcule(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(**{"Salaire brut garantie": 1000, "Bonus": 200, "Brut Réel": 5000})]).json()
+    c.post(f"{API}/imports/{lot['id']}/decisions", json={"lignes": {"2": {"Bonus": "300"}}})
+    assert any(a["code"] == "BRUT_REEL_ECART" for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json())
+
+
+def test_brut_reel_x10_avec_composante_x10_propose_la_somme_corrigee(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne(**{"Salaire brut garantie": 1000, "Bonus": 50, "Brut Réel": 1050})]).json()
+    assert c.post(f"{API}/imports/{prec['id']}/valider").json()["statut"] == "valide"
+    lot = up(c, [ligne(MOIS="Février", **{"Salaire brut garantie": 10000, "Bonus": 50, "Brut Réel": 10050})]).json()
+    brut = next(a for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json()
+                if a["colonne"] == "Brut Réel" and a["code"] == "MONTANT_X10")
+    assert brut["proposition"]["corrections"][0]["valeur"] == "1050"
+
+
+def test_mois_isole_ne_propose_pas_un_mois_ou_l_employe_a_deja_sa_ligne(make_client):
+    c = make_client(ADMIN)
+    rows = [ligne(MATRICULE=f"E{i}", Noms=f"N {i}", Formation=10) for i in range(12)]
+    rows += [ligne(MATRICULE=f"E{i}", Noms=f"N {i}", MOIS="Février", Formation=10) for i in range(6, 12)]
+    rows.append(ligne(MATRICULE="E1", Noms="N 1", MOIS="Juillet", Formation=10))
+    lot = up(c, rows).json()
+    iso = next(a for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json() if a["code"] == "PERIODE_ISOLEE")
+    assert iso["proposition"]["corrections"][0]["valeur"] == "Février"
