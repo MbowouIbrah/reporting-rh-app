@@ -1,0 +1,20 @@
+annee;mois;axe;cible;valeur;cas couvert
+2026;5;service;Administration;5200000;sous le budget
+2026;5;service;Commerce Pièces;5500000;proche du budget
+2026;5;service;Commerce VN;5300000;proche du budget
+2026;5;service;Pneumatique;4500000;au-dessus du budget
+2026;5;service;SAV Engins;6000000;sous le budget
+2026;5;service;SAV PL;7000000;au-dessus du budget
+2026;5;service;Sites Déportés;5600000;proche du budget
+2026;6;service;Administration;5000000;sous le budget
+2026;6;service;Commerce Pièces;5800000;proche du budget
+2026;6;service;Commerce VN;5000000;au-dessus du budget
+2026;6;service;Pneumatique;4800000;au-dessus du budget
+2026;6;service;SAV Engins;6200000;sous le budget
+2026;6;service;SAV PL;7000000;au-dessus du budget
+2026;6;service;Sites Déportés;6000000;sous le budget
+2026;6;site;Douala;3800000;sous le budget
+2026;6;site;Nkoteng;6000000;au-dessus du budget
+2026;6;site;Dehane;6000000;proche du budget
+2026;6;rubrique;Primes exceptionnelles;2000000;au-dessus du budget
+2026;6;rubrique;Formation;150000;sous le budget
