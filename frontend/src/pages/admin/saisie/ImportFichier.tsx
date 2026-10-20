@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, queryRetry } from '../../../api/client'
 import { envoyerFichier, lireAnomalies, urlRapport, type Lot } from '../../../api/saisie'
 import Etat from '../../../components/Etat'
@@ -7,7 +7,7 @@ import { Bouton, ChoixFichier } from '../../../components/Kit'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
 import FormulesRefusees, { CODES_FORMULE } from './FormulesRefusees'
-import PointsAttention, { VOLET_ERREURS } from './PointsAttention'
+import PointsAttention, { aConfirmer, repartir, VOLET_ERREURS } from './PointsAttention'
 
 const ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -28,15 +28,21 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
   const [pied, setPied] = useState<HTMLElement | null>(null)
   const input = useRef<HTMLInputElement>(null)
 
+  // Lot prêt : on n'avance que si aucun point « à confirmer » n'attend de solution.
+  const avancer = useCallback(async (l: Lot, actif: () => boolean = () => true) => {
+    if (l.statut !== 'pret') return setEtat({ lot: l })
+    const anos = await lireAnomalies(l.id)
+    if (!actif()) return
+    if (!anos.some(aConfirmer)) return onLot(l)
+    setVolet((v) => repartir(anos).find((g) => g.lignes.some(aConfirmer))?.id ?? v)
+    setEtat({ lot: l })
+  }, [onLot])
+
   useEffect(() => {
     let actif = true
     setEtat({})
     envoyerFichier(fichier, choix)
-      .then((lot) => {
-        if (!actif) return
-        if (lot.statut === 'pret') onLot(lot)
-        else setEtat({ lot })
-      })
+      .then((lot) => (actif ? avancer(lot, () => actif) : undefined))
       .catch((e) => {
         if (!actif) return
         const deja = e instanceof ApiError && e.status === 409
@@ -44,7 +50,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
         setEtat({ erreur: deja ? 'Ce fichier a déjà été importé et enregistré.' : e instanceof Error ? e.message : 'Fichier illisible.' })
       })
     return () => { actif = false }
-  }, [fichier, choix, onLot])
+  }, [fichier, choix, avancer])
 
   const lot = etat.lot
   const anomalies = useQuery({
@@ -54,13 +60,15 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
     retry: queryRetry,
   })
   const formules = !!anomalies.data?.some((a) => CODES_FORMULE.includes(a.code))
+  const pret = lot?.statut === 'pret'
+  const nbConfirmer = anomalies.data?.filter(aConfirmer).length ?? 0
 
   return (
     <section className="page-ecran rapport-excel saisie-apercu">
       <BarreParcours libelle="Renseigner des données" onRetour={onRetour}>
         <Etapes parcours="fichier" actuelle={0} />
       </BarreParcours>
-      <h2 className="bandeau-titre">{lot || etat.erreur ? 'FICHIER REFUSÉ' : 'ANALYSE DU FICHIER'} — {fichier.name}</h2>
+      <h2 className="bandeau-titre">{pret ? 'POINTS À CONFIRMER' : lot || etat.erreur ? 'FICHIER REFUSÉ' : 'ANALYSE DU FICHIER'} — {fichier.name}</h2>
       {etat.modifications !== undefined && (
         <p className="bandeau ko" role="status">
           <span>
@@ -73,14 +81,14 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       {!lot && !etat.erreur && etat.modifications === undefined && <Etat type="chargement" />}
       {(lot || etat.erreur) && (
         <p className="bandeau ko" role="alert">
-          {etat.erreur ?? (formules ? 'Fichier refusé : des formules n’ont pas de valeur utilisable. Corrigez le fichier dans Excel, puis importez-le de nouveau. Rien n’est enregistré.' : `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`)}
+          {etat.erreur ?? (pret ? `${nbConfirmer} point${nbConfirmer > 1 ? 's' : ''} à confirmer avant de continuer : choisissez une solution pour chacun, puis Enregistrer. Rien n’est enregistré pour l’instant.` : formules ? 'Fichier refusé : des formules n’ont pas de valeur utilisable. Corrigez le fichier dans Excel, puis importez-le de nouveau. Rien n’est enregistré.' : `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`)}
         </p>
       )}
       {lot && formules && <FormulesRefusees anomalies={anomalies.data!} />}
       {lot && !formules && (
         <div className="panneau">
           <div className="panneau-corps volets" role="region" aria-label="Erreurs du fichier">
-            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => (l.statut === 'pret' ? onLot(l) : setEtat({ lot: l }))} afficherLigne ouvert={volet} onOuvrir={setVolet} pied={pied} />}
+            {anomalies.data && <PointsAttention anomalies={anomalies.data} lotId={lot?.id} onLot={(l) => void avancer(l).catch((e) => setEtat({ erreur: e instanceof Error ? e.message : 'Erreur.' }))} afficherLigne ouvert={volet} onOuvrir={setVolet} pied={pied} />}
           </div>
         </div>
       )}

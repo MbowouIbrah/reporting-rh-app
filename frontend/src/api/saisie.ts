@@ -105,6 +105,8 @@ export interface AnomalieLot {
   /** Aide à la décision : lignes du doublon, valeur du mois précédent, liste où ajouter une valeur inconnue. */
   proposition?: {
     lignes?: number[]; valeur?: string; periode?: string; dimension?: string
+    /** Valeur inconnue : valeur existante la plus ressemblante, proposée en remplacement. */
+    proche?: string
     /** Nombre mal écrit : lecture(s) devinée(s), deux si le séparateur est ambigu. */
     corrections?: { valeur: string; libelle: string }[]
     /** Noms et matricules : noms du fichier, nom enregistré, employé connu le plus probable. */

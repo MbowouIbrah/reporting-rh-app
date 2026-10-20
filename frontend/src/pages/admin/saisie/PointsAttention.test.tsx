@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { vi } from 'vitest'
 import * as saisie from '../../../api/saisie'
 import type { AnomalieLot } from '../../../api/saisie'
-import PointsAttention, { repartir, VOLET_ERREURS } from './PointsAttention'
+import PointsAttention, { aConfirmer, repartir, VOLET_ERREURS } from './PointsAttention'
 
 function anomalie(code: string, gravite: AnomalieLot['gravite'] = 'avertissement', message = code, colonne = 'Noms'): AnomalieLot {
   return { ligne: 4, colonne, code, gravite, valeur: 'Jhon', message, matricule: 'EMP004', nom: 'John Doe' }
@@ -342,4 +342,26 @@ test('nom proche d’un autre employé : remplacer par cet employé ou personne 
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({
     lignes: { 40: { MATRICULE: 'EMP009', Noms: 'Awa Ngono' } } })))
+})
+
+const BRUT: AnomalieLot = { ...anomalie('BRUT_REEL_ECART', 'avertissement', 'Brut Réel différent de la somme.', 'Brut Réel'),
+  ligne: 40, valeur: '1 500', proposition: { corrections: [{ valeur: '1200', libelle: 'Corriger en 1 200' }] } }
+
+test('Brut Réel faux : garder la valeur ou corriger en la somme', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts(BRUT, vi.fn(), 'montants')
+  const liste = await screen.findByRole('combobox', { name: 'Brut Réel différent de la somme : que faire ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Choisir une solution…', 'Garder le Brut Réel saisi', 'Corriger en 1 200'])
+  fireEvent.change(liste, { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({ lignes: { 40: { 'Brut Réel': '1200' } } })))
+})
+
+test('à confirmer : bloque l’avance seulement si une solution est proposée', () => {
+  expect(aConfirmer(BRUT)).toBe(true)
+  expect(aConfirmer({ ...anomalie('VALEUR_MANQUANTE', 'avertissement', 'Poste vide.', 'Poste'), ligne: 40 })).toBe(true)
+  expect(aConfirmer({ ...anomalie('INCONNU_X', 'avertissement', 'Autre.'), colonne: null })).toBe(false)
+  expect(aConfirmer({ ...anomalie('TEXTE_CONVERTI', 'avertissement', 'Unité.', 'Bonus'), ligne: 40 })).toBe(false)
 })

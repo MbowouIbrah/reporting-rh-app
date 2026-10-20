@@ -12,7 +12,9 @@ function json(status: number, body: unknown) {
 test('fichier déjà en vérification : reprise des modifications enregistrées', async () => {
   const lot = { id: 7, statut: 'pret', fichier_nom: 'f.xlsx' }
   const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
-    String(url).includes('reprise=reprendre')
+    String(url).includes('/anomalies')
+      ? json(200, [])
+      : String(url).includes('reprise=reprendre')
       ? json(201, lot)
       : json(409, { detail: { message: 'Vérification en cours pour ce fichier', lot_id: 7, reprise: true, modifications: 3 } }))
   const onLot = vi.fn()
@@ -25,5 +27,6 @@ test('fichier déjà en vérification : reprise des modifications enregistrées'
   expect(screen.getByRole('button', { name: 'Tout annuler et recommencer' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Reprendre la vérification' }))
   await waitFor(() => expect(onLot).toHaveBeenCalledWith(lot))
-  expect(fetch).toHaveBeenCalledTimes(2)
+  // 409, réimport en reprise, puis lecture des points (aucun à confirmer : on avance).
+  expect(fetch).toHaveBeenCalledTimes(3)
 })

@@ -752,6 +752,7 @@ table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.det
 .ligne-fichier table.dense td { white-space: nowrap; }
 /* Boutons d'action sous la ligne du fichier, selon la nature du point. */
 .actions-point { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 8px; padding: 0 8px 8px; position: sticky; left: 0; }
+.actions-volet { margin: 0 0 8px; }
 /* Décision sur le point : question au-dessus de la liste, bouton Enregistrer au bout de la barre. */
 .actions-point .decision { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--navy); font-weight: 600; }
 .actions-point .decision select { font-weight: 400; max-width: 100%; }

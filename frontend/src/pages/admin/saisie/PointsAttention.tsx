@@ -34,8 +34,8 @@ const GROUPES: Groupe[] = [
   { id: VOLET_ERREURS, titre: 'Erreurs à corriger', niveau: 'corriger', aide: 'bloquent l’enregistrement',
     retenir: (a) => a.gravite === 'bloquant' },
   { id: 'noms', titre: 'Noms et matricules à vérifier', niveau: 'confirmer',
-    aide: 'nom différent de celui connu, proche d’un autre employé, ou matricule douteux',
-    retenir: (a) => codes('NOM_PROCHE', 'NOM_INCOHERENT', 'NOM_SIMILAIRE', 'MATRICULE_DOUTEUX', 'MATRICULE_NUMERIQUE')(a)
+    aide: 'nom différent de celui connu, proche d’un autre employé, matricule douteux ou absent',
+    retenir: (a) => codes('NOM_PROCHE', 'NOM_INCOHERENT', 'NOM_SIMILAIRE', 'MATRICULE_DOUTEUX', 'MATRICULE_NUMERIQUE', 'SANS_MATRICULE')(a)
       || (a.code === 'VALEUR_MANQUANTE' && a.colonne === 'Noms') },
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
@@ -44,9 +44,14 @@ const GROUPES: Groupe[] = [
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
     aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
     retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
-  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants négatifs, tirets lus comme vides, postes nouveaux ou vides',
+  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants inhabituels, Brut Réel, mois différent, postes nouveaux ou vides',
     retenir: () => true },
 ]
+
+/** Point qui attend une décision (volet « À confirmer ») : on n'avance pas tant qu'il reste sans solution. */
+export function aConfirmer(a: AnomalieLot) {
+  return GROUPES.find((g) => g.retenir(a))!.niveau === 'confirmer' && decisions(a) !== null
+}
 
 /** Ordre d'affichage : à corriger, à confirmer, corrigé automatiquement, pour information. */
 const ORDRE: Niveau[] = ['corriger', 'confirmer', 'auto', 'info']
@@ -201,6 +206,12 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
           <Volet key={g.id} titre={g.titre} valeur={reste} ton={reste === 0 ? 'ok' : NIVEAUX[g.niveau].ton}
             resume={<><span className="volet-niveau">{NIVEAUX[g.niveau].libelle}</span> : {g.aide}</>}
             ouvert={ouvert === g.id} onOuvrir={() => onOuvrir(g.id)}>
+            {g.id === 'auto' && lotId != null && afficherLigne && !lectureSeule
+              && g.lignes.some((a) => CODES_AUTO.includes(a.code) && restants.has(cle(a)) && !plan.choix[cle(a)]) && (
+              <p className="actions-volet">
+                <Bouton variante="secondaire" disabled={occupe} onClick={() => setPlan((p) => toutConserver(g.lignes, p))}>Tout conserver</Bouton>
+              </p>
+            )}
             <Tableau lignes={g.lignes} tous={tous} lotId={lotId} afficherLigne={afficherLigne}
               ton={NIVEAUX[g.niveau].ton} edition={lotId != null && g.niveau !== 'info' ? edition : undefined} />
           </Volet>
@@ -332,6 +343,7 @@ const LISTES: Record<string, { dimension: string; pluriel: string }> = {
   Service: { dimension: 'service', pluriel: 'services' },
   'Activité': { dimension: 'activite', pluriel: 'activités' },
   'Type Contrat': { dimension: 'type_contrat', pluriel: 'types de contrat' },
+  Poste: { dimension: 'poste', pluriel: 'postes' },
 }
 
 const TYPES_SITE = [['agence', 'Agence'], ['deporte', 'Site déporté'], ['principal', 'Siège / principal']]
@@ -392,6 +404,31 @@ function decisionsNoms(point: AnomalieLot): { question: string; choix: Decision[
   return null
 }
 
+/** Valeurs corrigées d'office : « Conserver » ou « Refuser » (la cellule passe alors en erreur à corriger). */
+const CODES_AUTO = ['NORMALISE', 'TEXTE_CONVERTI']
+
+/** Contrôles de vraisemblance : [décision qui garde la valeur du fichier, question]. */
+const CONFIRMER: Record<string, [string, string]> = {
+  PERIODE_ISOLEE: ['Période confirmée', 'Mois différent du reste du fichier : que faire ?'],
+  MONTANT_X10: ['Montant confirmé', 'Montant inhabituel : que faire ?'],
+  MONTANT_DIV10: ['Montant confirmé', 'Montant inhabituel : que faire ?'],
+  MONTANT_MILLIERS: ['Montant confirmé', 'Montant en milliers ? Que faire ?'],
+  BRUT_REEL_ECART: ['Garder le Brut Réel saisi', 'Brut Réel différent de la somme : que faire ?'],
+  LIGNE_SANS_MONTANT: ['Confirmer : aucun montant ce mois', 'Ligne sans montant : que faire ?'],
+  SANS_MATRICULE: ['Continuer sans matricule', 'Employé sans matricule : que faire ?'],
+  SANS_MONTANT: ['Laisser vide (aucun montant)', 'Cellule lue comme vide : que faire ?'],
+}
+
+/** « Tout conserver » : la première décision (Conserver) sur chaque correction automatique encore ouverte. */
+function toutConserver(lignes: AnomalieLot[], p: Plan): Plan {
+  const choix = { ...p.choix }
+  for (const a of lignes) {
+    const d = decisions(a)
+    if (CODES_AUTO.includes(a.code) && d && a.ligne != null && !choix[cle(a)]) choix[cle(a)] = { index: 0, decision: d.choix[0], ligne: a.ligne }
+  }
+  return { ...p, choix }
+}
+
 /** Question posée par la liste et décisions proposées, selon le code du point. Aucune n'est choisie d'office. */
 function decisions(point: AnomalieLot): { question: string; choix: Decision[] } | null {
   const col = point.colonne ?? ''
@@ -411,12 +448,41 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
         { libelle: `Erreur : garder « ${prop.valeur} » (${prop.periode})`, valeurs: { [col]: prop.valeur } }],
     }
   }
-  const liste = LISTES[col]
-  if (point.code === 'REFERENTIEL_INCONNU' && liste && point.valeur) {
+  if (CODES_AUTO.includes(point.code) && point.ligne != null && col) {
     return {
-      question: `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel} : que faire ?`,
-      choix: [{ libelle: `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
-        ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...precedent],
+      question: 'Correction automatique : la garder ?',
+      choix: [{ libelle: 'Conserver', accepter: `${point.ligne}|${col}` },
+        { libelle: 'Refuser : je saisis la bonne valeur', accepter: `!${point.ligne}|${col}` }],
+    }
+  }
+  const confirmer = CONFIRMER[point.code]
+  if (confirmer && point.ligne != null && col) {
+    return {
+      question: confirmer[1],
+      choix: [{ libelle: confirmer[0], accepter: `${point.ligne}|${col}` },
+        ...(prop?.corrections ?? []).map((c) => ({ libelle: c.libelle, valeurs: { [col]: c.valeur } })),
+        ...(point.code === 'LIGNE_SANS_MONTANT' ? [{ libelle: 'Supprimer la ligne', retirer: [point.ligne] }] : [])],
+    }
+  }
+  if (point.code === 'MONTANT_NEGATIF' && point.ligne != null && point.valeur) {
+    const positif = point.valeur.trim().replace(/^[-−]\s*/, '')
+    return {
+      question: 'Montant négatif : régularisation ou erreur de signe ?',
+      choix: [{ libelle: 'Régularisation confirmée', accepter: `${point.ligne}|${col}` },
+        { libelle: `Corriger en ${positif}`, valeurs: { [col]: positif } }],
+    }
+  }
+  const liste = LISTES[col]
+  if ((point.code === 'REFERENTIEL_INCONNU' || point.code === 'POSTE_NOUVEAU') && liste && point.valeur) {
+    // Une seule décision pour toutes les lignes qui portent cette valeur.
+    const lignes = prop?.lignes?.length ? prop.lignes : point.ligne != null ? [point.ligne] : []
+    const remplacer: Decision[] = prop?.proche
+      ? [{ libelle: `Remplacer par « ${prop.proche} »`, parLigne: partout(lignes, { [col]: prop.proche }) }]
+      : []
+    return {
+      question: `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel}${lignes.length > 1 ? ` (${lignes.length} lignes)` : ''} : que faire ?`,
+      choix: [{ libelle: col === 'Poste' ? `Créer le poste « ${point.valeur} »` : `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
+        ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...remplacer, ...precedent],
     }
   }
   if (prop?.corrections?.length) {
@@ -425,6 +491,9 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
         : point.valeur ? `« ${point.valeur} » : que faire ?` : `${col} vide : que faire ?`,
       choix: prop.corrections.map((c) => ({ libelle: c.libelle, valeurs: { [col]: c.valeur } })),
     }
+  }
+  if (point.code === 'VALEUR_MANQUANTE' && point.gravite !== 'bloquant' && point.ligne != null && col) {
+    return { question: `${col} vide : que faire ?`, choix: [...precedent, { libelle: 'Laisser vide', accepter: `${point.ligne}|${col}` }] }
   }
   if (point.code === 'VALEUR_MANQUANTE' && precedent.length) return { question: `${col} vide : que faire ?`, choix: precedent }
   if (point.code === 'DOUBLON' && prop?.lignes && prop.lignes.length > 1) {
