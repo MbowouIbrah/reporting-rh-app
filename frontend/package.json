@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --reporter=dot --exclude e2e",
+    "test": "vitest run --reporter=dot --exclude e2e --exclude e2e-recette",
     "e2e": "playwright test"
   },
   "dependencies": {
