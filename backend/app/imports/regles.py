@@ -39,6 +39,13 @@ CODES_FORMULE = ("FORMULE_SANS_VALEUR", "ERREUR_EXCEL", "LIAISON_ERREUR")
 # Textes qui signifient « pas de montant » (tiret, barre, néant…) : lus comme une cellule vide.
 SANS_MONTANT = {"-", "--", "–", "—", "/", ".", "x", "n/a", "na", "neant", "nil", "rien", "aucun", "sans"}
 # Ligne de total : « TOTAL », « Sous-total »… dans une colonne d'attribut, ou somme Excel sans matricule.
+BRUT = "Brut Réel"
+COMPOSANTES_BRUT = ("Salaire brut garantie", "Commission", "Bonus", "Primes sur ventes")
+# Montant comparé au mois précédent : rapport -> (code, correction proposée, explication).
+ECARTS = (("MONTANT_X10", Decimal("9.5"), Decimal("10.5"), "environ 10 fois le montant de {p} ({v}) : un zéro en trop ?"),
+          ("MONTANT_DIV10", Decimal("0.095"), Decimal("0.105"), "environ 10 fois moins que {p} ({v}) : un zéro oublié ?"),
+          ("MONTANT_MILLIERS", Decimal("0.00095"), Decimal("0.00105"), "contre {v} en {p} : montant saisi en milliers ?"))
+FACTEURS = {"MONTANT_X10": Decimal("0.1"), "MONTANT_DIV10": Decimal(10), "MONTANT_MILLIERS": Decimal(1000)}
 RE_TOTAL = re.compile(r"(sous[\s-]?)?tota(l|ux)\b")
 RE_SOMME = re.compile(r"\b(SUM|SOMME|SUBTOTAL|SOUS\.TOTAL)\s*\(", re.I)
 
@@ -58,6 +65,8 @@ class Refs:
     annuaire: dict[str, tuple[str, str]] = field(default_factory=dict)  # matricule casefold -> (matricule, nom)
     # matricule casefold -> mois enregistrés (année, mois, {colonne: libellé}), du plus ancien au plus récent
     historique: dict[str, list[tuple[int, int, dict[str, str]]]] = field(default_factory=dict)
+    # (matricule casefold, année, mois) -> montants enregistrés {rubrique: valeur}
+    montants: dict[tuple[str, int, int], dict[str, Decimal]] = field(default_factory=dict)
 
 
 @dataclass
@@ -140,6 +149,15 @@ def admis(colonne: str, index: dict[str, str] | None) -> str:
 
 SUJETS = {"MOIS": "Le mois", "Type Contrat": "Le type de contrat", "Activité": "L’activité", "Site": "Le site",
           "Service": "Le service"}
+
+
+def _sur_lignes(nums: list[int]) -> str:
+    """« (3 lignes : 4, 9 et 12) » quand une même valeur revient sur plusieurs lignes ; rien pour une seule."""
+    if len(nums) < 2:
+        return ""
+    vus = ", ".join(map(str, nums[:5]))
+    liste = (", ".join(map(str, nums[:-1])) + f" et {nums[-1]}") if len(nums) <= 5 else vus + "…"
+    return f" ({len(nums)} lignes : {liste})"
 
 
 def _periode(L) -> str:
@@ -258,6 +276,67 @@ def colonnes(entetes: list, refs: Refs) -> dict[str, int]:
     return cols
 
 
+def _periodes_isolees(lignes: list[Ligne], add) -> None:
+    """Une ou deux lignes d'un autre mois que celui du reste du fichier : souvent une erreur de saisie."""
+    vues = Counter((L.annee, L.mois) for L in lignes if L.annee and L.mois)
+    if sum(vues.values()) < 10:
+        return
+    (pa, pm), nb = vues.most_common(1)[0]
+    for L in lignes:
+        p = (L.annee, L.mois)
+        if L.annee and L.mois and p != (pa, pm) and vues[p] <= 2 and vues[p] * 10 <= nb:
+            col, val = ("ANNÉE", str(L.annee)) if L.annee != pa else ("MOIS", MOIS[L.mois - 1])
+            add(L.num, col, "PERIODE_ISOLEE", AVERT, val,
+                f"Ligne en {_periode(L)} alors que les autres lignes du fichier sont en {MOIS[pm - 1].lower()} {pa} "
+                f"({nb} lignes) : erreur de saisie ?")
+
+
+def _ecarts_mois_precedent(par_matricule, by_num: dict[int, Ligne], refs: Refs, add) -> None:
+    """Montant 10 fois plus grand, 10 fois plus petit ou en milliers par rapport au mois précédent de l'employé
+    (dans le fichier, sinon le dernier mois enregistré)."""
+    for mat, occ in par_matricule.items():
+        suite = sorted((by_num[o[0]] for o in occ), key=lambda L: (L.annee, L.mois))
+        for i, L in enumerate(suite):
+            avant = next((P for P in reversed(suite[:i]) if (P.annee, P.mois) < (L.annee, L.mois)), None)
+            if avant is not None:
+                base, per = avant.montants, _periode(avant)
+            else:
+                h = next((h for h in reversed(refs.historique.get(mat, [])) if (h[0], h[1]) < (L.annee, L.mois)),
+                         None)
+                if h is None:
+                    continue
+                base, per = refs.montants.get((mat, h[0], h[1]), {}), f"{MOIS[h[1] - 1].lower()} {h[0]}"
+            for nom, unite in refs.rubriques:
+                v, p = L.montants.get(nom), base.get(nom)
+                if unite == "jours" or not v or not p or v <= 0 or p <= 0:
+                    continue
+                r = v / p
+                for code, bas, haut, texte_ in ECARTS:
+                    if bas <= r <= haut:
+                        add(L.num, nom, code, AVERT, fr(v), f"{nom} : {fr(v)}, " + texte_.format(p=per, v=fr(p)))
+                        break
+
+
+def somme_brut(montants: dict[str, Decimal]) -> Decimal:
+    return sum((montants.get(c, Decimal(0)) for c in COMPOSANTES_BRUT), Decimal(0))
+
+
+def _brut_reel(lignes: list[Ligne], refs: Refs, add) -> None:
+    """Brut Réel saisi : il doit valoir Salaire brut garantie + Commission + Bonus + Primes sur ventes."""
+    noms = {n for n, _u in refs.rubriques}
+    if BRUT not in noms or not noms.issuperset(COMPOSANTES_BRUT):
+        return
+    for L in lignes:
+        b = L.montants.get(BRUT)
+        if b is None or L.bloquant:
+            continue
+        s = somme_brut(L.montants)
+        if abs(b - s) >= 1:
+            add(L.num, BRUT, "BRUT_REEL_ECART", AVERT, fr(b),
+                f"Brut Réel ({fr(b)}) différent de la somme Salaire brut garantie + Commission + Bonus + "
+                f"Primes sur ventes ({fr(s)}).")
+
+
 def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], dict]:
     anos: list[Anomalie] = []
     nb_bloq = 0
@@ -333,7 +412,10 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     lignes: list[Ligne] = []
     cles: dict[tuple, list[int]] = defaultdict(list)
     par_matricule: dict[str, list[tuple[int, str, dict]]] = defaultdict(list)
-    postes_vus: set[str] = set()
+    # Valeurs absentes des listes : (colonne, valeur normalisée) -> (valeur lue, lignes).
+    inconnus: dict[tuple[str, str], tuple[str, list[int]]] = {}
+    postes_nouveaux: dict[str, tuple[str, list[int]]] = {}
+    sans_matricule: dict[str, tuple[str, list[int]]] = {}
 
     for num, row in feuille.lignes:
         if ligne_vide(row, utiles):
@@ -341,6 +423,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
 
         L = Ligne(num)
         nb_avant = nb_bloq
+        inconnu = False
 
         def g(nom, row=row):
             j = cols[nom]
@@ -375,6 +458,11 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 continue
             ref = {norm(m): m for m in MOIS} if index is None else index
             canon = ref.get(norm(t))
+            if canon is None and index is not None:
+                # Un seul point par valeur inconnue, ancré sur sa première ligne (voir après la boucle).
+                inconnus.setdefault((nom, norm(t)), (t, []))[1].append(num)
+                inconnu = True
+                continue
             if canon is None:
                 add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, f"« {t} » ne figure pas dans la liste. {admis(nom, index)}")
                 continue
@@ -392,6 +480,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 mat = None
             else:
                 mat, homonymes = matricule_sans_matricule(nom_seul, refs)
+                if est_sans_matricule(mat) and mat.casefold() not in refs.annuaire:
+                    sans_matricule.setdefault(mat, (nom_seul, []))[1].append(num)
                 if homonymes:
                     add(num, "MATRICULE", "NOM_HOMONYME", BLOQUANT, nom_seul,
                         f"Plusieurs employés portent ce nom ({', '.join(homonymes)}) : indiquer le matricule.")
@@ -424,9 +514,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, nom, "TEXTE_TROP_LONG", BLOQUANT, t, "200 caractères maximum.")
             else:
                 setattr(L, attr, t)
-        if L.poste and norm(L.poste) not in refs.postes and norm(L.poste) not in postes_vus:
-            postes_vus.add(norm(L.poste))
-            add(num, "Poste", "POSTE_NOUVEAU", AVERT, L.poste, "Poste inconnu : il sera créé à l'enregistrement.")
+        if L.poste and norm(L.poste) not in refs.postes:
+            postes_nouveaux.setdefault(norm(L.poste), (L.poste, []))[1].append(num)
 
         if L.annee and L.mois and mat and not re.search(r"\s", mat):
             cles[(L.annee, L.mois, mat.casefold())].append(num)
@@ -478,10 +567,34 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, nom, "MONTANT_NEGATIF", AVERT, vu, "Montant négatif : régularisation ou erreur de signe ?")
             L.montants[nom] = q
 
-        L.bloquant = nb_bloq > nb_avant
+        if nb_bloq == nb_avant and not inconnu and not any(
+                n in L.montants for n, u in refs.rubriques if u != "jours"):
+            premiere = next((n for n, u in refs.rubriques if u != "jours" and n in cols), None)
+            if premiere:
+                add(num, premiere, "LIGNE_SANS_MONTANT", AVERT, None,
+                    f"Aucun montant sur cette ligne ({L.nom or _qui(mat or '')}) : employé sans paie ce mois-ci "
+                    "ou ligne incomplète ?")
+        L.bloquant = nb_bloq > nb_avant or inconnu
         lignes.append(L)
 
+    index_de = {"Type Contrat": refs.contrats, "Activité": refs.activites, "Site": refs.sites,
+                "Service": refs.services}
+    for (nom, _n), (t, nums) in inconnus.items():
+        add(nums[0], nom, "REFERENTIEL_INCONNU", BLOQUANT, t,
+            f"« {t} » ne figure pas dans la liste{_sur_lignes(nums)}. {admis(nom, index_de[nom])}")
+    for p, nums in postes_nouveaux.values():
+        add(nums[0], "Poste", "POSTE_NOUVEAU", AVERT, p,
+            f"Le poste « {p} » n’existe pas encore{_sur_lignes(nums)} : le créer ou le remplacer par un poste existant.")
+
+    for nom_seul, nums in sans_matricule.values():
+        add(nums[0], "MATRICULE", "SANS_MATRICULE", AVERT, None,
+            f"{nom_seul} n’a pas de matricule{_sur_lignes(nums)} : un identifiant provisoire lui est donné. "
+            "Saisir son matricule si vous le connaissez.")
+
     by_num = {L.num: L for L in lignes}
+    _periodes_isolees(lignes, add)
+    _ecarts_mois_precedent(par_matricule, by_num, refs, add)
+    _brut_reel(lignes, refs, add)
     douteux: set[str] = set()  # matricules inconnus qui désignent sans doute un employé connu
     for (a, m, _mat), nums in cles.items():
         if len(nums) > 1:

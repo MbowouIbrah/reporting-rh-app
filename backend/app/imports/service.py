@@ -1,10 +1,13 @@
 """Cycle de vie d'un lot : analyse (staging) -> validation explicite -> annulation."""
 
 import hashlib
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
+from openpyxl.comments import Comment
+from openpyxl.styles import Font, PatternFill
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
@@ -13,19 +16,22 @@ from app.imports.regles import (
     ATTRIBUTS,
     BLOQUANT,
     CODES_FORMULE,
+    FACTEURS,
     MOIS,
     Refs,
     colonnes,
     employe_probable,
     entetes_reconnus,
     est_sans_matricule,
+    fr,
     interpretations,
     nombre,
     norm,
+    somme_brut,
     texte,
     valider,
 )
-from app.imports.similarite import SEUIL_NOUVEAU_PROCHE, plus_proche
+from app.imports.similarite import SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
 from app.models.auth import AuditEvent
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
@@ -77,13 +83,21 @@ def charger_refs(db: Session) -> Refs:
                         .order_by(Periode.annee, Periode.mois)):
         historique.setdefault(r[0], []).append(
             (r[1], r[2], {c: lib[c].get(i) for c, i in zip(COLONNES_REF, r[3:], strict=True)}))
+    montants: dict[tuple[str, int, int], dict[str, Decimal]] = {}
+    for m, a, mo, rub, v in db.execute(
+            select(Salarie.matricule_norm, Periode.annee, Periode.mois, Montant.rubrique_id, Montant.valeur)
+            .join(SituationMensuelle, SituationMensuelle.salarie_id == Salarie.id)
+            .join(Periode, Periode.id == SituationMensuelle.periode_id)
+            .join(Montant, Montant.situation_id == SituationMensuelle.id)):
+        if rub in par_id:
+            montants.setdefault((m, a, mo), {})[par_id[rub]] = v
     return Refs(
         services=index("service", Service), activites=index("activite", Activite),
         sites=index("site", Site), contrats=index("type_contrat", TypeContrat),
         rubriques=[(r.libelle, r.unite) for r in rubs], rubrique_alias=alias,
         postes=set(index("poste", Poste)), noms_connus=noms,
         annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
-        historique=historique,
+        historique=historique, montants=montants,
     )
 
 
@@ -224,7 +238,11 @@ def _feuille_du_lot(lot: LotImport) -> Feuille:
                    f["ligne_ignoree"], formules)
 
 
-DIM_REFS = {"service": "services", "activite": "activites", "site": "sites", "type_contrat": "contrats"}
+# Rapport annoté : à corriger, à confirmer.
+ROUGE, ORANGE = "FFC7CE", "FFE4B5"
+
+DIM_REFS = {"service": "services", "activite": "activites", "site": "sites", "type_contrat": "contrats",
+            "poste": "postes"}
 
 
 def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Refs:
@@ -233,7 +251,10 @@ def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Ref
     for dim, valeurs in (lot.feuille.get("ajouts", {}) if ajouts is None else ajouts).items():
         idx = getattr(refs, DIM_REFS[dim])
         for v in valeurs:
-            idx[norm(v)] = v
+            if isinstance(idx, set):  # postes : textes normalisés seulement
+                idx.add(norm(v))
+            else:
+                idx[norm(v)] = v
     return refs
 
 
@@ -249,11 +270,24 @@ def _relancer(db: Session, lot: LotImport, feuille: Feuille, refs: Refs, **decis
     _ecrire(db, lot, lignes, anos, stats)
 
 
+CODES_AUTO = ("NORMALISE", "TEXTE_CONVERTI")  # valeurs corrigées d'office, refusables
+
+
 def _controler(feuille: Feuille, refs: Refs, ignores):
-    """Contrôles du lot ; un avertissement sur une cellule que l'utilisateur a choisi d'ignorer n'est plus signalé."""
+    """Contrôles du lot ; un avertissement sur une cellule que l'utilisateur a choisi d'ignorer n'est plus signalé.
+    « !ligne|colonne » : correction automatique refusée, la cellule passe en erreur à corriger."""
     lignes, anos, stats = valider(feuille, refs)
     ign = set(ignores)
-    return lignes, [a for a in anos if a.gravite == BLOQUANT or f"{a.ligne}|{a.colonne}" not in ign], stats
+    out = []
+    for a in anos:
+        c = f"{a.ligne}|{a.colonne}"
+        if a.gravite != BLOQUANT and a.code in CODES_AUTO and f"!{c}" in ign:
+            a = replace(a, code="CORRECTION_REFUSEE", gravite=BLOQUANT,
+                        message=f"Correction automatique refusée ({a.message}) : saisir la bonne valeur.")
+        elif a.gravite != BLOQUANT and c in ign:
+            continue
+        out.append(a)
+    return lignes, out, stats
 
 
 def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dict[int, dict[str, str | None]],
@@ -301,7 +335,9 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
             raise HTTPException(404, f"Ligne {num} introuvable")
         traces.append(("import_ligne_retiree", {"ligne": num}, None))
     feuille.lignes = [(n, r) for n, r in feuille.lignes if n not in set(retirees)]
-    tous_ignores = sorted({*lot.feuille.get("ignores", []), *ignores})
+    # Une cellule corrigée à la main n'a plus de correction automatique refusée.
+    saisies = {f"!{n}|{c}" for n, v in corrections.items() for c in v}
+    tous_ignores = sorted({*lot.feuille.get("ignores", []), *ignores} - saisies)
     if simuler:
         _, anos, _ = _controler(feuille, refs, tous_ignores)
         db.rollback()
@@ -396,6 +432,34 @@ def _brut(x) -> str | None:
     return None if x is None else str(x)
 
 
+def annoter_feuille(db: Session, lot: LotImport, anos, ws) -> None:
+    """Recopie la feuille importée dans `ws`, aux mêmes lignes ; cellule en cause en rouge (à corriger)
+    ou orange (à confirmer), message en commentaire ; point sans colonne : toute la ligne."""
+    if not lot.feuille:
+        return
+    f = lot.feuille
+    for j, v in enumerate(f["entetes"], 1):
+        ws.cell(f["entete_ligne"], j, v).font = Font(bold=True)
+    largeur = len(f["entetes"])
+    for n, row in f["lignes"]:
+        for j, v in enumerate(row, 1):
+            ws.cell(n, j, v)
+        largeur = max(largeur, len(row))
+    cols = colonnes(f["entetes"], _refs_du_lot(db, lot))
+    points: dict[tuple[int, int | None], list] = {}
+    for a in anos:
+        if a.num_ligne is not None:
+            j = cols.get(a.colonne) if a.colonne else None
+            points.setdefault((a.num_ligne, None if j is None else j + 1), []).append(a)
+    for (n, j), liste in points.items():
+        couleur = ROUGE if any(a.gravite == BLOQUANT for a in liste) else ORANGE
+        remplissage = PatternFill("solid", fgColor=couleur)
+        for c in [j] if j else range(1, largeur + 1):
+            ws.cell(n, c).fill = remplissage
+        ws.cell(n, j or 1).comment = Comment("\n".join(a.message for a in liste)[:30000], "Contrôle")
+    ws.freeze_panes = ws.cell(f["entete_ligne"] + 1, 1)
+
+
 def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
     """Ligne lue (valeurs comprises par les contrôles), avec, si le lot garde le fichier, les valeurs
     brutes à corriger et les listes de valeurs proposées (sans obligation : on peut taper autre chose)."""
@@ -457,11 +521,12 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code in ("DOUBLON", "MUTATION", *CODES_NOMS) or (a.code in ref and a.colonne in PRECEDENT))}
+        a.code in ("DOUBLON", "MUTATION", "BRUT_REEL_ECART", *FACTEURS, *CODES_NOMS) or (a.code in ref and a.colonne in PRECEDENT))}
     annuaire: dict[str, tuple[str, str]] | None = None
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
     periodes: dict[str, list[dict]] = {}
+    nouvelles: tuple | None = None
     out: dict[int, dict] = {}
     for a in anos:
         prop: dict = {}
@@ -475,8 +540,23 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
                 prop["corrections"] = periodes[a.colonne]
         if a.code == "LIGNE_TOTAL":
             prop["lignes"] = [a.num_ligne]
-        if a.code == "REFERENTIEL_INCONNU" and a.colonne in COLONNES_REF:
-            prop["dimension"] = COLONNES_REF[a.colonne][0]
+        if a.code == "PERIODE_ISOLEE":
+            if a.colonne not in periodes:
+                periodes[a.colonne] = _periode_du_fichier(db, lot_id, a.colonne)
+            if periodes[a.colonne]:
+                v = periodes[a.colonne][0]["valeur"]
+                prop["corrections"] = [{"valeur": v, "libelle": f"Corriger en {v}, comme les autres lignes"}]
+        r_g12 = rows.get(a.num_ligne)
+        if r_g12 is not None and a.colonne and (a.code in FACTEURS or a.code == "BRUT_REEL_ECART"):
+            m = {k: Decimal(x) for k, x in (r_g12.donnees.get("montants") or {}).items()}
+            juste = somme_brut(m) if a.code == "BRUT_REEL_ECART" else (
+                m[a.colonne] * FACTEURS[a.code] if a.colonne in m else None)
+            if juste is not None:
+                prop["corrections"] = [{"valeur": format(juste.normalize(), "f"), "libelle": f"Corriger en {fr(juste)}"}]
+        if a.code in NOUVELLES and a.valeur:
+            if nouvelles is None:
+                nouvelles = _nouvelles_valeurs(db, lot_id)
+            prop |= _proposition_nouvelle(nouvelles, a.colonne, a.valeur)
         r = rows.get(a.num_ligne)
         if r is not None and r.annee is not None and r.mois is not None and r.matricule:
             if a.code in CODES_NOMS:
@@ -492,7 +572,7 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
                     avant := _valeur_avant_dans_lot(db, lot_id, r, COLONNES_REF[a.colonne][0])):
                 # Changement entre deux mois du fichier : la valeur du mois d'avant, candidate si c'est une erreur.
                 prop |= avant
-            elif (a.code in ref or a.code == "MUTATION") and a.colonne in PRECEDENT:
+            elif (a.code in ref or a.code == "MUTATION") and a.colonne in PRECEDENT and len(prop.get("lignes", [])) < 2:
                 # Valeur du dernier mois enregistré avant celui de la ligne : candidate au remplacement.
                 model, attr = PRECEDENT[a.colonne]
                 q = (select(model.libelle, Periode.annee, Periode.mois)
@@ -512,6 +592,36 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
 
 
 CODES_NOMS = ("NOM_PROCHE", "NOM_INCOHERENT", "NOM_SIMILAIRE", "MATRICULE_DOUTEUX")
+NOUVELLES = ("REFERENTIEL_INCONNU", "POSTE_NOUVEAU")
+SEUIL_VALEUR_PROCHE = 0.75  # valeur existante proposée en remplacement d'une valeur inconnue
+
+
+def _nouvelles_valeurs(db: Session, lot_id: int) -> tuple:
+    """Lignes brutes du lot, position des colonnes et valeurs existantes de chaque liste (ajouts du lot compris)."""
+    lot = _get_lot(db, lot_id)
+    if not lot.feuille:
+        return [], {}, {}
+    refs = _refs_du_lot(db, lot)
+    existantes = {c: sorted(set(getattr(refs, DIM_REFS[d]).values()), key=norm)
+                  for c, (d, _m, _f) in COLONNES_REF.items()}
+    existantes["Poste"] = sorted(set(_ids(db, Poste)) | set((lot.feuille.get("ajouts") or {}).get("poste", {})), key=norm)
+    return lot.feuille["lignes"], colonnes(lot.feuille["entetes"], refs), existantes
+
+
+def _proposition_nouvelle(nouvelles: tuple, col: str | None, valeur: str) -> dict:
+    """Valeur absente d'une liste : liste où l'ajouter, toutes ses lignes (la décision vaut pour toutes) et la
+    valeur existante la plus ressemblante, à proposer en remplacement."""
+    rows, cols, existantes = nouvelles
+    prop: dict = {"dimension": "poste" if col == "Poste" else COLONNES_REF[col][0]} if col in PRECEDENT else {}
+    j = cols.get(col)
+    if j is not None:
+        prop["lignes"] = [n for n, r in rows if j < len(r) and r[j] is not None and norm(str(r[j])) == norm(valeur)]
+    scores = [(similarite(valeur, v), v) for v in existantes.get(col, [])]
+    meilleur = max(scores, default=(0, None))
+    if meilleur[0] >= SEUIL_VALEUR_PROCHE:
+        prop["proche"] = meilleur[1]
+    return prop
+
 
 
 def _proposition_nom(db: Session, lot_id: int, r: StagingLigne, code: str,

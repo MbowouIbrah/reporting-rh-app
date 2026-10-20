@@ -17,7 +17,7 @@ def test_site_inconnu_ajoute_dans_le_lot_puis_cree_a_la_validation(make_client, 
     lot = up(c, [ligne(Site="Kribi")]).json()
     assert lot["statut"] == "rejete"
     ano = anomalies(c, lot["id"])[0]
-    assert ano["code"] == "REFERENTIEL_INCONNU" and ano["proposition"] == {"dimension": "site"}
+    assert ano["code"] == "REFERENTIEL_INCONNU" and ano["proposition"] == {"dimension": "site", "lignes": [2]}
     r = c.post(f"{API}/imports/{lot['id']}/referentiels",
                json={"dimension": "site", "valeur": "Kribi", "type_site": "agence"})
     assert r.status_code == 200 and r.json()["statut"] == "pret", r.text
@@ -40,7 +40,7 @@ def test_ajout_referentiel_refus(make_client):
     assert c.post(u, json={"dimension": "site", "valeur": "douala", "type_site": "agence"}).status_code == 409
     assert c.post(u, json={"dimension": "site", "valeur": "Kribi"}).status_code == 422
     assert c.post(u, json={"dimension": "site", "valeur": "Kribi", "type_site": "x"}).status_code == 422
-    assert c.post(u, json={"dimension": "poste", "valeur": "Kribi"}).status_code == 422
+    assert c.post(u, json={"dimension": "contrat", "valeur": "Kribi"}).status_code == 422
     assert c.post(u, json={"dimension": "service", "valeur": "  "}).status_code == 422
 
 
@@ -180,7 +180,7 @@ def test_meme_fichier_avec_modifications_reprise_ou_tout_annuler(make_client, db
     if choix == "reprendre":
         assert r.json()["id"] == lot["id"] and lignes_ko == {3}  # la correction de la ligne 2 est gardée
     else:
-        assert r.json()["id"] != lot["id"] and lignes_ko == {2, 3}
+        assert r.json()["id"] != lot["id"] and lignes_ko == {2}  # un seul point pour « Kribi », sur ses 2 lignes
         assert db.get(LotImport, lot["id"]).statut == "annule"
 
 
@@ -225,3 +225,46 @@ def test_nom_proche_mettre_a_jour_le_nom_a_la_validation(make_client, db):
     c.post(f"{API}/imports/{lot['id']}/valider")
     db.expire_all()
     assert db.scalar(select(Salarie.nom).where(Salarie.matricule == "EMP001")) == "Jean Dupond"
+
+
+def test_valeur_inconnue_un_seul_point_avec_ses_lignes_et_la_valeur_proche(make_client):
+    c = make_client(ADMIN)
+    rows = [ligne(Site="Doualaa"), ligne(MATRICULE="EMP002", Noms="C D", Site="Doualaa")]
+    lot = up(c, rows).json()
+    [ano] = [a for a in anomalies(c, lot["id"]) if a["code"] == "REFERENTIEL_INCONNU"]
+    assert ano["proposition"] | {"valeur": None, "periode": None} == {
+        "dimension": "site", "lignes": [2, 3], "proche": "Douala", "valeur": None, "periode": None}
+    assert "2 lignes : 2 et 3" in ano["message"]
+    # « Remplacer par Douala » sur les deux lignes : plus rien à corriger
+    r = c.post(f"{API}/imports/{lot['id']}/decisions",
+               json={"lignes": {"2": {"Site": "Douala"}, "3": {"Site": "Douala"}}, "ajouts": [], "retirees": [],
+                     "ignores": []})
+    assert r.status_code == 200 and r.json()["statut"] == "pret", r.text
+
+
+def test_correction_automatique_refusee_devient_a_corriger_puis_saisie(make_client):
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Formation="25 000 FCFA")]).json()
+    assert lot["statut"] == "pret"
+    u = f"{API}/imports/{lot['id']}/decisions"
+    vide = {"ajouts": [], "retirees": [], "lignes": {}}
+    r = c.post(u, json={**vide, "ignores": ["!2|Formation"]})
+    assert r.status_code == 200 and r.json()["statut"] == "rejete", r.text
+    assert [a["code"] for a in anomalies(c, lot["id"])] == ["CORRECTION_REFUSEE"]
+    r = c.post(u, json={**vide, "ignores": ["!2|Formation"], "lignes": {"2": {"Formation": "25000"}}})
+    assert r.json()["statut"] == "pret", r.text
+
+
+def test_rapport_reprend_le_fichier_annote(make_client):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Site="Kribi"), ligne(MATRICULE="EMP002", Noms="C D", Poste=None)]).json()
+    wb = load_workbook(BytesIO(c.get(f"{API}/imports/{lot['id']}/rapport.xlsx").content))
+    ws = wb.worksheets[0]
+    assert ws.title == "FICHIER ANNOTÉ" and "ANOMALIES" in wb.sheetnames
+    col = {ws.cell(1, j).value: j for j in range(1, ws.max_column + 1)}
+    site, poste = ws.cell(2, col["Site"]), ws.cell(3, col["Poste"])
+    assert site.value == "Kribi" and site.fill.fgColor.rgb.endswith("FFC7CE") and "Kribi" in site.comment.text
+    assert poste.fill.fgColor.rgb.endswith("FFE4B5") and poste.comment is not None

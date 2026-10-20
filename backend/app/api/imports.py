@@ -149,8 +149,13 @@ def rapport(lot_id: int, p: Principal = Depends(current_principal), db: Session 
     anos = list(db.scalars(select(ImportAnomalie).where(ImportAnomalie.lot_id == lot_id)
                            .order_by(ImportAnomalie.gravite, ImportAnomalie.num_ligne)))
     wb = Workbook()
-    ws = wb.active
-    ws.title = "ANOMALIES"
+    if lot.feuille:
+        service.annoter_feuille(db, lot, anos, wb.active)
+        wb.active.title = "FICHIER ANNOTÉ"
+        ws = wb.create_sheet("ANOMALIES")
+    else:
+        ws = wb.active
+        ws.title = "ANOMALIES"
     ws.append(["Ligne", "Colonne", "Code", "Gravité", "Valeur", "Message"])
     for a in anos:
         ws.append([a.num_ligne, a.colonne, a.code, a.gravite, a.valeur, a.message])

@@ -57,7 +57,7 @@ def run(lignes, entetes=ENTETES, avant=0, **kw):
 
 
 def test_fichier_propre():
-    L, ens, anos, st = run([ligne(), ligne(MATRICULE="EMP002", Noms="C D")])
+    L, ens, anos, st = run([ligne(Bonus=5), ligne(MATRICULE="EMP002", Noms="C D", Bonus=5)])
     assert not [a for a in anos if a.gravite == BLOQUANT]
     assert st["lignes"] == 2 and st["salaries"] == 2 and not any(x.bloquant for x in L)
     assert ens == {(2, "Poste", "POSTE_NOUVEAU")}
@@ -83,11 +83,13 @@ def test_pieges_ensemble_exact_ligne_colonne_code():
         ligne(MATRICULE="E16", Formation="1.23456"),                                # 18 précision
     ]
     L, ens, anos, _ = run(rows, postes={"p"})
+    ens = {e for e in ens if e[2] != "LIGNE_SANS_MONTANT"}  # lignes de test sans montant
     assert ens == {
         (2, "MATRICULE", "DOUBLON"),
         (4, "Service", "REFERENTIEL_INCONNU"),
         (5, "Primes sur ventes", "NON_NUMERIQUE"),
         (7, "MOIS", "NORMALISE"),
+        (7, "MOIS", "PERIODE_ISOLEE"), (17, "MOIS", "PERIODE_ISOLEE"),
         (8, "MATRICULE", "NORMALISE"),
         (9, "MATRICULE", "MATRICULE_NUMERIQUE"),
         (10, "Absences (nb)", "ABSENCES_HORS_BORNES"),
@@ -114,7 +116,8 @@ def test_tirets_et_mots_lus_comme_vides():
     ]
     L, ens, anos, st = run(rows, postes={"p"})
     assert ens == {(2, "Bonus", "SANS_MONTANT"), (3, "Formation", "SANS_MONTANT"), (3, "Bonus", "SANS_MONTANT"),
-                   (3, "Absences (nb)", "SANS_MONTANT")}
+                   (3, "Absences (nb)", "SANS_MONTANT"), (2, "Primes sur ventes", "LIGNE_SANS_MONTANT"),
+                   (3, "Primes sur ventes", "LIGNE_SANS_MONTANT")}
     assert st["lignes"] == 2 and not any(x.bloquant for x in L)
     assert all("Formation" not in x.montants and "Bonus" not in x.montants for x in L)
 
@@ -392,3 +395,34 @@ def test_matricule_douteux_retrouve_l_employe_connu():
                        noms_connus=connus, annuaire=ann)
     assert (2, "MATRICULE", "NORMALISE") in ens and L[0].matricule == "EMP046"
     assert not any(code == "MATRICULE_DOUTEUX" for *_, code in ens)
+
+
+def _codes(anos, code):
+    return [(a.ligne, a.colonne) for a in anos if a.code == code]
+
+
+def test_periode_isolee_signalee():
+    rows = [ligne(MATRICULE=f"E{i}", Noms=f"N {i}", Formation=10) for i in range(11)]
+    rows.append(ligne(MATRICULE="E99", Noms="Z Z", MOIS="Juillet", Formation=10))
+    _, _, anos, _ = run(rows)
+    assert _codes(anos, "PERIODE_ISOLEE") == [(13, "MOIS")]
+
+
+def test_montant_x10_et_milliers_par_rapport_au_mois_precedent_du_fichier():
+    rows = [ligne(Bonus=1000, Formation=500), ligne(MOIS="Février", Bonus=10000, Formation="0,5")]
+    _, _, anos, _ = run(rows)
+    assert {a.code for a in anos if a.ligne == 3} >= {"MONTANT_X10", "MONTANT_MILLIERS"}
+
+
+def test_brut_reel_different_de_la_somme():
+    rows = [ligne(**{"Salaire brut garantie": 1000, "Bonus": 200, "Brut Réel": 1200}),
+            ligne(MATRICULE="EMP002", Noms="C D", **{"Salaire brut garantie": 1000, "Brut Réel": 1500})]
+    _, _, anos, _ = run(rows)
+    assert _codes(anos, "BRUT_REEL_ECART") == [(3, "Brut Réel")]
+
+
+def test_ligne_sans_montant_et_employe_sans_matricule():
+    rows = [ligne(Formation=10), ligne(MATRICULE="EMP002", Noms="C D"), ligne(MATRICULE=None, Noms="X Y", Bonus=5)]
+    _, _, anos, _ = run(rows)
+    assert [n for n, _ in _codes(anos, "LIGNE_SANS_MONTANT")] == [3]
+    assert _codes(anos, "SANS_MATRICULE") == [(4, "MATRICULE")]
