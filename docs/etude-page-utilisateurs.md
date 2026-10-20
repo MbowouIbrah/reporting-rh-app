@@ -21,7 +21,7 @@ Un administrateur RH doit pouvoir gérer les comptes de l'application (pas les e
 ## Choix : A
 - Onglet « Utilisateurs » (`/admin/utilisateurs`), visible et accessible avec `users:write`.
 - Tableau : nom, adresse, rôle, périmètre, détail nominatif, statut, actions (Modifier, Désactiver/Réactiver, Supprimer avec confirmation). Recherche par nom ou adresse.
-- Formulaire : nom, adresse (non modifiable après création : l'API ne le permet pas), mot de passe (obligatoire à la création, facultatif en modification), rôle, périmètre (seulement pour un lecteur à périmètre), case « accès au détail nominatif » (seulement pour un lecteur à périmètre ; les rôles globaux l'ont d'office).
+- Formulaire : nom, adresse (modifiable ; envoyée seulement si elle change ; la session porte l'id du compte, donc personne n'est déconnecté), mot de passe (obligatoire à la création, facultatif en modification), rôle, périmètre (seulement pour un lecteur à périmètre), case « accès au détail nominatif » (seulement pour un lecteur à périmètre ; les rôles globaux l'ont d'office).
 - Un seul rôle par compte dans le formulaire. Si un compte en a plusieurs (cas créé hors interface), tous sont affichés et un avertissement prévient qu'enregistrer les remplace.
 - Son propre compte : ni désactivation ni suppression proposées (évite de se fermer l'accès).
 - Contrôles côté front identiques à ceux du serveur, pour des messages immédiats ; le serveur reste l'autorité.

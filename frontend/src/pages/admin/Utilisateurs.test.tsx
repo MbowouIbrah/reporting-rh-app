@@ -133,11 +133,27 @@ test('son propre compte : rôle verrouillé, jamais envoyé', async () => {
   expect(ecritures(appels)[0].body).not.toHaveProperty('roles')
 })
 
-test('modification du nom seul : ni rôles ni mot de passe envoyés', async () => {
+test('modification de l’adresse : envoyée seule si elle change, refusée si invalide', async () => {
   const appels = monter(page, PERMS, servir)
   fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
   const f = await formulaire('Modifier l’utilisateur')
-  expect(f.getByLabelText('Adresse e-mail')).toBeDisabled()
+  const champ = f.getByLabelText('Adresse e-mail')
+  expect(champ).toBeEnabled()
+  await waitFor(() => expect(f.getByLabelText('Périmètre')).toHaveValue('5'))
+  fireEvent.change(champ, { target: { value: 'pas-une-adresse' } })
+  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
+  expect(f.getByText('Adresse e-mail invalide')).toBeInTheDocument()
+  expect(ecritures(appels)).toHaveLength(0)
+  fireEvent.change(champ, { target: { value: 'nouvelle@exemple.invalid' } })
+  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toMatchObject({ email: 'nouvelle@exemple.invalid' })
+})
+
+test('modification du nom seul : ni adresse, ni rôles, ni mot de passe envoyés', async () => {
+  const appels = monter(page, PERMS, servir)
+  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
+  const f = await formulaire('Modifier l’utilisateur')
   expect(f.getByLabelText('Nom')).toHaveValue('Chef Sav')
   await waitFor(() => expect(f.getByLabelText('Périmètre')).toHaveValue('5'))
   fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef SAV PL' } })
@@ -148,6 +164,7 @@ test('modification du nom seul : ni rôles ni mot de passe envoyés', async () =
   expect(put.url).toMatch(/\/users\/2$/)
   expect(put.body).not.toHaveProperty('password')
   expect(put.body).not.toHaveProperty('roles')
+  expect(put.body).not.toHaveProperty('email')
 })
 
 test('modification : un nouveau mot de passe trop court est refusé', async () => {

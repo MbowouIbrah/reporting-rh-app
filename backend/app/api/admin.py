@@ -34,25 +34,29 @@ class RoleIn(BaseModel):
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+def _email_valide(v: str | None) -> str | None:
+    if v is not None and not EMAIL_RE.match(v.strip()):
+        raise ValueError("Adresse e-mail invalide")
+    return v
+
+
 class UserIn(BaseModel):
     email: str
     nom: str
     password: str
     roles: list[RoleIn]
 
-    @field_validator("email")
-    @classmethod
-    def email_valide(cls, v: str) -> str:
-        if not EMAIL_RE.match(v.strip()):
-            raise ValueError("Adresse e-mail invalide")
-        return v
+    _email = field_validator("email")(_email_valide)
 
 
 class UserPatch(BaseModel):
+    email: str | None = None
     nom: str | None = None
     actif: bool | None = None
     password: str | None = None
     roles: list[RoleIn] | None = None
+
+    _email = field_validator("email")(_email_valide)
 
 
 class RegleIn(BaseModel):
@@ -170,6 +174,9 @@ def update_user(
         perd_role = body.roles is not None and not any(r.role == "rh_admin" for r in body.roles)
         if perd_actif or perd_role:
             _exiger_autre_admin(db, u)
+    # La session porte l'id du compte : changer l'adresse ne déconnecte personne.
+    if body.email is not None:
+        u.email = body.email.strip().lower()
     if body.nom is not None:
         u.nom = body.nom
     if body.actif is not None:

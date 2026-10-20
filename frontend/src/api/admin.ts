@@ -97,7 +97,7 @@ export interface CompteIn {
   password: string
   roles: Affectation[]
 }
-export type ComptePatch = { id: number } & Partial<Pick<Compte, 'nom' | 'actif' | 'roles'> & { password: string }>
+export type ComptePatch = { id: number } & Partial<Pick<Compte, 'email' | 'nom' | 'actif' | 'roles'> & { password: string }>
 
 export const useComptes = () =>
   useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<Compte[]>('/users'), retry: queryRetry })

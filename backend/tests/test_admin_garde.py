@@ -43,3 +43,14 @@ def test_creation_email_invalide_refusee(db, make_client):
         r = c.post(f"{API}/users", json={"email": email, "nom": "X", "password": PW,
                                          "roles": [{"role": "lecteur_global"}]})
         assert r.status_code == 422, email
+
+
+def test_modification_email(db, make_client):
+    c = make_client(ADMIN)
+    uid = second_admin(c)
+    r = c.put(f"{API}/users/{uid}", json={"email": " Nouveau@exemple.invalid "})
+    assert r.status_code == 200 and r.json()["email"] == "nouveau@exemple.invalid"
+    assert c.put(f"{API}/users/{uid}", json={"email": "a@b"}).status_code == 422
+    assert c.put(f"{API}/users/{uid}", json={"email": ADMIN}).status_code == 409
+    # le changement d'adresse ne touche pas le reste du compte
+    assert c.put(f"{API}/users/{uid}", json={"nom": "B"}).json()["email"] == "nouveau@exemple.invalid"

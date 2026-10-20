@@ -69,6 +69,7 @@ function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: bool
   const [initiale] = useState<Fiche>(() => ficheDe(edition.compte))
   const [fiche, setFiche] = useState<Fiche>(initiale)
   // Rôles envoyés seulement s'ils changent : un nom ou un mot de passe modifié ne touche pas aux affectations.
+  const emailChange = fiche.email.trim().toLowerCase() !== initiale.email
   const roleChange = nouveau || (['role', 'perimetre_id', 'nominatif'] as const).some((k) => fiche[k] !== initiale[k])
   const [erreurs, setErreurs] = useState<Record<string, string>>({})
   const [erreurApi, setErreurApi] = useState<string | null>(null)
@@ -79,7 +80,7 @@ function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: bool
     e.preventDefault()
     const err: Record<string, string> = {}
     if (!fiche.nom.trim()) err.nom = 'Nom obligatoire'
-    if (nouveau && !EMAIL_RE.test(fiche.email.trim())) err.email = 'Adresse e-mail invalide'
+    if (!EMAIL_RE.test(fiche.email.trim())) err.email = 'Adresse e-mail invalide'
     if ((nouveau || fiche.password) && fiche.password.length < MDP_MIN) err.password = `${MDP_MIN} caractères minimum`
     if (roleChange && fiche.role === 'lecteur_perimetre' && !fiche.perimetre_id) err.perimetre = 'Périmètre obligatoire'
     setErreurs(err)
@@ -90,7 +91,7 @@ function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: bool
     if (nouveau) creer.mutate({ email: fiche.email.trim(), nom: fiche.nom.trim(), password: fiche.password, roles }, opts)
     else
       modifier.mutate(
-        { id: edition.compte!.id, nom: fiche.nom.trim(), ...(roleChange ? { roles } : {}), ...(fiche.password ? { password: fiche.password } : {}) },
+        { id: edition.compte!.id, nom: fiche.nom.trim(), ...(emailChange ? { email: fiche.email.trim() } : {}), ...(roleChange ? { roles } : {}), ...(fiche.password ? { password: fiche.password } : {}) },
         opts,
       )
   }
@@ -102,7 +103,7 @@ function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: bool
           {(p) => <input {...p} value={fiche.nom} onChange={(e) => maj('nom', e.target.value)} />}
         </Champ>
         <Champ label="Adresse e-mail" erreur={erreurs.email}>
-          {(p) => <input {...p} type="email" autoComplete="off" value={fiche.email} disabled={!nouveau} onChange={(e) => maj('email', e.target.value)} />}
+          {(p) => <input {...p} type="email" autoComplete="off" value={fiche.email} onChange={(e) => maj('email', e.target.value)} />}
         </Champ>
         <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe (facultatif)'} erreur={erreurs.password}>
           {(p) => <input {...p} type="password" autoComplete="new-password" value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
