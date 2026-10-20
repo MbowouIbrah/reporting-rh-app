@@ -15,8 +15,13 @@ ADMIN, DRH, EQUIP, VN = ("admin@exemple.invalid", "drh@exemple.invalid", "dps.eq
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+_octets: dict[str, bytes] = {}
+
+
 def up(client, lignes, nom="f.xlsx"):
-    return client.post(f"{API}/imports", files={"fichier": (nom, xlsx(lignes), XLSX)})
+    # mêmes lignes → mêmes octets (openpyxl date chaque enregistrement : le sha256 changerait)
+    contenu = _octets.setdefault(repr(lignes), xlsx(lignes))
+    return client.post(f"{API}/imports", files={"fichier": (nom, contenu, XLSX)})
 
 
 def fichier_a():
