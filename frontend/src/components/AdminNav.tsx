@@ -5,6 +5,7 @@ const ONGLETS = [
   { to: '/admin', label: 'Données', perm: 'saisie:write' },
   { to: '/admin/employes', label: 'Employés', perm: 'saisie:write' },
   { to: '/admin/referentiels', label: 'Référentiels', perm: 'referentiel:write' },
+  { to: '/admin/utilisateurs', label: 'Utilisateurs', perm: 'users:write' },
 ]
 
 /** Sous-onglets de l'administration, sous le titre de page ; un onglet n'apparaît qu'avec le droit qu'exige son API. */

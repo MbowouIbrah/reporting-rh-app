@@ -70,3 +70,41 @@ export const useListes = () =>
 export const useCreerSalarie = () => useEcriture((b: FicheIn) => api<Fiche>('/salaries', json('POST', b)))
 export const useModifierSalarie = () =>
   useEcriture(({ id, ...b }: Fiche) => api<Fiche>(`/salaries/${id}`, json('PUT', b)))
+
+// ---- comptes de l'application (rh_admin seul) ----
+export const ROLES = ['rh_admin', 'lecteur_global', 'lecteur_perimetre'] as const
+export type Role = (typeof ROLES)[number]
+export interface Affectation {
+  role: Role
+  perimetre_id: number | null
+  nominatif: boolean
+}
+export interface Compte {
+  id: number
+  email: string
+  nom: string
+  actif: boolean
+  roles: Affectation[]
+}
+export interface Perimetre {
+  id: number
+  code: string
+  libelle: string
+}
+export interface CompteIn {
+  email: string
+  nom: string
+  password: string
+  roles: Affectation[]
+}
+export type ComptePatch = { id: number } & Partial<Pick<Compte, 'nom' | 'actif' | 'roles'> & { password: string }>
+
+export const useComptes = () =>
+  useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<Compte[]>('/users'), retry: queryRetry })
+export const usePerimetres = () =>
+  useQuery({ queryKey: ['admin', 'perimetres'], queryFn: () => api<Perimetre[]>('/perimetres'), retry: queryRetry })
+export const useCreerCompte = () => useEcriture((b: CompteIn) => api<Compte>('/users', json('POST', b)))
+export const useModifierCompte = () =>
+  useEcriture(({ id, ...b }: ComptePatch) => api<Compte>(`/users/${id}`, json('PUT', b)))
+export const useSupprimerCompte = () =>
+  useEcriture((id: number) => api(`/users/${id}`, { method: 'DELETE' }))

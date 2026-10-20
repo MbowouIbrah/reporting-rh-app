@@ -9,6 +9,7 @@ import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
 import Referentiels from './pages/admin/Referentiels'
 import Saisie from './pages/admin/Saisie'
+import Utilisateurs from './pages/admin/Utilisateurs'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 
@@ -85,6 +86,14 @@ export default function App() {
           element={
             <RequireAuth perm="referentiel:write">
               <Referentiels />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/utilisateurs"
+          element={
+            <RequireAuth perm="users:write">
+              <Utilisateurs />
             </RequireAuth>
           }
         />

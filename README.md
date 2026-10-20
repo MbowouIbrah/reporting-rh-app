@@ -3,7 +3,7 @@
 Application web de reporting RH (remplace le classeur Excel REPORTING_RH_V5).
 Backend FastAPI + PostgreSQL, frontend React + TypeScript, habillage cfaoacademy.
 
-- Plan : [docs/PLAN_APPLICATION.md](docs/PLAN_APPLICATION.md) · Cadrage (KPI, rôles) : [docs/P0_CADRAGE.md](docs/P0_CADRAGE.md) · Backlog : [backlog.md](backlog.md)
+- Plan : [docs/PLAN_APPLICATION.md](docs/PLAN_APPLICATION.md) · Cadrage (KPI, rôles) : [docs/P0_CADRAGE.md](docs/P0_CADRAGE.md) · Backlog : [backlog.md](backlog.md) · Étude page Utilisateurs : [docs/etude-page-utilisateurs.md](docs/etude-page-utilisateurs.md)
 - Template d'import : `templates/TEMPLATE_IMPORT_DONNEES_v1.xlsx` · Contrôle : `python tools/valider_import.py FICHIER.xlsx`
 
 ## Développement
