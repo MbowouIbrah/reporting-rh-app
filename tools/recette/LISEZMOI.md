@@ -40,6 +40,10 @@ Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUI
 Depuis `frontend/` : `npx playwright test -c playwright.recette.config.ts` (environ 1 min, ports 8101 et 5181).
 Réinitialise la base, puis parcourt chaque compte : onglets, marge, services visibles, contrôles de cohérence,
 Individuel, Administration, refus de l'API, déconnexion ; plus un mauvais mot de passe.
+Parcours de l'administrateur à l'écran, avec leurs effets (rapports, journal d'audit, API) : import avec erreurs puis
+corrigé (juillet), import et réimport d'août, CA / marge / budgets, employés, utilisateurs et périmètres, correction
+d'une valeur par la saisie, refus d'écriture aux lecteurs (drh@, dps@). Les fichiers viennent de `fichier_erreurs.py`.
+Ces parcours remplissent juillet et août et ajoutent comptes et employés de test : `reinit.py` repart de zéro.
 
 À savoir pour la démo : les filtres sont partagés entre les pages. Un service choisi sur Mensuel reste actif
 sur Individuel (« Matricule introuvable » si l'employé n'en fait pas partie) : « Réinitialiser les filtres ».
