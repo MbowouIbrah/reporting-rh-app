@@ -16,6 +16,7 @@ from app.imports.regles import (
     MOIS,
     Refs,
     colonnes,
+    employe_probable,
     entetes_reconnus,
     est_sans_matricule,
     interpretations,
@@ -24,6 +25,7 @@ from app.imports.regles import (
     texte,
     valider,
 )
+from app.imports.similarite import SEUIL_NOUVEAU_PROCHE, plus_proche
 from app.models.auth import AuditEvent
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
@@ -455,7 +457,8 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
     ligne de total à supprimer. Clé : id du point."""
     ref = ("VALEUR_MANQUANTE", "REFERENTIEL_INCONNU")
     nums = {a.num_ligne for a in anos if a.num_ligne and (
-        a.code in ("DOUBLON", "MUTATION") or (a.code in ref and a.colonne in PRECEDENT))}
+        a.code in ("DOUBLON", "MUTATION", *CODES_NOMS) or (a.code in ref and a.colonne in PRECEDENT))}
+    annuaire: dict[str, tuple[str, str]] | None = None
     rows = {r.num_ligne: r for r in db.scalars(select(StagingLigne).where(
         StagingLigne.lot_id == lot_id, StagingLigne.num_ligne.in_(nums)))} if nums else {}
     periodes: dict[str, list[dict]] = {}
@@ -476,7 +479,11 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
             prop["dimension"] = COLONNES_REF[a.colonne][0]
         r = rows.get(a.num_ligne)
         if r is not None and r.annee is not None and r.mois is not None and r.matricule:
-            if a.code == "DOUBLON":
+            if a.code in CODES_NOMS:
+                if annuaire is None and a.code in ("NOM_SIMILAIRE", "MATRICULE_DOUTEUX"):
+                    annuaire = {s.matricule_norm: (s.matricule, s.nom) for s in db.scalars(select(Salarie)) if s.nom}
+                prop |= _proposition_nom(db, lot_id, r, a.code, annuaire or {})
+            elif a.code == "DOUBLON":
                 q = select(StagingLigne.num_ligne).where(
                     StagingLigne.lot_id == lot_id, StagingLigne.annee == r.annee,
                     StagingLigne.mois == r.mois, func.lower(StagingLigne.matricule) == r.matricule.casefold())
@@ -502,6 +509,27 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
         if prop:
             out[a.id] = prop
     return out
+
+
+CODES_NOMS = ("NOM_PROCHE", "NOM_INCOHERENT", "NOM_SIMILAIRE", "MATRICULE_DOUTEUX")
+
+
+def _proposition_nom(db: Session, lot_id: int, r: StagingLigne, code: str,
+                     annuaire: dict[str, tuple[str, str]]) -> dict:
+    """Lignes de l'employé dans le lot (la décision vaut pour toutes) et, selon le point : noms lus et nom
+    enregistré, ou employé connu que désigne sans doute la ligne."""
+    lignes = db.execute(select(StagingLigne.num_ligne, StagingLigne.donnees).where(
+        StagingLigne.lot_id == lot_id, func.lower(StagingLigne.matricule) == r.matricule.casefold())
+        .order_by(StagingLigne.num_ligne)).all()
+    prop: dict = {"lignes": [n for n, _ in lignes]}
+    if code in ("NOM_PROCHE", "NOM_INCOHERENT"):
+        enregistre = db.scalar(select(Salarie.nom).where(Salarie.matricule_norm == r.matricule.casefold()))
+        noms = dict.fromkeys(d["nom"] for _, d in lignes if d.get("nom") and norm(d["nom"]) != norm(enregistre or ""))
+        return prop | {"noms": list(noms), "enregistre": enregistre or None}
+    nom = r.donnees.get("nom") or ""
+    trouve = (employe_probable(r.matricule, nom, annuaire) if code == "MATRICULE_DOUTEUX"
+              else plus_proche(nom, annuaire, r.matricule.casefold(), SEUIL_NOUVEAU_PROCHE))
+    return prop | {"employe": {"matricule": trouve[0], "nom": trouve[1]}} if trouve else prop
 
 
 def employes_des_lignes(db: Session, lot_id: int, nums: set[int]) -> dict[int, dict]:
@@ -683,6 +711,15 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
             db.flush()
             salaries[k] = s.id
             nouveaux.add(k)
+    # « Mettre à jour le nom » (point de nom accepté) : le nom du fichier remplace le nom enregistré.
+    ignores = set((lot.feuille or {}).get("ignores", []))
+    for r in rows:
+        k, nom = r.matricule.casefold(), r.donnees.get("nom")
+        if nom and k not in nouveaux and f"{r.num_ligne}|Noms" in ignores:
+            s = db.get(Salarie, salaries[k])
+            if s.nom != nom:
+                audit.record(db, user_id, "salarie_renomme", "salarie", s.id, {"nom": s.nom}, {"nom": nom})
+                s.nom = nom
 
     postes = {norm(k): v for k, v in _ids(db, Poste).items()}
     for r in rows:

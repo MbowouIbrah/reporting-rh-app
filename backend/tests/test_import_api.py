@@ -18,10 +18,13 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _octets: dict[str, bytes] = {}
 
 
-def up(client, lignes, nom="f.xlsx"):
+def octets(lignes) -> bytes:
     # mêmes lignes → mêmes octets (openpyxl date chaque enregistrement : le sha256 changerait)
-    contenu = _octets.setdefault(repr(lignes), xlsx(lignes))
-    return client.post(f"{API}/imports", files={"fichier": (nom, contenu, XLSX)})
+    return _octets.setdefault(repr(lignes), xlsx(lignes))
+
+
+def up(client, lignes, nom="f.xlsx"):
+    return client.post(f"{API}/imports", files={"fichier": (nom, octets(lignes), XLSX)})
 
 
 def fichier_a():

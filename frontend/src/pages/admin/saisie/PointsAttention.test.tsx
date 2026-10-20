@@ -301,3 +301,45 @@ test('point sans autre solution que la saisie : texte par défaut', async () => 
   expect(await screen.findByText(/^Veuillez saisir une valeur conforme/)).toBeInTheDocument()
   expect(screen.queryByRole('combobox')).toBeNull()
 })
+
+test('matricule douteux : « reprendre son matricule » vaut pour toutes les lignes de l’employé', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('MATRICULE_DOUTEUX', 'avertissement', 'Matricule inconnu.', 'MATRICULE'), ligne: 40, valeur: '20',
+    proposition: { lignes: [40, 52], employe: { matricule: 'EMP020', nom: 'Noel Essomba' } } }, vi.fn(), 'noms')
+  const liste = await screen.findByRole('combobox', { name: 'Matricule « 20 » inconnu : qui est-ce ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Choisir une solution…', "C'est Noel Essomba (EMP020) : reprendre son matricule", 'Nouvel employé : garder « 20 »'])
+  fireEvent.change(liste, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({
+    lignes: { 40: { MATRICULE: 'EMP020' }, 52: { MATRICULE: 'EMP020' } } })))
+})
+
+test('nom différent : « Mettre à jour le nom » pose le nom partout et accepte le point', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('NOM_PROCHE', 'avertissement', 'Nom proche.', 'Noms'), ligne: 40, valeur: 'Jean Dupond',
+    proposition: { lignes: [40, 52], noms: ['Jean Dupond'], enregistre: 'Jean Dupont' } }, vi.fn(), 'noms')
+  const liste = await screen.findByRole('combobox', { name: 'Nom différent de celui enregistré (« Jean Dupont ») : lequel garder ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Choisir une solution…', 'Garder le nom enregistré « Jean Dupont »', 'Mettre à jour le nom en « Jean Dupond »'])
+  fireEvent.change(liste, { target: { value: '1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({
+    lignes: { 40: { Noms: 'Jean Dupond' }, 52: { Noms: 'Jean Dupond' } }, ignores: ['40|Noms'] })))
+})
+
+test('nom proche d’un autre employé : remplacer par cet employé ou personne différente', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('NOM_SIMILAIRE', 'avertissement', 'Nom proche.', 'Noms'), ligne: 40, valeur: 'Ngono Awa',
+    proposition: { lignes: [40], employe: { matricule: 'EMP009', nom: 'Awa Ngono' } } }, vi.fn(), 'noms')
+  const liste = await screen.findByRole('combobox', { name: 'Nom proche de Awa Ngono (EMP009) : même personne ?' })
+  expect(within(liste).getAllByRole('option').map((o) => o.textContent)).toEqual([
+    'Choisir une solution…', "C'est Awa Ngono (EMP009) : remplacer par cet employé", 'Personne différente'])
+  fireEvent.change(liste, { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({
+    lignes: { 40: { MATRICULE: 'EMP009', Noms: 'Awa Ngono' } } })))
+})

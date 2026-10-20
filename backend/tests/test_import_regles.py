@@ -372,3 +372,23 @@ def test_lecture_des_nombres_mal_ecrits():
     # Décimales gardées telles qu'elles viennent, sans point d'attention.
     assert {x.num: x for x in L}[4].montants["Formation"] == Decimal("138700.4853") and (4, "Formation", "PRECISION_TRONQUEE") not in ens
     assert not any(c == "Noms" for _, c, _ in ens) and {x.num: x for x in L}[5].nom == "Jean Dupont"
+
+
+def test_matricule_douteux_retrouve_l_employe_connu():
+    ann = {"emp020": ("EMP020", "Noel Essomba"), "emp046": ("EMP046", "Awa Ngono")}
+    connus = {"emp020": "noel essomba", "emp046": "awa ngono"}
+    # « 20 » : mêmes chiffres et même nom qu'EMP020 ; plus de point « matricule numérique »
+    _, ens, anos, _ = run([ligne(MATRICULE=20, Noms="Noel Essomba")], postes={"p"},
+                          noms_connus=connus, annuaire=ann)
+    assert (2, "MATRICULE", "MATRICULE_DOUTEUX") in ens
+    assert not any(code == "MATRICULE_NUMERIQUE" for *_, code in ens)
+    assert "Noel Essomba (EMP020)" in next(a.message for a in anos if a.code == "MATRICULE_DOUTEUX")
+    # mêmes chiffres mais autre personne : pas de rapprochement
+    _, ens, _, _ = run([ligne(MATRICULE=20, Noms="Paul Biya")], postes={"p"},
+                       noms_connus=connus, annuaire=ann)
+    assert not any(code == "MATRICULE_DOUTEUX" for *_, code in ens)
+    # casse différente d'un matricule connu : repris tel qu'enregistré
+    L, ens, _, _ = run([ligne(MATRICULE="emp046", Noms="Awa Ngono")], postes={"p"},
+                       noms_connus=connus, annuaire=ann)
+    assert (2, "MATRICULE", "NORMALISE") in ens and L[0].matricule == "EMP046"
+    assert not any(code == "MATRICULE_DOUTEUX" for *_, code in ens)

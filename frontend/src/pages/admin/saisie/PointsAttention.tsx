@@ -35,7 +35,7 @@ const GROUPES: Groupe[] = [
     retenir: (a) => a.gravite === 'bloquant' },
   { id: 'noms', titre: 'Noms et matricules à vérifier', niveau: 'confirmer',
     aide: 'nom différent de celui connu, proche d’un autre employé, ou matricule douteux',
-    retenir: (a) => codes('NOM_PROCHE', 'NOM_INCOHERENT', 'NOM_SIMILAIRE', 'MATRICULE_NUMERIQUE')(a)
+    retenir: (a) => codes('NOM_PROCHE', 'NOM_INCOHERENT', 'NOM_SIMILAIRE', 'MATRICULE_DOUTEUX', 'MATRICULE_NUMERIQUE')(a)
       || (a.code === 'VALEUR_MANQUANTE' && a.colonne === 'Noms') },
   { id: 'affectation', titre: 'Changements d’affectation', niveau: 'confirmer',
     aide: 'service, site, contrat ou activité différents selon les mois : mutation ou erreur ?', retenir: codes('MUTATION') },
@@ -107,6 +107,7 @@ function corps(p: Plan): Decisions {
   for (const { decision: d, ligne } of Object.values(p.choix)) {
     if (d.accepter) acceptes.push(d.accepter)
     if (d.valeurs) lignes[ligne] = { ...lignes[ligne], ...d.valeurs }
+    for (const [n, v] of Object.entries(d.parLigne ?? {})) lignes[+n] = { ...lignes[+n], ...v }
     if (d.ajout) {
       const typeSite = d.ajout.dimension === 'site' ? p.typeSite[d.ajout.valeur] ?? null : null
       ajouts.set(`${d.ajout.dimension}|${d.ajout.valeur}`, { ...d.ajout, type_site: typeSite })
@@ -343,6 +344,52 @@ interface Decision {
   retirer?: number[]
   /** « ligne|colonne » : valeur du fichier gardée, point accepté sans rien changer. */
   accepter?: string
+  /** Valeurs posées sur d'autres lignes (toutes celles du même employé). */
+  parLigne?: Record<number, Record<string, string | null>>
+}
+
+/** Mêmes valeurs sur chaque ligne de l'employé. */
+function partout(lignes: number[], v: Record<string, string>) {
+  return Object.fromEntries(lignes.map((n) => [n, v]))
+}
+
+/** Noms et matricules : la décision vaut pour toutes les lignes du même matricule. */
+function decisionsNoms(point: AnomalieLot): { question: string; choix: Decision[] } | null {
+  const prop = point.proposition
+  const n = point.ligne
+  if (n == null) return null
+  const lignes = prop?.lignes?.length ? prop.lignes : [n]
+  const emp = prop?.employe
+  if (point.code === 'MATRICULE_DOUTEUX' && emp) {
+    return {
+      question: `Matricule « ${point.valeur} » inconnu : qui est-ce ?`,
+      choix: [{ libelle: `C'est ${emp.nom} (${emp.matricule}) : reprendre son matricule`,
+        parLigne: partout(lignes, { MATRICULE: emp.matricule }) },
+      { libelle: `Nouvel employé : garder « ${point.valeur} »`, accepter: `${n}|MATRICULE` }],
+    }
+  }
+  if (point.code === 'NOM_SIMILAIRE' && emp) {
+    return {
+      question: `Nom proche de ${emp.nom} (${emp.matricule}) : même personne ?`,
+      choix: [{ libelle: `C'est ${emp.nom} (${emp.matricule}) : remplacer par cet employé`,
+        parLigne: partout(lignes, { MATRICULE: emp.matricule, Noms: emp.nom }) },
+      { libelle: 'Personne différente', accepter: `${n}|Noms` }],
+    }
+  }
+  if ((point.code === 'NOM_PROCHE' || point.code === 'NOM_INCOHERENT') && prop?.noms?.length) {
+    const reg = prop.enregistre
+    const garder: Decision[] = reg ? [{ libelle: `Garder le nom enregistré « ${reg} »`, parLigne: partout(lignes, { Noms: reg }) }] : []
+    return {
+      question: reg ? `Nom différent de celui enregistré (« ${reg} ») : lequel garder ?` : 'Noms différents selon les lignes : lequel garder ?',
+      choix: [...garder, ...prop.noms.map((nom) => ({
+        libelle: reg ? `Mettre à jour le nom en « ${nom} »` : `Garder « ${nom} »`,
+        parLigne: partout(lignes, { Noms: nom }), accepter: `${n}|Noms` }))],
+    }
+  }
+  if (point.code === 'MATRICULE_NUMERIQUE' && point.valeur) {
+    return { question: `Matricule « ${point.valeur} » : que faire ?`, choix: [{ libelle: `Garder « ${point.valeur} »`, accepter: `${n}|MATRICULE` }] }
+  }
+  return null
 }
 
 /** Question posée par la liste et décisions proposées, selon le code du point. Aucune n'est choisie d'office. */
@@ -355,6 +402,8 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
   if (point.code === 'LIGNE_TOTAL') {
     return { question: 'Ligne de total : que faire ?', choix: [{ libelle: 'Supprimer la ligne', retirer: [point.ligne!] }] }
   }
+  const noms = decisionsNoms(point)
+  if (noms) return noms
   if (point.code === 'MUTATION' && prop?.valeur && point.ligne != null) {
     return {
       question: 'Mutation ou erreur ?',

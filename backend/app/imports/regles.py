@@ -107,6 +107,23 @@ def matricule_sans_matricule(nom: str, refs: "Refs") -> tuple[str, list[str]]:
     return PREFIXE_SANS_MATRICULE + hashlib.sha1(cle.encode()).hexdigest()[:12].upper(), []
 
 
+def chiffres(matricule: str) -> str:
+    """Chiffres du matricule sans zéros de tête : « 20 », « EMP020 » et « emp-20 » donnent « 20 »."""
+    return re.sub(r"\D", "", matricule).lstrip("0")
+
+
+def employe_probable(matricule: str, nom: str, annuaire: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
+    """Employé connu que désigne sans doute un matricule inconnu : mêmes chiffres de matricule et, si le nom
+    est donné, nom très proche. (matricule, nom), ou None si aucun ou plusieurs candidats."""
+    c = chiffres(matricule)
+    if not c or est_sans_matricule(matricule):
+        return None
+    candidats = [v for k, v in annuaire.items() if k != matricule.casefold() and chiffres(v[0]) == c]
+    if nom:
+        candidats = [v for v in candidats if similarite(nom, v[1]) >= SEUIL_NOUVEAU_PROCHE]
+    return candidats[0] if len(candidats) == 1 else None
+
+
 LIBELLES = {"MOIS": "Mois", "Type Contrat": "Types de contrat", "Activité": "Activités", "Site": "Sites",
             "Service": "Services"}
 MAX_ADMIS = 15
@@ -391,6 +408,10 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                     f"Matricule attendu sans espace (« {re.sub(r'\s', '', mat)} » ?).")
             if len(mat) > 30:
                 add(num, "MATRICULE", "TEXTE_TROP_LONG", BLOQUANT, mat, "30 caractères maximum.")
+            canon = refs.annuaire.get(mat.casefold(), (mat, ""))[0]
+            if canon != mat:
+                add(num, "MATRICULE", "NORMALISE", AVERT, mat, f"Écrit « {mat} », repris comme « {canon} ».")
+                mat = canon
         L.matricule = mat
 
         for nom, attr, libelle in (("Noms", "nom", "Le nom de l’employé est vide."),
@@ -461,6 +482,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         lignes.append(L)
 
     by_num = {L.num: L for L in lignes}
+    douteux: set[str] = set()  # matricules inconnus qui désignent sans doute un employé connu
     for (a, m, _mat), nums in cles.items():
         if len(nums) > 1:
             # Une seule erreur pour le groupe, ancrée sur la première ligne : les autres sont citées.
@@ -487,6 +509,11 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             else:
                 add(occ[0][0], "Noms", "NOM_INCOHERENT", AVERT, occ[0][4],
                     f"{_porteur(occ[0][4])} porte des noms différents : {liste}. Erreur de matricule ?")
+        elif not connu and (probable := employe_probable(
+                occ[0][4], next((o[3] for o in occ if o[1]), ""), refs.annuaire)):
+            douteux.add(mat)
+            add(occ[0][0], "MATRICULE", "MATRICULE_DOUTEUX", AVERT, occ[0][4],
+                f"Le matricule « {occ[0][4]} » n’existe pas : c’est sans doute {probable[1]} ({probable[0]}).")
         elif not connu and noms:
             nom_norm = next(iter(noms))
             trouve = plus_proche(next(o[3] for o in occ if o[1] == nom_norm), refs.annuaire, mat,
@@ -522,6 +549,10 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                     f"{SUJETS[champ]} de {qui} passe de « {prec[0]} » ({prec[1]}) à « {v} » ({p}) : "
                     "mutation ou erreur ?")
 
+    if douteux:
+        # « 20 » saisi en nombre : le point « matricule douteux » dit déjà tout, un seul point par cellule.
+        nums = {o[0] for m in douteux for o in par_matricule[m]}
+        anos[:] = [a for a in anos if not (a.code == "MATRICULE_NUMERIQUE" and a.ligne in nums)]
     if not lignes:
         add(feuille.entete_ligne + 1, "DONNEES", "FICHIER_VIDE", BLOQUANT, None, "Aucune ligne de données.")
     periodes = Counter((k[0], k[1]) for k in cles)

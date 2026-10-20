@@ -107,6 +107,8 @@ export interface AnomalieLot {
     lignes?: number[]; valeur?: string; periode?: string; dimension?: string
     /** Nombre mal écrit : lecture(s) devinée(s), deux si le séparateur est ambigu. */
     corrections?: { valeur: string; libelle: string }[]
+    /** Noms et matricules : noms du fichier, nom enregistré, employé connu le plus probable. */
+    noms?: string[]; enregistre?: string | null; employe?: { matricule: string; nom: string }
   } | null
 }
 

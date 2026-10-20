@@ -1,10 +1,10 @@
 import pytest
 from sqlalchemy import select
 
-from app.models.donnees import SituationMensuelle
+from app.models.donnees import Salarie, SituationMensuelle
 from app.models.imports import LotImport
 from app.models.referentiel import Site
-from tests.test_import_api import ADMIN, API, DRH, XLSX, up, xlsx
+from tests.test_import_api import ADMIN, API, DRH, XLSX, octets, up
 from tests.test_import_regles import ligne
 
 
@@ -173,7 +173,7 @@ def test_meme_fichier_avec_modifications_reprise_ou_tout_annuler(make_client, db
     r = up(c, rows)
     assert r.status_code == 409 and r.json()["detail"] | {"message": None} == {
         "message": None, "lot_id": lot["id"], "reprise": True, "modifications": 1}
-    r = c.post(f"{API}/imports?reprise={choix}", files={"fichier": ("f.xlsx", xlsx(rows), XLSX)})
+    r = c.post(f"{API}/imports?reprise={choix}", files={"fichier": ("f.xlsx", octets(rows), XLSX)})
     assert r.status_code == 201, r.text
     lignes_ko = {a["ligne"] for a in anomalies(c, r.json()["id"])}
     db.expire_all()
@@ -182,3 +182,46 @@ def test_meme_fichier_avec_modifications_reprise_ou_tout_annuler(make_client, db
     else:
         assert r.json()["id"] != lot["id"] and lignes_ko == {2, 3}
         assert db.get(LotImport, lot["id"]).statut == "annule"
+
+
+def _noms(c, lot_id):
+    return [a for a in c.get(f"{API}/imports/{lot_id}/anomalies").json()
+            if a["code"] in ("NOM_PROCHE", "NOM_INCOHERENT", "NOM_SIMILAIRE", "MATRICULE_DOUTEUX")]
+
+
+def test_matricule_douteux_propose_l_employe_et_reprend_son_matricule(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne(MATRICULE="EMP020", Noms="Noel Essomba")]).json()
+    c.post(f"{API}/imports/{prec['id']}/valider")
+    lot = up(c, [ligne(MOIS="Février", MATRICULE=20, Noms="Noel Essomba")]).json()
+    (p,) = _noms(c, lot["id"])
+    assert p["code"] == "MATRICULE_DOUTEUX"
+    assert p["proposition"] == {"lignes": [2], "employe": {"matricule": "EMP020", "nom": "Noel Essomba"}}
+    sim = c.post(f"{API}/imports/{lot['id']}/decisions",
+                 json={"lignes": {"2": {"MATRICULE": "EMP020"}}, "simuler": True}).json()
+    assert not any(a["ligne"] == 2 and a["colonne"] == "MATRICULE" for a in sim["anomalies"])
+
+
+def test_nom_similaire_propose_l_employe_existant(make_client):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne(MATRICULE="EMP009", Noms="Awa Ngono")]).json()
+    c.post(f"{API}/imports/{prec['id']}/valider")
+    lot = up(c, [ligne(MOIS="Février", MATRICULE="EMP090", Noms="Ngono Awa")]).json()
+    (p,) = _noms(c, lot["id"])
+    assert p["code"] == "NOM_SIMILAIRE"
+    assert p["proposition"]["employe"] == {"matricule": "EMP009", "nom": "Awa Ngono"}
+
+
+def test_nom_proche_mettre_a_jour_le_nom_a_la_validation(make_client, db):
+    c = make_client(ADMIN)
+    prec = up(c, [ligne(Noms="Jean Dupont")]).json()
+    c.post(f"{API}/imports/{prec['id']}/valider")
+    lot = up(c, [ligne(MOIS="Février", Noms="Jean Dupond"), ligne(MOIS="Mars", Noms="Jean Dupond")]).json()
+    p = next(a for a in _noms(c, lot["id"]) if a["code"] == "NOM_PROCHE")
+    assert p["proposition"] == {"lignes": [2, 3], "noms": ["Jean Dupond"], "enregistre": "Jean Dupont"}
+    ign = [f"{n}|Noms" for n in (2, 3)]
+    r = c.post(f"{API}/imports/{lot['id']}/decisions", json={"ignores": ign})
+    assert r.json()["statut"] == "pret", r.text
+    c.post(f"{API}/imports/{lot['id']}/valider")
+    db.expire_all()
+    assert db.scalar(select(Salarie.nom).where(Salarie.matricule == "EMP001")) == "Jean Dupond"
