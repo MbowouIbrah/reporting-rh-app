@@ -56,7 +56,7 @@ test('en-têtes de DONNEES, rubriques exclues en tête, juste après les colonne
     'Absences (nb) (exclu)', 'Brut Réel', 'TOTAL CHARGES (FCFA)', 'Total des colonnes exclues',
   ])
   expect(screen.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeInTheDocument()
-  expect(screen.getByText(/^Saisir ANNÉE \(ex\. 2025\)/)).toBeInTheDocument()
+  expect(screen.queryByText(/^Saisir ANNÉE/)).not.toBeInTheDocument()
   const cellules = screen.getAllByRole('cell')
   expect(cellules[10].textContent).toMatch(/^1\s000,5$/)
   expect(cellules[9].textContent).toBe('') // Absences non saisies : cellule vide

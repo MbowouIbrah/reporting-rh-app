@@ -13,10 +13,8 @@ import { useOrdreColonnes } from '../../hooks/useOrdreColonnes'
 import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../lib/format'
 import BandeauEnregistre from './saisie/Enregistre'
 
-// Lignes 1 et 2 de la feuille DONNEES (REPORTING_RH_V5.xlsx), reprises à l'identique.
+// Ligne 1 de la feuille DONNEES (REPORTING_RH_V5.xlsx).
 const TITRE = 'ADMINISTRATION DES DONNÉES'
-const CONSIGNE =
-  'Saisir ANNÉE (ex. 2025), MOIS (nom dans la liste) et MATRICULE (clé unique, ex. EMP001). Ajouter les nouveaux mois à la suite. Le TOTAL se calcule seul.'
 // Les quatre premières colonnes (ANNÉE à Noms) restent figées au défilement horizontal.
 const FIGEES = ['ANNÉE', 'MOIS', 'MATRICULE', 'Noms']
 const FIXES = [...FIGEES, 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service']
@@ -87,7 +85,6 @@ export default function Donnees() {
     <section className="page-ecran rapport-excel donnees-excel" aria-busy={charge || undefined}>
       <h2 className="bandeau-titre">{TITRE}</h2>
       <AdminNav />
-      <p className="regle">{CONSIGNE}</p>
       <div className="filtres" role="group" aria-label="Filtres">
         <label>
           Année
