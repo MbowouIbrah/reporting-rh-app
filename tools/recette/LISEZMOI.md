@@ -34,3 +34,12 @@ Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUI
 | dir.technique@ | SAV PL (EMP015 dès janvier 2026) | Autres services, noms |
 | resp.sav.engins@ | SAV Engins | Autres services, noms |
 | resp.sites.deportes@ | Sites Déportés | Autres services, noms |
+
+## Vérification automatique
+
+Depuis `frontend/` : `npx playwright test -c playwright.recette.config.ts` (environ 1 min, ports 8101 et 5181).
+Réinitialise la base, puis parcourt chaque compte : onglets, marge, services visibles, contrôles de cohérence,
+Individuel, Administration, refus de l'API, déconnexion ; plus un mauvais mot de passe.
+
+À savoir pour la démo : les filtres sont partagés entre les pages. Un service choisi sur Mensuel reste actif
+sur Individuel (« Matricule introuvable » si l'employé n'en fait pas partie) : « Réinitialiser les filtres ».
