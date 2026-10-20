@@ -9,7 +9,7 @@ Mêmes données à chaque passage : on réinitialise avant chaque test de profil
 3. Relancer l'API sur la base de recette :
    `DATABASE_URL=sqlite:///recette.db ENV=test COOKIE_SECURE=false COOKIE_PATH_PREFIX=/reporting-rh SECRET_KEY=<cle-de-test> .venv/Scripts/python -m uvicorn app.main:app --port 8100`
 
-Mot de passe de tous les comptes : `<mot-de-passe-test>` (ou la variable `RECETTE_PASSWORD`).
+Mot de passe : début de l'adresse + `<suffixe-retire>` (`admin@exemple.invalid` → `<mot-de-passe-recette>`, `drh@exemple.invalid` → `<mot-de-passe-recette>`). La variable `RECETTE_PASSWORD` impose un mot de passe commun.
 
 ## Fichiers
 

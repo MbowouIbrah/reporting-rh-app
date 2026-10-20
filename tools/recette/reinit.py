@@ -2,7 +2,8 @@
 
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
 Options : --base recette.db (fichier SQLite, dans backend/), --historique <xlsx>.
-Mot de passe de tous les comptes : RECETTE_PASSWORD, sinon PW.
+Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon <début de l'adresse><suffixe-retire>
+(admin@exemple.invalid -> <mot-de-passe-recette>).
 
 Contenu : comptes de comptes.csv, historique de paie (Excel REPORTING RH, 18 mois),
 CA et marge de ca_marge.csv, budgets de budgets.csv. Les mois suivants restent vides :
@@ -19,7 +20,6 @@ from pathlib import Path
 ICI = Path(__file__).resolve().parent
 BACKEND = ICI.parent.parent / "backend"
 HISTORIQUE = ICI.parent.parent.parent / "Reporting RH" / "REPORTING_RH_V4.xlsx"
-PW = "<mot-de-passe-test>"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -143,7 +143,11 @@ def main() -> None:
     ap.add_argument("--base", default="recette.db")
     ap.add_argument("--historique", type=Path, default=HISTORIQUE)
     args = ap.parse_args()
-    pw = os.environ.get("RECETTE_PASSWORD", PW)
+    commun = os.environ.get("RECETTE_PASSWORD")
+
+    def mdp(email: str) -> str:
+        return commun or email.strip().lower().split("@")[0] + "<suffixe-retire>"
+
     comptes = _csv("comptes.csv")
     admins = [c for c in comptes if c["role"] == "rh_admin"]
     if not admins:
@@ -162,10 +166,10 @@ def main() -> None:
     from app.seed import _user, run
 
     with SessionLocal() as db:
-        run(db, admins[0]["email"], pw, None)
+        run(db, admins[0]["email"], mdp(admins[0]["email"]), None)
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
-            _user(db, c["email"].strip().lower(), c["nom"], pw, c["role"],
+            _user(db, c["email"].strip().lower(), c["nom"], mdp(c["email"]), c["role"],
                   perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui")
         db.commit()
         cibles = {
@@ -176,7 +180,8 @@ def main() -> None:
 
     c = TestClient(app)
     api = "/api/v1"
-    r = c.post(f"{api}/auth/login", json={"email": admins[0]["email"], "password": pw})
+    admin = admins[0]["email"]
+    r = c.post(f"{api}/auth/login", json={"email": admin, "password": mdp(admin)})
     assert r.status_code == 200, r.text
     contenu, notes = historique_recette(args.historique)
     fichier = ("historique_recette.xlsx", contenu, XLSX)
@@ -206,7 +211,7 @@ def main() -> None:
         assert r.status_code == 200, r.text
 
     print(f"Base {args.base} prête : {lot['nb_lignes']} lignes de paie, "
-          f"{len(comptes)} comptes (mot de passe : {pw}).")
+          f"{len(comptes)} comptes (mot de passe : {commun or '<début de l’adresse><suffixe-retire>'}).")
     print("Scénarios :\n- " + "\n- ".join(notes))
 
 

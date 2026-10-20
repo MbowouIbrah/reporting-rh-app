@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
+import { mdpDe } from './outils'
 
-const PW = '<mot-de-passe-test>'
 const BASE_ONGLETS = ['Résumé', 'Graphes', 'Annuel', 'Mensuel', 'Individuel']
 const TOUS = ['Administration', 'Commerce Pièces', 'Commerce VN', 'Pneumatique', 'SAV Engins', 'SAV PL', 'Sites Déportés']
 
@@ -21,7 +21,7 @@ const PROFILS: Profil[] = [
 async function connecter(page: Page, email: string) {
   await page.goto('login')
   await page.getByLabel('Adresse e-mail').fill(email)
-  await page.getByLabel('Mot de passe').fill(PW)
+  await page.getByLabel('Mot de passe').fill(mdpDe(email))
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }

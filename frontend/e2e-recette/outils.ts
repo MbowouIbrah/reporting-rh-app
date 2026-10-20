@@ -3,10 +3,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, type APIRequestContext, type Page, type Request, type Route } from '@playwright/test'
 
-export const PW = '<mot-de-passe-test>'
+// Mot de passe des comptes de recette : début de l'adresse + « <suffixe-retire> » (admin@exemple.invalid -> <mot-de-passe-recette>)
+export const mdpDe = (email: string) => `${email.toLowerCase().split('@')[0]}<suffixe-retire>`
 export const ADMIN = 'admin@exemple.invalid'
 
-export async function connecter(page: Page, email: string, mdp = PW) {
+export async function connecter(page: Page, email: string, mdp = mdpDe(email)) {
   await page.goto('login')
   await page.getByLabel('Adresse e-mail').fill(email)
   await page.getByLabel('Mot de passe').fill(mdp)
