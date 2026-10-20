@@ -226,10 +226,10 @@ export default function Resume() {
       )}
       {a && (
         <>
-          <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
-          {aCa && (
-            <p className="regle">CA et marge saisis chaque mois par les RH ; % marge calculé sur les mois où les deux sont saisis.</p>
-          )}
+          <div className="titre-ligne">
+            <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
+            {aCa && <p className="regle">CA et marge saisis chaque mois par les RH ; % marge calculé sur les mois où les deux sont saisis.</p>}
+          </div>
           <div className="table-scroll">
             <table className="dense suivi">
               <thead>
