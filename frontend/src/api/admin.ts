@@ -91,6 +91,7 @@ export interface Perimetre {
   id: number
   code: string
   libelle: string
+  regles: { dimension: 'service' | 'site'; valeur: string }[]
 }
 export type CompteIn = Pick<Compte, 'email' | 'nom' | 'fonction' | 'permissions' | 'portee'> & { password: string }
 export type ComptePatch = { id: number } & Partial<Omit<Compte, 'id'> & { password: string }>

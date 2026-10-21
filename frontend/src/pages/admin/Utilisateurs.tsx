@@ -17,7 +17,7 @@ import AdminNav from '../../components/AdminNav'
 import { Panneau } from '../../components/BlocsRapport'
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../../components/Etat'
-import { Bouton, Champ, Confirmer } from '../../components/Kit'
+import { Bouton, Champ } from '../../components/Kit'
 import { CATALOGUE, GESTION_COMPTES, LECTURE, MODELES, exigeTout } from '../../lib/droits'
 
 const COLONNES = ['Nom', 'Données visibles', 'Statut']
@@ -88,31 +88,93 @@ interface Option<T> {
   libelle: string
 }
 
-/** Cases d'une dimension (périmètres, services, sites), repliables ; ouvertes si une case est cochée. */
-function Cases<T extends string | number>({ titre, options, choisis, onChange }: { titre: string; options: Option<T>[]; choisis: T[]; onChange: (v: T[]) => void }) {
+interface Toutes {
+  perimetres: Perimetre[]
+  services: string[] // actifs
+  sites: string[]
+}
+
+/** Valeurs d'une dimension apportées par les périmètres cochés -> libellé du premier périmètre. */
+export function viaPerimetres(choisis: number[], perimetres: Perimetre[], dim: 'service' | 'site') {
+  const m = new Map<string, string>()
+  for (const p of perimetres) {
+    if (!choisis.includes(p.id)) continue
+    for (const r of p.regles) if (r.dimension === dim && !m.has(r.valeur)) m.set(r.valeur, p.libelle)
+  }
+  return m
+}
+
+/** Tout coché (directement ou via périmètres) dans une dimension, sans restriction dans l'autre :
+ *  c'est « toutes les données » (seule portée qui ouvre CA, marge et import). */
+export function normaliser<F extends Portee>(f: F, t: Toutes): F {
+  if (f.tout) return f
+  const vus = (dim: 'service' | 'site', directs: string[]) => new Set([...directs, ...viaPerimetres(f.perimetres, t.perimetres, dim).keys()])
+  const complet = (v: Set<string>, tous: string[]) => tous.length > 0 && tous.every((x) => v.has(x))
+  const sv = vus('service', f.services)
+  const st = vus('site', f.sites)
+  const cs = complet(sv, t.services)
+  const ct = complet(st, t.sites)
+  return (cs || ct) && (cs || !sv.size) && (ct || !st.size) ? { ...f, tout: true, perimetres: [], services: [], sites: [] } : f
+}
+
+/** Cases d'une dimension, repliables ; ouvertes si une case est cochée. « Tout » coche le groupe entier ;
+ *  une valeur apportée par un périmètre est cochée et grisée (on décoche le périmètre). */
+function Cases<T extends string | number>({
+  titre,
+  options,
+  choisis,
+  inclus,
+  tout,
+  desactive,
+  onChange,
+}: {
+  titre: string
+  options: Option<T>[]
+  choisis: T[]
+  inclus?: Map<T, string>
+  tout: boolean
+  desactive: boolean
+  onChange: (v: T[]) => void
+}) {
   if (!options.length) return null
+  const coche = (v: T) => tout || choisis.includes(v) || !!inclus?.has(v)
+  const n = options.filter((o) => coche(o.valeur)).length
+  const toutCoche = n === options.length
   return (
-    <details className="fiche-dimension" open={choisis.length > 0}>
-      <summary>{`${titre} (${choisis.length} sur ${options.length})`}</summary>
+    <details className="fiche-dimension" open={n > 0}>
+      <summary>{`${titre} (${n} sur ${options.length})`}</summary>
       <div className="fiche-cases" role="group" aria-label={titre}>
-        {options.map((o) => (
-          <label key={o.valeur}>
-            <input type="checkbox" checked={choisis.includes(o.valeur)} onChange={() => onChange(basculer(choisis, o.valeur))} />
-            {o.libelle}
-          </label>
-        ))}
+        <label className="fiche-case-tout">
+          <input type="checkbox" checked={toutCoche} disabled={desactive} onChange={() => onChange(toutCoche ? [] : options.map((o) => o.valeur))} />
+          Tout
+        </label>
+        {options.map((o) => {
+          const via = tout ? undefined : inclus?.get(o.valeur)
+          return (
+            <label key={o.valeur}>
+              <input
+                type="checkbox"
+                checked={coche(o.valeur)}
+                disabled={desactive || via !== undefined}
+                onChange={() => onChange(basculer(tout ? options.map((x) => x.valeur) : choisis, o.valeur))}
+              />
+              {o.libelle}
+              {via && <small className="fiche-via">{`via ${via}`}</small>}
+            </label>
+          )
+        })}
       </div>
     </details>
   )
 }
 
 // Services et sites accordables : les actifs, plus ceux déjà accordés (marqués inactifs).
-function useValeurs(dim: 'service' | 'site', choisis: string[]): { options: Option<string>[]; erreur: boolean } {
+function useValeurs(dim: 'service' | 'site', choisis: string[]): { options: Option<string>[]; actifs: string[]; erreur: boolean } {
   const q = useReferentiel(dim)
   const valeurs = q.data?.valeurs ?? []
   const actifs = valeurs.filter((v) => v.actif).map((v) => ({ valeur: v.libelle, libelle: v.libelle }))
   const restes = choisis.filter((c) => !actifs.some((a) => a.valeur === c)).map((c) => ({ valeur: c, libelle: `${c} (inactif)` }))
-  return { options: [...actifs, ...restes], erreur: q.isError }
+  return { options: [...actifs, ...restes], actifs: actifs.map((a) => a.valeur), erreur: q.isError }
 }
 
 function FicheCompte({
@@ -145,6 +207,10 @@ function FicheCompte({
   const sites = useValeurs('site', fiche.sites)
   const envoi = creer.isPending || modifier.isPending
   const maj = <K extends keyof Fiche>(c: K, v: Fiche[K]) => setFiche((f) => ({ ...f, [c]: v }))
+  const toutes: Toutes = { perimetres: perimetres.data ?? [], services: services.actifs, sites: sites.actifs }
+  // Depuis « toutes les données », seule la dimension touchée garde ses cases (toutes moins celle décochée).
+  const changer = <K extends 'perimetres' | 'services' | 'sites'>(dim: K, v: Fiche[K]) =>
+    setFiche((f) => normaliser({ ...f, ...(f.tout && { tout: false, perimetres: [], services: [], sites: [] }), [dim]: v }, toutes))
   const patch = patchDe(fiche, initiale)
   // Comparé sur ce qui partirait : une espace en fin de nom ne compte pas comme une modification.
   const modifie = nouveau ? !memes(fiche, initiale) : Object.keys(patch).length > 0
@@ -195,7 +261,7 @@ function FicheCompte({
   const raison = (code: string) => {
     if (code === LECTURE) return 'Toujours accordée'
     if (soi && code === GESTION_COMPTES) return 'Vous ne pouvez pas retirer ce droit à votre propre compte'
-    if (exigeTout(code) && !fiche.tout) return 'Exige « Toutes les données »'
+    if (exigeTout(code) && !fiche.tout) return 'Exige toutes les données (« Tout » coché)'
     return null
   }
 
@@ -237,30 +303,42 @@ function FicheCompte({
 
         <fieldset>
           <legend>Données visibles</legend>
-          <label className="fiche-case-principale">
-            <input type="checkbox" checked={fiche.tout} disabled={soi} onChange={(e) => maj('tout', e.target.checked)} />
-            Toutes les données
-          </label>
           {soi && <p className="note">Votre propre accès aux données ne se modifie pas ici (évite de perdre l’accès).</p>}
-          {!fiche.tout && (
-            <>
-              {perimetres.isError && <p className="champ-erreur" role="alert">Liste des périmètres indisponible</p>}
-              <Cases
-                titre="Périmètres"
-                options={(perimetres.data ?? []).map((x) => ({ valeur: x.id, libelle: x.libelle }))}
-                choisis={fiche.perimetres}
-                onChange={(v) => maj('perimetres', v)}
-              />
-              {(services.erreur || sites.erreur) && <p className="champ-erreur" role="alert">Liste des services ou des sites indisponible</p>}
-              <Cases titre="Services" options={services.options} choisis={fiche.services} onChange={(v) => maj('services', v)} />
-              <Cases titre="Sites" options={sites.options} choisis={fiche.sites} onChange={(v) => maj('sites', v)} />
-              <p className="note">
-                {rienVisible
-                  ? 'Aucune donnée cochée : ce compte ne verra aucun rapport.'
-                  : 'Un service et un site cochés ensemble : seulement ce service sur ce site.'}
-              </p>
-            </>
-          )}
+          {perimetres.isError && <p className="champ-erreur" role="alert">Liste des périmètres indisponible</p>}
+          <Cases
+            titre="Périmètres"
+            options={toutes.perimetres.map((x) => ({ valeur: x.id, libelle: x.libelle }))}
+            choisis={fiche.perimetres}
+            tout={fiche.tout}
+            desactive={soi}
+            onChange={(v) => changer('perimetres', v)}
+          />
+          {(services.erreur || sites.erreur) && <p className="champ-erreur" role="alert">Liste des services ou des sites indisponible</p>}
+          <Cases
+            titre="Services"
+            options={services.options}
+            choisis={fiche.services}
+            inclus={viaPerimetres(fiche.perimetres, toutes.perimetres, 'service')}
+            tout={fiche.tout}
+            desactive={soi}
+            onChange={(v) => changer('services', v)}
+          />
+          <Cases
+            titre="Sites"
+            options={sites.options}
+            choisis={fiche.sites}
+            inclus={viaPerimetres(fiche.perimetres, toutes.perimetres, 'site')}
+            tout={fiche.tout}
+            desactive={soi}
+            onChange={(v) => changer('sites', v)}
+          />
+          <p className="note">
+            {fiche.tout
+              ? 'Toutes les données : ce compte voit toute l’entreprise.'
+              : rienVisible
+                ? 'Aucune donnée cochée : ce compte ne verra aucun rapport.'
+                : 'Un service et un site cochés ensemble : seulement ce service sur ce site.'}
+          </p>
         </fieldset>
 
         <fieldset>
@@ -304,7 +382,7 @@ function FicheCompte({
         )}
         {!nouveau && !modifie && !soi && (
           <div className="fiche-barre fiche-barre-discrete">
-            <Bouton variante="lien" onClick={() => onSupprimer(compte)}>Supprimer ce compte</Bouton>
+            <Bouton onClick={() => onSupprimer(compte)}>Supprimer ce compte</Bouton>
           </div>
         )}
       </form>
@@ -335,6 +413,7 @@ export default function Utilisateurs() {
       return
     }
     setMessage(null)
+    setASupprimer(null)
     setSelection(s)
   }
   const confirmerSuppression = () => {
@@ -383,7 +462,7 @@ export default function Utilisateurs() {
                   </thead>
                   <tbody>
                     {liste.map((c) => (
-                      <tr key={c.id}>
+                      <tr key={c.id} className={c.id === aSupprimer?.id ? 'a-supprimer' : undefined}>
                         <th scope="row">
                           <button type="button" className="ligne-compte" aria-current={c.id === selection ? 'true' : undefined} onClick={() => choisir(c.id)}>
                             {c.nom}
@@ -399,7 +478,18 @@ export default function Utilisateurs() {
                 </table>
               </Panneau>
             )}
-            {selection === 'nouveau' || choisi ? (
+            {aSupprimer ? (
+              <Panneau titre="Supprimer le compte ?" className="fiche-compte fiche-suppression">
+                <p>
+                  <strong>{aSupprimer.nom}</strong>
+                  {` (${aSupprimer.email}) ne pourra plus se connecter. Pour garder une trace, préférez décocher « Compte actif ».`}
+                </p>
+                <div className="fiche-barre fiche-barre-discrete">
+                  <Bouton disabled={supprimer.isPending} onClick={confirmerSuppression}>Supprimer</Bouton>
+                  <Bouton variante="secondaire" autoFocus onClick={() => setASupprimer(null)}>Annuler</Bouton>
+                </div>
+              </Panneau>
+            ) : selection === 'nouveau' || choisi ? (
               <FicheCompte
                 // Par identifiant : un rechargement de la liste n'efface pas une saisie en cours.
                 key={choisi?.id ?? 'nouveau'}
@@ -421,16 +511,6 @@ export default function Utilisateurs() {
           </div>
         </>
       )}
-      <Confirmer
-        ouvert={!!aSupprimer}
-        titre="Supprimer le compte ?"
-        confirmer="Supprimer"
-        desactive={supprimer.isPending}
-        onConfirmer={confirmerSuppression}
-        onAnnuler={() => setASupprimer(null)}
-      >
-        <p>{`${aSupprimer?.nom ?? ''} (${aSupprimer?.email ?? ''}) ne pourra plus se connecter. Pour garder une trace, préférez décocher « Compte actif ».`}</p>
-      </Confirmer>
     </section>
   )
 }

@@ -11,12 +11,12 @@ const COMPTES = [
   { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', fonction: '', actif: false, permissions: ['nominatif', 'marge'], portee: TOUT },
 ]
 const PERIMETRES = [
-  { id: 5, code: 'sav_pl', libelle: 'SAV PL' },
-  { id: 6, code: 'dps', libelle: 'DPS' },
+  { id: 5, code: 'sav_pl', libelle: 'SAV PL', regles: [{ dimension: 'service', valeur: 'SAV PL' }] },
+  { id: 6, code: 'dps', libelle: 'DPS', regles: [{ dimension: 'site', valeur: 'Yaoundé' }] },
 ]
 const REFERENTIELS: Record<string, unknown> = {
-  service: { valeurs: [{ id: 1, libelle: 'Commerce VN', actif: true }] },
-  site: { valeurs: [{ id: 1, libelle: 'Douala', actif: true }, { id: 2, libelle: 'Yaoundé', actif: true }] },
+  service: { valeurs: [{ id: 1, libelle: 'Commerce VN', actif: true }, { id: 2, libelle: 'SAV PL', actif: true }] },
+  site: { valeurs: [{ id: 1, libelle: 'Douala', actif: true }, { id: 2, libelle: 'Yaoundé', actif: true }, { id: 3, libelle: 'Garoua', actif: true }] },
 }
 const PERMS = ['users:read', 'users:write']
 
@@ -105,8 +105,15 @@ test('fiche : espaces seuls = pas de modification ; après enregistrement, mot d
 test('données visibles : périmètres, services et sites cochés partent avec les permissions', async () => {
   const appels = monter(page, PERMS, servir)
   const f = await ouvrir('Chef Sav')
+  const services = within(await f.findByRole('group', { name: 'Services' }))
+  // Le contenu d'un périmètre coché est affiché coché et grisé.
+  expect(services.getByLabelText(/SAV PL/)).toBeChecked()
+  expect(services.getByLabelText(/SAV PL/)).toBeDisabled()
+  expect(services.getByText('via SAV PL')).toBeInTheDocument()
   fireEvent.click(within(f.getByRole('group', { name: 'Périmètres' })).getByLabelText('DPS'))
-  fireEvent.click(within(await f.findByRole('group', { name: 'Services' })).getByLabelText('Commerce VN'))
+  expect(within(f.getByRole('group', { name: 'Sites' })).getByLabelText(/Yaoundé/)).toBeDisabled()
+  fireEvent.click(services.getByLabelText('Commerce VN'))
+  expect(services.getByLabelText('Tout')).toBeChecked()
   fireEvent.click(f.getByRole('checkbox', { name: /Voir les noms/ }))
   expect(f.getByText(/seulement ce service sur ce site/)).toBeInTheDocument()
   enregistrer()
@@ -123,12 +130,13 @@ test('permissions : celles qui exigent toutes les données sont grisées et reti
   const marge = f.getByRole('checkbox', { name: /Voir le CA et la marge/ })
   expect(marge).toBeChecked()
   expect(f.getByRole('checkbox', { name: /Consulter les rapports/ })).toBeDisabled()
-  fireEvent.click(f.getByRole('checkbox', { name: 'Toutes les données' }))
+  const sites = within(await f.findByRole('group', { name: 'Sites' }))
+  fireEvent.click(sites.getByLabelText('Tout'))
   expect(marge).toBeDisabled()
   expect(marge).not.toBeChecked()
-  expect(f.getByText(/Exige « Toutes les données ». Le CA/)).toBeInTheDocument()
+  expect(f.getByText(/Exige toutes les données \(« Tout » coché\). Le CA/)).toBeInTheDocument()
   expect(f.getByText(/ce compte ne verra aucun rapport/)).toBeInTheDocument()
-  fireEvent.click(within(f.getByRole('group', { name: 'Sites' })).getByLabelText('Yaoundé'))
+  fireEvent.click(sites.getByLabelText('Yaoundé'))
   enregistrer()
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({
@@ -137,10 +145,33 @@ test('permissions : celles qui exigent toutes les données sont grisées et reti
   })
 })
 
+test('« Tout » dans les services et les sites = toutes les données', async () => {
+  const appels = monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  fireEvent.click(within(await f.findByRole('group', { name: 'Sites' })).getByLabelText('Tout'))
+  expect(f.getByRole('checkbox', { name: /Voir le CA et la marge/ })).toBeDisabled()
+  fireEvent.click(within(f.getByRole('group', { name: 'Services' })).getByLabelText('Tout'))
+  expect(f.getByText(/ce compte voit toute l’entreprise/)).toBeInTheDocument()
+  fireEvent.click(f.getByRole('checkbox', { name: /Voir le CA et la marge/ }))
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({ permissions: ['marge'], portee: TOUT })
+})
+
+test('suppression annulée : la fiche revient', async () => {
+  monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  fireEvent.click(f.getByRole('button', { name: 'Supprimer ce compte' }))
+  fireEvent.click(within(await screen.findByRole('region', { name: 'Supprimer le compte ?' })).getByRole('button', { name: 'Annuler' }))
+  expect(await screen.findByRole('region', { name: 'Chef Sav' })).toBeInTheDocument()
+  expect((await liste()).getByRole('row', { name: /Chef Sav/ })).not.toHaveClass('a-supprimer')
+})
+
 test('son propre compte : données, gestion des comptes et statut verrouillés, pas de suppression', async () => {
   monter(page, PERMS, servir)
   const f = await ouvrir('Admin RH')
-  expect(f.getByRole('checkbox', { name: 'Toutes les données' })).toBeDisabled()
+  expect(within(f.getByRole('group', { name: 'Périmètres' })).getByLabelText('Tout')).toBeDisabled()
+  expect(within(await f.findByRole('group', { name: 'Sites' })).getByLabelText('Douala')).toBeDisabled()
   expect(f.getByRole('checkbox', { name: /Gérer les comptes/ })).toBeDisabled()
   expect(f.getByRole('checkbox', { name: /Consulter le journal/ })).toBeEnabled()
   expect(f.getByRole('checkbox', { name: 'Compte actif' })).toBeDisabled()
@@ -163,7 +194,7 @@ test('création depuis un modèle, puis sélection du nouveau compte', async () 
   const f = within(await screen.findByRole('region', { name: 'Nouveau compte' }))
   fireEvent.click(f.getByRole('button', { name: 'Lecteur global' }))
   expect(f.getByLabelText('Fonction')).toHaveValue('Lecteur global')
-  expect(f.getByRole('checkbox', { name: 'Toutes les données' })).toBeChecked()
+  expect(within(await f.findByRole('group', { name: 'Services' })).getByLabelText('Tout')).toBeChecked()
   fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Nouveau' } })
   fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'n@exemple.invalid' } })
   fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-12>' } })
@@ -204,7 +235,10 @@ test('suppression après confirmation', async () => {
   const appels = monter(page, PERMS, servir)
   const f = await ouvrir('Chef Sav')
   fireEvent.click(f.getByRole('button', { name: 'Supprimer ce compte' }))
-  const d = within(await screen.findByRole('dialog'))
+  // La confirmation remplace la fiche ; la ligne du compte est signalée dans la liste.
+  const d = within(await screen.findByRole('region', { name: 'Supprimer le compte ?' }))
+  expect(screen.queryByRole('region', { name: 'Chef Sav' })).toBeNull()
+  expect((await liste()).getByRole('row', { name: /Chef Sav/ })).toHaveClass('a-supprimer')
   fireEvent.click(d.getByRole('button', { name: 'Supprimer' }))
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0]).toMatchObject({ method: 'DELETE', url: expect.stringContaining('/users/2') })
