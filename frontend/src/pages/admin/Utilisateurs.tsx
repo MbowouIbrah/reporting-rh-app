@@ -142,12 +142,20 @@ function Cases<T extends string | number>({
   const toutCoche = n === options.length
   return (
     <details className="fiche-dimension" open={n > 0} role="group" aria-label={titre}>
-      <summary>
-        {`${titre} (${n} sur ${options.length})`}
+      {/* Un clic dans le titre replie le groupe : celui sur « Tout » est capté ici pour seulement cocher ou décocher. */}
+      <summary
+        onClick={(e) => {
+          if (!(e.target as Element).closest('.fiche-case-tout')) return
+          e.preventDefault()
+          if (!desactive) onChange(toutCoche ? [] : options.map((o) => o.valeur))
+        }}
+      >
+        <span className="fiche-dimension-nom">{titre}</span>
         <label className="fiche-case-tout">
-          <input type="checkbox" checked={toutCoche} disabled={desactive} onChange={() => onChange(toutCoche ? [] : options.map((o) => o.valeur))} />
+          <input type="checkbox" checked={toutCoche} disabled={desactive} readOnly />
           Tout
         </label>
+        <span className={`volet-valeur${toutCoche ? ' volet-valeur-ok' : ''}`}>{`${n} sur ${options.length}`}</span>
       </summary>
       <div className="fiche-cases">
         {options.map((o) => {
@@ -160,8 +168,10 @@ function Cases<T extends string | number>({
                 disabled={desactive || via !== undefined}
                 onChange={() => onChange(basculer(tout ? options.map((x) => x.valeur) : choisis, o.valeur))}
               />
-              {o.libelle}
-              {via && <small className="fiche-via">{`via ${via}`}</small>}
+              <span>
+                {o.libelle}
+                {via && <small className="fiche-via">{`via ${via}`}</small>}
+              </span>
             </label>
           )
         })}

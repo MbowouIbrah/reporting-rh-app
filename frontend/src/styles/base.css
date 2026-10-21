@@ -1187,17 +1187,24 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .fiche-compte :is(.admin-case, .admin-contexte) { grid-column: 1 / -1; }
 .admin-excel .fiche-compte .admin-case { height: auto; }
 .fiche-modeles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-sm); }
-.fiche-case-tout { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: var(--sp-4); color: var(--ink); font-weight: var(--fw-regular); cursor: pointer; }
-.fiche-via { color: var(--muted); font-size: var(--fs-xs); }
+.fiche-dimension { margin-top: var(--sp-2); border: 1px solid var(--rule); background: var(--paper); }
+.fiche-dimension summary { display: flex; align-items: center; gap: var(--sp-3); padding: 8px 12px; background: var(--paper-2); list-style: none; cursor: pointer; font-size: var(--fs-sm); }
+.fiche-dimension summary::-webkit-details-marker { display: none; }
+.fiche-dimension summary::before { content: '▸'; color: var(--muted-2); font-size: 11px; transition: transform .16s ease; }
+.fiche-dimension[open] summary { background: var(--paper); border-bottom: 1px solid var(--rule); }
+.fiche-dimension[open] summary::before { transform: rotate(90deg); color: var(--red); }
+.fiche-dimension-nom { color: var(--ink); font-family: var(--font-display); font-weight: 600; }
+.fiche-dimension .volet-valeur { margin-left: auto; font-size: var(--fs-xs); padding: 2px 8px; }
+.fiche-case-tout { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--muted); cursor: pointer; }
+.fiche-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px var(--sp-3); padding: 10px 12px; font-size: var(--fs-sm); }
+.fiche-cases label { display: flex; align-items: flex-start; gap: var(--sp-2); line-height: 1.3; }
+.fiche-cases label > input { margin: 2px 0 0; flex: none; }
+.fiche-via { display: block; color: var(--muted); font-size: var(--fs-xs); }
 .fiche-cases label:has(input:disabled) { color: var(--muted); }
 .fiche-suppression > :not(:first-child) { padding: var(--sp-4); }
 .fiche-suppression p { margin: 0 0 var(--sp-3); }
 .comptes-liste tr.a-supprimer:has(.ligne-compte) > * { background: var(--red-soft); }
 .comptes-liste tr.a-supprimer:has(.ligne-compte) > th { box-shadow: inset 3px 0 var(--red); }
-.fiche-dimension { margin-top: var(--sp-2); }
-.fiche-dimension summary { color: var(--navy); font-size: var(--fs-sm); font-weight: var(--fw-bold); cursor: pointer; }
-.fiche-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0 0 var(--sp-4); font-size: var(--fs-sm); }
-.fiche-cases label { display: flex; align-items: center; gap: var(--sp-2); }
 .fiche-compte .note { margin: var(--sp-2) 0 0; }
 .fiche-permissions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); column-gap: var(--sp-5); margin: 0; padding: 0; list-style: none; }
 .fiche-permissions li { border-top: 1px solid var(--rule); }
