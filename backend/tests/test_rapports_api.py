@@ -184,11 +184,10 @@ def test_individuel_tous(charge, make_client):
 
 def test_individuel_hors_perimetre_nominatif(charge, make_client, db):
     """Un lecteur à périmètre avec drapeau nominatif ne voit que son périmètre."""
-    from app.models.auth import RoleAssignment, Utilisateur
+    from app.models.auth import Utilisateur, UtilisateurPermission
 
     u = db.scalar(select(Utilisateur).where(Utilisateur.email == EQUIP))
-    a = db.scalar(select(RoleAssignment).where(RoleAssignment.utilisateur_id == u.id))
-    a.nominatif = True
+    u.permissions.append(UtilisateurPermission(permission="nominatif"))
     db.commit()
     c = make_client(EQUIP)
     assert get(c, "individuel", annee=2026, matricule="E1").status_code == 200
@@ -294,11 +293,10 @@ def test_filtre_employe_par_matricule(charge, make_client, db):
     # sans droit nominatif : refuse
     assert get(make_client(EQUIP), "mensuel", annee=2026, mois=1, matricule="E1").status_code == 403
     # avec le drapeau nominatif mais hors perimetre : rien ne fuit
-    from app.models.auth import RoleAssignment, Utilisateur
+    from app.models.auth import Utilisateur, UtilisateurPermission
 
     u = db.scalar(select(Utilisateur).where(Utilisateur.email == EQUIP))
-    ra = db.scalar(select(RoleAssignment).where(RoleAssignment.utilisateur_id == u.id))
-    ra.nominatif = True
+    u.permissions.append(UtilisateurPermission(permission="nominatif"))
     db.commit()
     c = make_client(EQUIP)
     assert get(c, "mensuel", annee=2026, mois=1, matricule="E1").status_code == 200

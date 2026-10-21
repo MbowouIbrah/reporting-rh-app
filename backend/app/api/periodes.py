@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.imports.regles import norm
 from app.imports.service import DIM_MODELS
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
-from app.models.auth import PerimetreRegle
+from app.models.auth import PerimetreRegle, UtilisateurPortee
 from app.models.donnees import Periode
 from app.models.pilotage import CaPeriode
 from app.models.referentiel import TYPES_SITE, RefAlias, Rubrique
@@ -260,19 +260,23 @@ def modifier_referentiel(
             RefAlias.dimension == dimension, RefAlias.alias_norm == norm(nouveau)))
         if pris is not None and pris.cible_id != rid:
             raise HTTPException(409, "Libellé déjà utilisé comme alias d'une autre valeur")
-    regles = []
+    regles, portees = [], []
     if renomme and dimension in ("service", "site"):
         regles = list(db.scalars(select(PerimetreRegle).where(
             PerimetreRegle.dimension == dimension, PerimetreRegle.valeur == ancien)))
+        # Valeur accordée en direct à un compte : suit le renommage, comme les périmètres.
+        portees = list(db.scalars(select(UtilisateurPortee).where(
+            UtilisateurPortee.type == dimension, UtilisateurPortee.valeur == ancien)))
     if apercu:
-        return {"perimetres_maj": len({r.perimetre_id for r in regles})}
+        return {"perimetres_maj": len({r.perimetre_id for r in regles}),
+                "comptes_maj": len({x.utilisateur_id for x in portees})}
     if body.actif is not None:
         row.actif = body.actif
     if body.type_site is not None:
         row.type_site = body.type_site
     if renomme:
         row.libelle = nouveau
-        for r in regles:
+        for r in [*regles, *portees]:
             r.valeur = nouveau
         if pris is not None:  # l'alias du nouveau libellé pointait déjà ici : devenu inutile
             db.delete(pris)
@@ -282,7 +286,8 @@ def modifier_referentiel(
             db.add(RefAlias(dimension=dimension, alias_norm=norm(ancien), cible_id=rid))
     db.flush()
     apres = {"libelle": row.libelle, "actif": row.actif,
-             "perimetres_maj": len({r.perimetre_id for r in regles})}
+             "perimetres_maj": len({r.perimetre_id for r in regles}),
+             "comptes_maj": len({x.utilisateur_id for x in portees})}
     if dimension == "site":
         apres["type_site"] = row.type_site
     audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant, apres)

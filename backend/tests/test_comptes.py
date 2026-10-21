@@ -18,14 +18,13 @@ def _dernier_audit(db):
 
 def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
-    argv = ["creer", " DPS.Sav@exemple.invalid ", "--nom", "DPS SAV", "--role",
-            "lecteur_perimetre", "--perimetre", "dps"]
+    argv = ["creer", " DPS.Sav@exemple.invalid ", "--nom", "DPS SAV", "--modele",
+            "perimetre", "--perimetre", "dps"]
     assert main(argv, db) == 0
     u = _u(db, "dps.sav@exemple.invalid")
     assert u.actif and verify_password(NOUVEAU, u.password_hash)
-    assert [(r.role, r.perimetre_id is not None, r.nominatif) for r in u.roles] == [
-        ("lecteur_perimetre", True, False)
-    ]
+    assert u.fonction == "Lecteur de périmètre" and u.permissions == []
+    assert [(x.type, x.perimetre_id is not None) for x in u.portees] == [("perimetre", True)]
     e = _dernier_audit(db)
     assert (e.action, e.entite, e.entite_id, e.utilisateur_id) == (
         "create", "utilisateur", str(u.id), None
@@ -36,14 +35,14 @@ def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
 
 def test_creer_refuse_doublon_mot_de_passe_court_et_perimetre_manquant(db, monkeypatch):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
-    assert main(["creer", "drh@exemple.invalid", "--nom", "X", "--role", "lecteur_global"], db) == 1
-    assert main(["creer", "a@exemple.invalid", "--nom", "A", "--role", "lecteur_perimetre"], db) == 1
-    assert main(["creer", "b@exemple.invalid", "--nom", "B", "--role", "lecteur_global",
+    assert main(["creer", "drh@exemple.invalid", "--nom", "X", "--modele", "global"], db) == 1
+    assert main(["creer", "a@exemple.invalid", "--nom", "A", "--modele", "perimetre"], db) == 1
+    assert main(["creer", "b@exemple.invalid", "--nom", "B", "--modele", "global",
                  "--perimetre", "dps"], db) == 1
-    assert main(["creer", "c@exemple.invalid", "--nom", "C", "--role", "lecteur_perimetre",
+    assert main(["creer", "c@exemple.invalid", "--nom", "C", "--modele", "perimetre",
                  "--perimetre", "inconnu"], db) == 1
     monkeypatch.setenv("MOT_DE_PASSE", "court")
-    assert main(["creer", "d@exemple.invalid", "--nom", "D", "--role", "lecteur_global"], db) == 1
+    assert main(["creer", "d@exemple.invalid", "--nom", "D", "--modele", "global"], db) == 1
     assert db.scalars(select(Utilisateur).where(Utilisateur.email.like("_@exemple.invalid"))).all() \
         == []
 
@@ -61,19 +60,20 @@ def test_desactiver_activer_et_mot_de_passe(db, monkeypatch):
 
 def test_jamais_zero_admin_actif(db):
     assert main(["desactiver", "admin@exemple.invalid"], db) == 1
-    assert main(["role", "admin@exemple.invalid", "--role", "lecteur_global"], db) == 1
+    assert main(["droits", "admin@exemple.invalid", "--modele", "global"], db) == 1
     assert _u(db, "admin@exemple.invalid").actif is True
-    assert main(["role", "drh@exemple.invalid", "--role", "rh_admin"], db) == 0
+    assert main(["droits", "drh@exemple.invalid", "--modele", "admin"], db) == 0
     assert main(["desactiver", "admin@exemple.invalid"], db) == 0
 
 
-def test_role_remplace_et_journal(db, capsys):
-    assert main(["role", "dop@exemple.invalid", "--role", "lecteur_perimetre",
-                 "--perimetre", "commerce_vn", "--nominatif"], db) == 0
+def test_droits_remplaces_et_journal(db, capsys):
+    assert main(["droits", "dop@exemple.invalid", "--modele", "perimetre",
+                 "--perimetre", "commerce_vn", "--nominatif", "--fonction", "DOP VN"], db) == 0
     e = _dernier_audit(db)
-    assert e.avant["roles"][0]["role"] == "lecteur_global"
-    assert e.apres["roles"][0]["role"] == "lecteur_perimetre"
+    assert e.avant["portee"]["tout"] and e.avant["permissions"] == ["marge", "nominatif"]
+    assert not e.apres["portee"]["tout"] and len(e.apres["portee"]["perimetres"]) == 1
+    assert e.apres["permissions"] == ["nominatif"] and e.apres["fonction"] == "DOP VN"
     capsys.readouterr()
     assert main(["journal", "--entite", "utilisateur", "--detail", "--limite", "1"], db) == 0
     sortie = capsys.readouterr().out
-    assert "console" in sortie and "update" in sortie and "lecteur_perimetre" in sortie
+    assert "console" in sortie and "update" in sortie and "DOP VN" in sortie

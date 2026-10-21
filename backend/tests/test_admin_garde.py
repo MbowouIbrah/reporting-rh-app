@@ -1,11 +1,15 @@
+from app.security.policy import ACCORDABLES
+
 API = "/api/v1"
 ADMIN = "admin@exemple.invalid"
 PW = "<mot-de-passe-test>"
+ADMIN_DROITS = {"permissions": list(ACCORDABLES), "portee": {"tout": True}}
+GLOBAL_DROITS = {"permissions": ["nominatif", "marge"], "portee": {"tout": True}}
 
 
 def second_admin(c):
     r = c.post(f"{API}/users", json={"email": "a2@exemple.invalid", "nom": "A2", "password": PW,
-                                     "roles": [{"role": "rh_admin"}]})
+                                     **ADMIN_DROITS})
     assert r.status_code == 201
     return r.json()["id"]
 
@@ -15,8 +19,7 @@ def test_dernier_admin_actif_protege(db, make_client):
     moi = c.get(f"{API}/auth/me").json()["id"]
     # seul admin : désactivation et retrait du rôle refusés
     assert c.put(f"{API}/users/{moi}", json={"actif": False}).status_code == 409
-    assert c.put(f"{API}/users/{moi}", json={"roles": [{"role": "lecteur_global"}]}
-                 ).status_code == 409
+    assert c.put(f"{API}/users/{moi}", json=GLOBAL_DROITS).status_code == 409
     # avec un second admin : possible
     autre = second_admin(c)
     assert c.put(f"{API}/users/{autre}", json={"actif": False}).status_code == 200
@@ -41,7 +44,7 @@ def test_creation_email_invalide_refusee(db, make_client):
     c = make_client(ADMIN)
     for email in ["pas-un-email", "a@b", "a b@exemple.invalid", "@exemple.invalid"]:
         r = c.post(f"{API}/users", json={"email": email, "nom": "X", "password": PW,
-                                         "roles": [{"role": "lecteur_global"}]})
+                                         **GLOBAL_DROITS})
         assert r.status_code == 422, email
 
 
@@ -54,3 +57,79 @@ def test_modification_email(db, make_client):
     assert c.put(f"{API}/users/{uid}", json={"email": ADMIN}).status_code == 409
     # le changement d'adresse ne touche pas le reste du compte
     assert c.put(f"{API}/users/{uid}", json={"nom": "B"}).json()["email"] == "nouveau@exemple.invalid"
+
+
+def test_retrait_de_sa_propre_gestion_refuse_meme_avec_un_autre_admin(db, make_client):
+    c = make_client(ADMIN)
+    moi = c.get(f"{API}/auth/me").json()["id"]
+    second_admin(c)
+    r = c.put(f"{API}/users/{moi}", json=GLOBAL_DROITS)
+    assert r.status_code == 409
+    # restreindre ses propres données retire aussi la gestion des comptes
+    assert c.put(f"{API}/users/{moi}", json={"portee": {"perimetres": [1]}}).status_code == 422
+
+
+def test_droits_valides(db, make_client):
+    c = make_client(ADMIN)
+    base = {"email": "v@exemple.invalid", "nom": "V", "password": PW}
+    pid = c.get(f"{API}/perimetres").json()[0]["id"]
+    # permission d'écriture sans « toutes les données » : refusée
+    r = c.post(f"{API}/users", json={**base, "permissions": ["import"],
+                                     "portee": {"perimetres": [pid]}})
+    assert r.status_code == 422 and "toutes les données" in r.json()["detail"]
+    assert c.post(f"{API}/users", json={**base, "permissions": ["inconnue"]}).status_code == 422
+    assert c.post(f"{API}/users", json={**base, "portee": {"perimetres": [9999]}}
+                  ).status_code == 422
+    assert c.post(f"{API}/users", json={**base, "portee": {"services": ["Inexistant"]}}
+                  ).status_code == 422
+    r = c.post(f"{API}/users", json={**base, "fonction": " Chef ", "permissions": ["nominatif"],
+                                     "portee": {"services": ["SAV PL", "SAV PL"],
+                                                "sites": ["Douala"]}})
+    assert r.status_code == 201, r.text
+    u = r.json()
+    assert u["fonction"] == "Chef" and u["permissions"] == ["nominatif"]
+    assert u["portee"] == {"tout": False, "perimetres": [], "services": ["SAV PL"],
+                           "sites": ["Douala"]}
+
+
+def test_journal_exige_toutes_les_donnees(db, make_client):
+    c = make_client(ADMIN)
+    pid = c.get(f"{API}/perimetres").json()[0]["id"]
+    r = c.post(f"{API}/users", json={"email": "j@exemple.invalid", "nom": "J", "password": PW,
+                                     "permissions": ["journal"],
+                                     "portee": {"perimetres": [pid]}})
+    assert r.status_code == 422 and "toutes les données" in r.json()["detail"]
+
+
+def test_portee_directe_suit_le_renommage(db, make_client):
+    from sqlalchemy import select
+
+    from app.models.referentiel import Service
+
+    c = make_client(ADMIN)
+    r = c.post(f"{API}/users", json={"email": "s@exemple.invalid", "nom": "S", "password": PW,
+                                     "portee": {"services": ["SAV PL"]}})
+    uid = r.json()["id"]
+    rid = db.scalar(select(Service.id).where(Service.libelle == "SAV PL"))
+    url = f"{API}/referentiels/service/{rid}"
+    apercu = c.put(url, params={"apercu": True}, json={"libelle": "SAV Poids Lourds"}).json()
+    assert apercu["comptes_maj"] == 1
+    assert c.put(url, json={"libelle": "SAV Poids Lourds"}).json()["comptes_maj"] == 1
+    u = c.get(f"{API}/users").json()
+    assert next(x for x in u if x["id"] == uid)["portee"]["services"] == ["SAV Poids Lourds"]
+    # la portée reste valide : une modification des seules permissions passe
+    assert c.put(f"{API}/users/{uid}", json={"permissions": ["nominatif"]}).status_code == 200
+
+
+def test_perimetre_une_dimension_et_suppression_si_inutilise(db, make_client):
+    c = make_client(ADMIN)
+    mixte = {"code": "mx", "libelle": "Mixte", "regles": [
+        {"dimension": "service", "valeur": "SAV PL"}, {"dimension": "site", "valeur": "Douala"}]}
+    assert c.post(f"{API}/perimetres", json=mixte).status_code == 422
+    r = c.post(f"{API}/perimetres", json={**mixte, "regles": mixte["regles"][1:]})
+    assert r.status_code == 201, r.text
+    pid = r.json()["id"]
+    c.post(f"{API}/users", json={"email": "p@exemple.invalid", "nom": "P", "password": PW,
+                                 "portee": {"perimetres": [pid]}})
+    r = c.delete(f"{API}/perimetres/{pid}")
+    assert r.status_code == 409 and "p@exemple.invalid" in r.json()["detail"]

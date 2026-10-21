@@ -2,8 +2,8 @@
 
 L'administration n'a plus d'écran Utilisateurs ni Journal (08a) : cet outil les remplace en
 production via `docker compose exec api python -m app.comptes ...`. Mêmes règles que l'API
-(rôles, 12 caractères, au moins un rh_admin actif) ; chaque écriture est tracée au journal
-d'audit avec un utilisateur vide (console).
+(droits, 12 caractères, au moins un compte actif qui gère les comptes) ; chaque écriture est
+tracée au journal d'audit avec un utilisateur vide (console).
 
 Mot de passe : saisi au clavier (jamais en argument, pour ne pas finir dans l'historique),
 ou lu dans la variable MOT_DE_PASSE pour un usage non interactif.
@@ -20,21 +20,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.admin import (
-    RoleIn,
+    PorteeIn,
+    _check_droits,
     _check_password,
-    _check_roles,
     _commit,
     _est_admin_actif,
     _exiger_autre_admin,
     _flush,
+    _poser_droits,
     _user_dict,
 )
 from app.db.session import SessionLocal
-from app.models.auth import AuditEvent, Perimetre, RoleAssignment, Utilisateur
+from app.models.auth import AuditEvent, Perimetre, Utilisateur
 from app.security import audit
+from app.security.deps import portee_de
 from app.security.passwords import hash_password
-
-ROLES = ("rh_admin", "lecteur_global", "lecteur_perimetre")
+from app.security.policy import MODELES
 
 
 class Erreur(Exception):
@@ -58,29 +59,37 @@ def _utilisateur(db: Session, email: str) -> Utilisateur:
     return u
 
 
-def _role(db: Session, args: argparse.Namespace) -> RoleIn:
-    pid = None
-    if args.perimetre:
+def _droits(db: Session, args: argparse.Namespace) -> tuple[str, list[str], PorteeIn]:
+    """Fonction, permissions et données d'un modèle ; --perimetre restreint les données."""
+    fonction, tout, perms = MODELES[args.modele]
+    perms = sorted(perms | ({"nominatif"} if args.nominatif else set()))
+    if tout:
+        if args.perimetre:
+            raise Erreur("--perimetre ne s'applique qu'au modèle perimetre")
+        portee = PorteeIn(tout=True)
+    else:
+        if not args.perimetre:
+            raise Erreur("--perimetre est obligatoire pour ce modèle (voir la commande perimetres)")
         p = db.scalar(select(Perimetre).where(Perimetre.code == args.perimetre))
         if p is None:
             raise Erreur(f"Périmètre inconnu : {args.perimetre} (voir la commande perimetres)")
-        pid = p.id
-    r = RoleIn(role=args.role, perimetre_id=pid, nominatif=args.nominatif)
-    _check_roles([r])
-    return r
+        portee = PorteeIn(perimetres=[p.id])
+    _check_droits(db, perms, portee)
+    return args.fonction or fonction, perms, portee
 
 
-def _modifier(db: Session, u: Utilisateur, *, actif=None, pw=None, role=None) -> None:
+def _modifier(db: Session, u: Utilisateur, *, actif=None, pw=None, droits=None) -> None:
     avant = _user_dict(u)
-    if _est_admin_actif(u) and (actif is False or (role and role.role != "rh_admin")):
-        _exiger_autre_admin(db, u)
+    etait_admin = _est_admin_actif(u)
     if actif is not None:
         u.actif = actif
     if pw is not None:
         u.password_hash = hash_password(pw)
-    if role is not None:
-        u.roles.clear()
-        u.roles.append(RoleAssignment(**role.model_dump()))
+    if droits is not None:
+        u.fonction, perms, portee = droits
+        _poser_droits(u, perms, portee)
+    if etait_admin and not _est_admin_actif(u):
+        _exiger_autre_admin(db, u)
     _flush(db)
     audit.record(db, None, "update", "utilisateur", u.id, avant, _user_dict(u))
     _commit(db)
@@ -89,13 +98,13 @@ def _modifier(db: Session, u: Utilisateur, *, actif=None, pw=None, role=None) ->
 def lister(db: Session, args: argparse.Namespace) -> None:
     codes = {p.id: p.code for p in db.scalars(select(Perimetre))}
     for u in db.scalars(select(Utilisateur).order_by(Utilisateur.email)):
-        roles = ", ".join(
-            r.role
-            + (f" [{codes.get(r.perimetre_id)}]" if r.perimetre_id else "")
-            + (" nominatif" if r.nominatif else "")
-            for r in u.roles
-        )
-        print(f"{u.email:40} {'actif' if u.actif else 'INACTIF':8} {roles}  ({u.nom})")
+        pt = portee_de(u)
+        donnees = "tout" if pt.tout else ", ".join(
+            [codes.get(i, str(i)) for i in sorted(pt.perimetres)] + sorted(pt.services | pt.sites)
+        ) or "aucune donnée"
+        perms = ", ".join(sorted(x.permission for x in u.permissions)) or "lecture"
+        etat = "actif" if u.actif else "INACTIF"
+        print(f"{u.email:40} {etat:8} [{donnees}] {perms}  ({u.nom}, {u.fonction or '-'})")
 
 
 def perimetres(db: Session, args: argparse.Namespace) -> None:
@@ -108,13 +117,14 @@ def creer(db: Session, args: argparse.Namespace) -> None:
     email = args.email.strip().lower()
     if db.scalar(select(Utilisateur).where(Utilisateur.email == email)):
         raise Erreur(f"Le compte {email} existe déjà")
-    role = _role(db, args)
+    fonction, perms, portee = _droits(db, args)
     u = Utilisateur(
         email=email,
         nom=args.nom,
+        fonction=fonction,
         password_hash=hash_password(_mot_de_passe()),
-        roles=[RoleAssignment(**role.model_dump())],
     )
+    _poser_droits(u, perms, portee)
     db.add(u)
     _flush(db)
     audit.record(db, None, "create", "utilisateur", u.id, None, _user_dict(u))
@@ -122,9 +132,9 @@ def creer(db: Session, args: argparse.Namespace) -> None:
     print(f"Compte créé : {email}")
 
 
-def role(db: Session, args: argparse.Namespace) -> None:
-    _modifier(db, _utilisateur(db, args.email), role=_role(db, args))
-    print(f"Rôle mis à jour : {args.email}")
+def droits(db: Session, args: argparse.Namespace) -> None:
+    _modifier(db, _utilisateur(db, args.email), droits=_droits(db, args))
+    print(f"Droits mis à jour : {args.email}")
 
 
 def activer(db: Session, args: argparse.Namespace) -> None:
@@ -160,24 +170,25 @@ def journal(db: Session, args: argparse.Namespace) -> None:
 def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="python -m app.comptes", description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="commande", required=True)
-    sub.add_parser("lister", help="comptes, état et rôles").set_defaults(fn=lister)
+    sub.add_parser("lister", help="comptes, état, données et permissions").set_defaults(fn=lister)
     sub.add_parser("perimetres", help="codes de périmètre").set_defaults(fn=perimetres)
 
-    def avec_role(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--role", required=True, choices=ROLES)
-        sp.add_argument("--perimetre", help="code, obligatoire pour lecteur_perimetre")
+    def avec_droits(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--modele", required=True, choices=tuple(MODELES))
+        sp.add_argument("--perimetre", help="code, obligatoire pour le modèle perimetre")
         sp.add_argument("--nominatif", action="store_true", help="accès aux données nominatives")
+        sp.add_argument("--fonction", help="intitulé affiché, sans effet sur les droits")
 
     sp = sub.add_parser("creer", help="nouveau compte (mot de passe demandé)")
     sp.add_argument("email")
     sp.add_argument("--nom", required=True)
-    avec_role(sp)
+    avec_droits(sp)
     sp.set_defaults(fn=creer)
 
-    sp = sub.add_parser("role", help="remplace le rôle d'un compte")
+    sp = sub.add_parser("droits", help="remplace la fonction, les données et les permissions")
     sp.add_argument("email")
-    avec_role(sp)
-    sp.set_defaults(fn=role)
+    avec_droits(sp)
+    sp.set_defaults(fn=droits)
 
     for nom, fn, aide in (
         ("activer", activer, "réactive un compte"),
@@ -204,11 +215,10 @@ def main(argv: list[str] | None = None, db: Session | None = None) -> int:
         else:
             with SessionLocal() as session:
                 args.fn(session, args)
-    except Erreur as e:
-        print(f"Erreur : {e}", file=sys.stderr)
-        return 1
-    except HTTPException as e:
-        print(f"Erreur : {e.detail}", file=sys.stderr)
+    except (Erreur, HTTPException) as e:
+        if db is not None:
+            db.rollback()  # refus : rien ne reste modifié dans la session appelante
+        print(f"Erreur : {getattr(e, 'detail', e)}", file=sys.stderr)
         return 1
     return 0
 

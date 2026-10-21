@@ -71,6 +71,9 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
         if autre:
             return {}
         if not scope.unrestricted:
+            # Accès restreint sur l'autre dimension : le budget la déborde, il reste masqué.
+            if scope.rules.get("site" if dim == "service" else "service"):
+                return {}
             vals = {k: v for k, v in vals.items() if k in scope.rules.get(dim, ())}
         return {k: v for k, v in vals.items() if choisi in (None, k)}
 

@@ -16,7 +16,8 @@ NEW_USER = {
     "email": "x@exemple.invalid",
     "nom": "X",
     "password": PW,
-    "roles": [{"role": "lecteur_global"}],
+    "permissions": ["nominatif", "marge"],
+    "portee": {"tout": True},
 }
 
 
@@ -60,7 +61,7 @@ def test_access_token_ne_sert_pas_de_refresh(make_client):
     assert c.post(f"{API}/auth/refresh").status_code == 401
 
 
-# endpoint, méthode, corps ; True = réservé au rh_admin
+# endpoint, méthode, corps ; réservés à la gestion des comptes
 WRITES = [
     ("post", "/users", NEW_USER),
     ("put", "/users/1", {"nom": "Z"}),
@@ -157,8 +158,16 @@ def test_ecriture_refusee_non_auditee(make_client, db):
 def test_validations(make_client):
     admin = make_client(ADMIN)
     assert admin.post(f"{API}/users", json={**NEW_USER, "password": "court"}).status_code == 422
-    bad = {**NEW_USER, "roles": [{"role": "lecteur_perimetre"}]}
+    bad = {**NEW_USER, "portee": {"tout": False, "sites": ["Lune"]}}
     assert admin.post(f"{API}/users", json=bad).status_code == 422
     assert admin.post(f"{API}/users", json={**NEW_USER, "email": ADMIN}).status_code == 409
     assert admin.delete(f"{API}/users/1").status_code == 409  # auto-suppression
     assert admin.delete(f"{API}/users/999").status_code == 404
+
+
+def test_me_fonction_et_actions(make_client):
+    me = make_client(EQUIP).get(f"{API}/auth/me").json()
+    assert me["fonction"] == "Lecteur de périmètre" and "roles" not in me
+    assert me["permissions"] == ["perimetre:read", "report:read"]
+    admin = make_client(ADMIN).get(f"{API}/auth/me").json()
+    assert {"users:write", "import:write", "marge:read"} <= set(admin["permissions"])

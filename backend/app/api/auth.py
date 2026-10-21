@@ -9,7 +9,7 @@ from app.models.auth import Utilisateur
 from app.security import audit
 from app.security.deps import current_principal, to_principal
 from app.security.passwords import hash_password, verify_password
-from app.security.policy import POLICY, Principal, is_allowed
+from app.security.policy import ACTIONS, Principal, is_allowed
 from app.security.tokens import make_token, read_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -47,13 +47,8 @@ def _me(p: Principal) -> dict:
         "id": p.user_id,
         "email": p.email,
         "nom": p.nom,
-        "roles": [
-            {"role": a.role, "perimetre_id": a.perimetre_id, "nominatif": a.nominatif}
-            for a in p.assignments
-        ],
-        "permissions": sorted(
-            a for a in set().union(*POLICY.values()) if is_allowed(p, a)
-        ),
+        "fonction": p.fonction,
+        "permissions": sorted(a for a in ACTIONS if is_allowed(p, a)),
     }
 
 

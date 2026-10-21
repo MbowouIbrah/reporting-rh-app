@@ -12,23 +12,33 @@ from app.models.auth import (
     AuditEvent,
     Perimetre,
     PerimetreRegle,
-    RoleAssignment,
     Utilisateur,
+    UtilisateurPermission,
+    UtilisateurPortee,
 )
+from app.models.referentiel import Service, Site
 from app.security import audit
-from app.security.deps import current_principal
+from app.security.deps import current_principal, portee_de, to_principal
 from app.security.passwords import hash_password
-from app.security.policy import Principal, Resource, authorize
+from app.security.policy import (
+    ACCORDABLES,
+    PERMISSIONS,
+    Principal,
+    Resource,
+    authorize,
+    is_allowed,
+)
 
 router = APIRouter(tags=["admin"])
 
-Role = Literal["rh_admin", "lecteur_global", "lecteur_perimetre"]
+Code = Literal[ACCORDABLES]
 
 
-class RoleIn(BaseModel):
-    role: Role
-    perimetre_id: int | None = None
-    nominatif: bool = False
+class PorteeIn(BaseModel):
+    tout: bool = False
+    perimetres: list[int] = []
+    services: list[str] = []
+    sites: list[str] = []
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -44,7 +54,9 @@ class UserIn(BaseModel):
     email: str
     nom: str
     password: str
-    roles: list[RoleIn]
+    fonction: str = ""
+    permissions: list[Code] = []
+    portee: PorteeIn = PorteeIn()
 
     _email = field_validator("email")(_email_valide)
 
@@ -54,7 +66,9 @@ class UserPatch(BaseModel):
     nom: str | None = None
     actif: bool | None = None
     password: str | None = None
-    roles: list[RoleIn] | None = None
+    fonction: str | None = None
+    permissions: list[Code] | None = None
+    portee: PorteeIn | None = None
 
     _email = field_validator("email")(_email_valide)
 
@@ -69,11 +83,51 @@ class PerimetreIn(BaseModel):
     libelle: str
     regles: list[RegleIn] = []
 
+    @field_validator("regles")
+    @classmethod
+    def _une_dimension(cls, v: list[RegleIn]) -> list[RegleIn]:
+        # Services ET sites dans un même périmètre se croiseraient avec ceux d'un autre
+        # périmètre accordé (filtre par dimension) : un périmètre porte une seule dimension.
+        if len({r.dimension for r in v}) > 1:
+            raise ValueError("un périmètre porte soit des services, soit des sites")
+        return v
 
-def _check_roles(roles: list[RoleIn]) -> None:
-    for r in roles:
-        if (r.role == "lecteur_perimetre") != (r.perimetre_id is not None):
-            raise HTTPException(422, "lecteur_perimetre exige un périmètre (et lui seul)")
+
+def _check_droits(db: Session, permissions: list[str], portee: PorteeIn) -> None:
+    """Écriture et CA réservés à « toutes les données » ; valeurs accordées connues."""
+    if not portee.tout:
+        for code in permissions:
+            if PERMISSIONS[code].portee_tout:
+                raise HTTPException(
+                    422, f"« {PERMISSIONS[code].libelle} » exige l'accès à toutes les données"
+                )
+    for pid in portee.perimetres:
+        if db.get(Perimetre, pid) is None:
+            raise HTTPException(422, f"Périmètre inconnu : {pid}")
+    for model, vals in ((Service, portee.services), (Site, portee.sites)):
+        connus = set(db.scalars(select(model.libelle).where(model.libelle.in_(vals))))
+        if inconnus := set(vals) - connus:
+            raise HTTPException(422, f"Valeur inconnue : {', '.join(sorted(inconnus))}")
+
+
+def _poser_droits(u: Utilisateur, permissions: list[str] | None, portee: PorteeIn | None) -> None:
+    if permissions is not None:
+        # Garder les lignes existantes : l'unité de travail insère avant de supprimer (unicité).
+        voulues = set(permissions)
+        gardees = {x.permission: x for x in u.permissions if x.permission in voulues}
+        u.permissions[:] = [gardees.get(c) or UtilisateurPermission(permission=c)
+                            for c in sorted(voulues)]
+    if portee is not None:
+        u.portees.clear()
+        if portee.tout:
+            u.portees.append(UtilisateurPortee(type="tout"))
+        else:
+            u.portees.extend(UtilisateurPortee(type="perimetre", perimetre_id=i)
+                             for i in sorted(set(portee.perimetres)))
+            u.portees.extend(UtilisateurPortee(type="service", valeur=v)
+                             for v in sorted(set(portee.services)))
+            u.portees.extend(UtilisateurPortee(type="site", valeur=v)
+                             for v in sorted(set(portee.sites)))
 
 
 def _check_password(pw: str) -> None:
@@ -82,15 +136,20 @@ def _check_password(pw: str) -> None:
 
 
 def _user_dict(u: Utilisateur) -> dict:
+    portee = portee_de(u)
     return {
         "id": u.id,
         "email": u.email,
         "nom": u.nom,
+        "fonction": u.fonction,
         "actif": u.actif,
-        "roles": [
-            {"role": r.role, "perimetre_id": r.perimetre_id, "nominatif": r.nominatif}
-            for r in u.roles
-        ],
+        "permissions": sorted(x.permission for x in u.permissions),
+        "portee": {
+            "tout": portee.tout,
+            "perimetres": sorted(portee.perimetres),
+            "services": sorted(portee.services),
+            "sites": sorted(portee.sites),
+        },
     }
 
 
@@ -104,14 +163,15 @@ def _perimetre_dict(p: Perimetre) -> dict:
 
 
 def _est_admin_actif(u: Utilisateur) -> bool:
-    return u.actif and any(r.role == "rh_admin" for r in u.roles)
+    """Compte actif qui gère les comptes (la permission exige « toutes les données »)."""
+    return u.actif and is_allowed(to_principal(u), "users:write")
 
 
 def _exiger_autre_admin(db: Session, u: Utilisateur) -> None:
-    """Garde : au moins un rh_admin actif doit subsister après l'opération."""
+    """Garde : au moins un compte actif doit encore gérer les comptes après l'opération."""
     autres = db.scalars(select(Utilisateur).where(Utilisateur.id != u.id)).all()
     if not any(_est_admin_actif(x) for x in autres):
-        raise HTTPException(409, "Il doit rester au moins un administrateur actif")
+        raise HTTPException(409, "Il doit rester au moins un compte qui gère les comptes")
 
 
 def _flush(db: Session) -> None:
@@ -130,7 +190,7 @@ def _commit(db: Session) -> None:
         raise HTTPException(409, "Conflit : doublon ou référence invalide") from None
 
 
-# ---- Utilisateurs (rh_admin seul) ----
+# ---- Utilisateurs (permission « Gérer les comptes et les droits ») ----
 @router.get("/users")
 def list_users(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "users:read")
@@ -142,14 +202,15 @@ def create_user(
     body: UserIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     authorize(p, "users:write")
-    _check_roles(body.roles)
+    _check_droits(db, body.permissions, body.portee)
     _check_password(body.password)
     u = Utilisateur(
         email=body.email.strip().lower(),
         nom=body.nom,
+        fonction=body.fonction.strip(),
         password_hash=hash_password(body.password),
-        roles=[RoleAssignment(**r.model_dump()) for r in body.roles],
     )
+    _poser_droits(u, body.permissions, body.portee)
     db.add(u)
     _flush(db)
     audit.record(db, p.user_id, "create", "utilisateur", u.id, None, _user_dict(u))
@@ -169,25 +230,30 @@ def update_user(
     if u is None:
         raise HTTPException(404, "Utilisateur introuvable")
     avant = _user_dict(u)
-    if _est_admin_actif(u):
-        perd_actif = body.actif is False
-        perd_role = body.roles is not None and not any(r.role == "rh_admin" for r in body.roles)
-        if perd_actif or perd_role:
-            _exiger_autre_admin(db, u)
+    if body.permissions is not None or body.portee is not None:
+        _check_droits(
+            db,
+            body.permissions if body.permissions is not None else avant["permissions"],
+            body.portee or PorteeIn(**avant["portee"]),
+        )
+    etait_admin = _est_admin_actif(u)
     # La session porte l'id du compte : changer l'adresse ne déconnecte personne.
     if body.email is not None:
         u.email = body.email.strip().lower()
     if body.nom is not None:
         u.nom = body.nom
+    if body.fonction is not None:
+        u.fonction = body.fonction.strip()
     if body.actif is not None:
         u.actif = body.actif
     if body.password is not None:
         _check_password(body.password)
         u.password_hash = hash_password(body.password)
-    if body.roles is not None:
-        _check_roles(body.roles)
-        u.roles.clear()
-        u.roles.extend(RoleAssignment(**r.model_dump()) for r in body.roles)
+    _poser_droits(u, body.permissions, body.portee)
+    if etait_admin and not _est_admin_actif(u):
+        if u.id == p.user_id:
+            raise HTTPException(409, "Impossible de se retirer à soi-même la gestion des comptes")
+        _exiger_autre_admin(db, u)
     _flush(db)
     audit.record(db, p.user_id, "update", "utilisateur", u.id, avant, _user_dict(u))
     _commit(db)
@@ -217,8 +283,7 @@ def list_perimetres(p: Principal = Depends(current_principal), db: Session = Dep
     authorize(p, "perimetre:read")
     rows = db.scalars(select(Perimetre).order_by(Perimetre.id)).all()
     if not p.is_global:
-        mine = {a.perimetre_id for a in p.assignments}
-        rows = [r for r in rows if r.id in mine]
+        rows = [r for r in rows if r.id in p.portee.perimetres]
     return [_perimetre_dict(r) for r in rows]
 
 
@@ -280,6 +345,10 @@ def delete_perimetre(
     row = db.get(Perimetre, pid)
     if row is None:
         raise HTTPException(404, "Périmètre introuvable")
+    comptes = db.scalars(select(Utilisateur.email).join(UtilisateurPortee).where(
+        UtilisateurPortee.perimetre_id == pid).order_by(Utilisateur.email)).all()
+    if comptes:
+        raise HTTPException(409, f"Périmètre accordé à : {', '.join(comptes)}")
     audit.record(db, p.user_id, "delete", "perimetre", row.id, _perimetre_dict(row), None)
     db.delete(row)
     _commit(db)

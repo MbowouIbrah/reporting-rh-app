@@ -2,8 +2,9 @@ from app.models.auth import (  # noqa: F401
     AuditEvent,
     Perimetre,
     PerimetreRegle,
-    RoleAssignment,
     Utilisateur,
+    UtilisateurPermission,
+    UtilisateurPortee,
 )
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle  # noqa: F401
 from app.models.imports import (  # noqa: F401

@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass
 
-from sqlalchemy import Select, false, or_
+from sqlalchemy import Select, and_, false
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models.auth import Perimetre
-from app.security.policy import PERIMETRE, Principal
+from app.security.policy import Principal
 
 
 @dataclass(frozen=True)
@@ -16,17 +16,16 @@ class Scope:
 
 
 def scope_for(db: Session, principal: Principal) -> Scope:
-    """Union des périmètres du principal ; global si un rôle global existe."""
-    if principal.is_global:
+    """Valeurs accordées + celles des périmètres accordés, par dimension ; global si « tout »."""
+    portee = principal.portee
+    if portee.tout:
         return Scope(True, {})
-    rules: dict[str, set[str]] = {}
-    for a in principal.assignments:
-        if a.role != PERIMETRE or a.perimetre_id is None:
-            continue
-        p = db.get(Perimetre, a.perimetre_id)
+    rules: dict[str, set[str]] = {"service": set(portee.services), "site": set(portee.sites)}
+    for pid in portee.perimetres:
+        p = db.get(Perimetre, pid)
         for r in p.regles if p else []:
             rules.setdefault(r.dimension, set()).add(r.valeur)
-    return Scope(False, {k: frozenset(v) for k, v in rules.items()})
+    return Scope(False, {k: frozenset(v) for k, v in rules.items() if v})
 
 
 def apply_scope(
@@ -36,13 +35,13 @@ def apply_scope(
     service: InstrumentedAttribute | None = None,
     site: InstrumentedAttribute | None = None,
 ) -> Select:
-    """Restreint une requête. Périmètre sans règle exploitable = aucune donnée."""
+    """Restreint une requête : ET entre dimensions, OU dans une dimension. Rien d'accordé = rien.
+
+    Une dimension restreinte sans colonne correspondante dans la requête ne laisse rien passer.
+    """
     if scope.unrestricted:
         return stmt
     cols = {"service": service, "site": site}
-    conds = [
-        cols[dim].in_(vals)
-        for dim, vals in scope.rules.items()
-        if cols.get(dim) is not None and vals
-    ]
-    return stmt.where(or_(*conds)) if conds else stmt.where(false())
+    if not scope.rules or any(cols.get(dim) is None for dim in scope.rules):
+        return stmt.where(false())
+    return stmt.where(and_(*(cols[dim].in_(vals) for dim, vals in scope.rules.items())))

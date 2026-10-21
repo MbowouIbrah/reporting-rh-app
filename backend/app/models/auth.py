@@ -46,20 +46,36 @@ class Utilisateur(Base):
     password_hash: Mapped[str] = mapped_column(String(100))
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
     cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    roles: Mapped[list["RoleAssignment"]] = relationship(
-        back_populates="utilisateur", cascade="all, delete-orphan", lazy="selectin"
+    fonction: Mapped[str] = mapped_column(String(200), default="", server_default="")  # sans effet
+    permissions: Mapped[list["UtilisateurPermission"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
+    portees: Mapped[list["UtilisateurPortee"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
     )
 
 
-class RoleAssignment(Base):
-    __tablename__ = "role_assignment"
+class UtilisateurPermission(Base):
+    """Permission accordée, code du catalogue de security/policy.py."""
+
+    __tablename__ = "utilisateur_permission"
+    __table_args__ = (UniqueConstraint("utilisateur_id", "permission"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
-    role: Mapped[str] = mapped_column(String(30))  # rh_admin | lecteur_global | lecteur_perimetre
+    permission: Mapped[str] = mapped_column(String(30))
+
+
+class UtilisateurPortee(Base):
+    """Données accordées : tout, un périmètre (perimetre_id), un service ou un site (valeur)."""
+
+    __tablename__ = "utilisateur_portee"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
+    type: Mapped[str] = mapped_column(String(20))  # tout | perimetre | service | site
     perimetre_id: Mapped[int | None] = mapped_column(ForeignKey("perimetre.id"), nullable=True)
-    nominatif: Mapped[bool] = mapped_column(Boolean, default=False)
-    utilisateur: Mapped[Utilisateur] = relationship(back_populates="roles")
+    valeur: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class AuditEvent(Base):

@@ -1,6 +1,6 @@
 """Amorçage : python -m app.seed  (ADMIN_EMAIL / ADMIN_PASSWORD en environnement).
 
-Crée le rh_admin et les deux périmètres du cadrage (hypothèses [H], éditables ensuite).
+Crée l'administrateur et les deux périmètres du cadrage (hypothèses [H], éditables ensuite).
 --demo ajoute des comptes de lecture d'exemple (mot de passe : DEMO_PASSWORD).
 """
 
@@ -11,9 +11,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.auth import Perimetre, PerimetreRegle, RoleAssignment, Utilisateur
+from app.models.auth import (
+    Perimetre,
+    PerimetreRegle,
+    Utilisateur,
+    UtilisateurPermission,
+    UtilisateurPortee,
+)
 from app.referentiels_init import seed_referentiels
 from app.security.passwords import hash_password
+from app.security.policy import MODELES
 
 # Mêmes valeurs que la migration 0011 (la base de test est créée sans migrations).
 PERIMETRES = {
@@ -26,15 +33,22 @@ PERIMETRES = {
 }
 
 
-def _user(db: Session, email: str, nom: str, pw: str, role: str, pid=None, nominatif=False):
+def _user(db: Session, email: str, nom: str, pw: str, modele: str, pid=None, nominatif=False):
+    """Compte créé d'après un modèle (mêmes droits que la conversion de la migration 0014)."""
     if db.scalar(select(Utilisateur).where(Utilisateur.email == email)):
         return
+    fonction, tout, perms = MODELES[modele]
+    perms = perms | ({"nominatif"} if nominatif else set())
+    portee = UtilisateurPortee(type="tout") if tout else UtilisateurPortee(
+        type="perimetre", perimetre_id=pid)
     db.add(
         Utilisateur(
             email=email,
             nom=nom,
+            fonction=fonction,
             password_hash=hash_password(pw),
-            roles=[RoleAssignment(role=role, perimetre_id=pid, nominatif=nominatif)],
+            permissions=[UtilisateurPermission(permission=c) for c in sorted(perms)],
+            portees=[portee],
         )
     )
 
@@ -53,22 +67,22 @@ def run(db: Session, admin_email: str, admin_password: str, demo_password: str |
             db.add(p)
             db.flush()
         ids[code] = p.id
-    _user(db, admin_email.lower(), "Administrateur RH", admin_password, "rh_admin")
+    _user(db, admin_email.lower(), "Administrateur RH", admin_password, "admin")
     if demo_password:
-        _user(db, "drh@exemple.invalid", "DRH", demo_password, "lecteur_global", None, True)
-        _user(db, "dop@exemple.invalid", "DOP", demo_password, "lecteur_global", None, True)
+        _user(db, "drh@exemple.invalid", "DRH", demo_password, "global", None, True)
+        _user(db, "dop@exemple.invalid", "DOP", demo_password, "global", None, True)
         _user(db, "dps.equipment@exemple.invalid", "DPS", demo_password,
-              "lecteur_perimetre", ids["dps"])
+              "perimetre", ids["dps"])
         _user(db, "dir.commercial.vn@exemple.invalid", "Directeur commercial VN", demo_password,
-              "lecteur_perimetre", ids["commerce_vn"])
+              "perimetre", ids["commerce_vn"])
         _user(db, "dc.pneumatique@exemple.invalid", "DC Pneumatique", demo_password,
-              "lecteur_perimetre", ids["pneumatique"])
+              "perimetre", ids["pneumatique"])
         _user(db, "dir.technique@exemple.invalid", "Directeur technique", demo_password,
-              "lecteur_perimetre", ids["sav_pl"])
+              "perimetre", ids["sav_pl"])
         _user(db, "resp.sav.engins@exemple.invalid", "Responsable technique SAV Engins",
-              demo_password, "lecteur_perimetre", ids["sav_engins"])
+              demo_password, "perimetre", ids["sav_engins"])
         _user(db, "resp.sites.deportes@exemple.invalid", "Responsable des sites déportés",
-              demo_password, "lecteur_perimetre", ids["sites_deportes"])
+              demo_password, "perimetre", ids["sites_deportes"])
     db.commit()
 
 
