@@ -523,10 +523,6 @@ export default function Utilisateurs() {
                             {c.id === me?.id && <span className="note"> (vous)</span>}
                           </button>
                           {c.fonction && <span className="fonction">{c.fonction}</span>}
-                          <span className="ligne-email">
-                            {c.email}
-                            <CopierEmail email={c.email} />
-                          </span>
                         </th>
                         <td>{resumePortee(c.portee, perimetres.data)}</td>
                         <td><span className={c.actif ? 'statut statut-ok' : 'statut'}>{c.actif ? 'Actif' : 'Inactif'}</span></td>

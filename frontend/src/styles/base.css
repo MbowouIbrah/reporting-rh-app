@@ -289,8 +289,7 @@ table.dense td.num { text-align: right; }
 .periode-label { background: var(--gris-etiq); color: var(--navy); font-weight: 700; font-size: var(--fs-xs); padding: 0 20px; height: 34px; display: inline-flex; align-items: center; }
 .periode select { height: 34px; min-width: 0; border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-weight: 700; padding: 0 12px; border-radius: 0; text-align: center; }
 .comparaison { margin-left: auto; color: var(--muted); font-size: var(--fs-sm); }
-/* Une rangée occupe toute la largeur, quel que soit le nombre de cartes accordées (sans CA : 3 puis 2, sans trou). */
-.cases { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--rule-strong); background: var(--surface); margin-bottom: var(--sp-3); }
+.cases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--rule-strong); background: var(--surface); margin-bottom: var(--sp-3); }
 .cases .case { border: 0; border-right: 1px solid var(--rule); border-radius: 0; box-shadow: none; background: var(--surface); padding: var(--sp-3) var(--sp-4); gap: 2px; min-height: 88px; align-content: start; }
 .cases .case:last-child { border-right: 0; }
 .cases .case .micro { font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; color: var(--muted); text-transform: none; }
@@ -316,7 +315,7 @@ table.dense td.num { text-align: right; }
 .suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tfoot :is(th, td) { background: var(--gris-etiq); border-top: 1px solid var(--rule-strong); font-weight: 700; color: var(--navy); }
-@media (max-width: 720px) { .cases { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
+@media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
 /* Résumé : filtre d'année */
 .filtre-annee { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: var(--sp-3); }
 .filtre-annee-label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -1177,12 +1176,10 @@ table.tableau-squelette td { height: 2.1em; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
 }
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
-.comptes-liste .ligne-email { display: flex; align-items: center; gap: var(--sp-1); color: var(--muted); font-size: var(--fs-xs); font-weight: 400; overflow-wrap: anywhere; }
 .bouton-copier { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--navy); cursor: pointer; }
 .bouton-copier:hover:not(:disabled) { background: var(--surface-hover); }
 .bouton-copier:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .bouton-copier:disabled { opacity: 0.4; cursor: default; }
-.comptes-liste .bouton-copier { width: 24px; height: 24px; }
 .champ-copie { display: flex; align-items: center; gap: var(--sp-2); }
 .champ-copie input { flex: 1; min-width: 0; }
 .comptes-invite { margin: 0; padding: var(--sp-4); border: 1px dashed var(--rule-strong); }
