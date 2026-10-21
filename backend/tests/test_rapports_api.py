@@ -280,6 +280,19 @@ def test_filtre_type_contrat(charge):
     assert get(charge, "annuel/export", annee=2026, mois=2, type_contrat=types[0]).status_code == 200
 
 
+def test_filtres_combinaisons(charge):
+    f = get(charge, "filtres", annee=2026).json()
+    combis = f["combinaisons"]
+    assert combis and all(len(c) == 6 for c in combis)
+    assert sorted({c[0] for c in combis}) == f["services"]
+    assert sorted({c[1] for c in combis}) == f["sites"]
+    assert sorted({c[4] for c in combis}) == f["types_contrat"]
+    # Chaque couple service + site proposé renvoie des effectifs.
+    for service, site in {(c[0], c[1]) for c in combis}:
+        r = get(charge, "mensuel", annee=2026, mois=1, service=service, site=site).json()
+        assert r["synthese"]["effectif"]["fin"] > 0, (service, site)
+
+
 def test_filtre_poste(charge, db):
     chef = Poste(libelle="Chef atelier")
     db.add(chef)

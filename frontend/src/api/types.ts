@@ -39,6 +39,8 @@ export interface Filtres {
   postes?: string[]
   activites?: string[]
   types_contrat?: string[]
+  /** N-uplets présents [service, site, type de site, activité, contrat, poste] ; '' = sans valeur. */
+  combinaisons?: string[][]
 }
 
 export interface Salarie {

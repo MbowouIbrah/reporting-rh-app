@@ -100,7 +100,14 @@ def filtres(
 ):
     authorize(p, "report:read")
     lignes = list(_lignes_annee(db, p, annee))
-    return {"services": sorted({L.service for L in lignes}),
+    # Combinaisons présentes : le front n'offre, pour chaque filtre, que les valeurs compatibles
+    # avec les autres filtres choisis (jamais d'option qui mène à un résultat vide).
+    combinaisons = sorted(
+        {(L.service, L.site, L.type_site, L.activite or "", L.contrat, L.poste or "")
+         for L in lignes}
+    )
+    return {"combinaisons": [list(c) for c in combinaisons],
+            "services": sorted({L.service for L in lignes}),
             "sites": sorted({L.site for L in lignes}),
             "types_site": sorted({L.type_site for L in lignes}),
             "type_par_site": {L.site: L.type_site for L in lignes},

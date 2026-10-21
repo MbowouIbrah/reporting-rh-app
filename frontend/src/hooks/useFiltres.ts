@@ -67,6 +67,39 @@ export function usePartage() {
   return { partage, set }
 }
 
+/** Filtres liés, dans l'ordre des colonnes de `combinaisons` (/rapports/filtres). */
+const DIMS = ['service', 'site', 'type_site', 'activite', 'type_contrat', 'poste'] as const
+type Dim = (typeof DIMS)[number]
+type Choix = Partial<Record<Dim, string | undefined>>
+
+const compatible = (c: string[], choix: Choix, sauf?: Dim) =>
+  DIMS.every((d, i) => d === sauf || !choix[d] || c[i] === choix[d])
+
+/** Valeurs proposées par filtre : celles des combinaisons compatibles avec les autres filtres choisis
+ *  (aucune option ne mène à un résultat vide) ; la valeur choisie reste toujours proposée. */
+export function facettes(combis: string[][], choix: Choix): Record<Dim, string[]> {
+  return Object.fromEntries(
+    DIMS.map((d, i) => {
+      const v = new Set(combis.filter((c) => compatible(c, choix, d)).map((c) => c[i]).filter(Boolean))
+      if (choix[d]) v.add(choix[d])
+      return [d, [...v].sort()]
+    }),
+  ) as Record<Dim, string[]>
+}
+
+/** Après un changement, efface les autres filtres choisis devenus incompatibles (le plus récent l'emporte). */
+export function sansIncompatibles(combis: string[][], actuel: Choix, patch: Patch): Patch {
+  const garde: Choix = Object.fromEntries(DIMS.filter((d) => d in patch).map((d) => [d, patch[d] ? String(patch[d]) : undefined]))
+  const efface: Patch = {}
+  for (const d of DIMS) {
+    if (d in patch || !actuel[d]) continue
+    const essai = { ...garde, [d]: actuel[d] }
+    if (combis.some((c) => compatible(c, essai))) garde[d] = actuel[d]
+    else efface[d] = undefined
+  }
+  return { ...patch, ...efface }
+}
+
 interface Options {
   /** La page affiche un sélecteur de mois ; sinon le mois partagé est ignoré (dernier mois saisi). */
   avecMois?: boolean
@@ -121,14 +154,12 @@ export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
     ...ref,
   }
 
-  // Site et type de site sont liés : la liste Site ne garde que les sites du type choisi, et un
-  // nouveau type efface un site qui n'en fait pas partie.
-  const typeParSite = options.data?.type_par_site ?? {}
-  const sites = (options.data?.sites ?? []).filter((s) => !p.type_site || typeParSite[s] === p.type_site)
+  // Filtres liés : chaque liste ne garde que les valeurs compatibles avec les autres choix, et un
+  // nouveau choix efface ceux qui ne le sont plus.
+  const combis = options.data?.combinaisons
+  const f = combis ? facettes(combis, p) : null
   function setLie(patch: Patch) {
-    const t = patch.type_site
-    if (t && !('site' in patch) && p.site && typeParSite[p.site] !== t) set({ ...patch, site: undefined })
-    else set(patch)
+    set(combis && DIMS.some((d) => d in patch) ? sansIncompatibles(combis, p, patch) : patch)
   }
 
   return {
@@ -137,12 +168,12 @@ export function useFiltres({ avecMois = true, comparaison }: Options = {}) {
     partage: p,
     periodes: periodes.data ?? [],
     annees: [...new Set(periodes.data?.map((x) => x.annee))],
-    services: options.data?.services ?? [],
-    sites,
-    typesSite: options.data?.types_site ?? [],
-    postes: options.data?.postes ?? [],
-    activites: options.data?.activites ?? [],
-    typesContrat: options.data?.types_contrat ?? [],
+    services: f?.service ?? options.data?.services ?? [],
+    sites: f?.site ?? options.data?.sites ?? [],
+    typesSite: f?.type_site ?? options.data?.types_site ?? [],
+    postes: f?.poste ?? options.data?.postes ?? [],
+    activites: f?.activite ?? options.data?.activites ?? [],
+    typesContrat: f?.type_contrat ?? options.data?.types_contrat ?? [],
     pret: !periodes.isLoading,
     vide: !periodes.isLoading && !derniere,
     erreur: periodes.error,
