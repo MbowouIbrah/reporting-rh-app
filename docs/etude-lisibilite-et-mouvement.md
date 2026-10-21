@@ -12,37 +12,42 @@
 ### Contraintes à respecter
 - Ordre et contenu des 8 indicateurs (16/10), bulles de détail au survol, masquage de CA/marge/CA par salarié avec une phrase d'explication quand un filtre est actif (Q3), chiffres exacts sans arrondi dans les bulles, angles droits.
 
-### Proposition (présentation seulement, aucun chiffre ni règle changé)
-1. **Un seul libellé de comparaison** au-dessus des cases (« Évolutions : cumul 2026 comparé à 2025 ») ; dans chaque case, l'évolution devient une ligne courte « ▲ 4,2 % » colorée. Le texte répété passe de 6 occurrences à 1.
-2. **Hiérarchie** : titre en petit texte normal (plus de capitales grasses), valeur en `--fs-xl`, une seule ligne secondaire. Marge intérieure portée à `--sp-3`/`--sp-4`.
-3. **Notes** : la phrase CA/marge (Q3) reste, mais en une ligne discrète sans fond ; la note du suivi mensuel passe dans une info-bulle « ⓘ » à côté du titre.
-4. **Tableau** : garder la teinte crème des cellules saisies, retirer le zébrage (une seule information visuelle par cellule).
+### Proposition (présentation seulement, aucun chiffre, règle ni libellé changé)
+Les 6 libellés « Évolution par rapport à … » restent tels quels (décision du 21/10 : ils doivent rester clairs et précis).
+1. **Hiérarchie** : titre en petit texte normal (plus de capitales grasses), valeur en `--fs-xl` ; le libellé d'évolution et sa valeur gardent leur texte mais passent en `--fs-sm` couleur atténuée, la flèche colorée seule porte le sens. Marge intérieure portée à `--sp-3`/`--sp-4`.
+2. **Notes** : la phrase CA/marge (Q3) reste, en une ligne discrète sans fond gris ; la note du suivi mensuel passe dans une info-bulle « ⓘ » à côté du titre.
+3. **Tableau** : garder la teinte crème des cellules saisies, retirer le zébrage (une seule information visuelle par cellule).
 
 ### Autres pages
 - Mensuel et Annuel : la grille dense est voulue (« tout visible sans défilement », comme les onglets Excel). Seules les retouches 2 et 4 (hiérarchie, une seule teinte) s'appliquent, sans changer la disposition.
 - Graphes, Individuel : à revoir après le Résumé, avec la même grille de lecture.
 
-## 2. Mouvement : navigation brusque
+## 2. Mouvement : état des lieux et écarts réels
 
-### Constat
-- Jetons déjà présents : `--dur-fast` 120 ms, `--dur` 200 ms, `--ease` ; `prefers-reduced-motion` déjà respecté par endroits. Il n'y a que des transitions de survol : rien au changement de page, à l'arrivée des données ou à l'ouverture des bulles.
-- React Router 7 : `NavLink` accepte `viewTransition`, qui s'appuie sur l'API View Transitions du navigateur.
+La première version de cette section affirmait « rien au changement de page ni à l'arrivée des données » : c'était faux. Inventaire vérifié dans `styles/base.css` et les pages :
 
-### Options
-| Option | Pour | Contre |
+| Moment | Ce qui existe | Écart réel ? |
 |---|---|---|
-| A. API View Transitions (`viewTransition` sur les liens) | Natif, 0 Ko ajouté, fondu entre pages, barre du haut fixe | Firefox récent seulement ; ailleurs, changement instantané comme aujourd'hui |
-| B. Animation CSS à l'arrivée du contenu de page (`key` sur l'`Outlet`) | Partout, simple | Pas de fondu de sortie |
-| C. Bibliothèque (motion) | Riche | +35 Ko, trop pour un outil de gestion |
+| Changement de page | Fondu d'apparition 0,3 s du contenu (`base.css:889-892`, `.page > *`), rejoué à chaque page car le contenu est remonté | **Partiel** : la page quittée disparaît d'un coup (pas de fondu de sortie), d'où l'effet de coupure ; le fondu n'utilise pas les jetons |
+| Premier chargement | Squelettes à reflet (`base.css:1002-1028`), affichés après 0,3 s seulement (pas de clignotement si la réponse est rapide) | Non |
+| Changement de filtre | `aria-busy` pendant le recalcul (Résumé, Mensuel, Annuel, Individuel) : mêmes squelettes après 0,3 s ; la classe `maj` n'a aucun style | Non pour le signal. **Petit** : le retour squelette → chiffres est sec |
+| Survol, focus, boutons, onglets | Transitions de couleur (`base.css:117, 825-861`), jetons `--dur`/`--ease` sur 10 règles | Non |
+| Rail de défilement, volets, flèche des sections | Fondus et glissements (`base.css:134, 399-409, 722`) | Non |
+| Bulle de détail d'une case du Résumé | `display: none` → `grid` (`base.css:304-305`) | **Oui** : apparition sèche, alors que la bulle du rail est en fondu |
+| Menu profil | Rendu conditionnel `ouvert && …` (`MenuProfil.tsx:47`) | **Oui** : apparition sèche |
+| Réduction du mouvement | Coupure globale (`base.css:17-19`) + squelettes figés | Non |
+| Cohérence | 14 durées codées en dur (0,15 à 0,7 s, 4 courbes différentes) à côté des jetons | **Oui**, mineur : rythme inégal |
 
-### Recommandation : A + B légère, sobre et professionnelle
-- Changement de page : fondu de 200 ms (A) ; en repli, le contenu monte de 4 px en fondu (B). La barre du haut et les filtres restent fixes.
-- Arrivée des données : fondu des cases et des tableaux (150 ms), sans cascade longue.
-- Changement de filtre : l'ancien contenu reste affiché (déjà le cas avec `keepPreviousData`), légèrement estompé pendant le chargement, ce qui signale le calcul sans clignotement.
-- Bulles et menus : fondu de 120 ms au lieu d'une apparition sèche.
-- Tout passe par les jetons `--dur`/`--ease` et est coupé avec `prefers-reduced-motion`. Aucun rebond, aucun effet décoratif.
-- Coût : environ 60 lignes de CSS et 3 fichiers TSX, sans dépendance ajoutée.
+Conclusion : l'impression « aucune animation » ne correspond pas au code ; l'impression « brusque » a deux causes concrètes : la sortie de page instantanée et les deux bulles/menus qui surgissent.
+
+### Améliorations ciblées (seulement sur les écarts ci-dessus)
+1. **Sortie de page** : `viewTransition` sur les `NavLink` de `Layout.tsx` (React Router 7, API View Transitions) → fondu croisé de 200 ms entre l'ancienne et la nouvelle page ; la barre du haut reste fixe. Navigateur sans l'API : comportement actuel inchangé. Le fondu d'apparition actuel passe sur `--dur`/`--ease`.
+2. **Bulle du Résumé et menu profil** : fondu de `--dur-fast` (120 ms), comme la bulle du rail.
+3. **Retour des chiffres après squelette** : fondu de 120 ms à la fin de `aria-busy`.
+4. **Durées** : les transitions codées en dur passent sur les jetons quand elles jouent le même rôle (survol, apparition) ; les animations à rythme propre (reflet des squelettes, rebond d'indice) restent.
+- Écarté : estomper le contenu pendant un changement de filtre (le squelette le signale déjà) ; bibliothèque d'animation (+35 Ko) ; tout effet décoratif.
+- Coût : environ 30 lignes de CSS, 2 fichiers TSX, sans dépendance.
 
 ## 3. Points à trancher
-- Retirer les 6 libellés « Évolution par rapport à … » au profit d'un libellé unique : accord du client nécessaire si ce libellé avait été demandé le 16/10.
-- Valider la recommandation sur le mouvement (A + B).
+- Valider les améliorations 1 à 4 du §2.
+- Valider la hiérarchie et les notes du §1 (libellés conservés).
