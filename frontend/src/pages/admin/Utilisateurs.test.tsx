@@ -239,7 +239,7 @@ test('suppression après confirmation', async () => {
   const d = within(await screen.findByRole('region', { name: 'Supprimer le compte ?' }))
   expect(screen.queryByRole('region', { name: 'Chef Sav' })).toBeNull()
   expect((await liste()).getByRole('row', { name: /Chef Sav/ })).toHaveClass('a-supprimer')
-  fireEvent.click(d.getByRole('button', { name: 'Supprimer' }))
+  fireEvent.click(d.getByRole('button', { name: 'Supprimer le compte' }))
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0]).toMatchObject({ method: 'DELETE', url: expect.stringContaining('/users/2') })
   expect(await screen.findByText('Compte de Chef Sav supprimé.')).toBeInTheDocument()

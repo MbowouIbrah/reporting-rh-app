@@ -493,13 +493,16 @@ export default function Utilisateurs() {
             )}
             {aSupprimer ? (
               <Panneau titre="Supprimer le compte ?" className="fiche-compte fiche-suppression">
-                <p>
-                  <strong>{aSupprimer.nom}</strong>
-                  {` (${aSupprimer.email}) ne pourra plus se connecter. Pour garder une trace, préférez décocher « Compte actif ».`}
-                </p>
-                <div className="fiche-barre fiche-barre-discrete">
-                  <Bouton disabled={supprimer.isPending} onClick={confirmerSuppression}>Supprimer</Bouton>
-                  <Bouton variante="secondaire" autoFocus onClick={() => setASupprimer(null)}>Annuler</Bouton>
+                <div className="suppression-carte" role="alertdialog" aria-labelledby="suppression-nom">
+                  <p className="suppression-titre">Suppression définitive</p>
+                  <p id="suppression-nom" className="suppression-nom">{aSupprimer.nom}</p>
+                  <p className="suppression-email">{aSupprimer.email}</p>
+                  <p>Ce compte ne pourra plus se connecter.</p>
+                  <p className="note">Pour garder une trace, préférez décocher « Compte actif ».</p>
+                  <div className="suppression-actions">
+                    <Bouton variante="secondaire" autoFocus onClick={() => setASupprimer(null)}>Annuler</Bouton>
+                    <Bouton disabled={supprimer.isPending} onClick={confirmerSuppression}>Supprimer le compte</Bouton>
+                  </div>
                 </div>
               </Panneau>
             ) : selection === 'nouveau' || choisi ? (
