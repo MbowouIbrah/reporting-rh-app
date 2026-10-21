@@ -72,4 +72,6 @@ def test_rapport_ecarts_et_perimetre(charge, make_client, db):
     e = get(make_client(EQUIP), "mensuel", annee=2026, mois=1).json()
     assert all(x["budget"] is None for x in e["a_type_charge"] if x["rubrique"] != "TOTAL CHARGES")
     es = {b["service"]: b["total"]["budget"] for b in e["b_service_activite"]}
-    assert es["SAV PL"] is not None and es["Commerce VN"] is None
+    assert es["SAV PL"] is not None and "Commerce VN" not in es  # pas de ligne hors périmètre
+    a = get(make_client(EQUIP), "annuel", annee=2026).json()
+    assert "Commerce VN" not in {b["service"] for b in a["b_service_activite"]}

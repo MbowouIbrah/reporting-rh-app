@@ -163,7 +163,7 @@ def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
         # pas de budget pour un poste, un type de contrat ou une personne :
         # seulement pour un effectif d'ensemble
         params = replace(params, budget_employe=None)
-    res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site), params,
+    res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site, scope), params,
                          ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
     return _sortie(p, res)
 
@@ -238,7 +238,8 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
         raise HTTPException(404, "Aucune donnée pour cette année")
     budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site, **crit)
                for m in moteur.avec_donnees(n, mois)}
-    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, ch.charger_refs(db, type_site),
+    refs = ch.charger_refs(db, type_site, scope)
+    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, refs,
                         ch.charger_params(db, annee, mois), budgets)
     return _sortie(p, res)
 

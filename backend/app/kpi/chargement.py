@@ -22,12 +22,16 @@ from app.models.referentiel import (
 from app.repos.scope import Scope, apply_scope
 
 
-def charger_refs(db: Session, type_site: str | None = None) -> Refs:
-    """Référentiels actifs ; un type de site ne garde que les sites de ce type."""
+def charger_refs(db: Session, type_site: str | None = None, scope: Scope | None = None) -> Refs:
+    """Référentiels actifs ; un type de site ne garde que les sites de ce type, un périmètre
+    que ses services et sites (les tableaux n'affichent pas de ligne hors périmètre)."""
     def libs(model):
         q = select(model.libelle).where(model.actif).order_by(model.id)
         if type_site and model is Site:
             q = q.where(Site.type_site == type_site)
+        dim = {Service: "service", Site: "site"}.get(model)
+        if scope and not scope.unrestricted and dim in scope.rules:
+            q = q.where(model.libelle.in_(scope.rules[dim]))
         return tuple(db.scalars(q))
 
     rub = tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.actif).order_by(Rubrique.ordre)))

@@ -132,13 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await apiLogout().catch(() => {})
     // Le prochain utilisateur de l'onglet ne doit pas hériter du service ou de l'employé choisis.
-    viderPartage()
+    // Pas de qc.clear() : il retirerait ['me'] et l'écran resterait sur le profil précédent.
     ecrireProfil(null)
-    viderCache()
-    qc.clear()
+    oublier()
     qc.setQueryData(['me'], null)
     canal.current?.postMessage('deconnexion')
-  }, [qc])
+  }, [qc, oublier])
 
   const value = useMemo<Auth>(
     () => ({ me, loading: q.isLoading, can: (p) => !!me?.permissions.includes(p), login, logout }),
