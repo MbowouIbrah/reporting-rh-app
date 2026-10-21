@@ -1,6 +1,8 @@
 /**
- * Borne la hauteur d'un panneau dont le tableau s'étire sur la hauteur disponible : le navigateur répartit
- * l'espace au prorata des lignes, la plus haute ne doit pas dépasser --ligne-max (défini au-dessus de 1100 px).
+ * Borne la hauteur d'un panneau dont le tableau s'étire sur la hauteur disponible :
+ * - S'il y a assez d'espace, le tableau grandit pour afficher toutes ses lignes sans défilement (scroll).
+ * - La hauteur de ligne ne doit pas dépasser --ligne-max pour ne pas rendre l'affichage trop grossier.
+ * - Si le contenu dépasse l'espace disponible, le panneau occupe la taille maximale de l'écran/section et défile.
  */
 export function plafonner(panneau: HTMLElement) {
   const table = panneau.querySelector<HTMLElement>('.panneau-corps > table')
@@ -8,15 +10,49 @@ export function plafonner(panneau: HTMLElement) {
   const plafond = parseFloat(racine.getPropertyValue('--ligne-max')) * parseFloat(racine.fontSize)
   panneau.style.maxHeight = ''
   if (!table || !plafond) return
+
   // Hauteurs naturelles, tableau non étiré
   table.style.height = 'auto'
   const lignes = [...table.querySelectorAll('tbody tr')].map((r) => r.getBoundingClientRect().height)
   const tete = table.querySelector('thead')?.getBoundingClientRect().height ?? 0
+  const pied = table.querySelector('tfoot')?.getBoundingClientRect().height ?? 0
   table.style.height = ''
   const haute = Math.max(...lignes)
   if (!lignes.length || !haute) return
-  const corps = panneau.querySelector('.panneau-corps')!.getBoundingClientRect().height
-  const autour = panneau.getBoundingClientRect().height - corps
+
+  const h3 = panneau.querySelector('h3')?.getBoundingClientRect().height ?? 0
+  const cs = getComputedStyle(panneau)
+  const bordures = parseFloat(cs.borderTopWidth || '0') + parseFloat(cs.borderBottomWidth || '0')
+  const autour = h3 + bordures
+
   const total = lignes.reduce((a, b) => a + b, 0)
-  panneau.style.maxHeight = `${Math.floor(autour + tete + (total * plafond) / haute)}px`
+  // Hauteur minimale pour afficher toutes les lignes sans scrollbar (+ marge de sécurité de 4px)
+  const besoinNaturel = autour + tete + pied + total + 4
+  // Hauteur étirée maximale autorisée selon --ligne-max (évite d'étirer démesurément peu de lignes)
+  const maxEtire = autour + tete + pied + (total * plafond) / haute + 4
+  const cible = Math.max(besoinNaturel, maxEtire)
+
+  // Vérifier l'espace vertical disponible dans la section
+  const section = panneau.closest<HTMLElement>('.snap-section')
+  if (section) {
+    const suite = section.querySelector<HTMLElement>('.snap-suite')
+    const suiteHauteur = suite ? suite.offsetHeight + 14 : 0
+    const dispoSection = Math.max(0, section.clientHeight - suiteHauteur)
+
+    const colonne = panneau.closest<HTMLElement>('.snap-colonne')
+    if (colonne) {
+      panneau.style.maxHeight = `${Math.ceil(cible)}px`
+    } else {
+      // Panneau seul dans la section (ex: Sites, Services) :
+      // S'il y a assez de place, on affiche toutes les lignes sans scroll (plafonnées à la cible).
+      // Si le tableau dépasse la section, on prend toute la hauteur disponible de la section.
+      if (dispoSection > 0 && cible > dispoSection) {
+        panneau.style.maxHeight = `${Math.floor(dispoSection)}px`
+      } else {
+        panneau.style.maxHeight = `${Math.ceil(cible)}px`
+      }
+    }
+  } else {
+    panneau.style.maxHeight = `${Math.ceil(cible)}px`
+  }
 }

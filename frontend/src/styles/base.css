@@ -391,7 +391,7 @@ table.dense td.num { text-align: right; }
   .snap-scroll::-webkit-scrollbar { display: none; }
   .rapport-excel .snap-section { height: 100%; box-sizing: border-box; scroll-snap-align: start; scroll-snap-stop: always; padding-bottom: var(--v); }
   .rapport-excel .snap-section .panneau > h3 { font-size: var(--fs-md); padding: calc(var(--v) * .6) 16px; }
-  .rapport-excel .snap-section .panneau-corps { flex: 1; min-height: 0; overflow-y: auto; }
+  .rapport-excel .snap-section .panneau-corps { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .rapport-excel .panneau table.dense { font-size: var(--fs-sm); }
   .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { padding-block: clamp(1px, .45vh, 6px); line-height: 1.3; }
   .rapport-excel .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; padding-block: clamp(3px, .7vh, 8px); font-size: var(--fs-xs); }
@@ -962,7 +962,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .rapport-excel .snap-section table.services tr.staff td { padding-block: 0; font-size: var(--fs-xs); line-height: 1.15; }
   /* Mensuel, Annuel : chaque section remplit l'écran, les lignes se partagent la hauteur
      (tableaux empilés : flex-grow au prorata des lignes, posé par SnapSections) */
-  .rapport-excel .snap-section > .panneau { align-self: stretch; }
+  .rapport-excel .snap-section > .panneau { align-self: start; max-height: 100%; }
   .rapport-excel .snap-colonne > .panneau { flex: 1 1 auto; }
   .rapport-excel .snap-section .panneau-corps > table.dense { height: 100%; }  /* Colonnes alignées d'un tableau à l'autre : libellé 24 %, sept colonnes de chiffres égales ;
      tableaux à double libellé (site, contrat) : le second occupe une colonne ; colonnes manquantes : vide entre libellés et chiffres, chiffres calés à droite */

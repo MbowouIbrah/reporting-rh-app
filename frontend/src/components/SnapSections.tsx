@@ -73,7 +73,20 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
       })
     poser()
     window.addEventListener('resize', poser)
-    return () => window.removeEventListener('resize', poser)
+
+    const racine = zone.current
+    let mo: MutationObserver | null = null
+    if (racine && typeof MutationObserver !== 'undefined') {
+      mo = new MutationObserver(() => {
+        poser()
+      })
+      mo.observe(racine, { childList: true, subtree: true })
+    }
+
+    return () => {
+      window.removeEventListener('resize', poser)
+      mo?.disconnect()
+    }
   })
 
   function aller(id: string) {
