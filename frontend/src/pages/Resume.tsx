@@ -85,9 +85,10 @@ export default function Resume() {
     site: f.filtres.site,
     type_site: f.filtres.type_site,
     activite: f.filtres.activite,
+    type_contrat: f.filtres.type_contrat,
   }
   // CA et marge n'existent qu'au global : masqués dès qu'un filtre restreint les salariés.
-  const filtre = !!(base && (base.service || base.site || base.type_site || base.activite))
+  const filtre = !!(base && (base.service || base.site || base.type_site || base.activite || base.type_contrat))
   const ann = useQuery({
     queryKey: ['annuel', base],
     queryFn: () => getAnnuel(base!),
@@ -111,7 +112,7 @@ export default function Resume() {
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}`} aria-busy={maj || ann.isLoading || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {ann.isLoading && (
@@ -219,7 +220,7 @@ export default function Resume() {
           {filtre && (
             <p className="regle">
               Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne s’affichent pas
-              quand un service, un site, un type de site ou une activité est choisi.
+              quand un service, un site, un type de site, une activité ou un contrat est choisi.
             </p>
           )}
         </>

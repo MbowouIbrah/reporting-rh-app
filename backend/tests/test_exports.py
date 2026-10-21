@@ -101,5 +101,5 @@ def test_export_audite_et_404(charge, db):
     assert (ev.entite, ev.entite_id, ev.apres) == (
         "rapport_mensuel", "2026-02",
         {"service": "SAV PL", "site": None, "type_site": None, "poste": None, "matricule": None,
-         "activite": None})
+         "activite": None, "type_contrat": None})
     assert get(charge, "mensuel/export", annee=2030, mois=1).status_code == 404

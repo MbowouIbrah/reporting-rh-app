@@ -105,7 +105,8 @@ def filtres(
             "types_site": sorted({L.type_site for L in lignes}),
             "type_par_site": {L.site: L.type_site for L in lignes},
             "postes": sorted({L.poste for L in lignes if L.poste}),
-            "activites": sorted({L.activite for L in lignes if L.activite})}
+            "activites": sorted({L.activite for L in lignes if L.activite}),
+            "types_contrat": sorted({L.contrat for L in lignes})}
 
 
 @router.get("/salaries")
@@ -140,19 +141,20 @@ def _salarie_id(db: Session, p: Principal, matricule: str | None) -> int | None:
 
 
 def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
-             type_site=None, poste=None, matricule=None, activite=None) -> dict:
+             type_site=None, poste=None, matricule=None, activite=None, type_contrat=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
-            "activite": activite}
+            "activite": activite, "type_contrat": type_contrat}
     cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site, **crit)
     if cur is None or not cur.lignes:
         raise HTTPException(404, "Aucune donnée pour cette période")
     ref = _reference(annee, mois, ref_annee, ref_mois)
     prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site, **crit)
     params = ch.charger_params(db, annee, mois)
-    if poste or crit["salarie_id"] is not None:
-        # pas de budget pour un poste ou une personne : seulement pour un effectif d'ensemble
+    if poste or type_contrat or crit["salarie_id"] is not None:
+        # pas de budget pour un poste, un type de contrat ou une personne :
+        # seulement pour un effectif d'ensemble
         params = replace(params, budget_employe=None)
     res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site), params,
                          ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
@@ -171,11 +173,12 @@ def mensuel(
     poste: str | None = Query(None, max_length=200),
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
+    type_contrat: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
-                    matricule, activite)
+                    matricule, activite, type_contrat)
 
 
 @router.get("/mensuel/export")
@@ -190,14 +193,16 @@ def mensuel_export(
     poste: str | None = Query(None, max_length=200),
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
+    type_contrat: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     res = _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
-                   matricule, activite)
+                   matricule, activite, type_contrat)
     audit.record(db, p.user_id, "export", "rapport_mensuel", f"{annee}-{mois:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
-                  "matricule": matricule, "activite": activite})
+                  "matricule": matricule, "activite": activite,
+                  "type_contrat": type_contrat})
     db.commit()
     choisie = ref_annee is not None and ref_mois is not None
     prec = f"{xlsx.MOIS[ref_mois - 1]} {ref_annee}" if choisie else "M-1"
@@ -206,11 +211,11 @@ def mensuel_export(
 
 
 def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
-            matricule=None, activite=None) -> dict:
+            matricule=None, activite=None, type_contrat=None) -> dict:
     authorize(p, "report:read")
     scope = scope_for(db, p)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
-            "activite": activite}
+            "activite": activite, "type_contrat": type_contrat}
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
         out = {}
@@ -241,11 +246,12 @@ def annuel(
     poste: str | None = Query(None, max_length=200),
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
+    type_contrat: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite)
+                   activite, type_contrat)
 
 
 @router.get("/annuel/export")
@@ -259,14 +265,16 @@ def annuel_export(
     poste: str | None = Query(None, max_length=200),
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
+    type_contrat: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite)
+                   activite, type_contrat)
     audit.record(db, p.user_id, "export", "rapport_annuel", f"{annee}-{mois:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
-                  "matricule": matricule, "activite": activite})
+                  "matricule": matricule, "activite": activite,
+                  "type_contrat": type_contrat})
     db.commit()
     return _xlsx(xlsx.annuel(res, annee, mois, ref_annee), f"reporting-annuel-{annee}.xlsx")
 

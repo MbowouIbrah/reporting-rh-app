@@ -18,6 +18,7 @@ interface Props {
   typesSite?: string[]
   postes?: string[]
   activites?: string[]
+  typesContrat?: string[]
   /** Employés proposés ; absent sans le droit nominatif : le filtre « Employé » n'est pas affiché. */
   salaries?: Salarie[]
   avecMois?: boolean
@@ -149,12 +150,13 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 }
 
 export default function FiltresPeriode({
-  filtres, annees, services, sites, typesSite, postes, activites, salaries, avecMois = true, comparaison, periodes,
+  filtres, annees, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, periodes,
   children, onChange, partage,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
   const avecActivite = !!activites?.length
+  const avecContrat = !!typesContrat?.length
   // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, N-1/M-1, tous).
   const cles: ClePartagee[] = [
     'annee',
@@ -164,6 +166,7 @@ export default function FiltresPeriode({
     ...(sites ? (['site'] as const) : []),
     ...(avecType ? (['type_site'] as const) : []),
     ...(avecActivite ? (['activite'] as const) : []),
+    ...(avecContrat ? (['type_contrat'] as const) : []),
     ...(avecPoste ? (['poste'] as const) : []),
     ...(salaries ? (['matricule'] as const) : []),
   ]
@@ -224,6 +227,17 @@ export default function FiltresPeriode({
           <select value={filtres.activite ?? ''} onChange={(e) => onChange({ activite: e.target.value })}>
             <option value="">Toutes</option>
             {activites!.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {avecContrat && (
+        <label className="souple">
+          Contrat
+          <select value={filtres.type_contrat ?? ''} onChange={(e) => onChange({ type_contrat: e.target.value })}>
+            <option value="">Tous</option>
+            {typesContrat!.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>

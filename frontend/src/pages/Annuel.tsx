@@ -72,7 +72,7 @@ export default function Annuel() {
     <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
       <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {q.isLoading && f.filtres && (

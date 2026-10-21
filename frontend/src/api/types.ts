@@ -38,6 +38,7 @@ export interface Filtres {
   type_par_site?: Record<string, string>
   postes?: string[]
   activites?: string[]
+  types_contrat?: string[]
 }
 
 export interface Salarie {

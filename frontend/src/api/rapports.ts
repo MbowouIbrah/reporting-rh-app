@@ -9,6 +9,7 @@ export interface FiltresPage {
   type_site?: string
   poste?: string
   activite?: string
+  type_contrat?: string
   /** Employé (réservé à nominatif:read). */
   matricule?: string
   /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */

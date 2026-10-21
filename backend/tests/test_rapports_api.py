@@ -265,6 +265,21 @@ def test_filtre_activite(charge):
     assert get(charge, "annuel/export", annee=2026, mois=2, activite=acts[0]).status_code == 200
 
 
+def test_filtre_type_contrat(charge):
+    types = get(charge, "filtres", annee=2026).json()["types_contrat"]
+    assert types
+    total = get(charge, "mensuel", annee=2026, mois=1).json()["synthese"]["effectif"]["fin"]
+    fins = [get(charge, "mensuel", annee=2026, mois=1, type_contrat=t).json()["synthese"]["effectif"]["fin"]
+            for t in types]
+    assert sum(fins) == total  # chaque salarié a un seul type de contrat
+    r = get(charge, "mensuel", annee=2026, mois=2, type_contrat=types[0]).json()
+    assert r["synthese"]["ca"] is None  # CA global seulement
+    assert r["synthese"]["ms"]["budget"] is None  # pas de budget pour un type de contrat
+    a = get(charge, "annuel", annee=2026, mois=2, type_contrat=types[0]).json()
+    assert a["ca_ytd"] is None and a["marge_ytd"] is None
+    assert get(charge, "annuel/export", annee=2026, mois=2, type_contrat=types[0]).status_code == 200
+
+
 def test_filtre_poste(charge, db):
     chef = Poste(libelle="Chef atelier")
     db.add(chef)

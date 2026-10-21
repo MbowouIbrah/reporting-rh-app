@@ -1,9 +1,9 @@
 /**
- * Filtres communs à toutes les pages (année, mois, service, site, type de site, poste, activité, employé, comparaison) :
+ * Filtres communs à toutes les pages (année, mois, service, site, type de site, poste, activité, type de contrat, employé, comparaison) :
  * une valeur choisie sur une page s'affiche à l'identique sur les autres. Conservés le temps
  * de la session du navigateur ; l'URL de la page courante en garde une copie (lien partageable).
  */
-export const CLES_PARTAGEES = ['annee', 'mois', 'service', 'site', 'type_site', 'poste', 'activite', 'matricule', 'cmp_annee', 'cmp_periode'] as const
+export const CLES_PARTAGEES = ['annee', 'mois', 'service', 'site', 'type_site', 'poste', 'activite', 'type_contrat', 'matricule', 'cmp_annee', 'cmp_periode'] as const
 export type ClePartagee = (typeof CLES_PARTAGEES)[number]
 export type Partage = Partial<Record<ClePartagee, string>>
 export type Patch = Partial<Record<ClePartagee, string | number | undefined>>

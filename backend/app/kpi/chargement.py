@@ -48,12 +48,12 @@ def charger_params(db: Session, annee: int, mois: int) -> Params:
 def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
                     service: str | None, site: str | None, *, type_site: str | None = None,
                     poste: str | None = None, salarie_id: int | None = None,
-                    activite: str | None = None) -> Budgets:
+                    activite: str | None = None, type_contrat: str | None = None) -> Budgets:
     """Budgets de la période visibles pour ce périmètre et ces filtres : un budget n'est montré
     que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global).
     Aucun budget pour un poste, une activité ou une personne ; un type de site ne garde que les
     budgets site."""
-    if poste or activite or salarie_id is not None:
+    if poste or activite or type_contrat or salarie_id is not None:
         return Budgets()
     pid = db.scalar(select(Periode.id).where(Periode.annee == annee, Periode.mois == mois))
     if pid is None:
@@ -213,7 +213,8 @@ def options_tableau(db: Session, scope: Scope) -> dict:
 
 def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
             type_site: str | None = None, poste: str | None = None,
-            salarie_id: int | None = None, activite: str | None = None) -> PeriodeData | None:
+            salarie_id: int | None = None, activite: str | None = None,
+            type_contrat: str | None = None) -> PeriodeData | None:
     """Filtre d'affichage choisi par l'utilisateur, appliqué après le périmètre (jamais en deçà)."""
     if pd is None:
         return None
@@ -222,10 +223,12 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
                    and (not type_site or L.type_site == type_site)
                    and (not poste or L.poste == poste)
                    and (not activite or L.activite == activite)
+                   and (not type_contrat or L.contrat == type_contrat)
                    and (salarie_id is None or L.salarie_id == salarie_id))
     # Le CA est global : il n'existe pas pour un service, un site, un type de site, un poste,
     # une activité ou une personne, donc ni marge ni taux.
-    global_ = not (service or site or type_site or poste or activite or salarie_id is not None)
+    global_ = not (service or site or type_site or poste or activite or type_contrat
+                    or salarie_id is not None)
     return PeriodeData(lignes, pd.exclues, ca=pd.ca if global_ else None,
                        marge=pd.marge if global_ else None)
 
