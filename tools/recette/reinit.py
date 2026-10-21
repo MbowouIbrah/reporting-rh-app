@@ -149,9 +149,9 @@ def main() -> None:
         return commun or email.strip().lower().split("@")[0] + "<suffixe-retire>"
 
     comptes = _csv("comptes.csv")
-    admins = [c for c in comptes if c["role"] == "rh_admin"]
+    admins = [c for c in comptes if c["modele"] == "admin"]
     if not admins:
-        sys.exit("comptes.csv : au moins un rh_admin requis")
+        sys.exit("comptes.csv : au moins un compte de modèle admin requis")
     _preparer(args.base)
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
@@ -170,10 +170,12 @@ def main() -> None:
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
             email = c["email"].strip().lower()
-            _user(db, email, c["nom"], mdp(c["email"]), c["role"],
+            _user(db, email, c["nom"], mdp(c["email"]), c["modele"],
                   perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui")
             # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
-            db.scalar(select(Utilisateur).where(Utilisateur.email == email)).nom = c["nom"]
+            db.flush()
+            u = db.scalar(select(Utilisateur).where(Utilisateur.email == email))
+            u.nom, u.fonction = c["nom"], c["fonction"] or u.fonction
         db.commit()
         cibles = {
             "service": {s.libelle: s.id for s in db.scalars(select(Service))},

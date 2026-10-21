@@ -15,7 +15,7 @@ Mot de passe : début de l'adresse + `<suffixe-retire>` (`admin@exemple.invalid`
 
 | Fichier | Contenu |
 |---|---|
-| `comptes.csv` | Un compte par profil. Remplacer les adresses `@exemple.invalid` par les vraies au fur et à mesure. |
+| `comptes.csv` | Un compte par profil : fonction (libellé affiché), modèle de droits (`admin`, `global`, `perimetre`), périmètre, nominatif. Remplacer les adresses `@exemple.invalid` par les vraies au fur et à mesure. |
 | `ca_marge.csv` | CA et marge de janvier 2025 à juin 2026 (marge négative, CA sans marge, mois non saisi, décimales). |
 | `budgets.csv` | Budgets de mai (services) et juin 2026 (services, sites, rubriques), au-dessus et en dessous du réel. |
 

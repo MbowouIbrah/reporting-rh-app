@@ -15,15 +15,20 @@ const EMAIL = {
   perimetreNominatif: 'lecteur.perimetre.nominatif@exemple.invalid',
 }
 
-type Role = { role: string; perimetre_id?: number | null; nominatif?: boolean }
-type User = { id: number; email: string; nom: string; actif: boolean; roles: Required<Role>[] }
+type Portee = { tout?: boolean; perimetres?: number[]; services?: string[]; sites?: string[] }
+type Droits = { fonction?: string; permissions?: string[]; portee?: Portee }
+type User = { id: number; email: string; nom: string; fonction: string; actif: boolean; permissions: string[]; portee: Required<Portee> }
 type Audit = { id: number; action: string; entite: string; entite_id: string; utilisateur_id: number | null; avant: any; apres: any }
 type Perimetre = { id: number; code: string; libelle: string; regles: { dimension: string; valeur: string }[] }
 
 const utilisateurs = (r: APIRequestContext) => lireJson<User[]>(r, 'users')
 const utilisateur = async (r: APIRequestContext, email: string) => (await utilisateurs(r)).find((u) => u.email === email)
-const creer = (r: APIRequestContext, email: string, nom: string, roles: Role[], password = MDP) =>
-  r.post('api/v1/users', { data: { email, nom, password, roles } })
+const creer = (r: APIRequestContext, email: string, nom: string, droits: Droits, password = MDP) =>
+  r.post('api/v1/users', { data: { email, nom, password, ...droits } })
+const TOUTES = ['comptes', 'import', 'journal', 'marge', 'nominatif', 'referentiel', 'saisie']
+const ADMIN_DROITS: Droits = { fonction: 'Administrateur RH', permissions: TOUTES, portee: { tout: true } }
+const GLOBAL: Portee = { tout: true }
+const portee = (p: Portee): Required<Portee> => ({ tout: false, perimetres: [], services: [], sites: [], ...p })
 const modifier = (r: APIRequestContext, id: number, data: object) => r.put(`api/v1/users/${id}`, { data })
 const journal = (r: APIRequestContext, query: string) => lireJson<Audit[]>(r, `audit?${query}`)
 
@@ -54,11 +59,12 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('administrateur créé : connexion (e-mail en majuscules accepté), écran d’administration et API admin', async ({ page, browser, baseURL }) => {
-    const rep = await creer(page.request, 'Admin.Recette@exemple.invalid', 'Admin Recette', [{ role: 'rh_admin' }])
+    const rep = await creer(page.request, 'Admin.Recette@exemple.invalid', 'Admin Recette', ADMIN_DROITS)
     expect(rep.status()).toBe(201)
     const cree = (await rep.json()) as User
-    expect(cree).toMatchObject({ email: EMAIL.admin, nom: 'Admin Recette', actif: true })
-    expect(cree.roles).toEqual([{ role: 'rh_admin', perimetre_id: null, nominatif: false }])
+    expect(cree).toMatchObject({ email: EMAIL.admin, nom: 'Admin Recette', fonction: 'Administrateur RH', actif: true })
+    expect(cree.permissions).toEqual(TOUTES)
+    expect(cree.portee).toEqual(portee({ tout: true }))
 
     const { context, page: p } = await session(browser, baseURL, 'Admin.Recette@exemple.invalid')
     await voir(p, { onglets: [...BASE_ONGLETS, 'Administration'], services: TOUS, marge: true })
@@ -69,9 +75,9 @@ test.describe.serial('gestion des utilisateurs', () => {
     await context.close()
   })
 
-  test('lecteur global : voit tout, nominatif et marge compris, quel que soit le drapeau nominatif', async ({ page, browser, baseURL }) => {
-    expect((await creer(page.request, EMAIL.global, 'Lecteur Global', [{ role: 'lecteur_global', nominatif: true }])).status()).toBe(201)
-    expect((await creer(page.request, EMAIL.anonyme, 'Lecteur Anonyme', [{ role: 'lecteur_global', nominatif: false }])).status()).toBe(201)
+  test('lecteur global : voit tout ; noms et marge seulement s’ils sont accordés', async ({ page, browser, baseURL }) => {
+    expect((await creer(page.request, EMAIL.global, 'Lecteur Global', { fonction: 'Lecteur global', permissions: ['marge', 'nominatif'], portee: GLOBAL })).status()).toBe(201)
+    expect((await creer(page.request, EMAIL.anonyme, 'Lecteur Anonyme', { permissions: ['marge'], portee: GLOBAL })).status()).toBe(201)
 
     const nominatif = await session(browser, baseURL, EMAIL.global)
     await voir(nominatif.page, { onglets: BASE_ONGLETS, services: TOUS, marge: true })
@@ -82,10 +88,10 @@ test.describe.serial('gestion des utilisateurs', () => {
     expect((await nominatif.page.request.get('api/v1/users')).status()).toBe(403)
     await nominatif.context.close()
 
-    // Pour un lecteur global, le drapeau « nominatif » est sans effet : l'accès nominatif et la marge sont inclus dans le rôle
+    // Toutes les données sans « Voir les noms » : pas d'individuel ; la marge reste, elle est accordée
     const anonyme = await session(browser, baseURL, EMAIL.anonyme)
-    await voir(anonyme.page, { onglets: BASE_ONGLETS, services: TOUS, marge: true })
-    expect((await anonyme.page.request.get('api/v1/rapports/salaries?annee=2026')).status()).toBe(200)
+    await voir(anonyme.page, { onglets: BASE_ONGLETS.slice(0, 4), services: TOUS, marge: true })
+    expect((await anonyme.page.request.get('api/v1/rapports/salaries?annee=2026')).status()).toBe(403)
     expect((await anonyme.page.request.get('api/v1/users')).status()).toBe(403)
     await anonyme.context.close()
   })
@@ -101,9 +107,9 @@ test.describe.serial('gestion des utilisateurs', () => {
     perimetreSites = (await b.json()) as Perimetre
     expect(perimetrePneu.regles).toEqual([{ dimension: 'service', valeur: 'Pneumatique' }])
 
-    const rep = await creer(page.request, EMAIL.perimetre, 'Lecteur Périmètre', [{ role: 'lecteur_perimetre', perimetre_id: perimetrePneu.id }])
+    const rep = await creer(page.request, EMAIL.perimetre, 'Lecteur Périmètre', { portee: { perimetres: [perimetrePneu.id] } })
     expect(rep.status()).toBe(201)
-    expect(((await rep.json()) as User).roles).toEqual([{ role: 'lecteur_perimetre', perimetre_id: perimetrePneu.id, nominatif: false }])
+    expect((await rep.json()) as User).toMatchObject({ permissions: [], portee: portee({ perimetres: [perimetrePneu.id] }) })
 
     const { context, page: p } = await session(browser, baseURL, EMAIL.perimetre)
     await voir(p, { onglets: BASE_ONGLETS.slice(0, 4), services: ['Pneumatique'], marge: false })
@@ -119,43 +125,54 @@ test.describe.serial('gestion des utilisateurs', () => {
     await context.close()
 
     // Même périmètre avec l'accès nominatif : l'individuel s'ouvre, jamais la marge
-    expect((await creer(page.request, EMAIL.perimetreNominatif, 'Périmètre nominatif', [{ role: 'lecteur_perimetre', perimetre_id: perimetrePneu.id, nominatif: true }])).status()).toBe(201)
+    expect((await creer(page.request, EMAIL.perimetreNominatif, 'Périmètre nominatif', { permissions: ['nominatif'], portee: { perimetres: [perimetrePneu.id] } })).status()).toBe(201)
     const n = await session(browser, baseURL, EMAIL.perimetreNominatif)
     await voir(n.page, { onglets: BASE_ONGLETS, services: ['Pneumatique'], marge: false })
     await n.context.close()
   })
 
-  test('rôles incohérents refusés : périmètre manquant ou superflu, rôle inconnu', async ({ page }) => {
+  test('droits incohérents refusés : écriture ou marge sans toutes les données, permission ou valeur inconnue', async ({ page }) => {
     const avant = (await utilisateurs(page.request)).length
-    const essai = async (email: string, roles: Role[]) => (await creer(page.request, email, 'Essai', roles)).status()
-    expect(await essai('sans.perimetre@exemple.invalid', [{ role: 'lecteur_perimetre' }])).toBe(422)
-    expect(await essai('perimetre.superflu@exemple.invalid', [{ role: 'rh_admin', perimetre_id: perimetrePneu.id }])).toBe(422)
-    expect(await essai('role.inconnu@exemple.invalid', [{ role: 'super_admin' }])).toBe(422)
-    // Périmètre inexistant : non testé ici, la base de recette (SQLite) n'applique pas les clés étrangères, le refus 409 relève de PostgreSQL
+    const essai = async (email: string, droits: Droits) => (await creer(page.request, email, 'Essai', droits)).status()
+    const pneu = { perimetres: [perimetrePneu.id] }
+    expect(await essai('import.perimetre@exemple.invalid', { permissions: ['import'], portee: pneu })).toBe(422)
+    expect(await essai('marge.perimetre@exemple.invalid', { permissions: ['marge'], portee: pneu })).toBe(422)
+    expect(await essai('comptes.service@exemple.invalid', { permissions: ['comptes'], portee: { services: ['Pneumatique'] } })).toBe(422)
+    expect(await essai('permission.inconnue@exemple.invalid', { permissions: ['super_admin'], portee: GLOBAL })).toBe(422)
+    expect(await essai('perimetre.inconnu@exemple.invalid', { portee: { perimetres: [99999] } })).toBe(422)
+    expect(await essai('service.inconnu@exemple.invalid', { portee: { services: ['Service fantôme'] } })).toBe(422)
     expect((await utilisateurs(page.request)).length).toBe(avant)
   })
 
-  test('changement de périmètre puis de rôle : visible à la reconnexion', async ({ page, browser, baseURL }) => {
+  test('changement de périmètre, puis service accordé directement, puis toutes les données : visible à la reconnexion', async ({ page, browser, baseURL }) => {
     const u = (await utilisateur(page.request, EMAIL.perimetre))!
 
-    const rep1 = await modifier(page.request, u.id, { roles: [{ role: 'lecteur_perimetre', perimetre_id: perimetreSites.id }] })
+    const rep1 = await modifier(page.request, u.id, { portee: { perimetres: [perimetreSites.id] } })
     expect(rep1.status()).toBe(200)
     let s = await session(browser, baseURL, EMAIL.perimetre)
     await voir(s.page, { onglets: BASE_ONGLETS.slice(0, 4), services: ['Sites Déportés'], marge: false })
     await s.context.close()
 
-    const rep2 = await modifier(page.request, u.id, { roles: [{ role: 'lecteur_global', nominatif: true }] })
+    // Service accordé sans périmètre ; la fonction est un libellé, elle ne change aucun droit
+    const repS = await modifier(page.request, u.id, { fonction: 'Directeur commercial VN', portee: { services: ['Commerce VN'] } })
+    expect(repS.status()).toBe(200)
+    expect((await repS.json()) as User).toMatchObject({ fonction: 'Directeur commercial VN', permissions: [], portee: portee({ services: ['Commerce VN'] }) })
+    s = await session(browser, baseURL, EMAIL.perimetre)
+    await voir(s.page, { onglets: BASE_ONGLETS.slice(0, 4), services: ['Commerce VN'], marge: false })
+    await s.context.close()
+
+    const rep2 = await modifier(page.request, u.id, { permissions: ['marge', 'nominatif'], portee: GLOBAL })
     expect(rep2.status()).toBe(200)
     s = await session(browser, baseURL, EMAIL.perimetre)
     await voir(s.page, { onglets: BASE_ONGLETS, services: TOUS, marge: true })
     await s.context.close()
 
-    // Journal : avant / après du changement de rôle, sans mot de passe
+    // Journal : avant / après du dernier changement de droits, sans mot de passe
     const lignes = await journal(page.request, `entite=utilisateur&entite_id=${u.id}`)
     const maj = lignes.filter((l) => l.action === 'update')
-    expect(maj.length).toBeGreaterThanOrEqual(2)
-    expect(maj[0].avant.roles[0].role).toBe('lecteur_perimetre')
-    expect(maj[0].apres.roles[0]).toMatchObject({ role: 'lecteur_global', nominatif: true })
+    expect(maj.length).toBeGreaterThanOrEqual(3)
+    expect(maj[0].avant).toMatchObject({ permissions: [], portee: portee({ services: ['Commerce VN'] }) })
+    expect(maj[0].apres).toMatchObject({ permissions: ['marge', 'nominatif'], portee: portee({ tout: true }) })
     expect(JSON.stringify(lignes)).not.toMatch(/password|hash/i)
   })
 
@@ -196,7 +213,7 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('mot de passe : trop court refusé à la création et au changement, nouveau mot de passe pris en compte', async ({ page, browser, baseURL }) => {
-    const faible = await creer(page.request, 'mdp.faible@exemple.invalid', 'Mot de passe faible', [{ role: 'lecteur_global' }], 'court-11-ch')
+    const faible = await creer(page.request, 'mdp.faible@exemple.invalid', 'Mot de passe faible', { portee: GLOBAL }, 'court-11-ch')
     expect(faible.status()).toBe(422)
     expect(JSON.stringify(await faible.json())).toContain('12')
     expect(await utilisateur(page.request, 'mdp.faible@exemple.invalid')).toBeUndefined()
@@ -218,45 +235,47 @@ test.describe.serial('gestion des utilisateurs', () => {
 
   test('création refusée : e-mail déjà utilisé (même en majuscules), nom manquant', async ({ page }) => {
     const avant = (await utilisateurs(page.request)).length
-    expect((await creer(page.request, EMAIL.admin, 'Doublon', [{ role: 'lecteur_global' }])).status()).toBe(409)
-    expect((await creer(page.request, 'ADMIN.RECETTE@exemple.invalid', 'Doublon', [{ role: 'lecteur_global' }])).status()).toBe(409)
-    const sansNom = await page.request.post('api/v1/users', { data: { email: 'sans.nom@exemple.invalid', password: MDP, roles: [{ role: 'lecteur_global' }] } })
+    expect((await creer(page.request, EMAIL.admin, 'Doublon', { portee: GLOBAL })).status()).toBe(409)
+    expect((await creer(page.request, 'ADMIN.RECETTE@exemple.invalid', 'Doublon', { portee: GLOBAL })).status()).toBe(409)
+    const sansNom = await page.request.post('api/v1/users', { data: { email: 'sans.nom@exemple.invalid', password: MDP, portee: GLOBAL } })
     expect(sansNom.status()).toBe(422)
     expect((await utilisateurs(page.request)).length).toBe(avant)
   })
 
   test('création refusée : adresse e-mail invalide', async ({ page }) => {
-    const rep = await creer(page.request, 'pas-un-email', 'Adresse invalide', [{ role: 'lecteur_global' }])
+    const rep = await creer(page.request, 'pas-un-email', 'Adresse invalide', { portee: GLOBAL })
     if (rep.status() === 201) await page.request.delete(`api/v1/users/${((await rep.json()) as User).id}`)
     expect(rep.status()).toBe(422)
   })
 
-  test('administrateurs : se désactiver est possible s’il en reste un autre, le dernier est protégé', async ({ page, browser, baseURL }) => {
+  test('gestionnaires des comptes : jamais d’auto-retrait, le dernier actif est protégé', async ({ page, browser, baseURL }) => {
     const moi = (await lireJson<{ id: number }>(page.request, 'auth/me')).id
     const temp = (await utilisateur(page.request, EMAIL.admin))!
     const admin2 = (await utilisateur(page.request, 'admin2@exemple.invalid'))!
 
-    // Un administrateur peut se désactiver tant qu'il en reste d'autres actifs
+    // Son propre compte : ni désactivation, ni retrait de « Gérer les comptes », même s'il reste d'autres gestionnaires
     const s = await session(browser, baseURL, EMAIL.admin)
-    expect((await modifier(s.page.request, temp.id, { actif: false })).status()).toBe(200)
-    expect((await s.page.request.get('api/v1/auth/me')).status()).toBe(401)
+    const soi = await modifier(s.page.request, temp.id, { actif: false })
+    expect(soi.status()).toBe(409)
+    expect(await soi.json()).toMatchObject({ detail: expect.stringContaining('soi-même') })
+    expect((await modifier(s.page.request, temp.id, { permissions: ['marge'] })).status()).toBe(409)
     await s.context.close()
-    expect((await utilisateur(page.request, EMAIL.admin))!.actif).toBe(false)
+    // Un autre gestionnaire peut le désactiver
+    expect((await modifier(page.request, temp.id, { actif: false })).status()).toBe(200)
 
     try {
-      // admin2 désactivé : « admin » devient le seul administrateur actif
+      // admin2 désactivé : « admin » reste le seul gestionnaire actif
       expect((await modifier(page.request, admin2.id, { actif: false })).status()).toBe(200)
       const refus = [
         await modifier(page.request, moi, { actif: false }),
-        await modifier(page.request, moi, { roles: [{ role: 'lecteur_global', nominatif: true }] }),
+        await modifier(page.request, moi, { permissions: ['marge', 'nominatif'] }),
         await page.request.delete(`api/v1/users/${moi}`),
       ]
       expect(refus.map((r) => r.status())).toEqual([409, 409, 409])
-      expect(await refus[0].json()).toMatchObject({ detail: expect.stringContaining('au moins un administrateur') })
       expect(await refus[2].json()).toMatchObject({ detail: expect.stringContaining('Auto-suppression') })
       const encore = (await utilisateur(page.request, ADMIN))!
       expect(encore.actif).toBe(true)
-      expect(encore.roles.map((r) => r.role)).toEqual(['rh_admin'])
+      expect(encore.permissions).toEqual(TOUTES)
     } finally {
       expect((await modifier(page.request, admin2.id, { actif: true })).status()).toBe(200)
     }
@@ -276,7 +295,7 @@ test.describe.serial('gestion des utilisateurs', () => {
     const desactivation = lignes.find((l) => l.action === 'update')!
     expect(desactivation.avant.actif).toBe(true)
     expect(desactivation.apres.actif).toBe(false)
-    expect(desactivation.utilisateur_id).toBe(u.id)
+    expect(desactivation.utilisateur_id).toBe((await lireJson<{ id: number }>(page.request, 'auth/me')).id)
 
     const perimetres = await journal(page.request, `entite=perimetre&entite_id=${perimetrePneu.id}`)
     expect(perimetres.some((l) => l.action === 'create' && l.apres.code === 'RECETTE_PNEU')).toBe(true)

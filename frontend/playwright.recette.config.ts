@@ -4,7 +4,8 @@ import { defineConfig } from '@playwright/test'
 const PY = process.platform === 'win32' ? '.venv\\Scripts\\python' : '.venv/bin/python'
 const API_PORT = process.env.E2E_API_PORT || '8101'
 const WEB_PORT = process.env.E2E_WEB_PORT || '5181'
-const ENV_API = { DATABASE_URL: 'sqlite:///recette.db', ENV: 'test', COOKIE_SECURE: 'false', COOKIE_PATH_PREFIX: '/reporting-rh', SECRET_KEY: '<cle-de-test>' }
+const BASE = process.env.E2E_BASE || 'recette.db'
+const ENV_API = { DATABASE_URL: `sqlite:///${BASE}`, ENV: 'test', COOKIE_SECURE: 'false', COOKIE_PATH_PREFIX: '/reporting-rh', SECRET_KEY: '<cle-de-test>' }
 
 export default defineConfig({
   testDir: './e2e-recette',
@@ -17,7 +18,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `${PY} -W ignore ../tools/recette/reinit.py && ${PY} -m uvicorn app.main:app --port ${API_PORT}`,
+      command: `${PY} -W ignore ../tools/recette/reinit.py --base ${BASE} && ${PY} -m uvicorn app.main:app --port ${API_PORT}`,
       cwd: '../backend',
       env: ENV_API,
       url: `http://localhost:${API_PORT}/health`,

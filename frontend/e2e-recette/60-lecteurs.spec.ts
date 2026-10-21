@@ -5,8 +5,8 @@ type Appel = { methode: 'POST' | 'PUT' | 'DELETE'; url: string; data?: object }
 
 // Écritures réservées à l'administrateur, avec un contenu valide : seul le droit doit les refuser
 const ECRITURES: Appel[] = [
-  { methode: 'POST', url: 'users', data: { email: 'intrus@exemple.invalid', nom: 'Intrus', password: '<mot-de-passe-test-2>', roles: [{ role: 'rh_admin' }] } },
-  { methode: 'PUT', url: 'users/1', data: { email: 'admin@exemple.invalid', nom: 'Piraté', roles: [{ role: 'lecteur_global' }] } },
+  { methode: 'POST', url: 'users', data: { email: 'intrus@exemple.invalid', nom: 'Intrus', password: '<mot-de-passe-test-2>', permissions: ['comptes'], portee: { tout: true } } },
+  { methode: 'PUT', url: 'users/1', data: { email: 'admin@exemple.invalid', nom: 'Piraté', permissions: ['comptes'], portee: { tout: true } } },
   { methode: 'DELETE', url: 'users/2' },
   { methode: 'POST', url: 'perimetres', data: { code: 'INTRUS', libelle: 'Intrus', regles: [] } },
   { methode: 'PUT', url: 'perimetres/1', data: { code: 'INTRUS', libelle: 'Intrus', regles: [] } },
