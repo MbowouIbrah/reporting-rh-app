@@ -361,15 +361,16 @@ function FicheCompte({
               const coche = p.code === LECTURE || (fiche.permissions.includes(p.code) && (fiche.tout || !p.porteeTout))
               return (
                 <li key={p.code}>
-                  <label>
+                  <label title={r ?? undefined}>
                     <input type="checkbox" checked={coche} disabled={r !== null} onChange={() => maj('permissions', basculer(fiche.permissions, p.code))} />
                     <strong>{p.libelle}</strong>
-                    <small>{r && p.code !== LECTURE ? `${r}. ${p.explication}` : p.explication}</small>
+                    <small>{p.explication}</small>
                   </label>
                 </li>
               )
             })}
           </ul>
+          {!fiche.tout && <p className="note">Cases grisées : cochez « Tout » dans les données visibles pour les accorder.</p>}
         </fieldset>
 
         {erreurApi && <p className="champ-erreur fiche-erreur" role="alert">{erreurApi}</p>}

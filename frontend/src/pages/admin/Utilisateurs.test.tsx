@@ -134,7 +134,7 @@ test('permissions : celles qui exigent toutes les données sont grisées et reti
   fireEvent.click(sites.getByLabelText('Tout'))
   expect(marge).toBeDisabled()
   expect(marge).not.toBeChecked()
-  expect(f.getByText(/Exige toutes les données \(« Tout » coché\). Le CA/)).toBeInTheDocument()
+  expect(f.getByText(/Cases grisées : cochez « Tout »/)).toBeInTheDocument()
   expect(f.getByText(/ce compte ne verra aucun rapport/)).toBeInTheDocument()
   fireEvent.click(sites.getByLabelText('Yaoundé'))
   enregistrer()
