@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { ApiError, setUnauthorizedHandler } from '../api/client'
 import { getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
 import type { Me } from '../api/types'
@@ -39,8 +39,14 @@ function ecrireProfil(me: Me | null) {
   }
 }
 
+// Le cookie de session est commun aux onglets, le profil non : une connexion ou une déconnexion
+// dans un onglet est annoncée aux autres, qui revérifient /auth/me (sinon ils gardent menus et
+// droits du compte précédent jusqu'au rafraîchissement).
+const CANAL = 'reporting-rh:session'
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
+  const canal = useRef<BroadcastChannel | null>(null)
   const q = useQuery({
     queryKey: ['me'],
     queryFn: () => getMe().catch(sansSession),
@@ -50,9 +56,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const me = q.data ?? null
 
+  /** Oublie tout ce qui appartient au compte précédent (filtres, caches), sauf le profil lui-même. */
+  const oublier = useCallback(() => {
+    viderPartage()
+    viderCache()
+    qc.removeQueries({ predicate: (x) => x.queryKey[0] !== 'me' })
+  }, [qc])
+
   useEffect(() => {
-    if (!q.isPlaceholderData && q.status === 'success') ecrireProfil(q.data)
-  }, [q.data, q.isPlaceholderData, q.status])
+    if (q.isPlaceholderData || q.status !== 'success') return
+    // Profil gardé d'un autre compte (connexion changée dans un autre onglet, onglet fermé) : on repart de zéro.
+    const garde = lireProfil()
+    if (garde && garde.id !== q.data?.id) oublier()
+    ecrireProfil(q.data)
+  }, [q.data, q.isPlaceholderData, q.status, oublier])
+
+  // Revérifie la session : sur annonce d'un autre onglet, ou quand l'onglet redevient visible.
+  useEffect(() => {
+    let enCours = false
+    const verifier = () => {
+      if (enCours) return
+      enCours = true
+      getMe()
+        .catch(sansSession)
+        .then(
+          (m: Me | null) => {
+            const avant = qc.getQueryData<Me | null>(['me'])
+            if ((m?.id ?? null) !== (avant?.id ?? null)) {
+              ecrireProfil(null)
+              oublier()
+            }
+            qc.setQueryData(['me'], m)
+          },
+          () => {},
+        )
+        .finally(() => {
+          enCours = false
+        })
+    }
+    const visible = () => {
+      if (document.visibilityState === 'visible') verifier()
+    }
+    if (typeof BroadcastChannel !== 'undefined') {
+      canal.current = new BroadcastChannel(CANAL)
+      canal.current.onmessage = verifier
+    }
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('focus', visible)
+    return () => {
+      canal.current?.close()
+      canal.current = null
+      document.removeEventListener('visibilitychange', visible)
+      window.removeEventListener('focus', visible)
+    }
+  }, [qc, oublier])
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -66,10 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       const me = await apiLogin(email, password)
-      viderCache()
+      oublier()
       qc.setQueryData(['me'], me)
+      canal.current?.postMessage('connexion')
     },
-    [qc],
+    [qc, oublier],
   )
   const logout = useCallback(async () => {
     await apiLogout().catch(() => {})
@@ -79,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     viderCache()
     qc.clear()
     qc.setQueryData(['me'], null)
+    canal.current?.postMessage('deconnexion')
   }, [qc])
 
   const value = useMemo<Auth>(
