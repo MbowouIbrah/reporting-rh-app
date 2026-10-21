@@ -290,15 +290,18 @@ table.dense td.num { text-align: right; }
 .periode select { height: 34px; min-width: 0; border: 1px solid var(--pointille); background: var(--paper); color: var(--brun); font: inherit; font-weight: 700; padding: 0 12px; border-radius: 0; text-align: center; }
 .comparaison { margin-left: auto; color: var(--muted); font-size: var(--fs-sm); }
 .cases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--rule-strong); background: var(--surface); margin-bottom: var(--sp-3); }
-.cases .case { border: 0; border-right: 1px solid var(--rule); border-radius: 0; box-shadow: none; background: var(--surface); padding: 6px 10px 4px; gap: 2px; min-height: 88px; align-content: start; }
+.cases .case { border: 0; border-right: 1px solid var(--rule); border-radius: 0; box-shadow: none; background: var(--surface); padding: var(--sp-3) var(--sp-4); gap: 2px; min-height: 88px; align-content: start; }
 .cases .case:last-child { border-right: 0; }
-.cases .case .micro { font-family: var(--font-body); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0; color: var(--muted); text-transform: none; }
-.cases .case strong { font-size: var(--fs-lg); text-align: right; min-height: 34px; padding-top: 8px; color: var(--navy); }
+.cases .case .micro { font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; color: var(--muted); text-transform: none; }
+.cases .case strong { font-size: var(--fs-xl); text-align: right; min-height: 34px; padding-top: 8px; color: var(--navy); }
 .cases .case .devise { font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
 .cases .case .note { font-style: italic; font-size: var(--fs-xs); color: var(--muted); }
-.cases .case .variation { text-align: right; font-size: var(--fs-xs); }
-.cases .case .second { text-align: right; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
-.cases .case .second-libelle { font-size: var(--fs-xs); color: var(--muted); }
+/* Évolution : texte atténué, seule la flèche porte le sens (rouge en baisse) */
+.cases .case .variation, .cases .case .variation.neg { text-align: right; font-size: var(--fs-sm); color: var(--muted); }
+.cases .case .variation > [aria-hidden] { color: var(--navy); }
+.cases .case .variation.neg > [aria-hidden] { color: var(--red-deep); }
+.cases .case .second { text-align: right; font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
+.cases .case .second-libelle { font-size: var(--fs-sm); color: var(--muted); }
 /* Bulle de détail au survol : chiffres exacts, même lecture que les bulles des graphiques. */
 .cases .case { position: relative; }
 .cases .case .bulle { display: none; position: absolute; top: calc(100% + 2px); right: 0; z-index: 20; border-radius: 0; min-width: 240px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); font-size: var(--fs-xs); color: var(--ink); }
@@ -312,13 +315,12 @@ table.dense td.num { text-align: right; }
 .suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tfoot :is(th, td) { background: var(--gris-etiq); border-top: 1px solid var(--rule-strong); font-weight: 700; color: var(--navy); }
-.suivi tbody tr:nth-child(even) td:not(.saisi), .suivi tbody tr:nth-child(even) th { background: var(--rapport-zebre); }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
 /* Résumé : filtre d'année */
 .filtre-annee { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: var(--sp-3); }
 .filtre-annee-label { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .selecteur-annee { display: inline-flex; align-items: center; gap: 10px; }
-.selecteur-annee select { appearance: none; border: 1px solid var(--rule-strong); border-radius: 999px; background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%231a1f3c' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center; font: inherit; font-weight: 700; color: var(--navy); padding: 6px 34px 6px 16px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.selecteur-annee select { appearance: none; border: 1px solid var(--rule-strong); border-radius: 999px; background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%231a1f3c' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center; font: inherit; font-weight: 700; color: var(--navy); padding: 6px 34px 6px 16px; cursor: pointer; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
 .selecteur-annee select:hover { border-color: var(--navy); }
 .selecteur-annee select:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; box-shadow: 0 0 0 3px rgba(227,0,27,.12); }
 @media (prefers-reduced-motion: reduce) { .selecteur-annee select { transition: none; } }
@@ -333,7 +335,7 @@ table.dense td.num { text-align: right; }
   .resume-excel .selecteur-annee select { padding-block: clamp(2px, .7vh, 6px); }
   .resume-excel .cases { margin-bottom: var(--v); }
   .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
-  .resume-excel .cases .case strong { font-size: var(--fs-lg); min-height: 0; padding-top: 0; }
+  .resume-excel .cases .case strong { font-size: var(--fs-xl); min-height: 0; padding-top: 0; }
   .resume-excel .regle { padding: calc(var(--v) * .4) 14px; font-size: var(--fs-xs); }
   .resume-excel > .table-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; margin: 0; }
   .resume-excel .suivi { height: 100%; }
@@ -396,10 +398,10 @@ table.dense td.num { text-align: right; }
 
   .rail { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .rail-point { position: relative; display: flex; align-items: center; justify-content: center; padding: 10px; border: 0; background: none; cursor: pointer; }
-  .rail-puce { width: 9px; height: 9px; border-radius: 50%; background: rgba(0,0,0,.15); transition: transform .3s, background .3s, box-shadow .3s; }
+  .rail-puce { width: 9px; height: 9px; border-radius: 50%; background: rgba(0,0,0,.15); transition: transform var(--dur) var(--ease), background var(--dur), box-shadow var(--dur); }
   .rail-point:hover .rail-puce { background: rgba(0,0,0,.35); }
   .rail-point.actif .rail-puce { background: var(--navy); transform: scale(1.35); box-shadow: 0 0 12px rgba(26,31,60,.25); }
-  .rail-bulle { position: absolute; right: 38px; top: 50%; transform: translate(8px, -50%); opacity: 0; pointer-events: none; white-space: nowrap; background: var(--paper); border: 1px solid rgba(0,0,0,.1); border-radius: 14px; box-shadow: 0 12px 28px rgba(0,0,0,.18); padding: 10px 16px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; color: var(--navy); transition: opacity .2s, transform .2s; }
+  .rail-bulle { position: absolute; right: 38px; top: 50%; transform: translate(8px, -50%); opacity: 0; pointer-events: none; white-space: nowrap; background: var(--paper); border: 1px solid rgba(0,0,0,.1); border-radius: 14px; box-shadow: 0 12px 28px rgba(0,0,0,.18); padding: 10px 16px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; color: var(--navy); transition: opacity var(--dur), transform var(--dur) var(--ease); }
   .rail-bulle::after { content: ""; position: absolute; top: 50%; right: -6px; width: 10px; height: 10px; background: var(--paper); border-top: 1px solid rgba(0,0,0,.1); border-right: 1px solid rgba(0,0,0,.1); transform: translateY(-50%) rotate(45deg); }
   .rail-point:hover .rail-bulle, .rail-point:focus-visible .rail-bulle { opacity: 1; transform: translate(0, -50%); }
   .rail-point:focus-visible { outline: 2px solid var(--red); outline-offset: -4px; border-radius: 50%; }
@@ -719,11 +721,11 @@ html, body { overscroll-behavior: none; }
 .volet { flex: none; border: 1px solid var(--rule); border-radius: 0; background: var(--paper); overflow: hidden; }
 .volet-ouvert { border-color: var(--muted-2); display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; }
 .page .volet-titre { margin: 0; font-size: inherit; }
-.volet-bouton { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 16px; border: 0; background: var(--paper-2); font-family: inherit; text-align: left; cursor: pointer; transition: background .14s; }
+.volet-bouton { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 16px; border: 0; background: var(--paper-2); font-family: inherit; text-align: left; cursor: pointer; transition: background var(--dur-fast); }
 .volet-bouton:hover { background: var(--paper-3); }
 .volet-bouton:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
 .volet-ouvert .volet-bouton { background: var(--paper); border-bottom: 1px solid var(--rule); }
-.volet-fleche { flex: none; color: var(--muted-2); font-size: 11px; transition: transform .16s ease; }
+.volet-fleche { flex: none; color: var(--muted-2); font-size: 11px; transition: transform var(--dur-fast) var(--ease); }
 .volet-ouvert .volet-fleche { transform: rotate(90deg); color: var(--red); }
 .volet-nom { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink); }
 .volet-resume { flex: none; font-size: 12.5px; font-weight: 400; color: var(--muted-2); }
@@ -737,9 +739,7 @@ table.points.bord-ko { --bord: var(--red-deep); }
 table.points.bord-attention { --bord: var(--warning); }
 table.points td.ouvert { border-left: 3px solid var(--bord); }
 table.points tr.detail-contrat > td, .rapport-excel .panneau table.points tr.detail-contrat > td { padding: 0; max-width: 0; border-left: 3px solid var(--bord); }
-.ligne-fichier { overflow-x: auto; position: sticky; left: 0; animation: ligne-fichier-ouvre .2s ease-out; }
-@keyframes ligne-fichier-ouvre { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .ligne-fichier { animation: none; } }
+.ligne-fichier { overflow-x: auto; position: sticky; left: 0; }
 .ligne-fichier table.dense :is(td, tbody th).fige { position: sticky; z-index: 1; }
 .ligne-fichier table.dense tbody th.num-ligne { background: var(--surface); color: var(--navy); font-weight: 600; text-align: right; }
 .ligne-fichier table.dense td.fige:not(.cellule-ko):not(.cellule-attention):not(.cellule-ok) { background: var(--surface); }
@@ -886,10 +886,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 .confirmer { border-radius: 0; box-shadow: var(--shadow-3); }
 .confirmer::backdrop { background: rgba(15, 23, 42, 0.4); }
 
-/* Apparition douce du contenu : opacité seule (une transformation ferait du conteneur la référence du rail fixe) */
-@keyframes apparaitre { from { opacity: 0; } to { opacity: 1; } }
-.page > * { animation: apparaitre 0.3s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .page > * { animation: none; } }
+/* Apparition du contenu, bulles, menus, transitions de page : styles/mouvement.css */
 
 /* Profil : icône dans la barre, menu déroulant (nom, adresse, rôle, déconnexion) */
 .topbar .profil { position: relative; margin-left: auto; flex: none; }
@@ -909,17 +906,19 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 
 @media (min-width: 900px), print {
   /* Résumé : cartes KPI sur deux lignes (libellé et note à gauche, valeur à droite), le tableau prend le reste */
-  .resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur' 'note variation'; align-items: center; column-gap: var(--sp-2); row-gap: 0; min-height: 0; padding: .375rem .625rem; }
+  .resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur' 'note variation'; align-items: center; column-gap: var(--sp-2); row-gap: 0; min-height: 0; padding: var(--sp-3) var(--sp-4); }
   .resume-excel .cases .case .micro { grid-area: titre; }
   /* La valeur se règle sur la largeur de la carte (cqi) pour laisser le libellé sur une seule ligne */
   .resume-excel .cases .case { container-type: inline-size; }
-  .resume-excel .cases .case strong { grid-area: valeur; font-size: min(var(--fs-lg), 5.4cqi); line-height: 1.2; white-space: nowrap; min-height: 0; padding-top: 0; }
+  .resume-excel .cases .case strong { grid-area: valeur; font-size: min(var(--fs-xl), 6.4cqi); line-height: 1.2; white-space: nowrap; min-height: 0; padding-top: 0; }
   .resume-excel .cases .case :is(.micro, .second-libelle) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .resume-excel .cases .case:not(:has(.variation, .second)) .note { grid-column: 1 / -1; }
   .resume-excel .cases .case .note { grid-area: note; }
   .resume-excel .cases .case .variation, .resume-excel .cases .case .second { grid-area: variation; }
   /* Le libellé passe sous la valeur (large montant) : seule la place de l'évolution lui est réservée */
   .resume-excel .cases .case .second-libelle { grid-row: 2; grid-column: 1 / -1; padding-right: 5.5em; }
+  /* Ligne secondaire en petit : le libellé d'évolution reste entier à côté de sa valeur */
+  .resume-excel .cases .case :is(.second-libelle, .variation, .second, .note) { font-size: var(--fs-xs); }
 }
 
 /* Tenue à l'écran (>= 1100 px), reprise de Suivi de formation : la taille racine suit la fenêtre
@@ -1190,7 +1189,7 @@ table.tableau-squelette td { height: 2.1em; }
 .fiche-dimension { margin-top: var(--sp-2); border: 1px solid var(--rule); background: var(--paper); }
 .fiche-dimension summary { display: flex; align-items: center; gap: var(--sp-3); padding: 8px 12px; background: var(--paper-2); list-style: none; cursor: pointer; font-size: var(--fs-sm); }
 .fiche-dimension summary::-webkit-details-marker { display: none; }
-.fiche-dimension summary::before { content: '▸'; color: var(--muted-2); font-size: 11px; transition: transform .16s ease; }
+.fiche-dimension summary::before { content: '▸'; color: var(--muted-2); font-size: 11px; transition: transform var(--dur-fast) var(--ease); }
 .fiche-dimension[open] summary { background: var(--paper); border-bottom: 1px solid var(--rule); }
 .fiche-dimension[open] summary::before { transform: rotate(90deg); color: var(--red); }
 .fiche-dimension-nom { color: var(--ink); font-family: var(--font-display); font-weight: 600; }
@@ -1292,6 +1291,13 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 /* Titre et note sur une ligne, chacun garde son style ; la marge basse passe au conteneur */
 .titre-ligne { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-3); margin-bottom: var(--sp-2); }
 .resume-excel .titre-ligne > :is(.bandeau-titre, .regle) { margin: 0; }
+.resume-excel .regle { font-weight: 400; }
+/* Note repliée dans une info-bulle « i » à côté d'un titre (survol ou focus clavier) */
+.info { position: relative; align-self: center; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: help; }
+.info:hover, .info:focus-visible { color: var(--navy); }
+.info-bulle { display: none; position: absolute; top: calc(100% + 2px); left: 0; z-index: 20; width: max-content; max-width: min(360px, 80vw); padding: 6px 10px; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); color: var(--ink); font-size: var(--fs-xs); text-align: left; cursor: auto; }
+.info:is(:hover, :focus) .info-bulle { display: block; }
+@media print { .info { display: none; } }
 @media (min-width: 1360px) { .resume-excel .titre-ligne { margin-bottom: var(--v); } }
 /* Renseigner des données >= 1100 px : espacements proportionnels à la hauteur, tout tient dans l'écran avec une marge en bas
    (la page défile en elle-même seulement si l'écran est vraiment trop bas) */

@@ -1,9 +1,10 @@
 import { BarChart3, CalendarDays, CalendarRange, Database, LayoutDashboard, UserRound } from 'lucide-react'
 import { useIsFetching } from '@tanstack/react-query'
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Fond from './Fond'
+import LienPage from './LienPage'
 import MenuProfil from './MenuProfil'
 
 const ONGLETS = [
@@ -24,10 +25,10 @@ export default function Layout() {
       <Fond />
       <header className="topbar">
        <div className="topbar-inner">
-        <NavLink to="/resume" className="marque" aria-label="Reporting RH, accueil">
+        <LienPage to="/resume" className="marque" aria-label="Reporting RH, accueil">
           <img className="marque-logo" src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
           <h1>Reporting RH</h1>
-        </NavLink>
+        </LienPage>
         <button
           type="button"
           className="menu-toggle"
@@ -39,10 +40,10 @@ export default function Layout() {
         </button>
         <nav id="nav-rapports" aria-label="Rapports" className={ouvert ? 'ouvert' : undefined} onClick={() => setOuvert(false)}>
           {ONGLETS.filter((o) => !o.perm || can(o.perm)).map((o) => (
-            <NavLink key={o.to} to={o.to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            <LienPage key={o.to} to={o.to} className={({ isActive }) => (isActive ? 'active' : undefined)}>
               <o.Icone aria-hidden="true" size={16} strokeWidth={2} />
               {o.label}
-            </NavLink>
+            </LienPage>
           ))}
         </nav>
         <MenuProfil />

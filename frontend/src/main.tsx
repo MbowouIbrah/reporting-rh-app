@@ -5,7 +5,11 @@ import { BrowserRouter } from 'react-router-dom'
 import { queryRetry } from './api/client'
 import App from './App'
 import { AuthProvider } from './auth/AuthContext'
+import { installerMouvement } from './lib/mouvement'
 import './styles/base.css'
+import './styles/mouvement.css'
+
+installerMouvement()
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: queryRetry, staleTime: 5 * 60 * 1000 } },

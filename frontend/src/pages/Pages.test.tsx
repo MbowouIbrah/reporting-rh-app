@@ -78,31 +78,31 @@ afterEach(() => vi.restoreAllMocks())
 
 test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
-  const tuile = (await screen.findByText('MARGE', { selector: '.micro' })).closest('.tuile')!
+  const tuile = (await screen.findByText('Marge', { selector: '.micro' })).closest('.tuile')!
   expect(tuile).toHaveTextContent('—')
   expect(tuile).not.toHaveTextContent('0')
   expect(tuile).toHaveTextContent(/Taux de marge\s*—/)
   expect(tuile).not.toHaveTextContent('vs')
-  expect(screen.getByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeInTheDocument()
-  expect(screen.queryByText(/MASSE SALARIALE \d{4}/)).toBeNull()
+  expect(screen.getByText('CA par salarié', { selector: '.micro' })).toBeInTheDocument()
+  expect(screen.queryByText(/Masse salariale \d{4}/)).toBeNull()
 })
 
 test('Résumé : effectif global de fin, évolution et répartition par contrat en bulle', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   const tuile = (await screen.findByText('Évolution par rapport à Fév 2025')).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/EFFECTIF GLOBAL4Évolution par rapport à Fév 2025/)
+  expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Fév 2025/)
   expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
   expect(tuile.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Effectif fin/)
   expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
-  expect(screen.queryByText('CA PAR SALARIÉ', { selector: '.micro' })).toBeNull()
+  expect(screen.queryByText('CA par salarié', { selector: '.micro' })).toBeNull()
 })
 
 test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salariale par contrat', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/MAD GLOBAUX2Pourcentage MAD sites déportés1 · 50\s%/)
+  expect(tuile).toHaveTextContent(/MAD globaux2Pourcentage MAD sites déportés1 · 50\s%/)
   expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
-  const ms = screen.getByText('MASSE SALARIALE', { selector: '.micro' }).closest('.tuile')!
+  const ms = screen.getByText('Masse salariale', { selector: '.micro' }).closest('.tuile')!
   expect(ms.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)
   expect(ms.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Écart|Mois saisis/)
   expect(screen.queryByText(/MOYENNE MENSUELLE/)).toBeNull()
@@ -118,8 +118,8 @@ test('Résumé : tableau avec frais de mission, logement et ligne de total', asy
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
-  await screen.findByText('MASSE SALARIALE', { selector: '.micro' })
-  expect(screen.queryByText('MARGE', { selector: '.micro' })).toBeNull()
+  await screen.findByText('Masse salariale', { selector: '.micro' })
+  expect(screen.queryByText('Marge', { selector: '.micro' })).toBeNull()
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
 })
 

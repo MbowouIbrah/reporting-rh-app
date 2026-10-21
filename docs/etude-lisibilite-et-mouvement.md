@@ -48,6 +48,17 @@ Conclusion : l'impression « aucune animation » ne correspond pas au code ; l'i
 - Écarté : estomper le contenu pendant un changement de filtre (le squelette le signale déjà) ; bibliothèque d'animation (+35 Ko) ; tout effet décoratif.
 - Coût : environ 30 lignes de CSS, 2 fichiers TSX, sans dépendance.
 
-## 3. Points à trancher
-- Valider les améliorations 1 à 4 du §2.
-- Valider la hiérarchie et les notes du §1 (libellés conservés).
+## 3. Décisions (21/10)
+- §1 et §2 validés. Demande ajoutée : apparition plus marquée que le simple fondu, réglée à un seul endroit et facile à changer pour comparer.
+- **Résumé** : titres en casse normale (même texte), valeur `--fs-xl`, marges `--sp-3`/`--sp-4`, évolution atténuée (flèche seule colorée : rouge en baisse) ; sur la grille ≥ 900 px la ligne secondaire reste en `--fs-xs` pour que « Évolution par rapport à Juin 2025 » tienne entier. Note du suivi mensuel dans une info-bulle « i » (survol, focus ou toucher) ; tableau sans zébrage.
+- **Mensuel / Annuel** : rien à changer, la ligne Total est déjà en gras sur une seule teinte ; le zébrage reste (tableaux larges et denses).
+
+### Mouvement centralisé
+- `frontend/src/styles/mouvement.css` : seul fichier des animations d'apparition. Réglages en tête (`--mv-dur-page`, `--mv-decalage`, `--mv-distance`, courbes), puis un préréglage par effet.
+- Effets : `monte` (défaut : glisse de 14 px vers le haut, blocs de la page décalés de 55 ms), `fondu`, `glisse` (latéral), `zoom`, `aucun`.
+- Essayer un effet : ajouter `?mouvement=zoom` à l'adresse (mémorisé dans ce navigateur), `?mouvement=defaut` pour revenir. Changer pour tout le monde : `EFFET_PAR_DEFAUT` dans `frontend/src/lib/mouvement.ts`.
+- Ajouter un effet : une paire de `@keyframes`, une ligne `[data-mouvement]`, le nom dans `EFFETS`.
+- Sortie de page : `LienPage.tsx` (barre du haut) appelle `transitionPage` → View Transitions, la page quittée s'efface en 180 ms. Navigateur sans l'API, mouvement réduit ou effet `aucun` : navigation directe.
+- Surgissent avec l'effet : bulle des cases, info-bulle, menu profil, ligne de fichier de l'import. Les chiffres reviennent en fondu à la fin d'un squelette.
+- Un bloc qui contient le rail fixe n'est animé qu'en fondu (un transform décalerait le rail pendant l'animation).
+- `prefers-reduced-motion` : tout est coupé.
