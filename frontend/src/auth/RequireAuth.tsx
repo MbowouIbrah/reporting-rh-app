@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import Etat from '../components/Etat'
+import { premierePageAdmin } from '../components/AdminNav'
 import { useAuth } from './AuthContext'
 
 export default function RequireAuth({ perm, children }: { perm?: string; children: ReactNode }) {
@@ -10,6 +10,10 @@ export default function RequireAuth({ perm, children }: { perm?: string; childre
   // celle de la page ; au rechargement, le profil gardé (AuthContext) affiche la page sans attendre.
   if (loading) return null
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
-  if (perm && !can(perm)) return <Etat type="403" />
+  // Page non accordée : on n'en révèle pas l'existence, on mène à une page permise.
+  if (perm && !can(perm)) {
+    const admin = loc.pathname.startsWith('/admin') ? premierePageAdmin(can) : undefined
+    return <Navigate to={admin ?? '/resume'} replace />
+  }
   return <>{children}</>
 }

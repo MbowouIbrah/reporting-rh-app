@@ -33,14 +33,15 @@ test('liste des employés : matricule, nom, fiche et statut', async () => {
   expect(screen.getByText('2 employés')).toBeInTheDocument()
 })
 
-test('sans le droit de saisie : accès refusé', async () => {
+test('sans le droit de saisie : renvoyé au Résumé', async () => {
   monter(
     <Routes>
       <Route path="/admin/employes" element={<RequireAuth perm="saisie:write"><Employes /></RequireAuth>} />
+      <Route path="/resume" element={<p>Accueil</p>} />
     </Routes>,
     ['nominatif:read'], servir, '/admin/employes',
   )
-  expect(await screen.findByText('Accès refusé')).toBeInTheDocument()
+  expect(await screen.findByText('Accueil')).toBeInTheDocument()
 })
 
 test('recherche par nom (sans accents) ou matricule, au-dessus du tableau', async () => {

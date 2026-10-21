@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
@@ -153,7 +153,9 @@ test('Individuel : tous les salariés par défaut', async () => {
   expect(janvier.cells[4]).toHaveTextContent('150')
 })
 
-test('Individuel : accès refusé sans nominatif:read', async () => {
-  rendu(<Individuel />, '/individuel', ['report:read'])
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Accès refusé'))
+test('Individuel sans nominatif:read : renvoyé au Résumé, la page n’est pas révélée', async () => {
+  // Route « * » : la redirection vers /resume affiche ce repère au lieu de la page.
+  rendu(<p>Accueil</p>, '/individuel', ['report:read'])
+  expect(await screen.findByText('Accueil')).toBeInTheDocument()
+  expect(screen.queryByText('Accès refusé')).not.toBeInTheDocument()
 })

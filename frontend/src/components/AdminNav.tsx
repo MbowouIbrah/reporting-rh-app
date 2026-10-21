@@ -9,6 +9,9 @@ const ONGLETS = [
   { to: '/admin/utilisateurs', label: 'Utilisateurs', perm: 'users:write', titre: 'ADMINISTRATION DES UTILISATEURS', aide: 'Comptes de connexion : qui accède à l’application et ce que chacun voit.' },
 ]
 
+/** Premier onglet d'administration accordé ; aucun : l'administration n'existe pas pour ce compte. */
+export const premierePageAdmin = (can: (perm: string) => boolean) => ONGLETS.find((o) => can(o.perm))?.to
+
 export default function AdminNav() {
   const { can } = useAuth()
   const { pathname } = useLocation()

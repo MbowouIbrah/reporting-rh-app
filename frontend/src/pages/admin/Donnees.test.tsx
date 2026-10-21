@@ -35,6 +35,7 @@ function rendu(perms: string[], chemin = '/admin') {
         <MemoryRouter initialEntries={[chemin]}>
           <Routes>
             <Route path="/admin" element={<RequireAuth perm="saisie:write"><Donnees /></RequireAuth>} />
+            <Route path="/resume" element={<p>Accueil</p>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -108,8 +109,8 @@ test('un filtre part dans la requête, Réinitialiser les retire tous', async ()
   await waitFor(() => expect(screen.getByRole('button', { name: 'Réinitialiser les filtres' })).toBeDisabled())
 })
 
-test('sans droit de saisie : accès refusé', async () => {
+test('sans droit de saisie : renvoyé au Résumé', async () => {
   appels = rendu([])
-  expect(await screen.findByRole('alert')).toHaveTextContent('Accès refusé')
+  expect(await screen.findByText('Accueil')).toBeInTheDocument()
   expect(tableau()).toHaveLength(0)
 })

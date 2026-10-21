@@ -35,14 +35,15 @@ test('deux blocs : sites avec leur type et leur statut, services', async () => {
   expect(services.queryByRole('columnheader', { name: 'Type de site' })).toBeNull()
 })
 
-test('sans droit sur les référentiels : accès refusé', async () => {
+test('sans droit sur les référentiels : renvoyé au premier onglet d’administration permis', async () => {
   monter(
     <Routes>
       <Route path="/admin/referentiels" element={<RequireAuth perm="referentiel:write"><Referentiels /></RequireAuth>} />
+      <Route path="/admin" element={<p>Données</p>} />
     </Routes>,
     ['saisie:write'], servir, '/admin/referentiels',
   )
-  expect(await screen.findByText('Accès refusé')).toBeInTheDocument()
+  expect(await screen.findByText('Données')).toBeInTheDocument()
 })
 
 test('ajout d’un site : POST /referentiels/site avec le type choisi', async () => {
