@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { Check, Copy } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   useComptes,
@@ -118,13 +119,16 @@ export function normaliser<F extends Portee>(f: F, t: Toutes): F {
 }
 
 /** Cases d'une dimension, repliables ; ouvertes si une case est cochée. « Tout » coche le groupe entier ;
- *  une valeur apportée par un périmètre est cochée et grisée (on décoche le périmètre). */
+ *  une valeur apportée par un périmètre est cochée et grisée (on décoche le périmètre).
+ *  `implicite` : dimension vide alors que l'autre est restreinte, donc non restreinte côté serveur :
+ *  tout s'affiche coché, et décocher une valeur garde les autres. */
 function Cases<T extends string | number>({
   titre,
   options,
   choisis,
   inclus,
   tout,
+  implicite = false,
   desactive,
   onChange,
 }: {
@@ -133,11 +137,13 @@ function Cases<T extends string | number>({
   choisis: T[]
   inclus?: Map<T, string>
   tout: boolean
+  implicite?: boolean
   desactive: boolean
   onChange: (v: T[]) => void
 }) {
   if (!options.length) return null
-  const coche = (v: T) => tout || choisis.includes(v) || !!inclus?.has(v)
+  const ouvert = tout || implicite
+  const coche = (v: T) => ouvert || choisis.includes(v) || !!inclus?.has(v)
   const n = options.filter((o) => coche(o.valeur)).length
   const toutCoche = n === options.length
   return (
@@ -159,14 +165,14 @@ function Cases<T extends string | number>({
       </summary>
       <div className="fiche-cases">
         {options.map((o) => {
-          const via = tout ? undefined : inclus?.get(o.valeur)
+          const via = ouvert ? undefined : inclus?.get(o.valeur)
           return (
             <label key={o.valeur}>
               <input
                 type="checkbox"
                 checked={coche(o.valeur)}
                 disabled={desactive || via !== undefined}
-                onChange={() => onChange(basculer(tout ? options.map((x) => x.valeur) : choisis, o.valeur))}
+                onChange={() => onChange(basculer(ouvert ? options.map((x) => x.valeur) : choisis, o.valeur))}
               />
               <span>
                 {o.libelle}
@@ -177,6 +183,29 @@ function Cases<T extends string | number>({
         })}
       </div>
     </details>
+  )
+}
+
+/** Bouton icône qui copie une adresse ; coche 2 s pour confirmer. */
+function CopierEmail({ email }: { email: string }) {
+  const [copie, setCopie] = useState(false)
+  useEffect(() => {
+    if (!copie) return
+    const t = setTimeout(() => setCopie(false), 2000)
+    return () => clearTimeout(t)
+  }, [copie])
+  const Icone = copie ? Check : Copy
+  return (
+    <button
+      type="button"
+      className="bouton-copier"
+      aria-label={copie ? 'Adresse copiée' : `Copier l’adresse ${email}`}
+      title={copie ? 'Copiée' : 'Copier l’adresse'}
+      disabled={!email}
+      onClick={() => navigator.clipboard?.writeText(email).then(() => setCopie(true), () => {})}
+    >
+      <Icone size={14} aria-hidden="true" />
+    </button>
   )
 }
 
@@ -269,6 +298,11 @@ function FicheCompte({
     }, onError)
   }
 
+  // Dimension vide alors que l'autre est restreinte : non restreinte (« service X sur tous les sites »).
+  const viaServices = viaPerimetres(fiche.perimetres, toutes.perimetres, 'service')
+  const viaSites = viaPerimetres(fiche.perimetres, toutes.perimetres, 'site')
+  const aServices = fiche.services.length > 0 || viaServices.size > 0
+  const aSites = fiche.sites.length > 0 || viaSites.size > 0
   const rienVisible = !fiche.tout && !fiche.perimetres.length && !fiche.services.length && !fiche.sites.length
   const raison = (code: string) => {
     if (code === LECTURE) return 'Toujours accordée'
@@ -295,7 +329,12 @@ function FicheCompte({
               {(p) => <input {...p} value={fiche.nom} onChange={(e) => maj('nom', e.target.value)} />}
             </Champ>
             <Champ label="Adresse e-mail" erreur={erreurs.email}>
-              {(p) => <input {...p} type="email" autoComplete="off" value={fiche.email} onChange={(e) => maj('email', e.target.value)} />}
+              {(p) => (
+                <span className="champ-copie">
+                  <input {...p} type="email" autoComplete="off" value={fiche.email} onChange={(e) => maj('email', e.target.value)} />
+                  <CopierEmail email={fiche.email.trim()} />
+                </span>
+              )}
             </Champ>
             <Champ label="Fonction">
               {(p) => <input {...p} placeholder="ex. DRH, Directeur commercial VN" value={fiche.fonction} onChange={(e) => maj('fonction', e.target.value)} />}
@@ -330,8 +369,9 @@ function FicheCompte({
             titre="Services"
             options={services.options}
             choisis={fiche.services}
-            inclus={viaPerimetres(fiche.perimetres, toutes.perimetres, 'service')}
+            inclus={viaServices}
             tout={fiche.tout}
+            implicite={aSites && !aServices}
             desactive={soi}
             onChange={(v) => changer('services', v)}
           />
@@ -339,8 +379,9 @@ function FicheCompte({
             titre="Sites"
             options={sites.options}
             choisis={fiche.sites}
-            inclus={viaPerimetres(fiche.perimetres, toutes.perimetres, 'site')}
+            inclus={viaSites}
             tout={fiche.tout}
+            implicite={aServices && !aSites}
             desactive={soi}
             onChange={(v) => changer('sites', v)}
           />
@@ -482,6 +523,10 @@ export default function Utilisateurs() {
                             {c.id === me?.id && <span className="note"> (vous)</span>}
                           </button>
                           {c.fonction && <span className="fonction">{c.fonction}</span>}
+                          <span className="ligne-email">
+                            {c.email}
+                            <CopierEmail email={c.email} />
+                          </span>
                         </th>
                         <td>{resumePortee(c.portee, perimetres.data)}</td>
                         <td><span className={c.actif ? 'statut statut-ok' : 'statut'}>{c.actif ? 'Actif' : 'Inactif'}</span></td>

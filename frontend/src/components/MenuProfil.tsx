@@ -53,7 +53,7 @@ export default function MenuProfil() {
           {me?.fonction && (
             <div className="profil-role">
               <span className="profil-libelle">Fonction</span>
-              <span className="badge badge-neutre">{me.fonction}</span>
+              <span className="badge badge-neutre" title={me.fonction}>{me.fonction}</span>
             </div>
           )}
           <button
