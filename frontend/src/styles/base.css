@@ -1324,3 +1324,24 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
   .page-ecran.saisie-verif .volet-ouvert { flex: none; }
   .page-ecran.saisie-verif .volet-ouvert .volet-corps { max-height: max(120px, calc(100cqh - 90px)); }
 }
+
+/* Choix de période (mois + année) : mois à gauche, année plus légère à droite. */
+.choix-periode { position: relative; }
+.choix-periode > button {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 8px;
+  border: 1px solid var(--rule-strong); border-radius: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: var(--fs-sm);
+  text-transform: none; letter-spacing: 0; cursor: pointer; transition: border-color var(--dur), box-shadow var(--dur);
+}
+.choix-periode > button:focus { outline: none; border-color: var(--red); box-shadow: var(--anneau-focus); }
+.choix-periode > button svg { margin-left: auto; color: var(--muted); }
+.choix-periode .periode-mois { font-weight: 600; }
+.choix-periode .periode-annee { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.choix-periode [role='listbox'] {
+  position: absolute; top: calc(100% + 2px); left: 0; z-index: calc(var(--z-sticky) + 5); width: max(100%, 200px); max-height: 320px; overflow-y: auto; overscroll-behavior: contain;
+  list-style: none; margin: 0; padding: 4px 0; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgba(26, 31, 60, .15);
+  font-size: var(--fs-sm); text-transform: none; letter-spacing: 0; color: var(--navy);
+}
+.choix-periode li { display: flex; justify-content: space-between; gap: var(--sp-4); padding: 6px 12px; cursor: pointer; }
+.choix-periode li .periode-mois { font-weight: 500; }
+.choix-periode li.actif { background: var(--surface-hover); }
+.choix-periode li[aria-selected='true'] .periode-mois { font-weight: 700; }

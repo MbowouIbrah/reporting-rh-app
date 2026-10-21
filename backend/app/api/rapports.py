@@ -204,8 +204,9 @@ def mensuel_export(
                   "matricule": matricule, "activite": activite,
                   "type_contrat": type_contrat})
     db.commit()
-    choisie = ref_annee is not None and ref_mois is not None
-    prec = f"{xlsx.MOIS[ref_mois - 1]} {ref_annee}" if choisie else "M-1"
+    if ref_annee is None or ref_mois is None:
+        ref_annee, ref_mois = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
+    prec = f"{xlsx.MOIS[ref_mois - 1]} {ref_annee}"
     return _xlsx(xlsx.mensuel(res, annee, mois, prec),
                  f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
 

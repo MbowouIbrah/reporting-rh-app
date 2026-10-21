@@ -109,8 +109,8 @@ export default function Graphes() {
   }
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
   const avecN1 = !!n1?.some((m) => m.remuneration != null)
-  const serieN = `${annee ?? 'N'}`
-  const serieN1 = `${annee ? annee - 1 : 'N-1'}`
+  const serieN = `${annee ?? ''}`
+  const serieN1 = `${annee ? annee - 1 : ''}`
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
 
   return (

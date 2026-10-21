@@ -4,8 +4,9 @@ import type { FiltresPage } from '../api/rapports'
 import type { Periode } from '../api/types'
 import ChoixSalarie, { type Salarie } from './ChoixSalarie'
 import type { ClePartagee, Partage } from '../lib/filtresPartages'
-import { MOIS, MOIS_COURTS } from '../lib/format'
+import { MOIS_COURTS } from '../lib/format'
 import BoutonReinitialiser from './BoutonReinitialiser'
+import ChoixPeriode, { type OptionPeriode } from './ChoixPeriode'
 
 type Patch = Record<string, string | number | undefined>
 
@@ -32,15 +33,21 @@ interface Props {
   partage: Partage
 }
 
-/** Période précédant (annee, mois) : M-1, décembre de l'année d'avant en janvier. */
+/** Période précédant (annee, mois) : mois d'avant, décembre de l'année d'avant en janvier. */
+const clePeriode = (p: { annee: number; mois: number }) => `${p.annee}-${String(p.mois).padStart(2, '0')}`
+
 export const moisPrecedent = (annee: number, mois: number) =>
   mois === 1 ? { annee: annee - 1, mois: 12 } : { annee, mois: mois - 1 }
 
-/** Libellé de la colonne de comparaison des tableaux : M-1 / N-1 par défaut, sinon la période choisie. */
+/** Libellé de la colonne de comparaison des tableaux : la période choisie, sinon le mois ou l'année d'avant. */
 export function libelleComparaison(f: FiltresPage, mode: 'annee' | 'periode') {
   if (mode === 'annee') return `${f.ref_annee ?? f.annee - 1}`
-  return f.ref_annee && f.ref_mois ? `${MOIS_COURTS[f.ref_mois - 1]} ${f.ref_annee}` : 'M-1'
+  const p = f.ref_annee && f.ref_mois ? { annee: f.ref_annee, mois: f.ref_mois } : moisPrecedent(f.annee, f.mois)
+  return libellePeriode(p)
 }
+
+/** Libellé court d'une période (« Juin 2026 ») : en-têtes de tableaux. */
+export const libellePeriode = (p: { annee: number; mois: number }) => `${MOIS_COURTS[p.mois - 1]} ${p.annee}`
 
 export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onChange }: {
   mode: 'annee' | 'periode'
@@ -55,7 +62,7 @@ export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onCh
       <label>
         Comparer à
         <select value={f.ref_annee ?? ''} onChange={(e) => onChange({ cmp_annee: e.target.value })}>
-          <option value="">{f.annee - 1} (N-1)</option>
+          <option value="">{f.annee - 1}</option>
           {autres.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
@@ -64,20 +71,37 @@ export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onCh
     )
   }
   const prec = moisPrecedent(f.annee, f.mois)
-  const cle = (p: Periode) => `${p.annee}-${String(p.mois).padStart(2, '0')}`
-  const exclues = new Set([cle(f), cle(prec)])
-  const autres = periodes.filter((p) => !exclues.has(cle(p))).sort((a, b) => cle(b).localeCompare(cle(a)))
-  const valeur = f.ref_annee && f.ref_mois ? cle({ annee: f.ref_annee, mois: f.ref_mois }) : ''
+  const exclues = new Set([clePeriode(f), clePeriode(prec)])
+  const options: OptionPeriode[] = [
+    { valeur: '', ...prec },
+    ...periodes.filter((p) => !exclues.has(clePeriode(p))).map((p) => ({ valeur: clePeriode(p), annee: p.annee, mois: p.mois })),
+  ].sort((x, y) => clePeriode(x).localeCompare(clePeriode(y)))
+  const valeur = f.ref_annee && f.ref_mois ? clePeriode({ annee: f.ref_annee, mois: f.ref_mois }) : ''
+  return <ChoixPeriode libelle="Comparer à" options={options} valeur={valeur} onChange={(v) => onChange({ cmp_periode: v })} />
+}
+
+/** Période étudiée (mensuel) : périodes importées en ordre chronologique, plus la période affichée si elle n'y est pas. */
+function ChoixMoisAnnee({ filtres: f, periodes, onChange }: {
+  filtres: FiltresPage
+  periodes: Periode[]
+  onChange: (patch: Patch) => void
+}) {
+  const valeur = clePeriode(f)
+  const cles = new Set([valeur, ...periodes.map(clePeriode)])
+  const options = [...cles].sort().map((c) => {
+    const [annee, mois] = c.split('-').map(Number)
+    return { valeur: c, annee, mois }
+  })
   return (
-    <label>
-      Comparer à
-      <select value={valeur} onChange={(e) => onChange({ cmp_periode: e.target.value })}>
-        <option value="">{MOIS[prec.mois - 1]} {prec.annee} (M-1)</option>
-        {autres.map((p) => (
-          <option key={cle(p)} value={cle(p)}>{MOIS[p.mois - 1]} {p.annee}</option>
-        ))}
-      </select>
-    </label>
+    <ChoixPeriode
+      libelle="Période"
+      options={options}
+      valeur={valeur}
+      onChange={(v) => {
+        const [annee, mois] = v.split('-').map(Number)
+        onChange({ annee, mois })
+      }}
+    />
   )
 }
 
@@ -157,7 +181,7 @@ export default function FiltresPeriode({
   const avecPoste = !!postes?.length
   const avecActivite = !!activites?.length
   const avecContrat = !!typesContrat?.length
-  // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, N-1/M-1, tous).
+  // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, période d'avant, tous).
   const cles: ClePartagee[] = [
     'annee',
     ...(avecMois ? (['mois'] as const) : []),
@@ -173,22 +197,14 @@ export default function FiltresPeriode({
   return (
     <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
       <TitreFiltres />
-      <label>
-        Année
-        <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value })}>
-          {annees.map((a) => (
-            <option key={a}>{a}</option>
-          ))}
-        </select>
-      </label>
-      {avecMois && (
+      {avecMois ? (
+        <ChoixMoisAnnee filtres={filtres} periodes={periodes ?? []} onChange={onChange} />
+      ) : (
         <label>
-          Mois
-          <select value={filtres.mois} onChange={(e) => onChange({ mois: e.target.value })}>
-            {MOIS.map((m, i) => (
-              <option key={m} value={i + 1}>
-                {m}
-              </option>
+          Année
+          <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value })}>
+            {annees.map((a) => (
+              <option key={a}>{a}</option>
             ))}
           </select>
         </label>
@@ -233,7 +249,7 @@ export default function FiltresPeriode({
         </label>
       )}
       {avecContrat && (
-        <label className="souple">
+        <label>
           Contrat
           <select value={filtres.type_contrat ?? ''} onChange={(e) => onChange({ type_contrat: e.target.value })}>
             <option value="">Tous</option>

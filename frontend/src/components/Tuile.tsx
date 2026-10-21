@@ -9,12 +9,12 @@ interface Props {
   hero?: boolean
   /** Explication quand la valeur est absente (« — »). */
   absence?: string
-  /** Libellé de la comparaison, par défaut « vs M-1 ». */
+  /** Libellé de la comparaison, vide par défaut. */
   vs?: string
 }
 
 /** Variation lisible sans la couleur : flèche, signe et texte. */
-export function Variation({ v, vs = 'vs M-1' }: { v: Cell['var_pct'] | undefined; vs?: string }) {
+export function Variation({ v, vs = '' }: { v: Cell['var_pct'] | undefined; vs?: string }) {
   if (v === null || v === undefined) return <span className="variation">— {vs}</span>
   if (v === 'n/a') return <span className="variation" title="Non calculable : la référence est nulle">— {vs}</span>
   const n = Number(v)

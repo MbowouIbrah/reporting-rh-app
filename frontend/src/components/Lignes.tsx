@@ -4,7 +4,7 @@ import { cls, fcfa, pct } from '../lib/format'
 
 type Budget = BudgetCols
 
-/** Ligne M-1 | M | Variation | Var. % (+ Budget | Écart | % si fourni). */
+/** Ligne période comparée | période | Variation | Var. % (+ Budget | Écart | % si fourni). */
 export function LigneCell({
   label,
   cell,
@@ -33,26 +33,5 @@ export function LigneCell({
         </>
       )}
     </tr>
-  )
-}
-
-export function EnTete({ premiere, budget }: { premiere: string; budget?: boolean }) {
-  return (
-    <thead>
-      <tr>
-        <th scope="col">{premiere}</th>
-        <th scope="col">M-1</th>
-        <th scope="col">M</th>
-        <th scope="col">Variation</th>
-        <th scope="col">Var. %</th>
-        {budget && (
-          <>
-            <th scope="col">Budget</th>
-            <th scope="col">Écart</th>
-            <th scope="col">% Budget</th>
-          </>
-        )}
-      </tr>
-    </thead>
   )
 }

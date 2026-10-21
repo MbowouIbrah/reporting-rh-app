@@ -109,7 +109,7 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
     _feuille(wb, "5 Contrat", ["Contrat · activité", "Indicateur", prec, cour, *var], c)
 
 
-def mensuel(r: dict, annee: int, mois: int, prec: str = "M-1") -> bytes:
+def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
     wb = Workbook()
     s = r["synthese"]
     bloquants = [c["controle"] for c in r["controles"] if c["bloquant"]]
@@ -119,7 +119,7 @@ def mensuel(r: dict, annee: int, mois: int, prec: str = "M-1") -> bytes:
         ["Taux de rotation", s["taux_rotation"]],
         ["Taux d'absentéisme", s["taux_absenteisme"]],
     ])
-    _blocs(wb, r, prec, "M")
+    _blocs(wb, r, prec, f"{MOIS[mois - 1]} {annee}")
     return _sortie(wb)
 
 

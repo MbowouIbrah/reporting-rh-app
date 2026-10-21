@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { getMensuel } from '../api/rapports'
 import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison, libellePeriode } from '../components/FiltresPeriode'
 import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useFiltres } from '../hooks/useFiltres'
@@ -30,7 +30,7 @@ export default function Mensuel() {
       {f.vide && <Etat type="vide" />}
       {q.isLoading && f.filtres && (
         <RapportSquelette
-          lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: 'M' }}
+          lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }}
           bandeau={
             <>
               <span>Contrôles de cohérence : <strong className="val">—</strong></span>
@@ -42,7 +42,7 @@ export default function Mensuel() {
         />
       )}
       {q.error && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && <Contenu d={q.data} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: 'M' }} />}
+      {q.data && f.filtres && <Contenu d={q.data} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }} />}
     </section>
   )
 }

@@ -97,8 +97,8 @@ export default function Resume() {
     placeholderData: keepPreviousData,
   })
   const maj = ann.isPlaceholderData
-  const an = f.filtres ? `${f.filtres.annee}` : 'N'
-  const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : 'N-1'
+  const an = f.filtres ? `${f.filtres.annee}` : ''
+  const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : ''
   const erreur = ann.error
   const a = ann.data
   const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && !filtre
