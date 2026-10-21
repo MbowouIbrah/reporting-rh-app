@@ -14,8 +14,6 @@ import Etat, { etatErreur } from '../../components/Etat'
 import { LIBELLE_TYPE_SITE } from '../../components/FiltresPeriode'
 import { Bouton, Champ } from '../../components/Kit'
 
-const TITRE = 'ADMINISTRATION DES RÉFÉRENTIELS'
-
 interface Renommage {
   id: number
   ancien: string
@@ -188,7 +186,6 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
 export default function Referentiels() {
   return (
     <section className="page-ecran rapport-excel admin-excel">
-      <h2 className="bandeau-titre">{TITRE}</h2>
       <AdminNav />
       <div className="admin-duo">
         <Bloc dim="site" titre="Sites" singulier="site" />

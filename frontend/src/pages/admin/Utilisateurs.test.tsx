@@ -94,11 +94,11 @@ test('fiche : espaces seuls = pas de modification ; après enregistrement, mot d
   const f = await ouvrir('Chef Sav')
   fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef Sav ' } })
   expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
-  fireEvent.change(f.getByLabelText('Nouveau mot de passe (facultatif)'), { target: { value: '<mot-de-passe-test-12>' } })
+  fireEvent.change(f.getByLabelText('Nouveau mot de passe'), { target: { value: '<mot-de-passe-test-12>' } })
   enregistrer()
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({ password: '<mot-de-passe-test-12>' })
-  await waitFor(() => expect(f.getByLabelText('Nouveau mot de passe (facultatif)')).toHaveValue(''))
+  await waitFor(() => expect(f.getByLabelText('Nouveau mot de passe')).toHaveValue(''))
   expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
 })
 

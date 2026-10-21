@@ -14,7 +14,6 @@ import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../lib/fo
 import BandeauEnregistre from './saisie/Enregistre'
 
 // Ligne 1 de la feuille DONNEES (REPORTING_RH_V5.xlsx).
-const TITRE = 'ADMINISTRATION DES DONNÉES'
 // Les quatre premières colonnes (ANNÉE à Noms) restent figées au défilement horizontal.
 const FIGEES = ['ANNÉE', 'MOIS', 'MATRICULE', 'Noms']
 const FIXES = [...FIGEES, 'Poste', 'Type Contrat', 'Activité', 'Site', 'Service']
@@ -83,7 +82,6 @@ export default function Donnees() {
 
   return (
     <section className="page-ecran rapport-excel donnees-excel" aria-busy={charge || undefined}>
-      <h2 className="bandeau-titre">{TITRE}</h2>
       <AdminNav />
       <div className="filtres" role="group" aria-label="Filtres">
         <label>

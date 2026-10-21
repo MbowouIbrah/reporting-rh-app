@@ -15,7 +15,6 @@ import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Champ } from '../../components/Kit'
 
-const TITRE = 'ADMINISTRATION DES EMPLOYÉS'
 const LIBELLES: Record<ChampFiche, string> = {
   poste: 'Poste',
   type_contrat: 'Type de contrat',
@@ -110,7 +109,6 @@ export default function Employes() {
 
   return (
     <section className="page-ecran rapport-excel admin-excel">
-      <h2 className="bandeau-titre">{TITRE}</h2>
       <AdminNav />
       <div className="filtres" role="group" aria-label="Recherche">
         <label>

@@ -30,7 +30,7 @@ CATALOGUE: tuple[Permission, ...] = (
     Permission("saisie", "Corriger les données, saisir budgets et CA",
                "Corrections, budgets, CA et marge, clôture des périodes.",
                frozenset({"saisie:write", "periode:write", "report:write"}), True),
-    Permission("referentiel", "Gérer les référentiels, règles et périmètres",
+    Permission("referentiel", "Gérer les sites, services, règles et périmètres",
                "Services, sites, rubriques, règles de calcul, périmètres.",
                frozenset({"referentiel:write", "perimetre:write"}), True),
     Permission("comptes", "Gérer les comptes et les droits",

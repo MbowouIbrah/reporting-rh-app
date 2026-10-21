@@ -14,7 +14,7 @@ export const CATALOGUE: PermissionCat[] = [
   { code: 'marge', libelle: 'Voir le CA et la marge', explication: 'Le CA et la marge n’existent qu’au global.', porteeTout: true },
   { code: 'import', libelle: 'Importer la paie', explication: 'Dépôt des fichiers mensuels et décisions d’import.', porteeTout: true },
   { code: 'saisie', libelle: 'Corriger les données, saisir budgets et CA', explication: 'Corrections, budgets, CA et marge, clôture des périodes.', porteeTout: true },
-  { code: 'referentiel', libelle: 'Gérer les référentiels, règles et périmètres', explication: 'Services, sites, rubriques, règles de calcul, périmètres.', porteeTout: true },
+  { code: 'referentiel', libelle: 'Gérer les sites, services, règles et périmètres', explication: 'Services, sites, rubriques, règles de calcul, périmètres.', porteeTout: true },
   { code: GESTION_COMPTES, libelle: 'Gérer les comptes et les droits', explication: 'Création des comptes, données visibles et permissions.', porteeTout: true },
   { code: 'journal', libelle: 'Consulter le journal', explication: 'Historique des connexions et des modifications.', porteeTout: true },
 ]

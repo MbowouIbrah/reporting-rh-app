@@ -20,7 +20,6 @@ import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Champ, Confirmer } from '../../components/Kit'
 import { CATALOGUE, GESTION_COMPTES, LECTURE, MODELES, exigeTout } from '../../lib/droits'
 
-const TITRE = 'ADMINISTRATION DES UTILISATEURS'
 const COLONNES = ['Nom', 'Données visibles', 'Statut']
 // Mêmes règles que le serveur (admin.py) : messages immédiats, le serveur reste l'autorité.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -223,8 +222,8 @@ function FicheCompte({
             <Champ label="Fonction">
               {(p) => <input {...p} placeholder="ex. DRH, Directeur commercial VN" value={fiche.fonction} onChange={(e) => maj('fonction', e.target.value)} />}
             </Champ>
-            <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe (facultatif)'} erreur={erreurs.password}>
-              {(p) => <input {...p} type="password" autoComplete="new-password" value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
+            <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe'} erreur={erreurs.password}>
+              {(p) => <input {...p} type="password" autoComplete="new-password" placeholder={nouveau ? undefined : 'Laisser vide pour le garder'} value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
             </Champ>
             {!nouveau && (
               <label className="admin-case">
@@ -356,7 +355,6 @@ export default function Utilisateurs() {
 
   return (
     <section className="page-ecran rapport-excel admin-excel">
-      <h2 className="bandeau-titre">{TITRE}</h2>
       <AdminNav />
       <div className="filtres" role="group" aria-label="Recherche">
         <label>

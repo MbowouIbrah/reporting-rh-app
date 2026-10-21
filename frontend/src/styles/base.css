@@ -1121,11 +1121,15 @@ table.tableau-squelette td { height: 2.1em; }
   .filtres-titre { flex-basis: 100%; border-right: 0; padding-right: 0; }
 }
 
-/* Administration : sous-onglets (rayon 8 px), formulaires et grilles à angles droits des écrans Employés et Référentiels */
-.admin-onglets { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
-.admin-onglets a { padding: 6px 16px; border: 1px solid var(--rule-strong); border-radius: var(--radius); background: var(--surface); color: var(--navy); font-size: var(--fs-md); font-weight: var(--fw-bold); text-decoration: none; }
-.admin-onglets a:hover { background: var(--surface-hover); }
-.admin-onglets a[aria-current='page'] { background: var(--navy); border-color: var(--navy); color: var(--paper); }
+/* Administration : barre d'onglets soulignés au-dessus de l'en-tête qu'ils pilotent (titre + rôle de la section) */
+.admin-onglets { display: flex; flex-wrap: wrap; margin: 0 0 var(--sp-3); border-bottom: 1px solid var(--rule-strong); }
+.admin-onglets a { margin-bottom: -1px; padding: 10px 18px 8px; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; color: var(--muted); font-size: var(--fs-md); font-weight: var(--fw-bold); text-decoration: none; }
+.admin-onglets a:hover { background: var(--surface-hover); color: var(--navy); }
+.admin-onglets a[aria-current='page'] { border-bottom-color: var(--red); color: var(--navy); }
+.admin-onglets a:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+.admin-excel .admin-entete { margin: 0 0 var(--sp-3); }
+.admin-excel .admin-entete .bandeau-titre { margin: 0 0 2px; }
+.admin-excel .admin-entete p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .admin-excel .panneau { flex: 0 1 auto; margin-bottom: var(--sp-3); }
 .admin-excel .panneau table.dense thead th { text-align: left; }
 .admin-excel .panneau table.dense tbody th[scope='row'] { text-align: left; font-weight: var(--fw-bold); color: var(--navy); }
@@ -1152,18 +1156,24 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .renommer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); min-width: 300px; font-weight: 400; }
 .admin-excel .renommer .bouton:not(.bouton-lien) { height: 30px; }
 .admin-excel .renommer p { flex-basis: 100%; margin: 0; white-space: normal; }
-.admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
+.admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
 @media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } }
 /* Utilisateurs : liste à gauche, fiche du compte éditée en place à droite */
-.comptes-duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
+.comptes-duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-4); align-items: start; min-height: 0; }
 .admin-excel .comptes-duo .panneau { margin-bottom: 0; }
 .comptes-liste .ligne-compte { padding: 0; border: 0; background: none; color: var(--navy); font: inherit; font-weight: var(--fw-bold); text-align: left; cursor: pointer; }
 .comptes-liste .ligne-compte:hover { text-decoration: underline; }
 .comptes-liste tr:has(.ligne-compte[aria-current='true']) > * { background: var(--surface-hover); }
 .comptes-liste tr:has(.ligne-compte[aria-current='true']) > th { box-shadow: inset 3px 0 var(--navy); }
-/* La fiche défile avec la zone .comptes-duo : la barre Enregistrer reste collée en bas de l'écran */
+/* Écran étroit : la fiche suit le défilement de la page, la barre Enregistrer reste collée en bas de l'écran */
 .admin-excel .fiche-compte .panneau-corps { overflow: visible; }
+/* Grand écran : les deux colonnes remplissent la hauteur restante et chacune défile seule (cadres étirés, jamais de lignes vides) */
+@media (min-width: 1360px) {
+  .admin-excel :is(.admin-duo, .comptes-duo) { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
+  .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
+}
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
 .comptes-invite { margin: 0; padding: var(--sp-4); border: 1px dashed var(--rule-strong); }
 .fiche-compte fieldset { margin: 0; padding: var(--sp-3) var(--sp-4); border: 0; border-bottom: 1px solid var(--rule); }
@@ -1171,6 +1181,11 @@ table.tableau-squelette td { height: 2.1em; }
 .fiche-compte fieldset > :not(legend) { clear: both; }
 .admin-excel .fiche-compte .admin-form { padding: 0; }
 .admin-excel .fiche-compte .admin-case { margin-top: 0; }
+/* Identité : deux colonnes de champs (libellé au-dessus), case et note sur toute la largeur */
+.admin-excel .fiche-compte .admin-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--sp-3) var(--sp-5); }
+.admin-excel .fiche-compte .admin-form .champ { max-width: none; }
+.admin-excel .fiche-compte :is(.admin-case, .admin-contexte) { grid-column: 1 / -1; }
+.admin-excel .fiche-compte .admin-case { height: auto; }
 .fiche-modeles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-sm); }
 .fiche-case-principale { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--navy); font-weight: var(--fw-bold); }
 .fiche-dimension { margin-top: var(--sp-2); }
@@ -1178,8 +1193,8 @@ table.tableau-squelette td { height: 2.1em; }
 .fiche-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0 0 var(--sp-4); font-size: var(--fs-sm); }
 .fiche-cases label { display: flex; align-items: center; gap: var(--sp-2); }
 .fiche-compte .note { margin: var(--sp-2) 0 0; }
-.fiche-permissions { margin: 0; padding: 0; list-style: none; }
-.fiche-permissions li + li { border-top: 1px solid var(--rule); }
+.fiche-permissions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); column-gap: var(--sp-5); margin: 0; padding: 0; list-style: none; }
+.fiche-permissions li { border-top: 1px solid var(--rule); }
 .fiche-permissions label { display: grid; grid-template-columns: auto 1fr; column-gap: var(--sp-2); padding: var(--sp-2) 0; cursor: pointer; }
 .fiche-permissions input { grid-row: span 2; margin-top: 3px; }
 .fiche-permissions strong { color: var(--navy); font-size: var(--fs-md); }
