@@ -1187,7 +1187,7 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .fiche-compte :is(.admin-case, .admin-contexte) { grid-column: 1 / -1; }
 .admin-excel .fiche-compte .admin-case { height: auto; }
 .fiche-modeles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-sm); }
-.fiche-case-tout { grid-column: 1 / -1; color: var(--navy); font-weight: var(--fw-bold); }
+.fiche-case-tout { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: var(--sp-4); color: var(--ink); font-weight: var(--fw-regular); cursor: pointer; }
 .fiche-via { color: var(--muted); font-size: var(--fs-xs); }
 .fiche-cases label:has(input:disabled) { color: var(--muted); }
 .fiche-suppression > :not(:first-child) { padding: var(--sp-4); }

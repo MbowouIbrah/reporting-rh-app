@@ -141,13 +141,15 @@ function Cases<T extends string | number>({
   const n = options.filter((o) => coche(o.valeur)).length
   const toutCoche = n === options.length
   return (
-    <details className="fiche-dimension" open={n > 0}>
-      <summary>{`${titre} (${n} sur ${options.length})`}</summary>
-      <div className="fiche-cases" role="group" aria-label={titre}>
+    <details className="fiche-dimension" open={n > 0} role="group" aria-label={titre}>
+      <summary>
+        {`${titre} (${n} sur ${options.length})`}
         <label className="fiche-case-tout">
           <input type="checkbox" checked={toutCoche} disabled={desactive} onChange={() => onChange(toutCoche ? [] : options.map((o) => o.valeur))} />
           Tout
         </label>
+      </summary>
+      <div className="fiche-cases">
         {options.map((o) => {
           const via = tout ? undefined : inclus?.get(o.valeur)
           return (
