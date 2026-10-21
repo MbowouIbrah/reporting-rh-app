@@ -136,11 +136,16 @@ def _modele(dimension: str):
 def referentiel(
     dimension: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
-    authorize(p, "import:read")
+    # la fiche d'un compte liste les services et sites accordables, sans les alias d'import
+    import_lu = is_allowed(p, "import:read")
+    if not import_lu and not (dimension in ("service", "site") and is_allowed(p, "users:read")):
+        authorize(p, "import:read")
     model = _modele(dimension)
+    valeurs = [_valeur(dimension, r) for r in db.scalars(select(model).order_by(model.id))]
+    if not import_lu:
+        return {"valeurs": valeurs}
     return {
-        "valeurs": [_valeur(dimension, r)
-                    for r in db.scalars(select(model).order_by(model.id))],
+        "valeurs": valeurs,
         "alias": [{"alias": a.alias_norm, "cible_id": a.cible_id}
                   for a in db.scalars(select(RefAlias).where(RefAlias.dimension == dimension))],
     }

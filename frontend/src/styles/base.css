@@ -1155,6 +1155,40 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
 @media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } }
+/* Utilisateurs : liste à gauche, fiche du compte éditée en place à droite */
+.comptes-duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-4); align-items: start; min-height: 0; overflow: auto; }
+.admin-excel .comptes-duo .panneau { margin-bottom: 0; }
+.comptes-liste .ligne-compte { padding: 0; border: 0; background: none; color: var(--navy); font: inherit; font-weight: var(--fw-bold); text-align: left; cursor: pointer; }
+.comptes-liste .ligne-compte:hover { text-decoration: underline; }
+.comptes-liste tr:has(.ligne-compte[aria-current='true']) > * { background: var(--surface-hover); }
+.comptes-liste tr:has(.ligne-compte[aria-current='true']) > th { box-shadow: inset 3px 0 var(--navy); }
+/* La fiche défile avec la zone .comptes-duo : la barre Enregistrer reste collée en bas de l'écran */
+.admin-excel .fiche-compte .panneau-corps { overflow: visible; }
+.comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
+.comptes-invite { margin: 0; padding: var(--sp-4); border: 1px dashed var(--rule-strong); }
+.fiche-compte fieldset { margin: 0; padding: var(--sp-3) var(--sp-4); border: 0; border-bottom: 1px solid var(--rule); }
+.fiche-compte legend { float: left; width: 100%; margin-bottom: var(--sp-2); color: var(--navy); font-size: var(--fs-md); font-weight: var(--fw-bold); }
+.fiche-compte fieldset > :not(legend) { clear: both; }
+.admin-excel .fiche-compte .admin-form { padding: 0; }
+.admin-excel .fiche-compte .admin-case { margin-top: 0; }
+.fiche-modeles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-sm); }
+.fiche-case-principale { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--navy); font-weight: var(--fw-bold); }
+.fiche-dimension { margin-top: var(--sp-2); }
+.fiche-dimension summary { color: var(--navy); font-size: var(--fs-sm); font-weight: var(--fw-bold); cursor: pointer; }
+.fiche-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-1) var(--sp-3); padding: var(--sp-2) 0 0 var(--sp-4); font-size: var(--fs-sm); }
+.fiche-cases label { display: flex; align-items: center; gap: var(--sp-2); }
+.fiche-compte .note { margin: var(--sp-2) 0 0; }
+.fiche-permissions { margin: 0; padding: 0; list-style: none; }
+.fiche-permissions li + li { border-top: 1px solid var(--rule); }
+.fiche-permissions label { display: grid; grid-template-columns: auto 1fr; column-gap: var(--sp-2); padding: var(--sp-2) 0; cursor: pointer; }
+.fiche-permissions input { grid-row: span 2; margin-top: 3px; }
+.fiche-permissions strong { color: var(--navy); font-size: var(--fs-md); }
+.fiche-permissions small { color: var(--muted); font-size: var(--fs-xs); }
+.fiche-permissions label:has(input:disabled) { cursor: default; }
+.fiche-erreur { padding: var(--sp-2) var(--sp-4) 0; }
+.fiche-barre { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--rule-strong); background: var(--surface); }
+.fiche-barre-discrete { position: static; border-top: 0; background: none; }
+@media (max-width: 899px) { .comptes-duo { grid-template-columns: minmax(0, 1fr); } }
 
 /* Export PDF : bouton à droite du titre de page, menu déroulant du choix des parties */
 .titre-rapport { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; }

@@ -19,7 +19,7 @@ export function monter(ui: ReactNode, perms: string[], repondre: (a: Appel) => u
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
     const appel: Appel = { url: String(u), method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : undefined }
     if (appel.url.includes('/auth/me')) {
-      return new Response(JSON.stringify({ id: 1, email: 'admin@exemple.invalid', roles: [], permissions: perms }))
+      return new Response(JSON.stringify({ id: 1, email: 'admin@exemple.invalid', fonction: '', permissions: perms }))
     }
     appels.push(appel)
     const r = repondre(appel)

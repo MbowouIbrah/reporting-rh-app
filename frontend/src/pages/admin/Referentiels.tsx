@@ -21,9 +21,15 @@ interface Renommage {
   ancien: string
   libelle: string
 }
+// « 2 périmètres et 1 compte mis à jour. » : les comptes qui voient ce service ou ce site suivent le renommage.
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
+const majs = (perimetres: number, comptes: number) =>
+  `${[perimetres || !comptes ? pluriel(perimetres, 'périmètre') : '', comptes ? pluriel(comptes, 'compte') : ''].filter(Boolean).join(' et ')} mis à jour.`
+
 interface Apercu {
   pour: string
   nb: number | null
+  comptes: number
   erreur: string | null
 }
 
@@ -50,8 +56,8 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
     let perime = false
     const delai = setTimeout(() => {
       apercuRenommage(dim, idRenommage, saisi).then(
-        (r) => !perime && setApercu({ pour: saisi, nb: r.perimetres_maj, erreur: null }),
-        (e: Error) => !perime && setApercu({ pour: saisi, nb: null, erreur: e.message }),
+        (r) => !perime && setApercu({ pour: saisi, nb: r.perimetres_maj, comptes: r.comptes_maj, erreur: null }),
+        (e: Error) => !perime && setApercu({ pour: saisi, nb: null, comptes: 0, erreur: e.message }),
       )
     }, 250)
     return () => {
@@ -134,7 +140,7 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                       <p id={idNote} className={courant?.erreur ? 'champ-erreur' : 'note'} role={courant?.erreur ? 'alert' : 'status'}>
                         {courant?.erreur ??
                           (courant && courant.nb !== null
-                            ? `${courant.nb} périmètre${courant.nb > 1 ? 's' : ''} mis à jour. L’ancien libellé « ${renommage.ancien} » reste reconnu à l’import.`
+                            ? `${majs(courant.nb, courant.comptes)} L’ancien libellé « ${renommage.ancien} » reste reconnu à l’import.`
                             : '')}
                       </p>
                     </form>

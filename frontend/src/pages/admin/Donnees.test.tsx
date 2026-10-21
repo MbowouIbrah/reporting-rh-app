@@ -26,7 +26,7 @@ function rendu(perms: string[], chemin = '/admin') {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (u) => {
     const url = String(u)
     appels.push(url)
-    const corps = url.includes('/auth/me') ? { id: 1, email: 'a@b.c', roles: [], permissions: perms } : TABLEAU
+    const corps = url.includes('/auth/me') ? { id: 1, email: 'a@b.c', fonction: '', permissions: perms } : TABLEAU
     return new Response(JSON.stringify(corps))
   })
   render(

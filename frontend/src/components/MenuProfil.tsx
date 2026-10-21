@@ -2,7 +2,6 @@ import { CircleUserRound, LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { ROLES } from '../lib/roles'
 
 /** Icône profil de la barre : ouvre un menu avec le nom, l'adresse, le rôle et la déconnexion. */
 export default function MenuProfil() {
@@ -11,7 +10,6 @@ export default function MenuProfil() {
   const [ouvert, setOuvert] = useState(false)
   const zone = useRef<HTMLDivElement>(null)
   const bouton = useRef<HTMLButtonElement>(null)
-  const role = me?.roles[0]?.role
 
   useEffect(() => {
     if (!ouvert) return
@@ -52,10 +50,10 @@ export default function MenuProfil() {
             <span className="profil-nom">{me?.nom || me?.email}</span>
             {me?.nom && <span className="profil-email">{me.email}</span>}
           </div>
-          {role && (
+          {me?.fonction && (
             <div className="profil-role">
-              <span className="profil-libelle">Rôle</span>
-              <span className="badge badge-neutre">{ROLES[role as keyof typeof ROLES]?.libelle ?? role}</span>
+              <span className="profil-libelle">Fonction</span>
+              <span className="badge badge-neutre">{me.fonction}</span>
             </div>
           )}
           <button

@@ -1,14 +1,16 @@
-import { useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
-  ROLES,
   useComptes,
   useCreerCompte,
   useModifierCompte,
   usePerimetres,
+  useReferentiel,
   useSupprimerCompte,
-  type Affectation,
   type Compte,
-  type Role,
+  type ComptePatch,
+  type Perimetre,
+  type Portee,
 } from '../../api/admin'
 import { useAuth } from '../../auth/AuthContext'
 import AdminNav from '../../components/AdminNav'
@@ -16,65 +18,153 @@ import { Panneau } from '../../components/BlocsRapport'
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Champ, Confirmer } from '../../components/Kit'
+import { CATALOGUE, GESTION_COMPTES, LECTURE, MODELES, exigeTout } from '../../lib/droits'
 
 const TITRE = 'ADMINISTRATION DES UTILISATEURS'
-export const LIBELLE_ROLE: Record<Role, string> = {
-  rh_admin: 'Administrateur RH',
-  lecteur_global: 'Lecteur global',
-  lecteur_perimetre: 'Lecteur à périmètre',
-}
-const COLONNES = ['Nom', 'Adresse e-mail', 'Rôle', 'Périmètre', 'Détail nominatif', 'Statut', 'Actions']
+const COLONNES = ['Nom', 'Données visibles', 'Statut']
 // Mêmes règles que le serveur (admin.py) : messages immédiats, le serveur reste l'autorité.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 const MDP_MIN = 12
 
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+const trier = <T extends string | number>(l: T[]) => [...l].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+const basculer = <T extends string | number>(l: T[], v: T) => (l.includes(v) ? l.filter((x) => x !== v) : trier([...l, v]))
+const libellePerimetre = (perimetres: Perimetre[] | undefined, id: number) =>
+  perimetres?.find((x) => x.id === id)?.libelle ?? `n° ${id}`
 
-interface Fiche {
-  email: string
-  nom: string
-  password: string
-  role: Role
-  perimetre_id: string
-  nominatif: boolean
+/** « Toutes les données », « DPS, Commerce VN », « DPS, Douala +2 ». */
+export function resumePortee(p: Portee, perimetres?: Perimetre[]) {
+  if (p.tout) return 'Toutes les données'
+  const noms = [...p.perimetres.map((id) => libellePerimetre(perimetres, id)), ...p.services, ...p.sites]
+  if (!noms.length) return 'Aucune donnée'
+  return noms.length <= 2 ? noms.join(', ') : `${noms.slice(0, 2).join(', ')} +${noms.length - 2}`
 }
-type Edition = { compte?: Compte }
 
-// Le formulaire porte un rôle par compte (cadrage : une personne = une affectation).
+interface Fiche extends Portee {
+  nom: string
+  email: string
+  fonction: string
+  password: string
+  actif: boolean
+  permissions: string[]
+}
+
 function ficheDe(c?: Compte): Fiche {
-  const r = c?.roles[0]
   return {
-    email: c?.email ?? '',
     nom: c?.nom ?? '',
+    email: c?.email ?? '',
+    fonction: c?.fonction ?? '',
     password: '',
-    role: r?.role ?? 'lecteur_perimetre',
-    perimetre_id: r?.perimetre_id != null ? String(r.perimetre_id) : '',
-    nominatif: r?.nominatif ?? false,
+    actif: c?.actif ?? true,
+    permissions: c?.permissions ?? [],
+    ...(c?.portee ?? { tout: false, perimetres: [], services: [], sites: [] }),
   }
 }
 
-// Les rôles globaux voient le détail nominatif d'office ; seul le lecteur à périmètre porte le choix.
-const voitNominatif = (r: Affectation) => r.role !== 'lecteur_perimetre' || r.nominatif
+// Ce qui part au serveur : sans « toutes les données », ni listes, ni permissions qui l'exigent.
+function droitsDe(f: Fiche): Pick<Compte, 'permissions' | 'portee'> {
+  return {
+    permissions: f.tout ? f.permissions : f.permissions.filter((c) => !exigeTout(c)),
+    portee: f.tout
+      ? { tout: true, perimetres: [], services: [], sites: [] }
+      : { tout: false, perimetres: f.perimetres, services: f.services, sites: f.sites },
+  }
+}
+const memes = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
-function affectation(f: Fiche): Affectation {
-  const perimetre = f.role === 'lecteur_perimetre'
-  return { role: f.role, perimetre_id: perimetre ? Number(f.perimetre_id) : null, nominatif: perimetre ? f.nominatif : true }
+// Seuls les champs modifiés partent : un nom corrigé ne touche ni aux droits ni à l'adresse.
+function patchDe(f: Fiche, ini: Fiche): Omit<ComptePatch, 'id'> {
+  const p: Omit<ComptePatch, 'id'> = {}
+  if (f.nom.trim() !== ini.nom) p.nom = f.nom.trim()
+  if (f.email.trim().toLowerCase() !== ini.email) p.email = f.email.trim()
+  if (f.fonction.trim() !== ini.fonction) p.fonction = f.fonction.trim()
+  if (f.actif !== ini.actif) p.actif = f.actif
+  if (f.password) p.password = f.password
+  if (!memes(droitsDe(f), droitsDe(ini))) Object.assign(p, droitsDe(f))
+  return p
 }
 
-function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: boolean; onFin: () => void }) {
+interface Option<T> {
+  valeur: T
+  libelle: string
+}
+
+/** Cases d'une dimension (périmètres, services, sites), repliables ; ouvertes si une case est cochée. */
+function Cases<T extends string | number>({ titre, options, choisis, onChange }: { titre: string; options: Option<T>[]; choisis: T[]; onChange: (v: T[]) => void }) {
+  if (!options.length) return null
+  return (
+    <details className="fiche-dimension" open={choisis.length > 0}>
+      <summary>{`${titre} (${choisis.length} sur ${options.length})`}</summary>
+      <div className="fiche-cases" role="group" aria-label={titre}>
+        {options.map((o) => (
+          <label key={o.valeur}>
+            <input type="checkbox" checked={choisis.includes(o.valeur)} onChange={() => onChange(basculer(choisis, o.valeur))} />
+            {o.libelle}
+          </label>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+// Services et sites accordables : les actifs, plus ceux déjà accordés (marqués inactifs).
+function useValeurs(dim: 'service' | 'site', choisis: string[]): { options: Option<string>[]; erreur: boolean } {
+  const q = useReferentiel(dim)
+  const valeurs = q.data?.valeurs ?? []
+  const actifs = valeurs.filter((v) => v.actif).map((v) => ({ valeur: v.libelle, libelle: v.libelle }))
+  const restes = choisis.filter((c) => !actifs.some((a) => a.valeur === c)).map((c) => ({ valeur: c, libelle: `${c} (inactif)` }))
+  return { options: [...actifs, ...restes], erreur: q.isError }
+}
+
+function FicheCompte({
+  compte,
+  soi,
+  onCree,
+  onEnregistre,
+  onFermer,
+  onSupprimer,
+  onModifie,
+}: {
+  compte?: Compte
+  soi: boolean
+  onCree: (c: Compte) => void
+  onEnregistre: () => void
+  onFermer: () => void
+  onSupprimer: (c: Compte) => void
+  onModifie: (m: boolean) => void
+}) {
   const perimetres = usePerimetres()
   const creer = useCreerCompte()
   const modifier = useModifierCompte()
-  const nouveau = edition.compte === undefined
-  const [initiale] = useState<Fiche>(() => ficheDe(edition.compte))
+  const nouveau = compte === undefined
+  const qc = useQueryClient()
+  const [initiale, setInitiale] = useState<Fiche>(() => ficheDe(compte))
   const [fiche, setFiche] = useState<Fiche>(initiale)
-  // Rôles envoyés seulement s'ils changent : un nom ou un mot de passe modifié ne touche pas aux affectations.
-  const emailChange = fiche.email.trim().toLowerCase() !== initiale.email
-  const roleChange = nouveau || (['role', 'perimetre_id', 'nominatif'] as const).some((k) => fiche[k] !== initiale[k])
   const [erreurs, setErreurs] = useState<Record<string, string>>({})
   const [erreurApi, setErreurApi] = useState<string | null>(null)
+  const services = useValeurs('service', fiche.services)
+  const sites = useValeurs('site', fiche.sites)
   const envoi = creer.isPending || modifier.isPending
   const maj = <K extends keyof Fiche>(c: K, v: Fiche[K]) => setFiche((f) => ({ ...f, [c]: v }))
+  const patch = patchDe(fiche, initiale)
+  // Comparé sur ce qui partirait : une espace en fin de nom ne compte pas comme une modification.
+  const modifie = nouveau ? !memes(fiche, initiale) : Object.keys(patch).length > 0
+
+  useEffect(() => {
+    onModifie(modifie)
+  }, [modifie, onModifie])
+  useEffect(() => () => onModifie(false), [onModifie])
+
+  const appliquerModele = (m: (typeof MODELES)[number]) =>
+    setFiche((f) => ({
+      ...f,
+      fonction: !f.fonction.trim() || MODELES.some((x) => x.fonction === f.fonction) ? m.fonction : f.fonction,
+      tout: m.tout,
+      perimetres: [],
+      services: [],
+      sites: [],
+      permissions: m.permissions,
+    }))
 
   const envoyer = (e: FormEvent) => {
     e.preventDefault()
@@ -82,105 +172,184 @@ function FormulaireCompte({ edition, soi, onFin }: { edition: Edition; soi: bool
     if (!fiche.nom.trim()) err.nom = 'Nom obligatoire'
     if (!EMAIL_RE.test(fiche.email.trim())) err.email = 'Adresse e-mail invalide'
     if ((nouveau || fiche.password) && fiche.password.length < MDP_MIN) err.password = `${MDP_MIN} caractères minimum`
-    if (roleChange && fiche.role === 'lecteur_perimetre' && !fiche.perimetre_id) err.perimetre = 'Périmètre obligatoire'
     setErreurs(err)
     setErreurApi(null)
     if (Object.keys(err).length) return
-    const opts = { onSuccess: onFin, onError: (x: Error) => setErreurApi(x.message) }
-    const roles = [affectation(fiche)]
-    if (nouveau) creer.mutate({ email: fiche.email.trim(), nom: fiche.nom.trim(), password: fiche.password, roles }, opts)
-    else
-      modifier.mutate(
-        { id: edition.compte!.id, nom: fiche.nom.trim(), ...(emailChange ? { email: fiche.email.trim() } : {}), ...(roleChange ? { roles } : {}), ...(fiche.password ? { password: fiche.password } : {}) },
-        opts,
-      )
+    // mutateAsync : un rappel passé à mutate() serait perdu si la fiche est démontée entre-temps (création).
+    const onError = (x: Error) => setErreurApi(x.message)
+    if (nouveau) {
+      creer
+        .mutateAsync({ email: fiche.email.trim(), nom: fiche.nom.trim(), fonction: fiche.fonction.trim(), password: fiche.password, ...droitsDe(fiche) })
+        .then(onCree, onError)
+      return
+    }
+    modifier.mutateAsync({ id: compte.id, ...patch }).then((c) => {
+      // La fiche repart de la réponse du serveur (mot de passe vidé, valeurs normalisées).
+      setInitiale(ficheDe(c))
+      setFiche(ficheDe(c))
+      if (soi) qc.invalidateQueries({ queryKey: ['me'] }) // nom et fonction du menu profil
+      onEnregistre()
+    }, onError)
+  }
+
+  const rienVisible = !fiche.tout && !fiche.perimetres.length && !fiche.services.length && !fiche.sites.length
+  const raison = (code: string) => {
+    if (code === LECTURE) return 'Toujours accordée'
+    if (soi && code === GESTION_COMPTES) return 'Vous ne pouvez pas retirer ce droit à votre propre compte'
+    if (exigeTout(code) && !fiche.tout) return 'Exige « Toutes les données »'
+    return null
   }
 
   return (
-    <Panneau titre={nouveau ? 'Nouvel utilisateur' : 'Modifier l’utilisateur'}>
-      <form className="admin-form" onSubmit={envoyer} noValidate>
-        <Champ label="Nom" erreur={erreurs.nom}>
-          {(p) => <input {...p} value={fiche.nom} onChange={(e) => maj('nom', e.target.value)} />}
-        </Champ>
-        <Champ label="Adresse e-mail" erreur={erreurs.email}>
-          {(p) => <input {...p} type="email" autoComplete="off" value={fiche.email} onChange={(e) => maj('email', e.target.value)} />}
-        </Champ>
-        <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe (facultatif)'} erreur={erreurs.password}>
-          {(p) => <input {...p} type="password" autoComplete="new-password" value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
-        </Champ>
-        <Champ label="Rôle">
-          {(p) => (
-            <select {...p} value={fiche.role} disabled={soi} onChange={(e) => maj('role', e.target.value as Role)}>
-              {ROLES.map((r) => <option key={r} value={r}>{LIBELLE_ROLE[r]}</option>)}
-            </select>
-          )}
-        </Champ>
-        {fiche.role === 'lecteur_perimetre' && (
-          <>
-            <Champ label="Périmètre" erreur={erreurs.perimetre ?? (perimetres.isError ? 'Liste des périmètres indisponible' : undefined)}>
-              {(p) => (
-                <select {...p} value={fiche.perimetre_id} disabled={soi} onChange={(e) => maj('perimetre_id', e.target.value)}>
-                  <option value="">Choisir…</option>
-                  {perimetres.data?.map((x) => <option key={x.id} value={x.id}>{x.libelle}</option>)}
-                </select>
-              )}
+    <Panneau titre={nouveau ? 'Nouveau compte' : compte.nom} className="fiche-compte">
+      <form onSubmit={envoyer} noValidate>
+        {nouveau && (
+          <div className="fiche-modeles" role="group" aria-label="Modèles">
+            <span>Partir d’un modèle :</span>
+            {MODELES.map((m) => (
+              <Bouton key={m.code} variante="secondaire" onClick={() => appliquerModele(m)}>{m.fonction}</Bouton>
+            ))}
+          </div>
+        )}
+        <fieldset>
+          <legend>Identité</legend>
+          <div className="admin-form">
+            <Champ label="Nom" erreur={erreurs.nom}>
+              {(p) => <input {...p} value={fiche.nom} onChange={(e) => maj('nom', e.target.value)} />}
             </Champ>
-            <label className="admin-case">
-              <input type="checkbox" checked={fiche.nominatif} disabled={soi} onChange={(e) => maj('nominatif', e.target.checked)} />
-              Accès au détail nominatif
-            </label>
-          </>
+            <Champ label="Adresse e-mail" erreur={erreurs.email}>
+              {(p) => <input {...p} type="email" autoComplete="off" value={fiche.email} onChange={(e) => maj('email', e.target.value)} />}
+            </Champ>
+            <Champ label="Fonction">
+              {(p) => <input {...p} placeholder="ex. DRH, Directeur commercial VN" value={fiche.fonction} onChange={(e) => maj('fonction', e.target.value)} />}
+            </Champ>
+            <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe (facultatif)'} erreur={erreurs.password}>
+              {(p) => <input {...p} type="password" autoComplete="new-password" value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
+            </Champ>
+            {!nouveau && (
+              <label className="admin-case">
+                <input type="checkbox" checked={fiche.actif} disabled={soi} onChange={(e) => maj('actif', e.target.checked)} />
+                Compte actif
+              </label>
+            )}
+            <p className="admin-contexte">La fonction est un libellé affiché ; elle ne donne aucun droit.</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Données visibles</legend>
+          <label className="fiche-case-principale">
+            <input type="checkbox" checked={fiche.tout} disabled={soi} onChange={(e) => maj('tout', e.target.checked)} />
+            Toutes les données
+          </label>
+          {soi && <p className="note">Votre propre accès aux données ne se modifie pas ici (évite de perdre l’accès).</p>}
+          {!fiche.tout && (
+            <>
+              {perimetres.isError && <p className="champ-erreur" role="alert">Liste des périmètres indisponible</p>}
+              <Cases
+                titre="Périmètres"
+                options={(perimetres.data ?? []).map((x) => ({ valeur: x.id, libelle: x.libelle }))}
+                choisis={fiche.perimetres}
+                onChange={(v) => maj('perimetres', v)}
+              />
+              {(services.erreur || sites.erreur) && <p className="champ-erreur" role="alert">Liste des services ou des sites indisponible</p>}
+              <Cases titre="Services" options={services.options} choisis={fiche.services} onChange={(v) => maj('services', v)} />
+              <Cases titre="Sites" options={sites.options} choisis={fiche.sites} onChange={(v) => maj('sites', v)} />
+              <p className="note">
+                {rienVisible
+                  ? 'Aucune donnée cochée : ce compte ne verra aucun rapport.'
+                  : 'Un service et un site cochés ensemble : seulement ce service sur ce site.'}
+              </p>
+            </>
+          )}
+        </fieldset>
+
+        <fieldset>
+          <legend>Permissions</legend>
+          <ul className="fiche-permissions">
+            {CATALOGUE.map((p) => {
+              const r = raison(p.code)
+              const coche = p.code === LECTURE || (fiche.permissions.includes(p.code) && (fiche.tout || !p.porteeTout))
+              return (
+                <li key={p.code}>
+                  <label>
+                    <input type="checkbox" checked={coche} disabled={r !== null} onChange={() => maj('permissions', basculer(fiche.permissions, p.code))} />
+                    <strong>{p.libelle}</strong>
+                    <small>{r && p.code !== LECTURE ? `${r}. ${p.explication}` : p.explication}</small>
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
+        </fieldset>
+
+        {erreurApi && <p className="champ-erreur fiche-erreur" role="alert">{erreurApi}</p>}
+        {(nouveau || modifie) && (
+          <div className="fiche-barre">
+            <button type="submit" className="bouton bouton-primaire" disabled={envoi}>
+              {nouveau ? 'Créer le compte' : 'Enregistrer'}
+            </button>
+            <Bouton
+              variante="secondaire"
+              disabled={envoi}
+              onClick={() => {
+                if (nouveau) return onFermer()
+                setFiche(initiale)
+                setErreurs({})
+                setErreurApi(null)
+              }}
+            >
+              Annuler
+            </Bouton>
+          </div>
         )}
-        {soi && <p className="note admin-note" role="note">Votre propre rôle ne se modifie pas ici (évite de perdre l’accès).</p>}
-        {(edition.compte?.roles.length ?? 0) > 1 && (
-          <p className="note admin-note" role="note">Ce compte a plusieurs rôles : changer le rôle les remplace par celui choisi.</p>
+        {!nouveau && !modifie && !soi && (
+          <div className="fiche-barre fiche-barre-discrete">
+            <Bouton variante="lien" onClick={() => onSupprimer(compte)}>Supprimer ce compte</Bouton>
+          </div>
         )}
-        {erreurApi && <p className="champ-erreur admin-erreur" role="alert">{erreurApi}</p>}
-        <div className="admin-actions">
-          <button type="submit" className="bouton bouton-primaire" disabled={envoi}>
-            {nouveau ? 'Créer l’utilisateur' : 'Enregistrer'}
-          </button>
-          <Bouton variante="secondaire" onClick={onFin} disabled={envoi}>Annuler</Bouton>
-        </div>
       </form>
     </Panneau>
   )
 }
 
+type Selection = number | 'nouveau' | null
+
 export default function Utilisateurs() {
   const { me } = useAuth()
   const q = useComptes()
   const perimetres = usePerimetres()
-  const modifier = useModifierCompte()
   const supprimer = useSupprimerCompte()
   const [recherche, setRecherche] = useState('')
-  const [edition, setEdition] = useState<Edition | null>(null)
+  const [selection, setSelection] = useState<Selection>(null)
+  const [enCours, setEnCours] = useState(false)
   const [aSupprimer, setASupprimer] = useState<Compte | null>(null)
-  const [erreur, setErreur] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ ok: boolean; texte: string } | null>(null)
 
-  const libellePerimetre = (id: number | null) =>
-    id === null ? 'Tous' : (perimetres.data?.find((x) => x.id === id)?.libelle ?? `n° ${id}`)
   const mots = plier(recherche.trim())
-  const liste = (q.data ?? []).filter((c) => !mots || plier(`${c.nom} ${c.email}`).includes(mots))
-  const ouvrir = (e: Edition) => {
-    setErreur(null)
-    setEdition(e)
-  }
-  const basculer = (c: Compte) => {
-    setErreur(null)
-    modifier.mutate({ id: c.id, actif: !c.actif }, { onError: (e) => setErreur(e.message) })
+  const liste = (q.data ?? []).filter((c) => !mots || plier(`${c.nom} ${c.email} ${c.fonction}`).includes(mots))
+  const choisi = typeof selection === 'number' ? q.data?.find((c) => c.id === selection) : undefined
+  // Une fiche modifiée ne se quitte pas sans Enregistrer ou Annuler (pas de perte silencieuse).
+  const choisir = (s: Selection) => {
+    if (enCours && s !== selection) {
+      setMessage({ ok: false, texte: 'Enregistrez ou annulez les modifications en cours avant de changer de compte.' })
+      return
+    }
+    setMessage(null)
+    setSelection(s)
   }
   const confirmerSuppression = () => {
     if (!aSupprimer) return
-    setErreur(null)
+    setMessage(null)
     supprimer.mutate(aSupprimer.id, {
       onSuccess: () => {
-        if (edition?.compte?.id === aSupprimer.id) setEdition(null)
+        setSelection(null)
+        setMessage({ ok: true, texte: `Compte de ${aSupprimer.nom} supprimé.` })
         setASupprimer(null)
       },
       onError: (e) => {
         setASupprimer(null)
-        setErreur(e.message)
+        setMessage({ ok: false, texte: e.message })
       },
     })
   }
@@ -192,10 +361,10 @@ export default function Utilisateurs() {
       <div className="filtres" role="group" aria-label="Recherche">
         <label>
           Recherche
-          <input type="search" placeholder="Nom ou adresse" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
+          <input type="search" placeholder="Nom, adresse ou fonction" value={recherche} onChange={(e) => setRecherche(e.target.value)} />
         </label>
         <BoutonReinitialiser actif={!!recherche} onClick={() => setRecherche('')} libelle="Effacer la recherche" />
-        <Bouton className="admin-ajout" onClick={() => ouvrir({})}>Nouvel utilisateur</Bouton>
+        <Bouton className="admin-ajout" onClick={() => choisir('nouveau')}>Nouveau compte</Bouton>
       </div>
       {q.isError && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
       {q.isLoading && <Etat type="chargement" colonnes={COLONNES} lignes={6} />}
@@ -204,58 +373,65 @@ export default function Utilisateurs() {
           <p className="bandeau">
             <span className="val">{`${liste.length} utilisateur${liste.length > 1 ? 's' : ''}`}</span>
           </p>
-          {erreur && <p className="bandeau ko" role="alert">{erreur}</p>}
-          {edition && <FormulaireCompte key={edition.compte?.id ?? 'nouveau'} edition={edition} soi={edition.compte?.id === me?.id} onFin={() => setEdition(null)} />}
-          {liste.length === 0 ? (
-            <Etat type="vide" titre={q.data.length ? 'Aucun utilisateur ne correspond à la recherche' : 'Aucun utilisateur'} aide="" />
-          ) : (
-            <Panneau titre="Utilisateurs">
-              <table className="dense">
-                <thead>
-                  <tr>{COLONNES.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {liste.map((c) => {
-                    const soi = c.id === me?.id
-                    return (
+          {message && <p className={message.ok ? 'bandeau' : 'bandeau ko'} role={message.ok ? 'status' : 'alert'}>{message.texte}</p>}
+          <div className="comptes-duo">
+            {liste.length === 0 ? (
+              <Etat type="vide" titre={q.data.length ? 'Aucun utilisateur ne correspond à la recherche' : 'Aucun utilisateur'} aide="" />
+            ) : (
+              <Panneau titre="Utilisateurs" className="comptes-liste">
+                <table className="dense">
+                  <thead>
+                    <tr>{COLONNES.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {liste.map((c) => (
                       <tr key={c.id}>
-                        <th scope="row">{c.nom}{soi && <span className="note"> (vous)</span>}</th>
-                        <td>{c.email}</td>
-                        <td>{c.roles.map((r) => LIBELLE_ROLE[r.role] ?? r.role).join(', ') || '—'}</td>
-                        <td>{c.roles.map((r) => libellePerimetre(r.perimetre_id)).join(', ') || '—'}</td>
-                        <td>{c.roles.some(voitNominatif) ? 'Oui' : 'Non'}</td>
+                        <th scope="row">
+                          <button type="button" className="ligne-compte" aria-current={c.id === selection ? 'true' : undefined} onClick={() => choisir(c.id)}>
+                            {c.nom}
+                            {c.id === me?.id && <span className="note"> (vous)</span>}
+                          </button>
+                          {c.fonction && <span className="fonction">{c.fonction}</span>}
+                        </th>
+                        <td>{resumePortee(c.portee, perimetres.data)}</td>
                         <td><span className={c.actif ? 'statut statut-ok' : 'statut'}>{c.actif ? 'Actif' : 'Inactif'}</span></td>
-                        <td className="actions">
-                          <Bouton variante="lien" aria-label={`Modifier ${c.nom}`} onClick={() => ouvrir({ compte: c })}>Modifier</Bouton>
-                          {!soi && (
-                            <>
-                              <Bouton variante="lien" aria-label={`${c.actif ? 'Désactiver' : 'Réactiver'} ${c.nom}`} disabled={modifier.isPending} onClick={() => basculer(c)}>
-                                {c.actif ? 'Désactiver' : 'Réactiver'}
-                              </Bouton>
-                              <Bouton variante="lien" aria-label={`Supprimer ${c.nom}`} disabled={supprimer.isPending} onClick={() => setASupprimer(c)}>
-                                Supprimer
-                              </Bouton>
-                            </>
-                          )}
-                        </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </Panneau>
-          )}
+                    ))}
+                  </tbody>
+                </table>
+              </Panneau>
+            )}
+            {selection === 'nouveau' || choisi ? (
+              <FicheCompte
+                // Par identifiant : un rechargement de la liste n'efface pas une saisie en cours.
+                key={choisi?.id ?? 'nouveau'}
+                compte={choisi}
+                soi={choisi?.id === me?.id}
+                onCree={(c) => {
+                  setEnCours(false)
+                  setSelection(c.id)
+                  setMessage({ ok: true, texte: `Compte de ${c.nom} créé.` })
+                }}
+                onEnregistre={() => setMessage({ ok: true, texte: 'Modifications enregistrées.' })}
+                onFermer={() => setSelection(null)}
+                onSupprimer={setASupprimer}
+                onModifie={setEnCours}
+              />
+            ) : (
+              <p className="note comptes-invite">Choisissez un compte dans la liste pour voir et modifier ses droits.</p>
+            )}
+          </div>
         </>
       )}
       <Confirmer
         ouvert={!!aSupprimer}
-        titre="Supprimer l’utilisateur ?"
+        titre="Supprimer le compte ?"
         confirmer="Supprimer"
         desactive={supprimer.isPending}
         onConfirmer={confirmerSuppression}
         onAnnuler={() => setASupprimer(null)}
       >
-        <p>{`${aSupprimer?.nom ?? ''} (${aSupprimer?.email ?? ''}) ne pourra plus se connecter. Pour garder une trace, préférez « Désactiver ».`}</p>
+        <p>{`${aSupprimer?.nom ?? ''} (${aSupprimer?.email ?? ''}) ne pourra plus se connecter. Pour garder une trace, préférez décocher « Compte actif ».`}</p>
       </Confirmer>
     </section>
   )

@@ -133,3 +133,20 @@ def test_perimetre_une_dimension_et_suppression_si_inutilise(db, make_client):
                                  "portee": {"perimetres": [pid]}})
     r = c.delete(f"{API}/perimetres/{pid}")
     assert r.status_code == 409 and "p@exemple.invalid" in r.json()["detail"]
+
+
+def test_gestionnaire_de_comptes_liste_services_et_sites(db, make_client):
+    c = make_client(ADMIN)
+    r = c.post(f"{API}/users", json={"email": "g@exemple.invalid", "nom": "G", "password": PW,
+                                     "permissions": ["comptes"], "portee": {"tout": True}})
+    assert r.status_code == 201
+    g = make_client("g@exemple.invalid")
+    r = g.get(f"{API}/referentiels/service")
+    assert r.status_code == 200 and "alias" not in r.json()
+    assert g.get(f"{API}/referentiels/site").status_code == 200
+    assert g.get(f"{API}/referentiels/rubrique").status_code == 403
+    assert g.get(f"{API}/referentiels/poste").status_code == 403
+    lecteur = c.post(f"{API}/users", json={"email": "l@exemple.invalid", "nom": "L", "password": PW,
+                                           **GLOBAL_DROITS})
+    assert lecteur.status_code == 201
+    assert make_client("l@exemple.invalid").get(f"{API}/referentiels/site").status_code == 403

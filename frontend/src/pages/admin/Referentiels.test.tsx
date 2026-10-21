@@ -13,7 +13,7 @@ const SERVICES = [{ id: 10, libelle: 'SAV PL', actif: false }]
 const PERMS = ['referentiel:write', 'saisie:write']
 
 const servir = (a: Appel) => {
-  if (a.method === 'PUT' && a.url.includes('apercu=true')) return { perimetres_maj: 2 }
+  if (a.method === 'PUT' && a.url.includes('apercu=true')) return { perimetres_maj: 2, comptes_maj: 1 }
   if (a.method !== 'GET') return {}
   return { valeurs: a.url.endsWith('/site') ? SITES : SERVICES, alias: [] }
 }
@@ -109,7 +109,7 @@ test('renommage : aperçu des périmètres mis à jour, puis PUT avec le nouveau
   const valider = screen.getByRole('button', { name: 'Renommer' })
   expect(valider).toBeDisabled() // libellé inchangé
   fireEvent.change(champ, { target: { value: 'Douala Port' } })
-  expect(await screen.findByText(/2 périmètres mis à jour/)).toHaveTextContent('« Douala » reste reconnu à l’import')
+  expect(await screen.findByText(/2 périmètres et 1 compte mis à jour/)).toHaveTextContent('« Douala » reste reconnu à l’import')
   const apercu = appels.find((a) => a.url.includes('apercu=true'))!
   expect(apercu.url).toMatch(/\/referentiels\/site\/2\?apercu=true$/)
   expect(apercu.body).toEqual({ libelle: 'Douala Port' })

@@ -1,216 +1,212 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { Route, Routes } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
-import RequireAuth from '../../auth/RequireAuth'
 import Utilisateurs from './Utilisateurs'
 import { erreurApi, monter, type Appel } from './testSupport'
 
+const TOUT = { tout: true, perimetres: [], services: [], sites: [] }
+const ADMIN = ['nominatif', 'marge', 'import', 'saisie', 'referentiel', 'comptes', 'journal']
 const COMPTES = [
-  { id: 1, email: 'admin@exemple.invalid', nom: 'Admin RH', actif: true, roles: [{ role: 'rh_admin', perimetre_id: null, nominatif: true }] },
-  { id: 2, email: 'chef.sav@exemple.invalid', nom: 'Chef Sav', actif: true, roles: [{ role: 'lecteur_perimetre', perimetre_id: 5, nominatif: false }] },
-  { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', actif: false, roles: [{ role: 'lecteur_global', perimetre_id: null, nominatif: false }] },
+  { id: 1, email: 'admin@exemple.invalid', nom: 'Admin RH', fonction: 'DRH', actif: true, permissions: ADMIN, portee: TOUT },
+  { id: 2, email: 'chef.sav@exemple.invalid', nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
+  { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', fonction: '', actif: false, permissions: ['nominatif', 'marge'], portee: TOUT },
 ]
 const PERIMETRES = [
   { id: 5, code: 'sav_pl', libelle: 'SAV PL' },
   { id: 6, code: 'dps', libelle: 'DPS' },
 ]
+const REFERENTIELS: Record<string, unknown> = {
+  service: { valeurs: [{ id: 1, libelle: 'Commerce VN', actif: true }] },
+  site: { valeurs: [{ id: 1, libelle: 'Douala', actif: true }, { id: 2, libelle: 'Yaoundé', actif: true }] },
+}
 const PERMS = ['users:read', 'users:write']
 
 const servir = (a: Appel) => {
-  if (a.method !== 'GET') return {}
-  return a.url.endsWith('/perimetres') ? PERIMETRES : COMPTES
+  if (a.method === 'PUT') {
+    const b = { ...a.body }
+    delete b.password
+    return { ...COMPTES.find((c) => a.url.endsWith(`/users/${c.id}`)), ...b }
+  }
+  if (a.method !== 'GET') return a.method === 'POST' ? { ...COMPTES[1], id: 9, nom: 'Nouveau', ...a.body } : {}
+  if (a.url.endsWith('/perimetres')) return PERIMETRES
+  const ref = a.url.match(/referentiels\/(\w+)/)
+  return ref ? REFERENTIELS[ref[1]] : COMPTES
 }
 const page = <Utilisateurs />
 const ecritures = (appels: Appel[]) => appels.filter((a) => a.method !== 'GET')
-const tableau = async () => within(await screen.findByRole('region', { name: 'Utilisateurs' }))
-const formulaire = async (titre: string) => within(await screen.findByRole('region', { name: titre }))
+const liste = async () => within(await screen.findByRole('region', { name: 'Utilisateurs' }))
+const ouvrir = async (nom: string) => {
+  fireEvent.click(await (await liste()).findByRole('button', { name: new RegExp(nom) }))
+  return within(await screen.findByRole('region', { name: nom }))
+}
+const enregistrer = () => fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
 
 afterEach(() => vi.restoreAllMocks())
 
-test('liste : rôle, périmètre, détail nominatif et statut', async () => {
+test('liste : fonction, résumé des données visibles et statut', async () => {
   monter(page, PERMS, servir)
-  const t = await tableau()
-  const chef = await t.findByRole('row', { name: /Chef Sav/ })
-  expect(within(chef).getByText('Lecteur à périmètre')).toBeInTheDocument()
-  expect(await within(chef).findByText('SAV PL')).toBeInTheDocument()
-  expect(within(chef).getByText('Non')).toBeInTheDocument()
-  const dg = t.getByRole('row', { name: /Élise Directrice/ })
-  expect(within(dg).getByText('Tous')).toBeInTheDocument()
-  expect(within(dg).getByText('Oui')).toBeInTheDocument() // rôle global : détail nominatif d'office
+  const l = await liste()
+  const chef = await l.findByRole('row', { name: /Chef Sav/ })
+  expect(within(chef).getByText('Chef SAV')).toBeInTheDocument()
+  expect(await within(chef).findByText('SAV PL, Douala')).toBeInTheDocument()
+  const dg = l.getByRole('row', { name: /Élise Directrice/ })
+  expect(within(dg).getByText('Toutes les données')).toBeInTheDocument()
   expect(within(dg).getByText('Inactif')).toBeInTheDocument()
-  expect(within(dg).getByRole('button', { name: 'Réactiver Élise Directrice' })).toBeInTheDocument()
+  expect(within(l.getByRole('row', { name: /Admin RH/ })).getByText('(vous)')).toBeInTheDocument()
   expect(screen.getByText('3 utilisateurs')).toBeInTheDocument()
 })
 
-test('recherche sans accents par nom ou adresse', async () => {
+test('recherche sans accents par nom, adresse ou fonction', async () => {
   monter(page, PERMS, servir)
-  await (await tableau()).findByRole('row', { name: /Chef Sav/ })
+  await (await liste()).findByRole('row', { name: /Chef Sav/ })
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'elise' } })
   expect(screen.getByText('1 utilisateur')).toBeInTheDocument()
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'chef.sav@' } })
-  expect((await tableau()).getByRole('row', { name: /Chef Sav/ })).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'drh' } })
+  expect((await liste()).getByRole('row', { name: /Admin RH/ })).toBeInTheDocument()
 })
 
-test('son propre compte : ni désactivation ni suppression', async () => {
+test('fiche : sans changement, pas de barre Enregistrer', async () => {
   monter(page, PERMS, servir)
-  const moi = await (await tableau()).findByRole('row', { name: /Admin RH/ })
-  expect(within(moi).getByRole('button', { name: 'Modifier Admin RH' })).toBeInTheDocument()
-  expect(within(moi).queryByRole('button', { name: /Désactiver|Supprimer/ })).toBeNull()
+  const f = await ouvrir('Chef Sav')
+  expect(f.getByLabelText('Nom')).toHaveValue('Chef Sav')
+  expect(f.getByLabelText('Fonction')).toHaveValue('Chef SAV')
+  expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+  expect(f.getByRole('button', { name: 'Supprimer ce compte' })).toBeInTheDocument()
+  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef SAV PL' } })
+  expect(f.getByRole('button', { name: 'Enregistrer' })).toBeInTheDocument()
+  fireEvent.click(f.getByRole('button', { name: 'Annuler' }))
+  expect(f.getByLabelText('Nom')).toHaveValue('Chef Sav')
+  expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
 })
 
-test('sans droit sur les utilisateurs : accès refusé', async () => {
-  monter(
-    <Routes>
-      <Route path="/admin/utilisateurs" element={<RequireAuth perm="users:write"><Utilisateurs /></RequireAuth>} />
-    </Routes>,
-    ['saisie:write'], servir, '/admin/utilisateurs',
-  )
-  expect(await screen.findByText('Accès refusé')).toBeInTheDocument()
-  expect(screen.queryByRole('heading', { name: 'ADMINISTRATION DES UTILISATEURS' })).toBeNull()
-})
-
-test('création : contrôles immédiats, puis envoi du compte', async () => {
+test('fiche : un nom corrigé n’envoie que le nom', async () => {
   const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Nouvel utilisateur' }))
-  const f = await formulaire('Nouvel utilisateur')
-  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'pas-une-adresse' } })
+  const f = await ouvrir('Chef Sav')
+  fireEvent.change(f.getByLabelText('Nom'), { target: { value: ' Chef SAV PL ' } })
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0]).toMatchObject({ method: 'PUT', url: expect.stringContaining('/users/2') })
+  expect(ecritures(appels)[0].body).toEqual({ nom: 'Chef SAV PL' })
+  expect(await screen.findByText('Modifications enregistrées.')).toBeInTheDocument()
+})
+
+test('fiche : espaces seuls = pas de modification ; après enregistrement, mot de passe vidé', async () => {
+  const appels = monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef Sav ' } })
+  expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+  fireEvent.change(f.getByLabelText('Nouveau mot de passe (facultatif)'), { target: { value: '<mot-de-passe-test-12>' } })
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({ password: '<mot-de-passe-test-12>' })
+  await waitFor(() => expect(f.getByLabelText('Nouveau mot de passe (facultatif)')).toHaveValue(''))
+  expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+})
+
+test('données visibles : périmètres, services et sites cochés partent avec les permissions', async () => {
+  const appels = monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  fireEvent.click(within(f.getByRole('group', { name: 'Périmètres' })).getByLabelText('DPS'))
+  fireEvent.click(within(await f.findByRole('group', { name: 'Services' })).getByLabelText('Commerce VN'))
+  fireEvent.click(f.getByRole('checkbox', { name: /Voir les noms/ }))
+  expect(f.getByText(/seulement ce service sur ce site/)).toBeInTheDocument()
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({
+    permissions: ['nominatif'],
+    portee: { tout: false, perimetres: [5, 6], services: ['Commerce VN'], sites: ['Douala'] },
+  })
+})
+
+test('permissions : celles qui exigent toutes les données sont grisées et retirées', async () => {
+  const appels = monter(page, PERMS, servir)
+  const f = await ouvrir('Élise Directrice')
+  const marge = f.getByRole('checkbox', { name: /Voir le CA et la marge/ })
+  expect(marge).toBeChecked()
+  expect(f.getByRole('checkbox', { name: /Consulter les rapports/ })).toBeDisabled()
+  fireEvent.click(f.getByRole('checkbox', { name: 'Toutes les données' }))
+  expect(marge).toBeDisabled()
+  expect(marge).not.toBeChecked()
+  expect(f.getByText(/Exige « Toutes les données ». Le CA/)).toBeInTheDocument()
+  expect(f.getByText(/ce compte ne verra aucun rapport/)).toBeInTheDocument()
+  fireEvent.click(within(f.getByRole('group', { name: 'Sites' })).getByLabelText('Yaoundé'))
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({
+    permissions: ['nominatif'],
+    portee: { tout: false, perimetres: [], services: [], sites: ['Yaoundé'] },
+  })
+})
+
+test('son propre compte : données, gestion des comptes et statut verrouillés, pas de suppression', async () => {
+  monter(page, PERMS, servir)
+  const f = await ouvrir('Admin RH')
+  expect(f.getByRole('checkbox', { name: 'Toutes les données' })).toBeDisabled()
+  expect(f.getByRole('checkbox', { name: /Gérer les comptes/ })).toBeDisabled()
+  expect(f.getByRole('checkbox', { name: /Consulter le journal/ })).toBeEnabled()
+  expect(f.getByRole('checkbox', { name: 'Compte actif' })).toBeDisabled()
+  expect(f.queryByRole('button', { name: 'Supprimer ce compte' })).toBeNull()
+})
+
+test('changement de compte refusé tant que la fiche est modifiée', async () => {
+  monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'X' } })
+  fireEvent.click((await liste()).getByRole('button', { name: /Élise Directrice/ }))
+  expect(screen.getByRole('alert')).toHaveTextContent(/Enregistrez ou annulez/)
+  expect(screen.queryByRole('region', { name: 'Élise Directrice' })).toBeNull()
+})
+
+test('création depuis un modèle, puis sélection du nouveau compte', async () => {
+  const appels = monter(page, PERMS, servir)
+  await liste()
+  fireEvent.click(screen.getByRole('button', { name: 'Nouveau compte' }))
+  const f = within(await screen.findByRole('region', { name: 'Nouveau compte' }))
+  fireEvent.click(f.getByRole('button', { name: 'Lecteur global' }))
+  expect(f.getByLabelText('Fonction')).toHaveValue('Lecteur global')
+  expect(f.getByRole('checkbox', { name: 'Toutes les données' })).toBeChecked()
+  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Nouveau' } })
+  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'n@exemple.invalid' } })
+  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-12>' } })
+  fireEvent.click(f.getByRole('button', { name: 'Créer le compte' }))
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({
+    email: 'n@exemple.invalid', nom: 'Nouveau', fonction: 'Lecteur global', password: '<mot-de-passe-test-12>',
+    permissions: ['nominatif', 'marge'], portee: TOUT,
+  })
+  expect(await screen.findByText('Compte de Nouveau créé.')).toBeInTheDocument()
+})
+
+test('création : champs obligatoires vérifiés avant envoi', async () => {
+  const appels = monter(page, PERMS, servir)
+  await liste()
+  fireEvent.click(screen.getByRole('button', { name: 'Nouveau compte' }))
+  const f = within(await screen.findByRole('region', { name: 'Nouveau compte' }))
+  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'a@b' } })
   fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: 'court' } })
-  fireEvent.click(f.getByRole('button', { name: 'Créer l’utilisateur' }))
-  expect(await f.findByText('Nom obligatoire')).toBeInTheDocument()
+  fireEvent.click(f.getByRole('button', { name: 'Créer le compte' }))
+  expect(f.getByText('Nom obligatoire')).toBeInTheDocument()
   expect(f.getByText('Adresse e-mail invalide')).toBeInTheDocument()
   expect(f.getByText('12 caractères minimum')).toBeInTheDocument()
-  expect(f.getByText('Périmètre obligatoire')).toBeInTheDocument()
-  expect(ecritures(appels)).toEqual([])
-
-  fireEvent.change(f.getByLabelText('Nom'), { target: { value: ' Paul Neuf ' } })
-  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'paul@exemple.invalid' } })
-  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-s>' } })
-  await f.findByRole('option', { name: 'DPS' })
-  fireEvent.change(f.getByLabelText('Périmètre'), { target: { value: '6' } })
-  fireEvent.click(f.getByLabelText('Accès au détail nominatif'))
-  fireEvent.click(f.getByRole('button', { name: 'Créer l’utilisateur' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0]).toMatchObject({
-    method: 'POST',
-    body: { email: 'paul@exemple.invalid', nom: 'Paul Neuf', password: '<mot-de-passe-test-s>', roles: [{ role: 'lecteur_perimetre', perimetre_id: 6, nominatif: true }] },
-  })
-  await waitFor(() => expect(screen.queryByRole('region', { name: 'Nouvel utilisateur' })).toBeNull())
-})
-
-test('rôle global : pas de périmètre, détail nominatif d’office', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Nouvel utilisateur' }))
-  const f = await formulaire('Nouvel utilisateur')
-  fireEvent.change(f.getByLabelText('Rôle'), { target: { value: 'lecteur_global' } })
-  expect(f.queryByLabelText('Périmètre')).toBeNull()
-  expect(f.queryByLabelText('Accès au détail nominatif')).toBeNull()
-  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Dir' } })
-  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'dir@exemple.invalid' } })
-  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-s>' } })
-  fireEvent.click(f.getByRole('button', { name: 'Créer l’utilisateur' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].body?.roles).toEqual([{ role: 'lecteur_global', perimetre_id: null, nominatif: true }])
-})
-
-test('modification du périmètre : les rôles sont envoyés', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
-  const f = await formulaire('Modifier l’utilisateur')
-  await waitFor(() => expect(f.getByLabelText('Périmètre')).toHaveValue('5'))
-  fireEvent.change(f.getByLabelText('Périmètre'), { target: { value: '6' } })
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].body?.roles).toEqual([{ role: 'lecteur_perimetre', perimetre_id: 6, nominatif: false }])
-})
-
-test('son propre compte : rôle verrouillé, jamais envoyé', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Admin RH' }))
-  const f = await formulaire('Modifier l’utilisateur')
-  expect(f.getByLabelText('Rôle')).toBeDisabled()
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].body).not.toHaveProperty('roles')
-})
-
-test('modification de l’adresse : envoyée seule si elle change, refusée si invalide', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
-  const f = await formulaire('Modifier l’utilisateur')
-  const champ = f.getByLabelText('Adresse e-mail')
-  expect(champ).toBeEnabled()
-  await waitFor(() => expect(f.getByLabelText('Périmètre')).toHaveValue('5'))
-  fireEvent.change(champ, { target: { value: 'pas-une-adresse' } })
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  expect(f.getByText('Adresse e-mail invalide')).toBeInTheDocument()
   expect(ecritures(appels)).toHaveLength(0)
-  fireEvent.change(champ, { target: { value: 'nouvelle@exemple.invalid' } })
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].body).toMatchObject({ email: 'nouvelle@exemple.invalid' })
+  fireEvent.click(f.getByRole('button', { name: 'Annuler' }))
+  expect(screen.queryByRole('region', { name: 'Nouveau compte' })).toBeNull()
 })
 
-test('modification du nom seul : ni adresse, ni rôles, ni mot de passe envoyés', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
-  const f = await formulaire('Modifier l’utilisateur')
-  expect(f.getByLabelText('Nom')).toHaveValue('Chef Sav')
-  await waitFor(() => expect(f.getByLabelText('Périmètre')).toHaveValue('5'))
-  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef SAV PL' } })
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  const [put] = ecritures(appels)
-  expect(put).toMatchObject({ method: 'PUT', body: { nom: 'Chef SAV PL' } })
-  expect(put.url).toMatch(/\/users\/2$/)
-  expect(put.body).not.toHaveProperty('password')
-  expect(put.body).not.toHaveProperty('roles')
-  expect(put.body).not.toHaveProperty('email')
+test('erreur du serveur affichée dans la fiche', async () => {
+  monter(page, PERMS, (a) => (a.method === 'PUT' ? erreurApi(409, 'Il doit rester au moins un gestionnaire des comptes actif') : servir(a)))
+  const f = await ouvrir('Chef Sav')
+  fireEvent.click(f.getByRole('checkbox', { name: 'Compte actif' }))
+  enregistrer()
+  expect(await f.findByRole('alert')).toHaveTextContent('au moins un gestionnaire')
 })
 
-test('modification : un nouveau mot de passe trop court est refusé', async () => {
+test('suppression après confirmation', async () => {
   const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Modifier Chef Sav' }))
-  const f = await formulaire('Modifier l’utilisateur')
-  fireEvent.change(f.getByLabelText('Nouveau mot de passe (facultatif)'), { target: { value: 'abc' } })
-  fireEvent.click(f.getByRole('button', { name: 'Enregistrer' }))
-  expect(await f.findByText('12 caractères minimum')).toBeInTheDocument()
-  expect(ecritures(appels)).toEqual([])
-})
-
-test('désactivation : seul le statut est envoyé', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Désactiver Chef Sav' }))
-  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0]).toMatchObject({ method: 'PUT', body: { actif: false } })
-  expect(Object.keys(ecritures(appels)[0].body ?? {})).toEqual(['actif'])
-})
-
-test('suppression : confirmation, puis DELETE', async () => {
-  const appels = monter(page, PERMS, servir)
-  fireEvent.click(await screen.findByRole('button', { name: 'Supprimer Chef Sav' }))
-  const d = within(await screen.findByRole('dialog', { name: 'Supprimer l’utilisateur ?' }))
-  expect(d.getByText(/Chef Sav \(chef\.sav@x\.fr\)/)).toBeInTheDocument()
-  expect(ecritures(appels)).toEqual([])
+  const f = await ouvrir('Chef Sav')
+  fireEvent.click(f.getByRole('button', { name: 'Supprimer ce compte' }))
+  const d = within(await screen.findByRole('dialog'))
   fireEvent.click(d.getByRole('button', { name: 'Supprimer' }))
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].method).toBe('DELETE')
-  expect(ecritures(appels)[0].url).toMatch(/\/users\/2$/)
-})
-
-test('refus du serveur affiché', async () => {
-  monter(page, PERMS, (a) => (a.method === 'PUT' ? erreurApi(409, 'Il doit rester au moins un administrateur actif') : servir(a)))
-  fireEvent.click(await screen.findByRole('button', { name: 'Désactiver Chef Sav' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('Il doit rester au moins un administrateur actif')
-})
-
-test('création refusée par le serveur : message dans le formulaire, qui reste ouvert', async () => {
-  monter(page, PERMS, (a) => (a.method === 'POST' ? erreurApi(409, 'Conflit : doublon ou référence invalide') : servir(a)))
-  fireEvent.click(await screen.findByRole('button', { name: 'Nouvel utilisateur' }))
-  const f = await formulaire('Nouvel utilisateur')
-  fireEvent.change(f.getByLabelText('Rôle'), { target: { value: 'rh_admin' } })
-  fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Double' } })
-  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'admin@exemple.invalid' } })
-  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-s>' } })
-  fireEvent.click(f.getByRole('button', { name: 'Créer l’utilisateur' }))
-  expect(await f.findByRole('alert')).toHaveTextContent('Conflit : doublon ou référence invalide')
+  expect(ecritures(appels)[0]).toMatchObject({ method: 'DELETE', url: expect.stringContaining('/users/2') })
+  expect(await screen.findByText('Compte de Chef Sav supprimé.')).toBeInTheDocument()
 })

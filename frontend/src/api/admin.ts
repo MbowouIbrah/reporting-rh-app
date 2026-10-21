@@ -42,7 +42,7 @@ export const useReferentiel = (dim: DimensionRef) =>
     retry: queryRetry,
   })
 export const apercuRenommage = (dim: DimensionRef, id: number, libelle: string) =>
-  api<{ perimetres_maj: number }>(`/referentiels/${dim}/${id}?apercu=true`, json('PUT', { libelle }))
+  api<{ perimetres_maj: number; comptes_maj: number }>(`/referentiels/${dim}/${id}?apercu=true`, json('PUT', { libelle }))
 export const useModifierRef = () =>
   useEcriture(({ dim, id, ...b }: ModifRef) => api<ValeurRef>(`/referentiels/${dim}/${id}`, json('PUT', b)))
 export const useCreerRef = () =>
@@ -71,33 +71,29 @@ export const useCreerSalarie = () => useEcriture((b: FicheIn) => api<Fiche>('/sa
 export const useModifierSalarie = () =>
   useEcriture(({ id, ...b }: Fiche) => api<Fiche>(`/salaries/${id}`, json('PUT', b)))
 
-// ---- comptes de l'application (rh_admin seul) ----
-export const ROLES = ['rh_admin', 'lecteur_global', 'lecteur_perimetre'] as const
-export type Role = (typeof ROLES)[number]
-export interface Affectation {
-  role: Role
-  perimetre_id: number | null
-  nominatif: boolean
+// ---- comptes de l'application : fonction (libellé), données visibles et permissions ----
+export interface Portee {
+  tout: boolean
+  perimetres: number[]
+  services: string[]
+  sites: string[]
 }
 export interface Compte {
   id: number
   email: string
   nom: string
+  fonction: string
   actif: boolean
-  roles: Affectation[]
+  permissions: string[]
+  portee: Portee
 }
 export interface Perimetre {
   id: number
   code: string
   libelle: string
 }
-export interface CompteIn {
-  email: string
-  nom: string
-  password: string
-  roles: Affectation[]
-}
-export type ComptePatch = { id: number } & Partial<Pick<Compte, 'email' | 'nom' | 'actif' | 'roles'> & { password: string }>
+export type CompteIn = Pick<Compte, 'email' | 'nom' | 'fonction' | 'permissions' | 'portee'> & { password: string }
+export type ComptePatch = { id: number } & Partial<Omit<Compte, 'id'> & { password: string }>
 
 export const useComptes = () =>
   useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<Compte[]>('/users'), retry: queryRetry })
