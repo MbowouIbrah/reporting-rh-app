@@ -251,7 +251,7 @@ test.describe.serial('gestion des utilisateurs', () => {
   test('gestionnaires des comptes : jamais d’auto-retrait, le dernier actif est protégé', async ({ page, browser, baseURL }) => {
     const moi = (await lireJson<{ id: number }>(page.request, 'auth/me')).id
     const temp = (await utilisateur(page.request, EMAIL.admin))!
-    const admin2 = (await utilisateur(page.request, 'admin2@exemple.invalid'))!
+    const admin2 = (await utilisateur(page.request, 'rh.partenaire@exemple.invalid'))!
 
     // Son propre compte : ni désactivation, ni retrait de « Gérer les comptes », même s'il reste d'autres gestionnaires
     const s = await session(browser, baseURL, EMAIL.admin)
@@ -279,7 +279,7 @@ test.describe.serial('gestion des utilisateurs', () => {
     } finally {
       expect((await modifier(page.request, admin2.id, { actif: true })).status()).toBe(200)
     }
-    expect((await utilisateur(page.request, 'admin2@exemple.invalid'))!.actif).toBe(true)
+    expect((await utilisateur(page.request, 'rh.partenaire@exemple.invalid'))!.actif).toBe(true)
   })
 
   test('journal d’audit : créations, modifications et connexions tracées', async ({ page }) => {

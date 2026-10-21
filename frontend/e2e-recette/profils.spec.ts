@@ -7,7 +7,7 @@ const TOUS = ['Administration', 'Commerce Pièces', 'Commerce VN', 'Pneumatique'
 type Profil = { email: string; admin?: boolean; nominatif: boolean; services: string[] }
 const PROFILS: Profil[] = [
   { email: 'admin@exemple.invalid', admin: true, nominatif: true, services: TOUS },
-  { email: 'admin2@exemple.invalid', admin: true, nominatif: true, services: TOUS },
+  { email: 'rh.partenaire@exemple.invalid', admin: true, nominatif: true, services: TOUS },
   { email: 'drh@exemple.invalid', nominatif: true, services: TOUS },
   { email: 'dop@exemple.invalid', nominatif: true, services: TOUS },
   { email: 'dps@exemple.invalid', nominatif: false, services: ['Commerce Pièces', 'SAV Engins', 'SAV PL', 'Sites Déportés'] },

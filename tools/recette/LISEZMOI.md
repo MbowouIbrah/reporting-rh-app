@@ -26,7 +26,7 @@ Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUI
 
 | Compte | Doit voir | Ne doit pas voir |
 |---|---|---|
-| admin@, admin2@ | Tout + import, pilotage, comptes | — |
+| admin@, rh.partenaire@ | Tout + import, pilotage, comptes | — |
 | drh@, dop@ | Tous les services, noms des salariés | Import, pilotage, comptes |
 | dps@ | Commerce Pièces, SAV PL, SAV Engins, Sites Déportés | Autres services, noms |
 | dir.commercial.vn@ | Commerce VN (EMP015 jusqu'en décembre 2025) | Autres services, noms |
