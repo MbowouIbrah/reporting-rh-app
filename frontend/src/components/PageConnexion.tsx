@@ -57,7 +57,10 @@ export default function PageConnexion({ children }: { children: ReactNode }) {
       <main className="login-main">
         <div className="login-card login-card--glass">
           <div className="login-card-brand">
-            <img className="login-card-logo" src={`${base}images/cfao_logo.png`} alt="" />
+            <img className="login-logo" src={`${base}images/cfao_logo.png`} alt="" />
+            <p className="login-marque-titre">
+              Reporting <span>RH</span>
+            </p>
           </div>
           {children}
         </div>
