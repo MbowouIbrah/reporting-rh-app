@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { ADMIN, connecter, corrigerCellule, deplier, fichiers, importer, lireJson, ouvrirVolet, reinitialiserFiltres } from './outils'
+import { ADMIN, choisirPeriode, connecter, corrigerCellule, deplier, fichiers, importer, lireJson, ouvrirVolet, reinitialiserFiltres } from './outils'
 
 // Import de juillet 2026 (avec erreurs) puis d'août 2026 (propre), dans l'ordre : l'état se transmet d'un test à l'autre.
 test.describe.serial('import de fichiers', () => {
@@ -49,6 +49,7 @@ test.describe.serial('import de fichiers', () => {
   })
 
   test('juillet : correction des erreurs dans l’écran, confirmation des points, enregistrement', async ({ page }) => {
+    test.slow() // 81 lignes vérifiées puis enregistrées : dépasse le délai par défaut
     const c = f.manifeste.cibles
     await connecter(page, ADMIN)
     await importer(page, f.juilletErreurs)
@@ -102,8 +103,8 @@ test.describe.serial('import de fichiers', () => {
     await expect(page.getByRole('region', { name: 'Contrôles' })).toContainText('0 erreur bloquante')
     await page.getByRole('button', { name: 'Enregistrer 81 lignes' }).click()
 
-    await expect(page).toHaveURL(/admin$/)
-    await expect(page.getByText('Enregistré : 81 lignes')).toBeVisible()
+    await expect(page).toHaveURL(/admin$/, { timeout: 30_000 })
+    await expect(page.getByText('Enregistré : 81 lignes')).toBeVisible({ timeout: 30_000 })
   })
 
   test('juillet : visible dans le rapport mensuel, valeurs corrigées retrouvées', async ({ page }) => {
@@ -114,7 +115,7 @@ test.describe.serial('import de fichiers', () => {
 
     await page.goto('mensuel')
     await reinitialiserFiltres(page)
-    await page.getByRole('group', { name: 'Filtres' }).getByLabel('Mois').selectOption({ label: 'Juillet' })
+    await choisirPeriode(page, 'Juillet')
     await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
     await expect(page.getByText(/Effectif fin de mois :\s*81/)).toBeVisible()
 
@@ -136,6 +137,7 @@ test.describe.serial('import de fichiers', () => {
   })
 
   test('août : fichier propre, aperçu des départs et du nouvel employé, enregistrement', async ({ page }) => {
+    test.slow() // enregistrement d'un mois complet : dépasse le délai par défaut
     await connecter(page, ADMIN)
     await importer(page, f.aout)
     // Le site et le service créés en juillet pour deux employés s'y retrouvent : c'est un changement par rapport à juin
@@ -154,14 +156,14 @@ test.describe.serial('import de fichiers', () => {
     await expect(page.getByRole('region', { name: "Détail de l'aperçu" })).toContainText(f.manifeste.nouveau.matricule)
 
     await page.getByRole('button', { name: `Enregistrer ${f.manifeste.lignes_aout} lignes` }).click()
-    await expect(page).toHaveURL(/admin$/)
-    await expect(page.getByText(`Enregistré : ${f.manifeste.lignes_aout} lignes`)).toBeVisible()
+    await expect(page).toHaveURL(/admin$/, { timeout: 30_000 })
+    await expect(page.getByText(`Enregistré : ${f.manifeste.lignes_aout} lignes`)).toBeVisible({ timeout: 30_000 })
 
     const m = await lireJson(page.request, 'rapports/mensuel?annee=2026&mois=8')
     expect(m.synthese.effectif.fin).toBe(f.manifeste.lignes_aout)
     await page.goto('mensuel')
     await reinitialiserFiltres(page)
-    await page.getByRole('group', { name: 'Filtres' }).getByLabel('Mois').selectOption({ label: 'Août' })
+    await choisirPeriode(page, 'Août')
     await expect(page.getByText(new RegExp(`Effectif fin de mois :\\s*${f.manifeste.lignes_aout}`))).toBeVisible({ timeout: 15_000 })
   })
 
@@ -174,6 +176,7 @@ test.describe.serial('import de fichiers', () => {
   })
 
   test('août : un fichier révisé remplace le mois après choix ligne par ligne', async ({ page }) => {
+    test.slow() // enregistrement d'un mois complet : dépasse le délai par défaut
     const rev = f.manifeste.revisions_aout
     await connecter(page, ADMIN)
     await importer(page, f.aoutRevise)
@@ -192,8 +195,8 @@ test.describe.serial('import de fichiers', () => {
     // Le premier employé garde ses montants enregistrés, les autres sont remplacés
     await detail.getByRole('row', { name: new RegExp(rev[0].matricule) }).getByLabel('Garder').check()
     await page.getByRole('button', { name: `Enregistrer ${rev.length - 1} lignes` }).click()
-    await expect(page).toHaveURL(/admin$/)
-    await expect(page.getByText(`Enregistré : ${rev.length - 1} lignes`)).toBeVisible()
+    await expect(page).toHaveURL(/admin$/, { timeout: 30_000 })
+    await expect(page.getByText(`Enregistré : ${rev.length - 1} lignes`)).toBeVisible({ timeout: 30_000 })
 
     const aout = await lireJson<{ lignes: { matricule: string; montants: Record<string, string> }[] }>(page.request, 'donnees?annee=2026&mois=8')
     const frais = (mat: string) => Number(aout.lignes.find((l) => l.matricule === mat)!.montants['Frais de mission'] ?? 0)

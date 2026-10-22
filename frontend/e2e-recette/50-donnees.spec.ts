@@ -52,6 +52,7 @@ test.describe.serial('feuille DONNEES et correction de données', () => {
   })
 
   test('correction d’une valeur d’août : la grille reprend la ligne ; « Garder » ne change rien, « Remplacer » met la ligne à jour sans doublon', async ({ page }) => {
+    test.slow() // deux enregistrements successifs : dépasse le délai par défaut
     const mois = await lireJson<Mois>(page.request, AOUT)
     const exclues = (await tableau(page)).exclues
     const compte = (r: { libelle: string; unite: string }, x: Ligne) => r.unite === 'FCFA' && !exclues.includes(r.libelle) && nombre(x.montants[r.libelle]) > 0

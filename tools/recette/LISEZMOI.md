@@ -27,13 +27,13 @@ Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUI
 | Compte | Doit voir | Ne doit pas voir |
 |---|---|---|
 | admin@, rh.partenaire@ | Tout + import, pilotage, comptes | — |
-| drh@, dop@ | Tous les services, noms des salariés | Import, pilotage, comptes |
-| dps@ | Commerce Pièces, SAV PL, SAV Engins, Sites Déportés | Autres services, noms |
-| dir.commercial.vn@ | Commerce VN (EMP015 jusqu'en décembre 2025) | Autres services, noms |
-| dc.pneumatique@ | Pneumatique | Autres services, noms |
-| dir.technique@ | SAV PL (EMP015 dès janvier 2026) | Autres services, noms |
+| drh@ (DRH), dop@ (DOP) | Tous les services, noms des salariés | Import, pilotage, comptes |
+| dps@ (DPS) | Commerce Pièces, SAV PL, SAV Engins, Sites Déportés | Autres services, noms |
+| commerce.vn@ | Commerce VN (EMP015 jusqu'en décembre 2025) | Autres services, noms |
+| pneumatique@ | Pneumatique | Autres services, noms |
+| sav.pl@ | SAV PL (EMP015 dès janvier 2026) | Autres services, noms |
 | resp.sav.engins@ | SAV Engins | Autres services, noms |
-| resp.sites.deportes@ | Sites Déportés | Autres services, noms |
+| sites.deportes@ | Sites Déportés | Autres services, noms |
 
 ## Vérification automatique
 

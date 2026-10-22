@@ -11,17 +11,17 @@ const PROFILS: Profil[] = [
   { email: 'drh@exemple.invalid', nominatif: true, services: TOUS },
   { email: 'dop@exemple.invalid', nominatif: true, services: TOUS },
   { email: 'dps@exemple.invalid', nominatif: false, services: ['Commerce Pièces', 'SAV Engins', 'SAV PL', 'Sites Déportés'] },
-  { email: 'dir.commercial.vn@exemple.invalid', nominatif: false, services: ['Commerce VN'] },
-  { email: 'dc.pneumatique@exemple.invalid', nominatif: false, services: ['Pneumatique'] },
-  { email: 'dir.technique@exemple.invalid', nominatif: false, services: ['SAV PL'] },
+  { email: 'commerce.vn@exemple.invalid', nominatif: false, services: ['Commerce VN'] },
+  { email: 'pneumatique@exemple.invalid', nominatif: false, services: ['Pneumatique'] },
+  { email: 'sav.pl@exemple.invalid', nominatif: false, services: ['SAV PL'] },
   { email: 'resp.sav.engins@exemple.invalid', nominatif: false, services: ['SAV Engins'] },
-  { email: 'resp.sites.deportes@exemple.invalid', nominatif: false, services: ['Sites Déportés'] },
+  { email: 'sites.deportes@exemple.invalid', nominatif: false, services: ['Sites Déportés'] },
 ]
 
 async function connecter(page: Page, email: string) {
   await page.goto('login')
-  await page.getByLabel('Adresse e-mail').fill(email)
-  await page.getByLabel('Mot de passe').fill(mdpDe(email))
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(email)
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(mdpDe(email))
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }
@@ -37,7 +37,7 @@ for (const p of PROFILS) {
 
     const attendus = p.nominatif ? BASE_ONGLETS : BASE_ONGLETS.slice(0, 4)
     await expect(onglets(page)).toHaveText(p.admin ? [...attendus, 'Administration'] : attendus)
-    await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ })).toHaveCount(p.nominatif ? 1 : 0)
+    await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ })).toHaveCount(p.nominatif ? 1 : 0)
 
     for (const rapport of ['Graphes', 'Annuel', 'Mensuel']) {
       await page.getByRole('link', { name: rapport, exact: true }).click()
@@ -59,14 +59,16 @@ for (const p of PROFILS) {
       await page.locator('li[role=option]').first().click()
       await expect(page.getByText(/Employé retenu : .*EMP015/)).toBeVisible()
     } else {
-      await expect(page.getByRole('alert')).toContainText('Accès refusé')
+      // Page non accordée : redirection vers le résumé (pas de 403 affiché)
+      await expect(page).toHaveURL(/resume$/)
     }
 
     await page.goto('admin')
     if (p.admin) {
       await expect(page.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeVisible()
     } else {
-      await expect(page.getByRole('alert')).toContainText('Accès refusé')
+      // Page non accordée : redirection vers le résumé (pas de 403 affiché)
+      await expect(page).toHaveURL(/resume$/)
     }
 
     // Protection côté serveur, indépendamment de l'écran
@@ -85,8 +87,8 @@ for (const p of PROFILS) {
 
 test('mauvais mot de passe : refusé', async ({ page }) => {
   await page.goto('login')
-  await page.getByLabel('Adresse e-mail').fill('drh@exemple.invalid')
-  await page.getByLabel('Mot de passe').fill('<mot-de-passe-faux-2>')
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill('drh@exemple.invalid')
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill('<mot-de-passe-faux-2>')
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toHaveCount(0)

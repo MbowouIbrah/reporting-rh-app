@@ -176,6 +176,14 @@ def main() -> None:
             db.flush()
             u = db.scalar(select(Utilisateur).where(Utilisateur.email == email))
             u.nom, u.fonction = c["nom"], c["fonction"] or u.fonction
+        types_site = {
+            "Yaoundé": "agence", "Douala": "principal", "Bertoua": "agence",
+            "Ngaoundéré": "agence", "Garoua": "agence", "Dehane": "deporte",
+            "Libongo": "deporte", "Njombe": "deporte", "Dimon": "deporte", "Nkoteng": "deporte",
+        }
+        for s in db.scalars(select(Site)):
+            if s.libelle in types_site:
+                s.type_site = types_site[s.libelle]
         db.commit()
         cibles = {
             "service": {s.libelle: s.id for s in db.scalars(select(Service))},

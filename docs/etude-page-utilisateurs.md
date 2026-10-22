@@ -6,7 +6,7 @@ Date : 2026-10-20. Branche `page-utilisateurs`.
 Un administrateur RH doit pouvoir gérer les comptes de l'application (pas les employés) depuis l'interface : voir la liste, créer un compte, changer son rôle, son périmètre ou son mot de passe, le désactiver ou le supprimer. Aujourd'hui, seuls la console serveur (`python -m app.comptes`) et l'API directe le permettent.
 
 ## Existant
-- API complète (`backend/app/api/admin.py`) : `GET/POST /users`, `PUT/DELETE /users/{id}`, droit `users:read` / `users:write` (rh_admin seul). Contrôles serveur : e-mail valide, mot de passe de 12 caractères minimum, `lecteur_perimetre` ⇔ périmètre, au moins un administrateur actif, pas d'auto-suppression, doublon d'e-mail → 409. Chaque écriture est auditée.
+- API complète (`backend/app/api/admin.py`) : `GET/POST /users`, `PUT/DELETE /users/{id}`, droit `users:read` / `users:write` (rh_admin seul). Contrôles serveur : e-mail valide, mot de passe de 8 caractères minimum, `lecteur_perimetre` ⇔ périmètre, au moins un administrateur actif, pas d'auto-suppression, doublon d'e-mail → 409. Chaque écriture est auditée.
 - `GET /perimetres` donne les libellés des périmètres.
 - Front : onglets d'administration (`AdminNav`), pages `Employes.tsx` et `Referentiels.tsx` (formulaire `Champ`, tableau `dense`, `Panneau`, `Etat`, `Confirmer`), client `api/admin.ts` (`useEcriture` rafraîchit le cache après écriture), utilitaire de test `testSupport.tsx`.
 - Rôles (P0_CADRAGE §2) : un compte = une affectation de rôle.
@@ -32,7 +32,7 @@ Un administrateur RH doit pouvoir gérer les comptes de l'application (pas les e
 - Déploiement : front seul.
 
 ## Risques
-- Comptes de recette créés avec des mots de passe courts (hors règle des 12 caractères) : sans effet, on ne modifie le mot de passe que si un nouveau est saisi.
+- Comptes de recette créés avec des mots de passe courts (hors règle des 8 caractères) : sans effet, on ne modifie le mot de passe que si un nouveau est saisi.
 
 ## Points à trancher
 Aucun bloquant.

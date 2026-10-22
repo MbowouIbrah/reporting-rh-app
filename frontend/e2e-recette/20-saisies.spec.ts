@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test'
-import { ADMIN, connecter, lireJson } from './outils'
+import { ADMIN, choisirPeriode, connecter, lireJson } from './outils'
 
 // Mois de travail : juillet 2026 existe (import du spec 10) ; septembre reste vide, il sert au brouillon.
 const ANNEE = 2026
@@ -204,7 +204,7 @@ test.describe.serial('saisies de pilotage', () => {
     const cv = m.b_service_activite.find((s: { service: string }) => s.service === 'Commerce VN')
     expect(num(cv.total.budget)).toBe(5123456)
     await page.goto('mensuel')
-    await page.getByRole('combobox', { name: 'Mois' }).selectOption({ label: 'Juillet' })
+    await choisirPeriode(page, 'Juillet', ANNEE)
     await expect(page.getByRole('cell', { name: /5\s123\s456/ }).first()).toBeVisible()
   })
 

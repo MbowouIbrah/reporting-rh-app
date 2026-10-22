@@ -73,7 +73,8 @@ for (const profil of [{ email: 'drh@exemple.invalid', nom: 'DRH (lecteur global)
       await expect(page.getByRole('navigation', { name: 'Rapports' }).getByRole('link', { name: 'Administration' })).toHaveCount(0)
       for (const chemin of ['admin', 'admin/saisie', 'admin/employes', 'admin/referentiels']) {
         await page.goto(chemin)
-        await expect(page.getByRole('alert')).toContainText('Accès refusé')
+        // Page non accordée : redirection vers le résumé (pas de 403 affiché)
+        await expect(page).toHaveURL(/resume$/)
         await expect(page.getByRole('button', { name: /Enregistrer|Nouvel employé|Importer/ })).toHaveCount(0)
       }
       await deconnecter(page)

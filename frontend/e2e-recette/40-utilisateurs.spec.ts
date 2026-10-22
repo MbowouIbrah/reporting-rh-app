@@ -45,7 +45,7 @@ async function session(browser: Browser, baseURL: string | undefined, email: str
 
 async function voir(page: Page, attendus: { onglets: string[]; services: string[]; marge: boolean }) {
   await expect(onglets(page)).toHaveText(attendus.onglets)
-  await expect(page.locator('.tuile .micro', { hasText: /^MARGE$/ })).toHaveCount(attendus.marge ? 1 : 0)
+  await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ })).toHaveCount(attendus.marge ? 1 : 0)
   await page.getByRole('link', { name: 'Mensuel', exact: true }).click()
   await expect(optionsService(page)).toHaveText(['Tous', ...attendus.services])
 }
@@ -84,7 +84,8 @@ test.describe.serial('gestion des utilisateurs', () => {
     await nominatif.page.goto('individuel')
     await expect(nominatif.page.getByRole('region', { name: 'Reporting individuel' })).toBeVisible()
     await nominatif.page.goto('admin')
-    await expect(nominatif.page.getByRole('alert')).toContainText('Accès refusé')
+    // Page non accordée : redirection vers le résumé (pas de 403 affiché)
+    await expect(nominatif.page).toHaveURL(/resume$/)
     expect((await nominatif.page.request.get('api/v1/users')).status()).toBe(403)
     await nominatif.context.close()
 
@@ -115,7 +116,8 @@ test.describe.serial('gestion des utilisateurs', () => {
     await voir(p, { onglets: BASE_ONGLETS.slice(0, 4), services: ['Pneumatique'], marge: false })
     await expect(p.getByText('Contrôles de cohérence : OK')).toBeVisible()
     await p.goto('individuel')
-    await expect(p.getByRole('alert')).toContainText('Accès refusé')
+    // Page non accordée : redirection vers le résumé (pas de 403 affiché)
+    await expect(p).toHaveURL(/resume$/)
     expect((await p.request.get('api/v1/rapports/salaries?annee=2026')).status()).toBe(403)
     // Les périmètres lisibles se limitent au sien
     const vus = await lireJson<Perimetre[]>(p.request, 'perimetres')
@@ -189,8 +191,8 @@ test.describe.serial('gestion des utilisateurs', () => {
     const refus = await browser.newContext({ baseURL })
     const p = await refus.newPage()
     await p.goto('login')
-    await p.getByLabel('Adresse e-mail').fill(EMAIL.global)
-    await p.getByLabel('Mot de passe').fill(MDP)
+    await p.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(EMAIL.global)
+    await p.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(MDP)
     await p.getByRole('button', { name: 'Se connecter' }).click()
     await expect(p.getByRole('alert')).toBeVisible()
     await expect(p.getByRole('navigation', { name: 'Rapports' })).toHaveCount(0)
@@ -213,9 +215,9 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('mot de passe : trop court refusé à la création et au changement, nouveau mot de passe pris en compte', async ({ page, browser, baseURL }) => {
-    const faible = await creer(page.request, 'mdp.faible@exemple.invalid', 'Mot de passe faible', { portee: GLOBAL }, 'court-11-ch')
+    const faible = await creer(page.request, 'mdp.faible@exemple.invalid', 'Mot de passe faible', { portee: GLOBAL }, 'court-7')
     expect(faible.status()).toBe(422)
-    expect(JSON.stringify(await faible.json())).toContain('12')
+    expect(JSON.stringify(await faible.json())).toContain('8 caractères')
     expect(await utilisateur(page.request, 'mdp.faible@exemple.invalid')).toBeUndefined()
 
     const u = (await utilisateur(page.request, EMAIL.anonyme))!

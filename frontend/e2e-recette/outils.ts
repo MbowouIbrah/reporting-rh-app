@@ -9,8 +9,8 @@ export const ADMIN = 'admin@exemple.invalid'
 
 export async function connecter(page: Page, email: string, mdp = mdpDe(email)) {
   await page.goto('login')
-  await page.getByLabel('Adresse e-mail').fill(email)
-  await page.getByLabel('Mot de passe').fill(mdp)
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(email)
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(mdp)
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }
@@ -147,4 +147,10 @@ export async function importer(page: Page, chemin: string) {
     }
   }
   throw new Error('Le fichier a été abandonné à chaque envoi ' + trace.join(' ; '))
+}
+
+/** Sélecteur « Période » des rapports (liste mois + année, pas un <select>). */
+export async function choisirPeriode(page: Page, mois: string, annee = 2026) {
+  await page.getByRole('combobox', { name: 'Période' }).click()
+  await page.getByRole('option').filter({ hasText: mois }).filter({ hasText: String(annee) }).click()
 }
