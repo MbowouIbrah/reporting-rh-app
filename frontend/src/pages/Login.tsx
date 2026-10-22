@@ -4,7 +4,7 @@ import { ApiError } from '../api/client'
 import { motDePasseOublie } from '../api/rapports'
 import { useAuth } from '../auth/AuthContext'
 import ChampMotDePasse from '../components/ChampMotDePasse'
-import Fond from '../components/Fond'
+import PageConnexion from '../components/PageConnexion'
 
 function IconeMicrosoft() {
   return (
@@ -56,7 +56,8 @@ export default function Login() {
       premier.current = false
       return
     }
-    ;(oubli ? champOubli : champConnexion).current?.focus()
+    // Sans preventScroll, le navigateur fait défiler le cadre rogné en plus de la translation.
+    ;(oubli ? champOubli : champConnexion).current?.focus({ preventScroll: true })
   }, [oubli])
 
   async function onSubmit(e: FormEvent) {
@@ -108,104 +109,110 @@ export default function Login() {
   }
 
   return (
-    <main className="login-page">
-      <Fond />
-      <div className="login-card">
-        <div className="login-marque">
-          <img className="login-logo" src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
-          <h1>
-            Reporting <span className="accent">RH</span>
-          </h1>
-        </div>
-        <div className="login-form-slider">
-          <div className={`login-form-track${oubli ? ' is-oubli' : ''}`}>
-            <div className="login-form-panel" role="group" aria-label="Connexion" inert={oubli} aria-hidden={oubli}>
-              <div className="login-sso">
-                {SSO.map(({ id, libelle, Icone }) => (
-                  <button key={id} type="button" className="login-sso-btn" disabled title="Connexion SSO : bientôt disponible">
-                    <Icone />
-                    <span className="login-sso-label">{libelle}</span>
-                    <span className="login-sso-badge">Bientôt</span>
-                  </button>
-                ))}
-              </div>
-              <div className="login-divider">
-                <span>ou</span>
-              </div>
-              {error && (
-                <div role="alert" className="alert">
-                  {error}
-                </div>
-              )}
-              <form onSubmit={onSubmit} noValidate>
-                <div className="field">
-                  <label htmlFor="email">Adresse e-mail</label>
-                  <input
-                    id="email"
-                    ref={champConnexion}
-                    type="email"
-                    autoComplete="username"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <ChampMotDePasse id="password" libelle="Mot de passe" valeur={password} onChange={setPassword} autoComplete="current-password" />
-                <div className="login-options">
-                  <label className="login-remember">
-                    <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-                    <span>Se souvenir de moi</span>
-                  </label>
-                  <button type="button" className="login-forgot" onClick={() => basculer(true)}>
-                    Mot de passe oublié ?
-                  </button>
-                </div>
-                <button className="btn" type="submit" disabled={busy}>
-                  Se connecter
+    <PageConnexion>
+      <div className="login-form-slider">
+        <div className={`login-form-track${oubli ? ' is-oubli' : ''}`}>
+          <div className="login-form-panel" role="group" aria-label="Connexion" inert={oubli} aria-hidden={oubli}>
+            <p className="login-card-lead">Veuillez saisir votre adresse e-mail et votre mot de passe pour vous connecter</p>
+            <div className="login-sso">
+              {SSO.map(({ id, libelle, Icone }) => (
+                <button key={id} type="button" className="login-sso-btn" disabled title="Connexion SSO : bientôt disponible">
+                  <Icone />
+                  <span className="login-sso-label">{libelle}</span>
+                  <span className="login-sso-badge">Bientôt</span>
                 </button>
-              </form>
-              <p className="login-contact-note">Pas de compte ou un problème d'accès ? Contactez l'administrateur RH.</p>
+              ))}
             </div>
+            <div className="login-divider">
+              <span>ou</span>
+            </div>
+            {error && (
+              <div role="alert" className="alert">
+                {error}
+              </div>
+            )}
+            <form onSubmit={onSubmit} noValidate>
+              <div className="field">
+                <label htmlFor="email" className="sr-only">
+                  Adresse e-mail
+                </label>
+                <input
+                  id="email"
+                  ref={champConnexion}
+                  type="email"
+                  autoComplete="username"
+                  placeholder="Adresse e-mail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <ChampMotDePasse
+                id="password"
+                libelle="Mot de passe"
+                libelleMasque
+                placeholder="Mot de passe"
+                valeur={password}
+                onChange={setPassword}
+                autoComplete="current-password"
+              />
+              <div className="login-options">
+                <label className="login-remember">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                  <span>Se souvenir de moi</span>
+                </label>
+                <button type="button" className="login-forgot" onClick={() => basculer(true)}>
+                  Mot de passe oublié ?
+                </button>
+              </div>
+              <button className="btn login-submit" type="submit" disabled={busy}>
+                Se connecter
+              </button>
+            </form>
+            <p className="login-contact-note">Pas de compte ou un problème d'accès ? Contactez l'administrateur RH.</p>
+          </div>
 
-            <div className="login-form-panel" role="group" aria-label="Mot de passe oublié" inert={!oubli} aria-hidden={!oubli}>
-              <p className="login-explication">
-                Saisissez l'adresse e-mail de votre compte. Nous vous enverrons un lien pour choisir un nouveau mot de passe.
-              </p>
-              {errorOubli && (
-                <div role="alert" className="alert">
-                  {errorOubli}
-                </div>
-              )}
-              {envoye && (
-                <div role="status" className="login-succes">
-                  Si un compte existe pour cette adresse, un lien de réinitialisation vient d'être envoyé.
-                </div>
-              )}
-              <form onSubmit={onSubmitOubli} noValidate>
-                <div className="field">
-                  <label htmlFor="email-oubli">Adresse e-mail</label>
-                  <input
-                    id="email-oubli"
-                    ref={champOubli}
-                    type="email"
-                    autoComplete="email"
-                    value={emailOubli}
-                    onChange={(e) => setEmailOubli(e.target.value)}
-                    disabled={envoye}
-                  />
-                </div>
-                <button className="btn" type="submit" disabled={busy || envoye}>
-                  Envoyer le lien
-                </button>
-              </form>
-              <p className="login-retour">
-                <button type="button" className="login-forgot" onClick={() => basculer(false)}>
-                  ← Retour à la connexion
-                </button>
-              </p>
-            </div>
+          <div className="login-form-panel" role="group" aria-label="Mot de passe oublié" inert={!oubli} aria-hidden={!oubli}>
+            <p className="login-form-eyebrow">Mot de passe oublié</p>
+            <h2 className="login-form-title">Réinitialiser</h2>
+            <p className="login-form-sub">
+              Saisissez l'adresse e-mail de votre compte. Nous vous enverrons un lien pour choisir un nouveau mot de passe.
+            </p>
+            {errorOubli && (
+              <div role="alert" className="alert">
+                {errorOubli}
+              </div>
+            )}
+            {envoye && (
+              <div role="status" className="login-succes">
+                Si un compte existe pour cette adresse, un lien de réinitialisation vient d'être envoyé.
+              </div>
+            )}
+            <form onSubmit={onSubmitOubli} noValidate>
+              <div className="field">
+                <label htmlFor="email-oubli">Adresse e-mail</label>
+                <input
+                  id="email-oubli"
+                  ref={champOubli}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="prenom.nom@exemple.invalid"
+                  value={emailOubli}
+                  onChange={(e) => setEmailOubli(e.target.value)}
+                  disabled={envoye}
+                />
+              </div>
+              <button className="btn login-submit" type="submit" disabled={busy || envoye}>
+                Envoyer le lien <span aria-hidden="true">→</span>
+              </button>
+            </form>
+            <p className="login-retour">
+              <button type="button" className="login-forgot" onClick={() => basculer(false)}>
+                ← Retour à la connexion
+              </button>
+            </p>
           </div>
         </div>
       </div>
-    </main>
+    </PageConnexion>
   )
 }

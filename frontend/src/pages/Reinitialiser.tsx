@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { reinitialiser } from '../api/rapports'
 import ChampMotDePasse from '../components/ChampMotDePasse'
-import Fond from '../components/Fond'
+import PageConnexion from '../components/PageConnexion'
 
 export default function Reinitialiser() {
   const { hash } = useLocation()
@@ -45,53 +45,46 @@ export default function Reinitialiser() {
   }
 
   return (
-    <main className="login-page">
-      <Fond />
-      <div className="login-card">
-        <div className="login-marque">
-          <img className="login-logo" src={`${import.meta.env.BASE_URL}images/cfao_logo.png`} alt="CFAO" />
-          <h1>
-            Reporting <span className="accent">RH</span>
-          </h1>
-        </div>
-        {fait ? (
-          <>
-            <div role="status" className="login-succes">
-              Votre mot de passe a été modifié.
-            </div>
-            <p className="login-retour">
-              <Link className="btn-link" to="/login">
-                Se connecter
-              </Link>
-            </p>
-          </>
-        ) : invalide ? (
-          <>
+    <PageConnexion>
+      <p className="login-form-eyebrow">Mot de passe oublié</p>
+      <h2 className="login-form-title">Nouveau mot de passe</h2>
+      {fait ? (
+        <>
+          <div role="status" className="login-succes">
+            Votre mot de passe a été modifié.
+          </div>
+          <p className="login-retour">
+            <Link className="btn-link" to="/login">
+              Se connecter
+            </Link>
+          </p>
+        </>
+      ) : invalide ? (
+        <>
+          <div role="alert" className="alert">
+            Ce lien est invalide ou a expiré.
+          </div>
+          <p className="login-retour">
+            <Link className="btn-link" to="/login?oubli=1">
+              Demander un nouveau lien
+            </Link>
+          </p>
+        </>
+      ) : (
+        <form onSubmit={onSubmit} noValidate>
+          <p className="login-form-sub">Choisissez un nouveau mot de passe (8 caractères minimum).</p>
+          {error && (
             <div role="alert" className="alert">
-              Ce lien est invalide ou a expiré.
+              {error}
             </div>
-            <p className="login-retour">
-              <Link className="btn-link" to="/login?oubli=1">
-                Demander un nouveau lien
-              </Link>
-            </p>
-          </>
-        ) : (
-          <form onSubmit={onSubmit} noValidate>
-            <p className="login-explication">Choisissez un nouveau mot de passe (8 caractères minimum).</p>
-            {error && (
-              <div role="alert" className="alert">
-                {error}
-              </div>
-            )}
-            <ChampMotDePasse id="nouveau" libelle="Nouveau mot de passe" valeur={password} onChange={setPassword} autoComplete="new-password" />
-            <ChampMotDePasse id="confirmation" libelle="Confirmer le mot de passe" valeur={confirmation} onChange={setConfirmation} autoComplete="new-password" />
-            <button className="btn" type="submit" disabled={busy}>
-              Enregistrer le mot de passe
-            </button>
-          </form>
-        )}
-      </div>
-    </main>
+          )}
+          <ChampMotDePasse id="nouveau" libelle="Nouveau mot de passe" valeur={password} onChange={setPassword} autoComplete="new-password" />
+          <ChampMotDePasse id="confirmation" libelle="Confirmer le mot de passe" valeur={confirmation} onChange={setConfirmation} autoComplete="new-password" />
+          <button className="btn login-submit" type="submit" disabled={busy}>
+            Enregistrer le mot de passe
+          </button>
+        </form>
+      )}
+    </PageConnexion>
   )
 }

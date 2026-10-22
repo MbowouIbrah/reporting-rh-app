@@ -27,19 +27,24 @@ type Props = {
   onChange: (v: string) => void
   autoComplete: string
   desactive?: boolean
+  placeholder?: string
+  libelleMasque?: boolean
 }
 
 /** Champ mot de passe avec bouton œil (afficher / masquer). */
-export default function ChampMotDePasse({ id, libelle, valeur, onChange, autoComplete, desactive }: Props) {
+export default function ChampMotDePasse({ id, libelle, valeur, onChange, autoComplete, desactive, placeholder, libelleMasque }: Props) {
   const [visible, setVisible] = useState(false)
   return (
     <div className="field">
-      <label htmlFor={id}>{libelle}</label>
+      <label htmlFor={id} className={libelleMasque ? 'sr-only' : undefined}>
+        {libelle}
+      </label>
       <div className="login-input-wrap">
         <input
           id={id}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
+          placeholder={placeholder}
           value={valeur}
           onChange={(e) => onChange(e.target.value)}
           disabled={desactive}
