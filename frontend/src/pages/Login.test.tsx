@@ -81,11 +81,10 @@ test('le bouton œil affiche puis masque le mot de passe', () => {
   expect(champ).toHaveAttribute('type', 'password')
 })
 
-test('les connexions Microsoft et Google sont désactivées', () => {
+test('aucune connexion Microsoft ou Google', () => {
   repondre('{}', 401)
   rendu()
-  expect(connexion().getByRole('button', { name: /Microsoft/ })).toBeDisabled()
-  expect(connexion().getByRole('button', { name: /Google/ })).toBeDisabled()
+  expect(connexion().queryByRole('button', { name: /Microsoft|Google/ })).toBeNull()
 })
 
 test('mot de passe oublié : bascule de panneau et message neutre', async () => {

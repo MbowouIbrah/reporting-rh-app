@@ -11,7 +11,7 @@ Date : 2026-10-21. Branche : `securite-connexion`.
 |---|---|---|
 | Mise en page | Fond photo (`Fond.tsx`) + carte en verre, logo, titre | Fond photo + carte en verre, deux panneaux qui glissent (connexion / oubli) |
 | Champs | E-mail, mot de passe | Identifiant, mot de passe avec bouton œil |
-| Options | Aucune | « Se souvenir de moi », « Mot de passe oublié ? », SSO Microsoft / Google désactivés (« Bientôt »), ligne de contact |
+| Options | Aucune | « Se souvenir de moi », « Mot de passe oublié ? », ligne de contact (boutons SSO retirés à la demande du client, 22/10) |
 | Mot de passe oublié | Absent | Simulé côté front (aucun envoi réel) |
 | Back | `/auth/login`, `/refresh`, `/logout`, `/me` ; cookies httponly ; JWT `typ` | — |
 | E-mail | Aucun envoi (B-004 à faire) | — |
@@ -25,7 +25,7 @@ Date : 2026-10-21. Branche : `securite-connexion`.
 
 ## 4. Choix : B
 - **Page** : mise en page cfaoacademy avec les jetons du projet (angles droits, rayon 8 px sur les boutons). Sans tiroir de profils de démo.
-- **SSO** : boutons Microsoft et Google affichés désactivés, badge « Bientôt » (B-001).
+- **SSO** : aucun bouton affiché (retirés à la demande du client le 22/10) ; SSO réel reste en B-001.
 - **Bouton œil** sur le mot de passe.
 - **Se souvenir de moi** : décoché → cookies de session (fermés avec le navigateur) ; coché → session de `REFRESH_TOKEN_DAYS` jours. Le choix est gardé dans le jeton de rafraîchissement (`rem`).
 - **Mot de passe oublié** :
