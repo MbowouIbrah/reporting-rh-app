@@ -22,7 +22,7 @@ export default function PageConnexion({ children }: { children: ReactNode }) {
   return (
     <div className="login-page">
       <div className="login-bg" aria-hidden="true">
-        <div className="login-bg-photo" style={{ backgroundImage: `url('${base}images/login-fond.jpg')` }} />
+        <div className="login-bg-photo" style={{ backgroundImage: `url('${base}images/fond.webp')` }} />
         <div className="login-bg-vignette" />
         <ul className="login-particles">
           {PARTICULES.map(([taille, haut, gauche, delai, duree, dy, dx, rotation, opacite, ronde], i) => (
