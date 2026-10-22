@@ -9,6 +9,7 @@ export function plafonner(panneau: HTMLElement) {
   const racine = getComputedStyle(document.documentElement)
   const plafond = parseFloat(racine.getPropertyValue('--ligne-max')) * parseFloat(racine.fontSize)
   panneau.style.maxHeight = ''
+  panneau.style.height = ''
   if (!table || !plafond) return
 
   // Hauteurs naturelles, tableau non étiré
@@ -43,14 +44,11 @@ export function plafonner(panneau: HTMLElement) {
     if (colonne) {
       panneau.style.maxHeight = `${Math.ceil(cible)}px`
     } else {
-      // Panneau seul dans la section (ex: Sites, Services) :
-      // S'il y a assez de place, on affiche toutes les lignes sans scroll (plafonnées à la cible).
-      // Si le tableau dépasse la section, on prend toute la hauteur disponible de la section.
-      if (dispoSection > 0 && cible > dispoSection) {
-        panneau.style.maxHeight = `${Math.floor(dispoSection)}px`
-      } else {
-        panneau.style.maxHeight = `${Math.ceil(cible)}px`
-      }
+      // Panneau seul dans la section (ex: Sites, Services) : il prend la hauteur de la cible
+      // (lignes étirées jusqu'à --ligne-max), bornée par la section ; au-delà, il défile.
+      const h = dispoSection > 0 ? Math.min(cible, dispoSection) : cible
+      panneau.style.height = `${Math.floor(h)}px`
+      panneau.style.maxHeight = `${Math.floor(h)}px`
     }
   } else {
     panneau.style.maxHeight = `${Math.ceil(cible)}px`
