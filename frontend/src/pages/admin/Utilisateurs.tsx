@@ -24,7 +24,7 @@ import { CATALOGUE, GESTION_COMPTES, LECTURE, MODELES, exigeTout } from '../../l
 const COLONNES = ['Nom', 'Données visibles', 'Statut']
 // Mêmes règles que le serveur (admin.py) : messages immédiats, le serveur reste l'autorité.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-const MDP_MIN = 12
+const MDP_MIN = 8
 
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 const trier = <T extends string | number>(l: T[]) => [...l].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))

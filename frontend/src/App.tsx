@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
+import Reinitialiser from './pages/Reinitialiser'
 import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
 import Referentiels from './pages/admin/Referentiels'
@@ -20,6 +21,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reinitialiser" element={<Reinitialiser />} />
       <Route
         path="/rapport"
         element={

@@ -10,7 +10,7 @@ interface Auth {
   me: Me | null
   loading: boolean
   can: (perm: string) => boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -121,8 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc])
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const me = await apiLogin(email, password)
+    async (email: string, password: string, remember = false) => {
+      const me = await apiLogin(email, password, remember)
       oublier()
       qc.setQueryData(['me'], me)
       canal.current?.postMessage('connexion')

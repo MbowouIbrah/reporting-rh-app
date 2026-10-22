@@ -217,7 +217,7 @@ test('création : champs obligatoires vérifiés avant envoi', async () => {
   fireEvent.click(f.getByRole('button', { name: 'Créer le compte' }))
   expect(f.getByText('Nom obligatoire')).toBeInTheDocument()
   expect(f.getByText('Adresse e-mail invalide')).toBeInTheDocument()
-  expect(f.getByText('12 caractères minimum')).toBeInTheDocument()
+  expect(f.getByText('8 caractères minimum')).toBeInTheDocument()
   expect(ecritures(appels)).toHaveLength(0)
   fireEvent.click(f.getByRole('button', { name: 'Annuler' }))
   expect(screen.queryByRole('region', { name: 'Nouveau compte' })).toBeNull()
