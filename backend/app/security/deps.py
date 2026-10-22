@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.auth import Utilisateur
 from app.security.policy import Portee, Principal
-from app.security.tokens import read_token
+from app.security.tokens import empreinte, read_claims
 
 
 def portee_de(user: Utilisateur) -> Portee:
@@ -35,8 +35,10 @@ def to_principal(user: Utilisateur) -> Principal:
 def current_principal(
     access_token: str | None = Cookie(default=None), db: Session = Depends(get_db)
 ) -> Principal:
-    uid = read_token(access_token, "access") if access_token else None
+    claims = read_claims(access_token, "access") if access_token else None
+    uid = int(claims["sub"]) if claims and str(claims.get("sub", "")).isdigit() else None
     user = db.get(Utilisateur, uid) if uid else None
-    if user is None or not user.actif:
+    # Jeton lié au mot de passe : un changement ferme aussi les sessions ouvertes.
+    if user is None or not user.actif or claims.get("pwd") != empreinte(user.password_hash):
         raise HTTPException(status_code=401, detail="Non authentifié")
     return to_principal(user)

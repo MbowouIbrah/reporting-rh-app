@@ -2,7 +2,7 @@
 
 L'administration n'a plus d'écran Utilisateurs ni Journal (08a) : cet outil les remplace en
 production via `docker compose exec api python -m app.comptes ...`. Mêmes règles que l'API
-(droits, 12 caractères, au moins un compte actif qui gère les comptes) ; chaque écriture est
+(droits, 8 caractères, au moins un compte actif qui gère les comptes) ; chaque écriture est
 tracée au journal d'audit avec un utilisateur vide (console).
 
 Mot de passe : saisi au clavier (jamais en argument, pour ne pas finir dans l'historique),
@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 from app.api.admin import (
     PorteeIn,
     _check_droits,
-    _check_password,
     _commit,
     _est_admin_actif,
     _exiger_autre_admin,
@@ -34,7 +33,7 @@ from app.db.session import SessionLocal
 from app.models.auth import AuditEvent, Perimetre, Utilisateur
 from app.security import audit
 from app.security.deps import portee_de
-from app.security.passwords import hash_password
+from app.security.passwords import check_password, hash_password
 from app.security.policy import MODELES
 
 
@@ -48,7 +47,7 @@ def _mot_de_passe() -> str:
         pw = getpass.getpass("Mot de passe : ")
         if getpass.getpass("Confirmer : ") != pw:
             raise Erreur("Les deux saisies diffèrent")
-    _check_password(pw)
+    check_password(pw)
     return pw
 
 

@@ -30,6 +30,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY requis}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      APP_URL: ${APP_URL:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TLS: ${SMTP_TLS:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
       COOKIE_PATH_PREFIX: /reporting-rh
     depends_on:

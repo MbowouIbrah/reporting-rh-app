@@ -88,8 +88,8 @@ def run(db: Session, admin_email: str, admin_password: str, demo_password: str |
 
 if __name__ == "__main__":
     email, pw = os.environ.get("ADMIN_EMAIL"), os.environ.get("ADMIN_PASSWORD")
-    if not email or not pw or len(pw) < 12:
-        sys.exit("ADMIN_EMAIL et ADMIN_PASSWORD (12 caractères min) requis")
+    if not email or not pw or len(pw) < 8:
+        sys.exit("ADMIN_EMAIL et ADMIN_PASSWORD (8 caractères min) requis")
     demo = os.environ.get("DEMO_PASSWORD") if "--demo" in sys.argv else None
     with SessionLocal() as session:
         run(session, email, pw, demo)

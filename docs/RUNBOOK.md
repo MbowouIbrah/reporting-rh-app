@@ -4,7 +4,7 @@ Serveur Academy, réseau Docker `edge`, base sans port publié. Commandes depuis
 
 ## 1. Mise en service
 1. `docker network create edge` (une fois), nginx d'Academy rattaché à `edge`.
-2. `cp deploy/.env.example deploy/.env` puis renseigner `POSTGRES_PASSWORD`, `SECRET_KEY` (≥ 32 car.), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (≥ 12 car.).
+2. `cp deploy/.env.example deploy/.env` puis renseigner `POSTGRES_PASSWORD`, `SECRET_KEY` (≥ 32 car.), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (≥ 8 car.).
 3. `docker compose -f deploy/docker-compose.yml up -d --build` : les migrations Alembic et le seed (référentiels, périmètres, rh_admin) tournent au démarrage, idempotents.
 4. Inclure `deploy/nginx-academy-snippet.conf` dans le nginx d'Academy, recharger.
 5. Vérifier : `docker compose -f deploy/docker-compose.yml ps` (api healthy) et connexion en rh_admin.
@@ -19,8 +19,9 @@ Pas d'écran de gestion des comptes : console serveur, `C="docker compose -f dep
   - `$C creer dps@exemple.invalid --nom "DPS" --role lecteur_perimetre --perimetre dps`.
 - Modèle d'attribution : les administrateurs RH en `rh_admin` ; DRH et DOP en `lecteur_global` ; en `lecteur_perimetre` : DPS `dps`, directeur commercial `commerce_vn`, DC Pneumatique `pneumatique`, directeur technique `sav_pl`, responsable technique SAV Engins `sav_engins`, responsable des sites déportés `sites_deportes`. `--nominatif` ouvre le reporting individuel à un `lecteur_perimetre` (`lecteur_global` l'a d'office).
 - `$C lister`, `$C role EMAIL --role ...`, `$C mot-de-passe EMAIL`, `$C desactiver EMAIL` / `$C activer EMAIL`.
-- Mots de passe : 12 caractères minimum, communiqués hors e-mail. Il reste toujours au moins un rh_admin actif (refus sinon).
+- Mots de passe : 8 caractères minimum, communiqués hors e-mail. Il reste toujours au moins un rh_admin actif (refus sinon).
 - Départ d'un utilisateur : `desactiver` (ne pas supprimer, pour garder l'audit).
+- Mot de passe oublié (page de connexion) : lien à usage unique valable 30 min, envoyé par e-mail, une demande toutes les 5 min par compte. Variables de `deploy/.env` : `APP_URL` (adresse publique avec préfixe, ex. `https://serveur/reporting-rh`), `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` (true = STARTTLS). Sans `SMTP_HOST`, rien n'est envoyé en production (journal : `reinit_non_envoye`) : réinitialiser alors le mot de passe depuis la page Utilisateurs ou `$C mot-de-passe`.
 - Journal : `$C journal [--entite utilisateur] [--limite 50] [--detail]` ; « console » = action faite par cet outil.
 
 ## 3. Sauvegarde

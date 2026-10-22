@@ -23,7 +23,18 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_DAYS: int = 7
     COOKIE_SECURE: bool = True
 
+    RESET_TOKEN_MINUTES: int = 30
+
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+
+    # Lien de réinitialisation et envoi d'e-mail (SMTP_HOST vide : aucun envoi)
+    APP_URL: str = "http://localhost:5173"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_TLS: bool = True
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -39,6 +50,10 @@ class Settings(BaseSettings):
     def _secrets_en_prod(self) -> "Settings":
         if self.ENV == "prod" and len(self.SECRET_KEY) < 32:
             raise ValueError("SECRET_KEY (32 caractères minimum) obligatoire en production")
+        if self.SMTP_USER and not self.SMTP_TLS:
+            raise ValueError("SMTP_TLS obligatoire avec SMTP_USER (sinon mot de passe en clair)")
+        if self.ENV == "prod" and self.SMTP_HOST and "localhost" in self.APP_URL:
+            raise ValueError("APP_URL (adresse publique) obligatoire avec SMTP_HOST")
         return self
 
 

@@ -19,7 +19,7 @@ from app.models.auth import (
 from app.models.referentiel import Service, Site
 from app.security import audit
 from app.security.deps import current_principal, portee_de, to_principal
-from app.security.passwords import hash_password
+from app.security.passwords import check_password, hash_password
 from app.security.policy import (
     ACCORDABLES,
     PERMISSIONS,
@@ -130,11 +130,6 @@ def _poser_droits(u: Utilisateur, permissions: list[str] | None, portee: PorteeI
                              for v in sorted(set(portee.sites)))
 
 
-def _check_password(pw: str) -> None:
-    if len(pw) < 12:
-        raise HTTPException(422, "Mot de passe : 12 caractères minimum")
-
-
 def _user_dict(u: Utilisateur) -> dict:
     portee = portee_de(u)
     return {
@@ -203,7 +198,7 @@ def create_user(
 ):
     authorize(p, "users:write")
     _check_droits(db, body.permissions, body.portee)
-    _check_password(body.password)
+    check_password(body.password)
     u = Utilisateur(
         email=body.email.strip().lower(),
         nom=body.nom,
@@ -247,7 +242,7 @@ def update_user(
     if body.actif is not None:
         u.actif = body.actif
     if body.password is not None:
-        _check_password(body.password)
+        check_password(body.password)
         u.password_hash = hash_password(body.password)
     _poser_droits(u, body.permissions, body.portee)
     if etait_admin and not _est_admin_actif(u):
