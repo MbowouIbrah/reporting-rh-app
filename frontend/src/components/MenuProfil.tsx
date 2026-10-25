@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
-/** Icône profil de la barre : ouvre un menu avec le nom, l'adresse, le rôle et la déconnexion. */
+/** Nom de l'utilisateur et icône profil de la barre : l'icône ouvre un menu avec l'adresse, le rôle et la déconnexion. */
 export default function MenuProfil() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
@@ -32,6 +32,7 @@ export default function MenuProfil() {
 
   return (
     <div className="user profil" ref={zone}>
+      <span className="profil-barre-nom" title={me?.nom || me?.email}>{me?.nom || me?.email}</span>
       <button
         ref={bouton}
         type="button"
