@@ -88,6 +88,8 @@ export interface Mensuel {
     taux_marge?: Val
   }
   a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
+  /** Absent sans la permission marge:read. */
+  lignes_ca_marge?: { ca: Cell; marge: Cell }
   b_service_activite: {
     service: string
     total: Cell & Budget
@@ -162,6 +164,7 @@ export interface Annuel {
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
+  lignes_ca_marge?: Mensuel['lignes_ca_marge']
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']
   c_site_total?: Mensuel['c_site_total']

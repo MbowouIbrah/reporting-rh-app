@@ -19,7 +19,7 @@ from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
-              "taux_marge_ytd", "ca_cumul", "ca_par_effectif"}
+              "taux_marge_ytd", "ca_cumul", "ca_par_effectif", "lignes_ca_marge"}
 
 # Colonnes du reporting individuel (RETOURS_PRESENTATION §4, docs/QUESTIONS_CLIENT.md A3, B1,
 # B2) et les rubriques de DONNEES qu'elles reprennent, une par colonne : « Autres primes » = primes

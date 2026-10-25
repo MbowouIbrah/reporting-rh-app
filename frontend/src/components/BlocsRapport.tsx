@@ -3,7 +3,7 @@ import type { Budget, Cell, Mensuel } from '../api/types'
 import { cls, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
-export type Blocs = Pick<Mensuel, 'a_type_charge' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
+export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
 export interface Libelles {
   prec: string
   cour: string
@@ -69,7 +69,7 @@ function Bourrage({ n, tete }: { n: number; tete?: boolean }) {
   return tete ? <th className="bourrage" colSpan={n} aria-hidden="true" /> : <td className="bourrage" colSpan={n} aria-hidden="true" />
 }
 
-/** 1. Reporting global : types de charge, TOTAL GÉNÉRAL en dernière ligne. */
+/** 1. Reporting global : types de charge, TOTAL GÉNÉRAL, puis CA et marge (hors total, sans budget). */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
@@ -81,6 +81,12 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
           <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
         ))}
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
+        {d.lignes_ca_marge && (
+          <>
+            <Ligne label="Chiffre d'affaires" cell={d.lignes_ca_marge.ca} budget />
+            <Ligne label="Marge" cell={d.lignes_ca_marge.marge} budget />
+          </>
+        )}
       </tbody>
     </table>
   )

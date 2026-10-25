@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import type { Cell } from '../api/types'
-import { type Blocs, ServicesActivites, Sites } from './BlocsRapport'
+import { type Blocs, ServicesActivites, Sites, TypesCharge } from './BlocsRapport'
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
@@ -76,4 +76,17 @@ test('répartition par service : dépliage par contrat', () => {
   fireEvent.click(bouton)
   expect(screen.getByText('CDI').closest('tr')).toHaveTextContent(/600.*700/)
   expect(screen.getByText('Staff CDI').closest('tr')).toHaveTextContent(/2.*3/)
+})
+
+test('reporting global : CA et marge sous le TOTAL GÉNÉRAL, budget vide, absents sans le droit', () => {
+  const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...cell, budget: '20', ecart: '8', ecart_pct: '0.4' }
+  const blocs = { a_type_charge: [total], lignes_ca_marge: { ca: cell, marge: cell } } as unknown as Blocs
+  const { unmount } = render(<TypesCharge d={blocs} lib={{ prec: 'M-1', cour: 'M' }} />)
+  const lignes = screen.getAllByRole('row').map((r) => r.querySelector('th')?.textContent)
+  expect(lignes.slice(-3)).toEqual(['TOTAL GÉNÉRAL', "Chiffre d'affaires", 'Marge'])
+  const ca = screen.getByText("Chiffre d'affaires").closest('tr')!
+  expect([...ca.querySelectorAll('td')].slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
+  unmount()
+  render(<TypesCharge d={{ a_type_charge: [total] } as unknown as Blocs} lib={{ prec: 'M-1', cour: 'M' }} />)
+  expect(screen.queryByText("Chiffre d'affaires")).toBeNull()
 })

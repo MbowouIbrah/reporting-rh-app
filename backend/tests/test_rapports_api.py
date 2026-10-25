@@ -212,8 +212,9 @@ def test_annuel_serie_sans_marge_pour_perimetre(charge, make_client):
     assert all("marge" not in x and "taux_marge" not in x for x in equip["serie_n"])
     assert "commissions" in equip["serie_n"][0] and "primes" in equip["serie_n"][0]
     assert "ca_ytd" not in equip and "taux_marge_ytd" not in equip and "primes_ytd" in equip
+    assert "lignes_ca_marge" not in equip
     adm = get(charge, "annuel", annee=2026, mois=2).json()
-    assert adm["serie_n"][0]["marge"] is not None
+    assert adm["serie_n"][0]["marge"] is not None and "lignes_ca_marge" in adm
     sav = next(x for x in adm["par_service"] if x["service"] == "SAV PL")
     assert sav["nb_mois"] == 2 and sav["moy_m"] is not None
 

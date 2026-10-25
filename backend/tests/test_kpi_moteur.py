@@ -84,6 +84,13 @@ def test_mensuel_ca_sans_marge_saisie_reste_vide():
     assert s["ca"] == 100 and s["marge"] is None and s["taux_marge"] is None
 
 
+def test_mensuel_lignes_ca_marge_avec_mois_precedent():
+    prev = pd(ca=80, marge=20)  # CA saisi sans paie le mois précédent : comparé quand même
+    r = mensuel(pd(L(1, Brut_Réel=10), ca=100), prev, REFS, Params())["lignes_ca_marge"]
+    assert (r["ca"]["m"], r["ca"]["m1"], r["ca"]["var"]) == (100, 80, 20)
+    assert r["marge"]["m"] is None and r["marge"]["m1"] == 20
+
+
 def test_mensuel_mouvements_effectif():
     prev = pd(L(1, Brut_Réel=100), L(2, Brut_Réel=100), L(3, Brut_Réel=100))
     cur = pd(L(2, Brut_Réel=150), L(3, Brut_Réel=100), L(4, Brut_Réel=100), L(5, Brut_Réel=1))
@@ -128,7 +135,7 @@ def test_blocs_service_site_contrat():
 def test_controle_bloquant_si_referentiel_incomplet():
     cur = pd(L(1, ctr="Stagiaire", Brut_Réel=10))  # contrat hors référentiel
     cs = {c["controle"]: c for c in mensuel(cur, None, REFS, Params())["controles"]}
-    assert cs["Total contrats = CDI + CDD + MAD"]["bloquant"]
+    assert cs["Total contrats = somme des types"]["bloquant"]
 
 
 def test_regle_datee_changeant_le_total():
@@ -148,6 +155,8 @@ def test_annuel_cumul_moyenne_nb_mois_et_marge_ytd():
     assert r["cumul_ytd"]["m1"] == 100 and r["cumul_ytd"]["nb_mois_n1"] == 2
     assert r["moyenne_mensuelle"]["m"] == 200
     assert r["marge_ytd"] == 200 - 100 and r["nb_mois_marge"] == 2
+    assert r["lignes_ca_marge"]["ca"]["m"] == 850 and r["lignes_ca_marge"]["marge"]["m"] == 100
+    assert r["lignes_ca_marge"]["ca"]["m1"] is None and r["lignes_ca_marge"]["marge"]["m1"] is None
     assert r["ca_ytd"] == 850 and r["nb_mois_ca"] == 3
     assert r["taux_marge_ytd"] == D(100) / D(800)  # mêmes mois que les marges
     assert r["serie_n"][2]["ms"] is None and r["serie_n"][3]["ms"] == 300  # mars sans paie
