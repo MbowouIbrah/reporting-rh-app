@@ -6,10 +6,10 @@ import {
 import { getAnnuel } from '../api/rapports'
 import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { entier, fcfa, MOIS_COURTS } from '../lib/format'
+import { compact, entier, fcfa, MOIS_COURTS } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
 
@@ -24,18 +24,17 @@ const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'va
 const N1 = 'var(--muted-2)'
 const GRILLE = 'var(--rule)'
 // Ordre et titres d'origine ; seuls les deux derniers graphes changent de sujet.
-const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Rémunération globale (FCFA)']
+const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Salaire, prime, rémunération et charges (FCFA)']
 const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 const AXE_X = { dataKey: 'mois', interval: 'preserveStartEnd', minTickGap: 4, padding: { left: 12, right: 16 }, ...AXE } as const
-// Axe en millions (« 45 M ») : lisible d'un coup d'œil ; la valeur exacte est dans l'info-bulle.
-const millions = (v: number) => `${(v / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M`
+// Axe en K / M (« 45 M », « 750 K ») : lisible d'un coup d'œil ; la valeur exacte est dans l'info-bulle.
 // Haut d'axe arrondi à 4 pas réguliers (1, 2, 2,5 ou 5 × 10^n) : graduations rondes même avec un domaine calculé.
 const haut4 = (v: number) => {
   const p = 10 ** Math.floor(Math.log10(v / 4))
   return 4 * [1, 2, 2.5, 5, 10].map((k) => k * p).find((k) => 4 * k >= v)!
 }
 const AXE_FCFA = {
-  tickFormatter: millions, width: 52, tickCount: 5, domain: [0, (max: number) => (max > 0 ? haut4(max) : 1)], ...AXE,
+  tickFormatter: compact, width: 52, tickCount: 5, domain: [0, (max: number) => (max > 0 ? haut4(max) : 1)], ...AXE,
 } as const
 // Ordre des séries conservé (pas de tri alphabétique) ; texte en encre neutre, la pastille porte la couleur.
 const LEGENDE = {
@@ -68,7 +67,7 @@ export default function Graphes() {
   // Rapport PDF : sans animation, sinon l'impression relance le tracé et fige des courbes à moitié dessinées
   const ANIM = useLocation().pathname.startsWith('/rapport') ? { isAnimationActive: false } : ANIMATION
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
-  const f = useFiltres({ avecMois: false })
+  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
   const salaries = useSalaries(f.filtres?.annee)
   const ann = useQuery({
     queryKey: ['annuel', f.filtres],
@@ -110,7 +109,7 @@ export default function Graphes() {
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
   const avecN1 = !!n1?.some((m) => m.remuneration != null)
   const serieN = `${annee ?? ''}`
-  const serieN1 = `${annee ? annee - 1 : ''}`
+  const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
 
   return (
@@ -119,7 +118,7 @@ export default function Graphes() {
     <section className="page-ecran page-etroite rapport-excel graphes-excel">
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} />}
@@ -176,7 +175,7 @@ export default function Graphes() {
                 {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
               </ComposedChart>
             </Carte>
-            <Carte titre={TITRES[3]} lecture={`Total versé chaque mois : salaires et charges, plus les primes hors total${comparaison}.`}>
+            <Carte titre={TITRES[3]} lecture={`Total de chaque mois en ${serieN}${comparaison}.`}>
               <AreaChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
