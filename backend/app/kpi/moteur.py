@@ -127,6 +127,8 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
 def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
             budgets: Budgets | None = None) -> dict:
     budgets = budgets or Budgets()
+    # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
+    ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
     eff, eff1 = len(cur.ids), len(prev.ids) if prev else None
@@ -281,7 +283,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
 
     controles = [
         _controle("MS type de charge = service = site", ms_a, ms_services, ms_sites, ms),
-        _controle("Total contrats = CDI + CDD + MAD", total_contrats, Decimal(eff)),
+        _controle("Total contrats = somme des types", total_contrats, Decimal(eff)),
     ]
     controles.extend(ctrl_contrats)
     if eff1 is not None:
@@ -289,6 +291,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                                    Decimal(eff1 + recrut - departs), Decimal(eff)))
     return {
         "synthese": synthese,
+        "lignes_ca_marge": {"ca": cell(cur.ca, ca1), "marge": cell(cur.marge, marge1)},
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
@@ -487,6 +490,8 @@ def annuel(
     # (docs/QUESTIONS_CLIENT.md C1, C3).
     avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]
     ca1 = sum((n1[m].ca for m in avec_ca1), ZERO) if avec_ca1 else None
+    avec_marge1 = [m for m in avec_ca1 if n1[m].marge is not None]
+    marge1 = sum((n1[m].marge for m in avec_marge1), ZERO) if avec_marge1 else None
     eff = blocs["effectif_global"]
 
     def ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
@@ -531,6 +536,7 @@ def annuel(
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
         "ca_cumul": cell(ca_ytd, ca1),
+        "lignes_ca_marge": {"ca": cell(ca_ytd, ca1), "marge": cell(marge_ytd, marge1)},
         "commissions_cumul": cell(commissions_ytd,
                                   sum((n1[m].rubrique(COMMISSION) for m in ok1), ZERO)
                                   if ok1 else None),

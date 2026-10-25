@@ -20,7 +20,7 @@ from app.models.referentiel import (
 SERVICES = ["Commerce VN", "Commerce Pièces", "Administration", "SAV PL",
             "SAV Engins", "Sites Déportés", "Pneumatique"]
 ACTIVITES = ["Front office", "Back Office"]
-CONTRATS = ["CDI", "CDD", "MAD"]
+CONTRATS = ["CDI", "CDD", "MAD", "Stage"]
 SITES = ["Yaoundé", "Douala", "Bertoua", "Ngaoundéré", "Garoua", "Dehane",
          "Libongo", "Njombe", "Dimon", "Nkoteng"]
 RUBRIQUES = [

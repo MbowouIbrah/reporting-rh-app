@@ -572,7 +572,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, nom, "MONTANT_NEGATIF", AVERT, vu, "Montant négatif : régularisation ou erreur de signe ?")
             L.montants[nom] = q
 
-        if nb_bloq == nb_avant and not inconnu and not any(
+        # Un stagiaire peut ne toucher aucune paie : pas d'avertissement pour lui.
+        if nb_bloq == nb_avant and not inconnu and L.type_contrat != "Stage" and not any(
                 n in L.montants for n, u in refs.rubriques if u != "jours"):
             premiere = next((n for n, u in refs.rubriques if u != "jours" and n in cols), None)
             if premiere:

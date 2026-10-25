@@ -433,3 +433,10 @@ def test_ecart_signale_ne_sert_pas_de_base_au_mois_suivant():
     rows = [ligne(Bonus=1000), ligne(MOIS="Février", Bonus=10000), ligne(MOIS="Mars", Bonus=1000)]
     _, _, anos, _ = run(rows)
     assert _codes(anos, "MONTANT_X10") == [(3, "Bonus")] and not _codes(anos, "MONTANT_DIV10")
+
+
+def test_stage_sans_montant_sans_avertissement():
+    rows = [ligne(MATRICULE="S1", **{"Type Contrat": "Stage"}), ligne(MATRICULE="E2")]
+    L, ens, _, _ = run(rows, postes={"p"})
+    assert ens == {(3, "Primes sur ventes", "LIGNE_SANS_MONTANT")}
+    assert L[0].type_contrat == "Stage" and not L[0].bloquant
