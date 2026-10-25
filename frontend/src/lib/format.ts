@@ -24,6 +24,17 @@ export function fcfa(v: Val | number | undefined): string {
   return espacer(NF.format(Number(v)))
 }
 
+/** Montant abrégé pour les indicateurs et les graphes : « 125,4 M », « 830 K » (une décimale) ; les tableaux gardent fcfa. */
+export function compact(v: Val | number | undefined): string {
+  if (v === null || v === undefined || v === 'n/a') return '—'
+  const n = Number(v)
+  const a = Math.abs(n)
+  if (a < 1000) return espacer(NF.format(n))
+  // 999 960 donnerait « 1 000 K » : passe en M dès que l'arrondi en K atteint 1 000
+  const [div, unite] = Math.round(a / 100) >= 10000 ? [1e6, 'M'] : [1e3, 'K']
+  return `${espacer(NF1.format(n / div))}${SEP}${unite}`
+}
+
 /** Valeur saisie telle quelle (toutes ses décimales), formatée sans flottant ; cellule vide si absente. */
 export function valeurBrute(v: string | undefined): string {
   if (v == null) return ''

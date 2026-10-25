@@ -1,10 +1,21 @@
-import { cls, fcfa, pct, valeurBrute } from './format'
+import { cls, compact, fcfa, pct, valeurBrute } from './format'
 
 test('fcfa : séparateur, absent et n/a', () => {
   expect(fcfa('1234567')).toBe('1\u00a0234\u00a0567')
   expect(fcfa(null)).toBe('—')
   expect(fcfa('n/a')).toBe('—')
   expect(pct('n/a')).toBe('—')
+})
+
+test('compact : K et M à une décimale, petits montants entiers', () => {
+  expect(compact('125400000')).toBe('125,4 M')
+  expect(compact('830000')).toBe('830 K')
+  expect(compact(1500)).toBe('1,5 K')
+  expect(compact('999960')).toBe('1 M')
+  expect(compact('-2500000')).toMatch(/^-2,5 M$/)
+  expect(compact('512')).toBe('512')
+  expect(compact(null)).toBe('—')
+  expect(compact('n/a')).toBe('—')
 })
 
 test('pct : multiplie le ratio par 100', () => {

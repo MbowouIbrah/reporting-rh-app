@@ -7,7 +7,7 @@ import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useFiltres } from '../hooks/useFiltres'
-import { cls, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
+import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -151,16 +151,16 @@ export default function Resume() {
               effectif global, CA par salarié. Effectifs = fin du dernier mois saisi. */}
           <div className="cases">
             {aCa && (
-              <Case titre="Chiffre d’affaires" valeur={montrer(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
+              <Case titre="Chiffre d’affaires" valeur={compact(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
               </Case>
             )}
-            <Case titre="Commissions" valeur={montrer(a.commissions_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
+            <Case titre="Commissions" valeur={compact(a.commissions_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
               <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
             <Case
               titre="Masse salariale"
-              valeur={fcfa(a.cumul_ytd.m)}
+              valeur={compact(a.cumul_ytd.m)}
               libelle2={`Évolution par rapport à ${n1}`}
               detail={parContrat(a.ms_contrat, exact)}
             >
@@ -186,7 +186,7 @@ export default function Resume() {
           <div className="cases">
             {aCa && (
               // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
-              <Case titre="Marge" valeur={montrer(a.marge_ytd)} libelle2="Taux de marge"
+              <Case titre="Marge" valeur={compact(a.marge_ytd)} libelle2="Taux de marge"
                 detail={[
                   ['Marge cumulée', exact(a.marge_ytd)],
                   ['CA des mois avec marge', exact(a.ca_avec_marge)],
@@ -197,7 +197,7 @@ export default function Resume() {
                 <span className="second">{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</span>
               </Case>
             )}
-            <Case titre="Primes de productivité" valeur={montrer(a.primes_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
+            <Case titre="Primes de productivité" valeur={compact(a.primes_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
@@ -207,7 +207,7 @@ export default function Resume() {
               <Variation v={a.effectif_fin.var_pct} vs="" />
             </Case>
             {aCa && (
-              <Case titre="CA par salarié" valeur={montrer(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
+              <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
                 detail={[
                   ...comparaison(a.ca_par_effectif, an, n1),
                   ['CA cumulé', exact(a.ca_ytd)],
