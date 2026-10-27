@@ -24,17 +24,18 @@ const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'va
 const N1 = 'var(--muted-2)'
 const GRILLE = 'var(--rule)'
 // Ordre et titres d'origine ; seuls les deux derniers graphes changent de sujet.
-const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Salaire, prime, rémunération et charges (FCFA)']
+const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Rémunération globale (FCFA)']
 const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 const AXE_X = { dataKey: 'mois', interval: 'preserveStartEnd', minTickGap: 4, padding: { left: 12, right: 16 }, ...AXE } as const
-// Axe en K / M (« 45 M », « 750 K ») : lisible d'un coup d'œil ; la valeur exacte est dans l'info-bulle.
+// Axe en millions seulement (« 0,5 M », « 45 M ») : une seule unité ; l'info-bulle donne la valeur en K ou M.
+const millions = (v: number) => `${(v / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M`
 // Haut d'axe arrondi à 4 pas réguliers (1, 2, 2,5 ou 5 × 10^n) : graduations rondes même avec un domaine calculé.
 const haut4 = (v: number) => {
   const p = 10 ** Math.floor(Math.log10(v / 4))
   return 4 * [1, 2, 2.5, 5, 10].map((k) => k * p).find((k) => 4 * k >= v)!
 }
 const AXE_FCFA = {
-  tickFormatter: compact, width: 52, tickCount: 5, domain: [0, (max: number) => (max > 0 ? haut4(max) : 1)], ...AXE,
+  tickFormatter: millions, width: 52, tickCount: 5, domain: [0, (max: number) => (max > 0 ? haut4(max) : 1)], ...AXE,
 } as const
 // Ordre des séries conservé (pas de tri alphabétique) ; texte en encre neutre, la pastille porte la couleur.
 const LEGENDE = {
@@ -43,7 +44,7 @@ const LEGENDE = {
   wrapperStyle: { fontSize: 12 },
   formatter: (v: string) => <span style={{ color: 'var(--muted)' }}>{v}</span>,
 } as const
-const BULLE_FCFA = (v: unknown) => fcfa(Number(v))
+const BULLE_FCFA = (v: unknown) => compact(Number(v))
 // Transition courte d'une valeur à l'autre (1,5 s par défaut pour une courbe : trop lent au changement de filtre).
 const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as const
 
@@ -175,7 +176,7 @@ export default function Graphes() {
                 {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
               </ComposedChart>
             </Carte>
-            <Carte titre={TITRES[3]} lecture={`Total de chaque mois en ${serieN}${comparaison}.`}>
+            <Carte titre={TITRES[3]} lecture={`Salaire, prime, rémunération et charges : total de chaque mois en ${serieN}${comparaison}.`}>
               <AreaChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
