@@ -1242,7 +1242,7 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
 /* Référentiels : sites et services, puis la liste fixe des contrats sous les services (écran moyen)
    ou en troisième colonne plus étroite (grand écran) ; elle garde sa hauteur, jamais étirée */
-.admin-trio { grid-template-areas: "site service" "site contrat"; }
+.admin-trio { grid-template-areas: "site service" "site contrat"; grid-template-rows: auto 1fr; }
 .admin-trio > :nth-child(1) { grid-area: site; }
 .admin-trio > :nth-child(2) { grid-area: service; }
 .admin-trio > .ref-contrats { grid-area: contrat; align-self: start; }
@@ -1262,8 +1262,7 @@ table.tableau-squelette td { height: 2.1em; }
   .admin-excel :is(.admin-duo, .comptes-duo) { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
-  .admin-trio { grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr); grid-template-areas: "site service contrat"; }
-  .admin-trio > :not(:first-child) { align-self: start; max-height: 100%; }
+  .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
 }
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
 .bouton-copier { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--navy); cursor: pointer; }
