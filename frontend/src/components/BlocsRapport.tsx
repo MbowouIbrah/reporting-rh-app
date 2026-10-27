@@ -191,7 +191,7 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
             <Budgets b={total} />
           </tr>
         )}
-        <tr className="staff">
+        <tr className="total staff">
           <th scope="row" colSpan={2}>Effectif global</th>
           <Valeurs c={d.d_contrat.total} />
           <td colSpan={3} />
@@ -428,7 +428,7 @@ export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
             <Valeurs c={total} />
           </tr>
         )}
-        <tr className="staff">
+        <tr className="total staff">
           <th scope="row" colSpan={2}>Effectif global</th>
           <Valeurs c={d.d_contrat.total} />
         </tr>

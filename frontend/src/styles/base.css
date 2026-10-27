@@ -369,8 +369,10 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
-.rapport-excel .panneau table.services tbody tr.total.staff:nth-child(n) > * { background: var(--peche); opacity: 1; color: var(--brun); font-weight: var(--fw-regular); border-top: 0; border-bottom: 2px solid var(--brun); }
-.rapport-excel .panneau table.services tbody tr.total:nth-child(n):has(+ tr.staff) > :not([rowspan]) { border-bottom: 0; }
+/* Effectif sous un total : même bande que le total, sans trait entre les deux (modèle du tableau par site) */
+.rapport-excel .panneau table.dense tbody tr.total.staff:nth-child(n) > * { opacity: 1; font-weight: var(--fw-regular); }
+.rapport-excel .panneau table.dense tbody tr.total + tr.total.staff:nth-child(n) > * { border-top: 0; }
+.rapport-excel .panneau table.dense tbody tr.total:nth-child(n):has(+ tr.total.staff) > :not([rowspan]) { border-bottom: 0; }
 /* Damier par service : chaque bloc (service, activités, budget fusionnés) forme une seule bande */
 .rapport-excel .panneau table.dense.services tbody tr:not(.total) > td, .rapport-excel .panneau table.dense.services tbody tr:not(.total) > th { background: var(--surface); }
 .rapport-excel .panneau table.dense.services tbody tr.bande > td, .rapport-excel .panneau table.dense.services tbody tr.bande > th { background: var(--rapport-zebre); }
