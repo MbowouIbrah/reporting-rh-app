@@ -6,6 +6,7 @@ import FiltresPeriode, { libelleComparaison, libellePeriode } from '../component
 import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useAttente } from '../hooks/useAttente'
+import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, pct } from '../lib/format'
@@ -22,15 +23,18 @@ export default function Mensuel() {
   })
   const [premier, relais] = useAttente(q.isLoading)
   const [maj] = useAttente(q.isPlaceholderData)
+  const gab = useGabarit('mensuel', q.data, !q.isPlaceholderData)
+  // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
+  const d = premier ? gab : q.data
 
   return (
-    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || undefined}>
+    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="REPORTING MENSUEL" />
       {f.filtres && (
         <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {premier && f.filtres && (
+      {premier && !gab && f.filtres && (
         <RapportSquelette
           lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }}
           bandeau={
@@ -44,7 +48,7 @@ export default function Mensuel() {
         />
       )}
       {q.error && !premier && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && !premier && <Contenu d={q.data} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }} />}
+      {d && f.filtres && <Contenu d={d} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }} />}
     </section>
   )
 }
@@ -55,7 +59,7 @@ function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string
   return (
     <>
       <p className={bloquants.length ? 'bandeau ko' : 'bandeau ok'} role="status">
-        <span>
+        <span className="sk-texte">
           {bloquants.length
             ? `Contrôles de cohérence en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`
             : 'Contrôles de cohérence : OK'}

@@ -7,6 +7,7 @@ import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useAttente } from '../hooks/useAttente'
+import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
@@ -99,10 +100,12 @@ export default function Resume() {
   })
   const [premier, relais] = useAttente(ann.isLoading)
   const [maj] = useAttente(ann.isPlaceholderData)
+  const gab = useGabarit('annuel', ann.data, !ann.isPlaceholderData)
   const an = f.filtres ? `${f.filtres.annee}` : ''
   const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : ''
   const erreur = premier ? null : ann.error
-  const a = premier ? undefined : ann.data
+  // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
+  const a = premier ? gab : ann.data
   // Clés absentes de la réponse sans le droit « marge » ; présentes mais vides sous filtre.
   const droitCa = a !== undefined && 'ca_ytd' in a
   const aCa = droitCa && !filtre && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
@@ -117,13 +120,13 @@ export default function Resume() {
   ]
 
   return (
-    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || premier || undefined}>
+    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {premier && (
+      {premier && !gab && (
         // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
         <>
           {[['Commissions', 'Masse salariale', 'MAD globaux'], ['Primes de productivité', 'Effectif global']].map((ligne) => (

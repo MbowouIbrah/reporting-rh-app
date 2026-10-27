@@ -6,6 +6,7 @@ import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
+import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS } from '../lib/format'
@@ -70,14 +71,17 @@ export default function Annuel() {
   })
   const [premier, relais] = useAttente(q.isLoading)
   const [maj] = useAttente(q.isPlaceholderData)
+  const gab = useGabarit('annuel', q.data, !q.isPlaceholderData)
+  // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
+  const d = premier ? gab : q.data
   return (
-    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || undefined}>
+    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {premier && f.filtres && (
+      {premier && !gab && f.filtres && (
         <RapportSquelette
           lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: `${f.filtres.annee}` }}
           bandeau={
@@ -90,7 +94,7 @@ export default function Annuel() {
         />
       )}
       {q.error && !premier && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && !premier && <Contenu d={q.data} f={f.filtres} />}
+      {d && f.filtres && <Contenu d={d} f={f.filtres} />}
     </section>
   )
 }

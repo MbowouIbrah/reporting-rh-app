@@ -151,6 +151,11 @@ export function usePeut(perm: string): boolean {
   return useContext(Ctx)?.can(perm) ?? false
 }
 
+/** Identifiant du compte connecté, sans exiger le fournisseur (tests de composants). */
+export function useMonId(): number | undefined {
+  return useContext(Ctx)?.me?.id
+}
+
 export function useAuth(): Auth {
   const v = useContext(Ctx)
   if (!v) throw new Error('AuthProvider manquant')
