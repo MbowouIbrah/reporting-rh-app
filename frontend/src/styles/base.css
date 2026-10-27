@@ -1078,20 +1078,21 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
    sa taille ; tout le statique reste affiché (titres, en-têtes, libellés de ligne, filtres, mentions).
    Valeurs variables : cellules td.num (montants, effectifs, %) et td.var (texte issu des données), valeurs en
    ligne .val, valeurs et notes des cases, zone des graphes.
-   Apparition après 300 ms (pas de clignotement sur réponse rapide) ; balayage gauche → droite 833 ms puis pause
-   667 ms (eBay Playbook) ; figé sur la couleur de base si le mouvement est réduit. */
-:root { --sk-base: #e6e9ef; --sk-reflet: #f5f6f9; --sk-delai: .3s; }
+   Apparition après 300 ms (pas de clignotement sur réponse rapide), puis pulsation d'opacité (animée par le
+   compositeur, sans repeinte) ; hooks/useAttente tient le squelette jusqu'à la fin de son cycle, au moins un
+   cycle complet. Figé sur la couleur de base si le mouvement est réduit. */
+:root { --sk-base: #e6e9ef; --sk-delai: .3s; --sk-cycle: 1.2s; }
 @keyframes sk-masquer { to { color: transparent; } }
 @keyframes sk-cacher { to { visibility: hidden; } }
 @keyframes sk-montrer { to { opacity: 1; } }
-@keyframes sk-balayage { 0% { background-position: 100% 0; } 55.5%, 100% { background-position: 0 0; } }
+@keyframes sk-pouls { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 :where([aria-busy='true']) :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .graphe-zone) { position: relative; }
 [aria-busy='true'] :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation) { animation: sk-masquer .01s var(--sk-delai) forwards; }
 [aria-busy='true'] :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .graphe-zone) > * { animation: sk-cacher .01s var(--sk-delai) forwards; }
 [aria-busy='true'] :is(tbody tr:not(.reste) td.num, tbody tr:not(.reste) .var, .val, .case > strong, .case > .note, .case > .variation, .graphe-zone)::after {
   content: ""; position: absolute; z-index: 1; pointer-events: none; opacity: 0;
-  background: linear-gradient(90deg, var(--sk-base) 33%, var(--sk-reflet) 50%, var(--sk-base) 67%) 100% 0 / 300% 100%;
-  animation: sk-montrer .2s var(--sk-delai) forwards, sk-balayage 1.5s linear var(--sk-delai) infinite;
+  background: var(--sk-base);
+  animation: sk-pouls var(--sk-cycle) ease-in-out var(--sk-delai) infinite;
 }
 /* Barre d'une ligne de texte, à gauche (texte) ou à droite (nombre), longueurs variées d'une ligne à l'autre. */
 [aria-busy='true'] tbody :is(td, th)::after { top: calc(50% - .375em); left: .6em; width: min(70%, 9em); height: .75em; }
@@ -1107,7 +1108,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 /* Graphe : la zone garde sa taille, un voile en squelette couvre les courbes. */
 [aria-busy='true'] .graphe-zone::after { inset: 8px; }
 @media (prefers-reduced-motion: reduce) {
-  [aria-busy='true'] :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .graphe-zone)::after { animation: sk-montrer .01s var(--sk-delai) forwards; background: var(--sk-base); }
+  [aria-busy='true'] :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .graphe-zone)::after { animation: sk-montrer .01s var(--sk-delai) forwards; }
 }
 .etat-chargement { margin-top: var(--sp-3); }
 table.tableau-squelette { width: 100%; }

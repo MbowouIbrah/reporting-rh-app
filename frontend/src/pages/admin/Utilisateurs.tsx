@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
+import { useAttente } from '../../hooks/useAttente'
 import {
   useComptes,
   useCreerCompte,
@@ -449,6 +450,7 @@ type Selection = number | 'nouveau' | null
 export default function Utilisateurs() {
   const { me } = useAuth()
   const q = useComptes()
+  const [premier] = useAttente(q.isLoading)
   const perimetres = usePerimetres()
   const supprimer = useSupprimerCompte()
   const [recherche, setRecherche] = useState('')
@@ -497,9 +499,9 @@ export default function Utilisateurs() {
         <BoutonReinitialiser actif={!!recherche} onClick={() => setRecherche('')} libelle="Effacer la recherche" />
         <Bouton className="admin-ajout" onClick={() => choisir('nouveau')}>Nouveau compte</Bouton>
       </div>
-      {q.isError && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
-      {q.isLoading && <Etat type="chargement" colonnes={COLONNES} lignes={6} />}
-      {q.data && (
+      {q.isError && !premier && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
+      {premier && <Etat type="chargement" colonnes={COLONNES} lignes={6} />}
+      {q.data && !premier && (
         <>
           <p className="bandeau">
             <span className="val">{`${liste.length} utilisateur${liste.length > 1 ? 's' : ''}`}</span>

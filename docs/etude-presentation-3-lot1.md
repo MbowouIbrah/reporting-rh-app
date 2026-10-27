@@ -55,3 +55,16 @@ Choix : A partout.
 - Types de contrat : liste fixe en lecture seule (CDI, CDD, MAD, Stage) dans Administration > Sites et services, sous Services (même colonne, hauteur de la page couverte).
 - Stagiaires : « Stage » apparaît dans les répartitions par contrat seulement s'il a au moins une ligne sur les périodes affichées (`FACULTATIFS`, `kpi/moteur.py`).
 - Filtre actif : les cases CA, Marge et CA par salarié restent affichées avec « — » et « Non disponible pour ces filtres ». Les colonnes CA/Marge du tableau mensuel restent masquées.
+- Analyse des effectifs : « Effectif fin de période » ferme le tableau, à la couleur des totaux ; l'effectif sous un TOTAL (ligne staff) prend le texte des totaux.
+
+## Chargement : squelette et animation d'entrée (27/10)
+
+Problème : à l'arrivée des données, le squelette était démonté et le contenu monté à sa place ; l'animation d'entrée de la page rejouait alors (deuxième apparition, saut d'image). Le squelette pouvait aussi disparaître au milieu de son balayage.
+
+Pratiques retenues (Nielsen Norman Group, Material, eBay Playbook, shadcn/GitHub) :
+- Rien sous 300 ms : une réponse rapide ne montre pas de squelette (pas de clignotement).
+- Un squelette montré reste au moins un cycle complet et n'est jamais coupé au milieu ; le contenu remplace la forme au même endroit, sans nouveau mouvement.
+- Pulsation d'opacité (1,2 s) plutôt que balayage de dégradé : animée par le compositeur, sans repeinte, plus sobre sur un tableau dense.
+- Mouvement réduit : squelette figé.
+
+Mise en œuvre : `hooks/useAttente.ts` tient l'état de chargement jusqu'à la fin du cycle en cours ; la classe `relais` coupe l'entrée des blocs qui remplacent un squelette (`styles/mouvement.css`) ; seules les valeurs apparaissent en fondu. Appliqué aux rapports (mensuel, annuel, résumé, graphes, individuel), à DONNEES et aux listes Employés et Utilisateurs.

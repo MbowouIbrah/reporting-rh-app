@@ -7,6 +7,7 @@ import { getAnnuel } from '../api/rapports'
 import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { compact, entier, fcfa, MOIS_COURTS } from '../lib/format'
@@ -76,12 +77,13 @@ export default function Graphes() {
     enabled: !!f.filtres,
     placeholderData: keepPreviousData,
   })
-  const erreur = ann.error
+  const [premier, relais] = useAttente(ann.isLoading)
+  const erreur = premier ? null : ann.error
 
   const annee = f.filtres?.annee
   const contrats = ann.data?.d_contrat.effectifs.map((c) => c.contrat) ?? []
   const n1 = ann.data?.serie_n1
-  const serie = ann.data?.serie_n.map((m: SerieMois, i) => ({
+  const serie = premier ? undefined : ann.data?.serie_n.map((m: SerieMois, i) => ({
     mois: MOIS_COURTS[m.mois - 1],
     ms: num(m.ms),
     ms1: num(n1?.[i]?.ms),
@@ -116,7 +118,7 @@ export default function Graphes() {
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
-    <section className="page-ecran page-etroite rapport-excel graphes-excel">
+    <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
@@ -124,8 +126,8 @@ export default function Graphes() {
       {f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} />}
       {/* Un seul conteneur : au premier chargement les quatre cartes ont déjà leur taille définitive. */}
-      <div className="graphes" aria-busy={ann.isLoading || undefined}>
-        {ann.isLoading &&
+      <div className="graphes" aria-busy={premier || undefined}>
+        {premier &&
           TITRES.map((t) => (
             <figure key={t} className="graphe">
               <figcaption>{t}</figcaption>

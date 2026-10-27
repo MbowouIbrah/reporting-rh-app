@@ -7,6 +7,7 @@ import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import ChoixSalarie from '../../components/ChoixSalarie'
 import ConfirmerColonne from '../../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../../components/Etat'
+import { useAttente } from '../../hooks/useAttente'
 import { useFenetre } from '../../hooks/useFenetre'
 import { usePartage } from '../../hooks/useFiltres'
 import { useOrdreColonnes } from '../../hooks/useOrdreColonnes'
@@ -53,9 +54,9 @@ export default function Donnees() {
   const d = q.data
   // En-tête et filtres : ceux des lignes affichées, sinon la structure seule (premier chargement).
   const st = d ?? s.data
-  const charge = q.isLoading || q.isPlaceholderData
+  const [charge] = useAttente(q.isLoading || q.isPlaceholderData)
   // Aucune ligne à habiller (premier chargement, ou tableau précédent vide) : lignes vides en squelette.
-  const squelette = q.isLoading || (q.isPlaceholderData && !d?.lignes.length)
+  const [squelette] = useAttente(q.isLoading || (q.isPlaceholderData && !d?.lignes.length))
   // Des milliers de lignes × une trentaine de colonnes : seules celles proches de la zone visible sont rendues.
   const { ref, debut, fin, avant, apres } = useFenetre(squelette ? 0 : d?.lignes.length ?? 0)
 

@@ -51,6 +51,9 @@
 /* Un bloc qui contient le rail fixe n'est qu'en fondu : un transform en ferait la référence du rail pendant l'animation. */
 .page > :has(.rail), .page > .page-ecran > :has(.rail) { animation-name: mv-fondu; }
 :root[data-mouvement='aucun'] :is(.page > :has(.rail), .page > .page-ecran > :has(.rail)) { animation-name: none; }
+/* Contenu qui prend la place d'un squelette resté visible (hooks/useAttente) : pas de seconde entrée, il est
+   déjà en place ; seules les valeurs apparaissent en fondu (règle de fin de recalcul ci-dessous). */
+.page > .page-ecran.relais > :nth-child(n + 3) { animation: none; }
 
 /* Sortie d'une page (lib/mouvement.ts, transitionPage) : la page quittée s'efface ; la nouvelle joue son entrée ci-dessus. */
 .page { view-transition-name: page; }

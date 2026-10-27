@@ -1,3 +1,4 @@
+import { useAttente } from '../../hooks/useAttente'
 import { useState, type FormEvent } from 'react'
 import {
   CHAMPS_FICHE,
@@ -91,6 +92,7 @@ function FormulaireEmploye({ edition, onFin }: { edition: Edition; onFin: () => 
 
 export default function Employes() {
   const q = useSalaries()
+  const [premier] = useAttente(q.isLoading)
   const modifier = useModifierSalarie()
   const [recherche, setRecherche] = useState('')
   const [edition, setEdition] = useState<Edition | null>(null)
@@ -118,9 +120,9 @@ export default function Employes() {
         <BoutonReinitialiser actif={!!recherche} onClick={() => setRecherche('')} libelle="Effacer la recherche" />
         <Bouton className="admin-ajout" onClick={() => ouvrir({ fiche: VIDE })}>Nouvel employé</Bouton>
       </div>
-      {q.isError && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
-      {q.isLoading && <Etat type="chargement" colonnes={COLONNES} lignes={6} />}
-      {q.data && (
+      {q.isError && !premier && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
+      {premier && <Etat type="chargement" colonnes={COLONNES} lignes={6} />}
+      {q.data && !premier && (
         <>
           <p className="bandeau">
             <span className="val">{`${liste.length} employé${liste.length > 1 ? 's' : ''}`}</span>

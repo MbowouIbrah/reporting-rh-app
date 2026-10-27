@@ -9,6 +9,7 @@ import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import ConfirmerColonne from '../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../components/Etat'
 import { ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
+import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
@@ -59,7 +60,7 @@ export default function Individuel() {
   })
   // Premier chargement : le vrai tableau (colonnes et mois sont statiques) avec des valeurs vides,
   // que le squelette commun masque ; seules les valeurs chargent.
-  const maj = q.isPlaceholderData || q.isLoading
+  const [maj] = useAttente(q.isPlaceholderData || q.isLoading)
   const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
   // Comme DONNEES : colonnes exclues du total (hachurées) d'abord, juste après le mois, puis les
   // colonnes comptées dans le TOTAL MENSUEL (servi par le serveur, sans les hachurées).

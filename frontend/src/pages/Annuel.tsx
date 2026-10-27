@@ -5,6 +5,7 @@ import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites,
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { entier, fcfa, MOIS } from '../lib/format'
@@ -67,15 +68,16 @@ export default function Annuel() {
     enabled: !!f.filtres,
     placeholderData: keepPreviousData,
   })
-  const maj = q.isPlaceholderData
+  const [premier, relais] = useAttente(q.isLoading)
+  const [maj] = useAttente(q.isPlaceholderData)
   return (
-    <section className={maj ? 'page-ecran rapport-excel maj' : 'page-ecran rapport-excel'} aria-busy={maj || undefined}>
+    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || undefined}>
       <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {q.isLoading && f.filtres && (
+      {premier && f.filtres && (
         <RapportSquelette
           lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: `${f.filtres.annee}` }}
           bandeau={
@@ -87,8 +89,8 @@ export default function Annuel() {
           }
         />
       )}
-      {q.error && <Etat type={etatErreur(q.error)} />}
-      {q.data && f.filtres && <Contenu d={q.data} f={f.filtres} />}
+      {q.error && !premier && <Etat type={etatErreur(q.error)} />}
+      {q.data && f.filtres && !premier && <Contenu d={q.data} f={f.filtres} />}
     </section>
   )
 }
