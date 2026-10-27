@@ -203,7 +203,7 @@ export default function Individuel() {
                 ))}
                 <td className="num fige-d1">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
               </tr>
-              <tr className="total">
+              <tr className="total staff">
                 <th scope="row" className="fige-g">Total Staff</th>
                 {rubriques.map((r) => (
                   <td className={'num' + classe(r)} key={r}>
