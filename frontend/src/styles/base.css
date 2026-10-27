@@ -360,6 +360,9 @@ table.dense td.num { text-align: right; }
    CA et marge du reporting global sous le total, en orange des classeurs, hors total */
 .rapport-excel .panneau table.dense tbody tr.total:nth-child(n) > * { background: var(--peche); color: var(--brun); border-top: 2px solid var(--brun); border-bottom: 2px solid var(--brun); }
 .rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n) > * { background: var(--rapport-hors-total); color: var(--rapport-hors-total-texte); font-weight: var(--fw-bold); }
+/* Trait fin entre le total et CA/Marge, trait épais seulement à la fin du groupe */
+.rapport-excel .panneau table.dense tbody tr.total:nth-child(n):has(+ tr.hors-total) > * { border-bottom: 1px solid var(--rule); }
+.rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n):not(:has(+ tr.hors-total)) > * { border-bottom: 2px solid var(--brun); }
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rapport-excel .panneau table.services th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); padding-left: calc(12px + var(--sp-1)); padding-right: 2px; }
