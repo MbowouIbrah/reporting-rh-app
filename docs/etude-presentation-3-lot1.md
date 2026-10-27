@@ -68,3 +68,5 @@ Pratiques retenues (Nielsen Norman Group, Material, eBay Playbook, shadcn/GitHub
 - Mouvement réduit : squelette figé.
 
 Mise en œuvre : `hooks/useAttente.ts` tient l'état de chargement jusqu'à la fin du cycle en cours ; la classe `relais` coupe l'entrée des blocs qui remplacent un squelette (`styles/mouvement.css`) ; seules les valeurs apparaissent en fondu. Appliqué aux rapports (mensuel, annuel, résumé, graphes, individuel), à DONNEES et aux listes Employés et Utilisateurs.
+
+Retour 27/10 (3e passe) : le squelette doit être la page elle-même. Au premier chargement, Mensuel, Annuel et Résumé s'affichent sur le **gabarit** de la dernière réponse (`lib/gabarit.ts` : libellés et lignes gardés, montants remplacés par vide, conservé dans le navigateur par compte) ; seules les valeurs passent en squelette, puis le texte apparaît sans aucun déplacement (mesuré : 0 écart de position sur les trois pages). Sans gabarit (toute première visite), l'ancien squelette générique sert de repli. Le gabarit ne contient aucun montant.
