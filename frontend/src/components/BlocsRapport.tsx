@@ -361,7 +361,7 @@ const EnteteDetail = ({ libelle, lignes }: { libelle: string; lignes: number }) 
 
 const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
 
-/** 5. Analyse des effectifs : total puis par nature de contrat. */
+/** 5. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
 export function AnalyseEffectifs({ d }: { d: Blocs }) {
   const cols = [d.d_contrat.indicateurs[d.d_contrat.indicateurs.length - 1], ...d.d_contrat.indicateurs.slice(0, -1)]
   const ligne = (label: string, f: (i: (typeof cols)[number]) => string, className?: string) => (
@@ -392,10 +392,10 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
         {ligne('Effectif début de période', (i) => entier(i.debut))}
         {ligne('Recrutements', (i) => entier(i.recrutements))}
         {ligne('Départs', (i) => entier(i.departs))}
-        {ligne('Effectif fin de période', (i) => entier(i.fin), 'total')}
         {ligne('Taux de rotation', (i) => pct(i.taux_rotation))}
         {ligne('Nombre d’absences (jours)', (i) => fcfa(i.absences))}
         {ligne('Taux d’absentéisme', (i) => pct(i.taux_absenteisme))}
+        {ligne('Effectif fin de période', (i) => entier(i.fin), 'total')}
       </tbody>
     </table>
   )

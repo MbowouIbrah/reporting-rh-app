@@ -369,7 +369,7 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
-.rapport-excel .panneau table.services tbody tr.total.staff:nth-child(n) > * { background: var(--peche); opacity: 1; color: var(--muted); font-weight: var(--fw-regular); border-top: 0; border-bottom: 2px solid var(--brun); }
+.rapport-excel .panneau table.services tbody tr.total.staff:nth-child(n) > * { background: var(--peche); opacity: 1; color: var(--brun); font-weight: var(--fw-regular); border-top: 0; border-bottom: 2px solid var(--brun); }
 .rapport-excel .panneau table.services tbody tr.total:nth-child(n):has(+ tr.staff) > :not([rowspan]) { border-bottom: 0; }
 /* Damier par service : chaque bloc (service, activités, budget fusionnés) forme une seule bande */
 .rapport-excel .panneau table.dense.services tbody tr:not(.total) > td, .rapport-excel .panneau table.dense.services tbody tr:not(.total) > th { background: var(--surface); }
