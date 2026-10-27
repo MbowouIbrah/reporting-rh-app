@@ -347,3 +347,17 @@ def test_total_sites_et_services_par_contrat():
     vn = next(b for b in r["b_service_activite"] if b["service"] == "Commerce VN")
     assert {c: v["m"] for c, v in vn["ms_contrat"].items()} == {"CDI": 0, "CDD": 0, "MAD": 40}
     assert {c: v["m"] for c, v in vn["effectif_contrat"].items()} == {"CDI": 0, "CDD": 0, "MAD": 1}
+
+
+def test_stage_affiche_seulement_avec_des_lignes():
+    refs = Refs(REFS.services, REFS.activites, REFS.sites, ("CDI", "CDD", "MAD", "Stage"), REFS.rubriques)
+    sans = mensuel(pd(L(1, Brut_Réel=100)), None, refs, Params())
+    assert "Stage" not in sans["c_site"][0]["effectif_contrat"]
+    assert [e["contrat"] for e in sans["d_contrat"]["effectifs"]] == ["CDI", "CDD", "MAD"]
+    avec = mensuel(pd(L(1, Brut_Réel=100), L(2, ctr="Stage")), None, refs, Params())
+    assert [e["contrat"] for e in avec["d_contrat"]["effectifs"]] == ["CDI", "CDD", "MAD", "Stage"]
+    assert avec["c_site"][0]["effectif_contrat"]["Stage"]["m"] == 1
+    an = annuel({1: pd(L(1, Brut_Réel=100))}, {}, 1, refs, Params())
+    assert "Stage" not in an["effectif_fin_contrat"] and "Stage" not in an["ms_contrat"]
+    an2 = annuel({1: pd(L(1, ctr="Stage"))}, {}, 1, refs, Params())
+    assert "Stage" in an2["effectif_fin_contrat"]

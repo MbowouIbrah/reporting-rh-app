@@ -4,7 +4,7 @@ Aucune dépendance base de données : l'entrée est une liste de `Ligne` par pé
 """
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from app.kpi import formules as f
@@ -70,6 +70,15 @@ class Refs:
     rubriques: tuple[str, ...]
 
 
+FACULTATIFS = ("Stage",)  # contrats affichés seulement s'ils ont au moins une ligne
+
+
+def _contrats_vus(refs: Refs, *pds: PeriodeData | None) -> Refs:
+    vus = {L.contrat for pd in pds if pd for L in pd.lignes}
+    return replace(refs, contrats=tuple(
+        c for c in refs.contrats if c not in FACULTATIFS or c in vus))
+
+
 @dataclass(frozen=True)
 class Params:
     jours_ouvres: Decimal = Decimal(22)
@@ -127,6 +136,7 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
 def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
             budgets: Budgets | None = None) -> dict:
     budgets = budgets or Budgets()
+    refs = _contrats_vus(refs, cur, prev)
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
     prev = _ok(prev)
@@ -435,6 +445,7 @@ def annuel(
     budgets: dict[int, Budgets] | None = None,
 ) -> dict:
     """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul."""
+    refs = _contrats_vus(refs, *n.values(), *n1.values())
     def remuneration(pd: PeriodeData) -> Decimal:
         # comme `remuneration_globale` du mensuel : TOTAL CHARGES + exclusions hors absences
         return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r != ABSENCES), ZERO)
