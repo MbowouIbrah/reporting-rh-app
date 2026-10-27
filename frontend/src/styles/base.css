@@ -357,6 +357,12 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.dense tbody tr:nth-child(even) td, .rapport-excel .panneau table.dense tbody tr:nth-child(even) th { background: var(--rapport-zebre); }
 .rapport-excel .panneau table.dense tr.groupe th, .rapport-excel .panneau table.dense tr.groupe td { background: var(--rapport-groupe); }
 .rapport-excel .panneau table.dense tr.total th, .rapport-excel .panneau table.dense tr.total td { background: var(--peche); color: var(--brun); border-top: 1px solid var(--pointille); }
+/* Reporting global : TOTAL GÉNÉRAL encadré comme dans l'Excel (fond pêche, traits épais, zébrure ignorée),
+   puis CA et marge détachés sous un intertitre « hors total » : texte gris, libellé en retrait, fond neutre */
+.rapport-excel .panneau table.tab-global tbody tr.total:nth-child(n) > * { background: var(--peche); color: var(--brun); border-top: 2px solid var(--brun); border-bottom: 2px solid var(--brun); }
+.rapport-excel .panneau table.tab-global tbody tr.hors-total-titre:nth-child(n) > * { background: var(--surface); padding-top: var(--sp-4); text-align: left; font-size: var(--fs-xs); font-style: italic; font-weight: var(--fw-regular); color: var(--muted); border-bottom: 1px solid var(--rule); }
+.rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n) > * { background: var(--surface); color: var(--muted); }
+.rapport-excel .panneau table.tab-global tbody tr.hors-total th { padding-left: calc(12px + var(--sp-3)); font-weight: var(--fw-regular); }
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rapport-excel .panneau table.services th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); padding-left: calc(12px + var(--sp-1)); padding-right: 2px; }
