@@ -1,9 +1,14 @@
+import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { gabarit } from './gabarit'
+import { viderCache } from './cacheSession'
+import { useGabarit } from './gabarit'
 
-describe('gabarit', () => {
-  it('garde la structure et les libellés, retire tous les chiffres', () => {
-    const d = { mois: 3, lignes: [{ rubrique: 'Salaire', m: '1200.50', var_pct: '-0.125', exclu: false }], part: 'n/a', vide: null }
-    expect(gabarit(d)).toEqual({ mois: 3, lignes: [{ rubrique: 'Salaire', m: null, var_pct: null, exclu: false }], part: 'n/a', vide: null })
+describe('useGabarit', () => {
+  it("garde la dernière réponse fraîche pour l'ouverture suivante, oubliée au changement de session", () => {
+    const d = { lignes: [{ rubrique: 'Salaire', m: '1200.05' }] }
+    renderHook(() => useGabarit('annuel', d, true))
+    expect(renderHook(() => useGabarit('annuel', undefined, false)).result.current).toEqual(d)
+    viderCache()
+    expect(renderHook(() => useGabarit('annuel', undefined, false)).result.current).toBeUndefined()
   })
 })
