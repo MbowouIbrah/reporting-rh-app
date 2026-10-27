@@ -49,7 +49,7 @@ function routes(avecMarge: boolean, perms: string[]) {
         effectif_fin_contrat: { CDI: { ...cell('3'), part: '0.75' }, MAD: { ...cell('1'), part: '0.25' } },
         mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
         ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
-        ...(avecMarge ? { ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
+        ...(avecMarge ? { ca_ytd: null, marge_ytd: null, ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
       }
@@ -114,6 +114,15 @@ test('Résumé : tableau avec frais de mission, logement et ligne de total', asy
   const entetes = [...document.querySelectorAll('.suivi thead th')].map((t) => t.textContent)
   expect(entetes).toEqual(['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.', 'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ'])
   expect(document.querySelector('.suivi tfoot')).toHaveTextContent(/TOTAL.*7.*3/)
+})
+
+test('Résumé : avec un filtre, tuiles CA et marge gardées avec « — »', async () => {
+  rendu(<Resume />, '/resume?type_site=agence', ['report:read', 'marge:read'], true)
+  for (const titre of ['Chiffre d’affaires', 'Marge', 'CA par salarié']) {
+    const tuile = (await screen.findByText(titre, { selector: '.micro' })).closest('.tuile')!
+    expect(tuile).toHaveTextContent(`${titre}—Non disponible pour ces filtres`)
+  }
+  expect(screen.getByText(/ne sont pas disponibles/)).toBeInTheDocument()
 })
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {

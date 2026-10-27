@@ -88,7 +88,7 @@ export default function Resume() {
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
   }
-  // CA et marge n'existent qu'au global : masqués dès qu'un filtre restreint les salariés.
+  // CA et marge n'existent qu'au global : « — » dès qu'un filtre restreint les salariés.
   const filtre = !!(base && (base.service || base.site || base.type_site || base.activite || base.type_contrat))
   const ann = useQuery({
     queryKey: ['annuel', base],
@@ -101,7 +101,12 @@ export default function Resume() {
   const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : ''
   const erreur = ann.error
   const a = ann.data
-  const aCa = a !== undefined && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && !filtre
+  // Clés absentes de la réponse sans le droit « marge » ; présentes mais vides sous filtre.
+  const droitCa = a !== undefined && 'ca_ytd' in a
+  const aCa = droitCa && !filtre && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
+  const indispo = (titre: string) => (
+    <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
+  )
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
   const moisFin = a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
   const colonnes = [
@@ -150,6 +155,7 @@ export default function Resume() {
           {/* Disposition du 16/10 : CA, commissions, masse salariale, MAD ; puis marge, primes,
               effectif global, CA par salarié. Effectifs = fin du dernier mois saisi. */}
           <div className="cases">
+            {droitCa && filtre && indispo('Chiffre d’affaires')}
             {aCa && (
               <Case titre="Chiffre d’affaires" valeur={compact(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
@@ -184,6 +190,7 @@ export default function Resume() {
             </Case>
           </div>
           <div className="cases">
+            {droitCa && filtre && indispo('Marge')}
             {aCa && (
               // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
               <Case titre="Marge" valeur={compact(a.marge_ytd)} libelle2="Taux de marge"
@@ -206,6 +213,7 @@ export default function Resume() {
             >
               <Variation v={a.effectif_fin.var_pct} vs="" />
             </Case>
+            {droitCa && filtre && indispo('CA par salarié')}
             {aCa && (
               <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
                 detail={[
@@ -218,9 +226,9 @@ export default function Resume() {
               </Case>
             )}
           </div>
-          {filtre && (
+          {droitCa && filtre && (
             <p className="regle">
-              Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne s’affichent pas
+              Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne sont pas disponibles
               quand un service, un site, un type de site, une activité ou un contrat est choisi.
             </p>
           )}
