@@ -22,13 +22,13 @@ export default function Mensuel() {
     placeholderData: keepPreviousData,
   })
   const [premier, relais] = useAttente(q.isLoading)
-  const [maj] = useAttente(q.isPlaceholderData)
+  const [maj, relaisMaj] = useAttente(q.isPlaceholderData)
   const gab = useGabarit('mensuel', q.data, !q.isPlaceholderData)
   // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
   const d = premier ? gab : q.data
 
   return (
-    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
+    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="REPORTING MENSUEL" />
       {f.filtres && (
         <FiltresPeriode comparaison="periode" periodes={f.periodes} filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />

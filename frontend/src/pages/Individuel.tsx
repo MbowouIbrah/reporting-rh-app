@@ -60,7 +60,7 @@ export default function Individuel() {
   })
   // Premier chargement : le vrai tableau (colonnes et mois sont statiques) avec des valeurs vides,
   // que le squelette commun masque ; seules les valeurs chargent.
-  const [maj] = useAttente(q.isPlaceholderData || q.isLoading)
+  const [maj, relais] = useAttente(q.isPlaceholderData || q.isLoading)
   const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
   // Comme DONNEES : colonnes exclues du total (hachurées) d'abord, juste après le mois, puis les
   // colonnes comptées dans le TOTAL MENSUEL (servi par le serveur, sans les hachurées).
@@ -94,7 +94,7 @@ export default function Individuel() {
   })
 
   return (
-    <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}`} aria-busy={maj || undefined}>
+    <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || undefined}>
       <TitreRapport titre="REPORTING INDIVIDUEL" />
       {f.filtres && (
         <div className="filtres filtres-rapport" role="group" aria-label="Filtres">

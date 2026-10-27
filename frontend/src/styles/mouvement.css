@@ -66,14 +66,32 @@
 .cases .case .bulle, .info-bulle, .profil-menu, .ligne-fichier, .choix-periode [role='listbox'] { animation: var(--mv-surgir) var(--mv-dur-surgir) var(--mv-courbe-surgir) backwards; }
 
 /* Fin d'un recalcul : les chiffres remplacent le squelette en fondu (le nom d'animation change quand aria-busy disparaît). */
-.page-ecran :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) {
+.page-ecran :is(tbody td.num, tfoot td.num, tbody .var, .val, .sk-texte, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) {
   animation: mv-fondu var(--mv-dur-retour) ease-out backwards;
 }
+/* Chiffres qui arrivent après un squelette resté visible (classe relais) : révélation marquée, le flou de la barre
+   se dissipe en montant, ligne après ligne de haut en bas. Sans squelette, ils arrivent avec le contenu (fondu ci-dessus). */
+@keyframes mv-chiffre { from { opacity: 0; transform: translateY(5px); filter: blur(4px); } 60% { filter: blur(0); } }
+.page-ecran.relais :is(tbody td.num, tfoot td.num, tbody .var, .val, .sk-texte, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) {
+  animation: mv-chiffre var(--mv-dur-chiffre) var(--mv-courbe) backwards;
+  animation-delay: calc(var(--mv-r, 0) * var(--mv-decalage-chiffre));
+}
+:root { --mv-dur-chiffre: 560ms; --mv-decalage-chiffre: 28ms; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(2) { --mv-r: 1; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(3) { --mv-r: 2; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(4) { --mv-r: 3; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(5) { --mv-r: 4; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(6) { --mv-r: 5; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(7) { --mv-r: 6; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(8) { --mv-r: 7; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(9) { --mv-r: 8; }
+.page-ecran.relais :is(tbody tr, .cases .case):nth-child(n + 10) { --mv-r: 9; }
+.page-ecran.relais tfoot tr { --mv-r: 10; }
 
 @media (prefers-reduced-motion: reduce) {
   :root, :root[data-mouvement] { --mv-entree: none; --mv-sortie: none; --mv-surgir: none; }
   .page > :has(.rail), .page > .page-ecran > :has(.rail) { animation-name: none; }
-  .page-ecran :is(tbody td.num, tbody .var, .val, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) { animation: none; }
+  .page-ecran :is(tbody td.num, tfoot td.num, tbody .var, .val, .sk-texte, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) { animation: none !important; }
 }
 @media print {
   .page > :not(.page-ecran), .page > .page-ecran > *, .page-ecran :is(tbody td.num, .case > strong) { animation: none !important; }

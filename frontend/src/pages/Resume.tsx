@@ -99,7 +99,7 @@ export default function Resume() {
     placeholderData: keepPreviousData,
   })
   const [premier, relais] = useAttente(ann.isLoading)
-  const [maj] = useAttente(ann.isPlaceholderData)
+  const [maj, relaisMaj] = useAttente(ann.isPlaceholderData)
   const gab = useGabarit('annuel', ann.data, !ann.isPlaceholderData)
   const an = f.filtres ? `${f.filtres.annee}` : ''
   const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : ''
@@ -120,7 +120,7 @@ export default function Resume() {
   ]
 
   return (
-    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
+    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
