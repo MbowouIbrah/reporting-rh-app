@@ -183,13 +183,40 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
   )
 }
 
+// Liste fixe : les types de contrat ne se créent pas dans l'application (référentiel initial).
+const CONTRATS: [string, string][] = [
+  ['CDI', 'Contrat à durée indéterminée'],
+  ['CDD', 'Contrat à durée déterminée'],
+  ['MAD', 'Mise à disposition'],
+  ['Stage', 'Convention de stage'],
+]
+
+function TypesContrat() {
+  return (
+    <Panneau titre="Types de contrat" className="ref-contrats">
+      <p className="note">Liste fixe, non modifiable.</p>
+      <table className="dense">
+        <thead>
+          <tr><th scope="col">Code</th><th scope="col">Libellé</th></tr>
+        </thead>
+        <tbody>
+          {CONTRATS.map(([code, libelle]) => (
+            <tr key={code}><th scope="row">{code}</th><td>{libelle}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </Panneau>
+  )
+}
+
 export default function Referentiels() {
   return (
     <section className="page-ecran rapport-excel admin-excel">
       <AdminNav />
-      <div className="admin-duo">
+      <div className="admin-duo admin-trio">
         <Bloc dim="site" titre="Sites" singulier="site" />
         <Bloc dim="service" titre="Services" singulier="service" />
+        <TypesContrat />
       </div>
     </section>
   )

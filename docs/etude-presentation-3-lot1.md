@@ -48,3 +48,10 @@ Choix : A partout.
 ## Risques
 - Libellé du contrôle des contrats changé : tests et recette à aligner.
 - Arrondi d'affichage K/M : seul l'affichage arrondit, les valeurs restent exactes (bulles et tableaux en chiffres complets).
+
+## Retour du 27/10 (2e passe)
+- CA et Marge : orange de l'Excel (fond `#FCE4D6`, texte `#833C00`, jetons `--rapport-hors-total*`), sans ligne d'en-tête.
+- Totaux : même cadre partout (fond, traits épais haut et bas) ; le total à deux lignes (masse + staff) est encadré comme un seul bloc.
+- Types de contrat : liste fixe en lecture seule (CDI, CDD, MAD, Stage) dans Administration > Sites et services, en troisième colonne.
+- Stagiaires : « Stage » apparaît dans les répartitions par contrat seulement s'il a au moins une ligne sur les périodes affichées (`FACULTATIFS`, `kpi/moteur.py`).
+- Filtre actif : les cases CA, Marge et CA par salarié restent affichées avec « — » et « Non disponible pour ces filtres ». Les colonnes CA/Marge du tableau mensuel restent masquées.

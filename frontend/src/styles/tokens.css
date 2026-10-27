@@ -47,6 +47,9 @@
   --rapport-groupe: var(--surface-hover);
   --rapport-zebre: var(--paper-2);
   --rapport-total: var(--info-soft);
+  /* CA et marge sous le total : orange des classeurs Excel (remplissage FCE4D6, texte 833C00) */
+  --rapport-hors-total: #fce4d6;
+  --rapport-hors-total-texte: #833c00;
   --rapport-saisi: var(--warning-soft);
   --rapport-saisi-bord: var(--warning);
 

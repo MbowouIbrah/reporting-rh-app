@@ -83,9 +83,6 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
         {d.lignes_ca_marge && (
           <>
-            <tr className="hors-total-titre">
-              <th scope="colgroup" colSpan={COLONNES + 1}>Pour information, hors total</th>
-            </tr>
             <Ligne label="Chiffre d'affaires" cell={d.lignes_ca_marge.ca} budget className="hors-total" />
             <Ligne label="Marge" cell={d.lignes_ca_marge.marge} budget className="hors-total" />
           </>

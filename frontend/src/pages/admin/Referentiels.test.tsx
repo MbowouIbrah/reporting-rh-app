@@ -35,6 +35,14 @@ test('deux blocs : sites avec leur type et leur statut, services', async () => {
   expect(services.queryByRole('columnheader', { name: 'Type de site' })).toBeNull()
 })
 
+test('types de contrat : liste fixe en lecture seule, Stage compris', async () => {
+  monter(page, PERMS, servir)
+  const bloc = within(await screen.findByRole('region', { name: 'Types de contrat' }))
+  expect(bloc.getAllByRole('rowheader').map((c) => c.textContent)).toEqual(['CDI', 'CDD', 'MAD', 'Stage'])
+  expect(bloc.queryByRole('button')).toBeNull()
+  expect(bloc.queryByRole('textbox')).toBeNull()
+})
+
 test('sans droit sur les référentiels : renvoyé au premier onglet d’administration permis', async () => {
   monter(
     <Routes>

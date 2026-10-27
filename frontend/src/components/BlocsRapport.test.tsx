@@ -83,7 +83,7 @@ test('reporting global : CA et marge sous le TOTAL GÉNÉRAL, budget vide, absen
   const blocs = { a_type_charge: [total], lignes_ca_marge: { ca: cell, marge: cell } } as unknown as Blocs
   const { unmount } = render(<TypesCharge d={blocs} lib={{ prec: 'M-1', cour: 'M' }} />)
   const lignes = screen.getAllByRole('row').map((r) => r.querySelector('th')?.textContent)
-  expect(lignes.slice(-4)).toEqual(['TOTAL GÉNÉRAL', 'Pour information, hors total', "Chiffre d'affaires", 'Marge'])
+  expect(lignes.slice(-3)).toEqual(['TOTAL GÉNÉRAL', "Chiffre d'affaires", 'Marge'])
   const ca = screen.getByText("Chiffre d'affaires").closest('tr')!
   expect([...ca.querySelectorAll('td')].slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
   unmount()
