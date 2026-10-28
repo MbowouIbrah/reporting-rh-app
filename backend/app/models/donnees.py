@@ -83,6 +83,7 @@ class SituationMensuelle(Base):
     type_contrat_id: Mapped[int] = mapped_column(ForeignKey("type_contrat.id"))
     poste_id: Mapped[int | None] = mapped_column(ForeignKey("poste.id"), nullable=True)
     lot_import_id: Mapped[int | None] = mapped_column(ForeignKey("lot_import.id"), nullable=True)
+    reference_activite: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class Montant(Base):

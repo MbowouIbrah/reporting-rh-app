@@ -47,7 +47,7 @@ def _vue(db: Session, per: Periode) -> dict:
     for axe, model in MODELES.items():
         q = select(model).order_by(model.ordre if axe == "rubrique" else model.id)
         if axe == "rubrique":
-            q = q.where(Rubrique.unite == "FCFA")
+            q = q.where(Rubrique.unite == "FCFA", Rubrique.nature == "paie")
         lignes[axe] = [
             {"cible_id": r.id, "libelle": r.libelle, "actif": r.actif,
              "valeur": vals[axe].get(r.id)}
@@ -97,7 +97,7 @@ def valider_lignes(db: Session, lignes: list[LigneIn]) -> list[tuple[LigneIn, De
         cible = db.get(MODELES[x.axe], x.cible_id)
         if cible is None:
             raise HTTPException(422, "Cible inconnue")
-        if x.axe == "rubrique" and cible.unite != "FCFA":
+        if x.axe == "rubrique" and (cible.unite != "FCFA" or cible.nature != "paie"):
             raise HTTPException(422, "Budget possible sur une rubrique en FCFA uniquement")
         vide = x.valeur is None or not x.valeur.strip()
         out.append((x, None if vide else parse_montant(x.valeur)))

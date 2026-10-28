@@ -61,7 +61,7 @@ def _vue(db: Session, annee: int, mois: int) -> dict:
     for axe, model in MODELES.items():
         q = select(model).order_by(model.ordre if axe == "rubrique" else model.id)
         if axe == "rubrique":
-            q = q.where(Rubrique.unite == "FCFA")
+            q = q.where(Rubrique.unite == "FCFA", Rubrique.nature == "paie")
         budgets[axe] = [
             {"cible_id": r.id, "libelle": r.libelle, "actif": r.actif,
              "exclue": axe == "rubrique" and r.libelle in exclues,

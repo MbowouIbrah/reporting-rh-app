@@ -1,6 +1,15 @@
 from datetime import date
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -14,6 +23,8 @@ class _Ref:
 
 class Service(_Ref, Base):
     __tablename__ = "service"
+
+    productif: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class Activite(_Ref, Base):
@@ -60,13 +71,17 @@ class RefAlias(Base):
 
 class Rubrique(Base):
     __tablename__ = "rubrique"
-    __table_args__ = (CheckConstraint("unite IN ('FCFA','jours')"),)
+    __table_args__ = (
+        CheckConstraint("unite IN ('FCFA','jours','nombre')", name="ck_rubrique_unite"),
+        CheckConstraint("nature IN ('paie','activite')", name="ck_rubrique_nature"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     libelle: Mapped[str] = mapped_column(String(200), unique=True)
     unite: Mapped[str] = mapped_column(String(10))
     ordre: Mapped[int] = mapped_column(Integer)
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
+    nature: Mapped[str] = mapped_column(String(10), default="paie", server_default="paie")
 
 
 class RubriqueRegle(Base):

@@ -7,7 +7,17 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.kpi.moteur import Budgets, Ligne, Params, PeriodeData, Refs, exclusions_ligne, total_ligne
+from app.kpi.moteur import (
+    CA_INDIVIDUEL,
+    MARGE_INDIVIDUELLE,
+    Budgets,
+    Ligne,
+    Params,
+    PeriodeData,
+    Refs,
+    exclusions_ligne,
+    total_ligne,
+)
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.pilotage import Budget, CaPeriode, Parametre
 from app.models.referentiel import (
@@ -34,7 +44,8 @@ def charger_refs(db: Session, type_site: str | None = None, scope: Scope | None 
             q = q.where(model.libelle.in_(scope.rules[dim]))
         return tuple(db.scalars(q))
 
-    rub = tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.actif).order_by(Rubrique.ordre)))
+    rub = tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.actif, Rubrique.nature == "paie")
+                          .order_by(Rubrique.ordre)))
     return Refs(libs(Service), libs(Activite), libs(Site), libs(TypeContrat), rub)
 
 
@@ -67,6 +78,8 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
         q = (select(model.libelle, Budget.valeur)
              .join(model, model.id == Budget.cible_id)
              .where(Budget.periode_id == pid, Budget.axe == axe, model.actif))
+        if model is Rubrique:
+            q = q.where(Rubrique.nature == "paie")
         if type_site and model is Site:
             q = q.where(Site.type_site == type_site)
         return {lib: Decimal(str(v)) for lib, v in db.execute(q)}
@@ -91,7 +104,8 @@ def exclues_a_date(db: Session, annee: int, mois: int) -> frozenset[str]:
     d = date(annee, mois, 1)
     q = (select(Rubrique.libelle)
          .join(RubriqueRegle, RubriqueRegle.rubrique_id == Rubrique.id)
-         .where(RubriqueRegle.regle == "exclu_total_ligne", RubriqueRegle.date_debut <= d,
+         .where(Rubrique.nature == "paie",
+                RubriqueRegle.regle == "exclu_total_ligne", RubriqueRegle.date_debut <= d,
                 (RubriqueRegle.date_fin.is_(None)) | (RubriqueRegle.date_fin >= d)))
     return frozenset(db.scalars(q))
 
@@ -102,7 +116,8 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
         return None
     q = apply_scope(
         select(SituationMensuelle.id, SituationMensuelle.salarie_id, Service.libelle,
-               Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle)
+               Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle,
+               SituationMensuelle.reference_activite)
         .join(Service, Service.id == SituationMensuelle.service_id)
         .join(Site, Site.id == SituationMensuelle.site_id)
         .join(Activite, Activite.id == SituationMensuelle.activite_id)
@@ -112,15 +127,19 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
         scope, service=Service.libelle, site=Site.libelle)
     rows = db.execute(q).all()
     montants: dict[int, dict[str, Decimal]] = defaultdict(dict)
+    indicateurs: dict[int, dict[str, Decimal]] = defaultdict(dict)
     if rows:
-        mq = (select(Montant.situation_id, Rubrique.libelle, Montant.valeur)
+        mq = (select(Montant.situation_id, Rubrique.libelle, Montant.valeur, Rubrique.nature)
               .join(Rubrique, Rubrique.id == Montant.rubrique_id)
               .where(Montant.situation_id.in_([r[0] for r in rows])))
-        for sid, rub, val in db.execute(mq):
-            montants[sid][rub] = Decimal(str(val))
+        for sid, rub, val, nature in db.execute(mq):
+            # la paie et l'activité sont séparées dès la lecture : le moteur de paie ne voit
+            # jamais une rubrique d'activité
+            (montants if nature == "paie" else indicateurs)[sid][rub] = Decimal(str(val))
     saisie = db.get(CaPeriode, periode.id)
-    lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste)
-                   for sid, sal, srv, site, act, ctr, tsite, poste in rows)
+    lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste,
+                         indicateurs.get(sid, {}), ref)
+                   for sid, sal, srv, site, act, ctr, tsite, poste, ref in rows)
     return PeriodeData(lignes, exclues_a_date(db, annee, mois),
                        ca=_dec(saisie.valeur) if saisie else None,
                        marge=_dec(saisie.marge) if saisie else None)
@@ -140,7 +159,7 @@ def texte_montant(v: Decimal) -> str:
 def rubriques_exclues(db: Session) -> frozenset[str]:
     """Rubriques exclues du TOTAL sur au moins une période (colonnes isolées dans DONNEES)."""
     q = (select(Rubrique.libelle).join(RubriqueRegle, RubriqueRegle.rubrique_id == Rubrique.id)
-         .where(RubriqueRegle.regle == "exclu_total_ligne"))
+         .where(Rubrique.nature == "paie", RubriqueRegle.regle == "exclu_total_ligne"))
     return frozenset(db.scalars(q))
 
 
@@ -148,7 +167,8 @@ def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, servi
                         site: str | None, recherche: str | None, matricule: str | None = None):
     q = apply_scope(
         select(SituationMensuelle.id, Periode.annee, Periode.mois, Salarie.matricule, Salarie.nom,
-               Poste.libelle, TypeContrat.libelle, Activite.libelle, Site.libelle, Service.libelle)
+               Poste.libelle, TypeContrat.libelle, Activite.libelle, Site.libelle, Service.libelle,
+               SituationMensuelle.reference_activite)
         .join(Periode, Periode.id == SituationMensuelle.periode_id)
         .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
         .outerjoin(Poste, Poste.id == SituationMensuelle.poste_id)
@@ -171,21 +191,27 @@ def _situations_tableau(scope: Scope, annee: int | None, mois: int | None, servi
 def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
                     mois: int | None = None, service: str | None = None,
                     site: str | None = None, recherche: str | None = None,
-                    matricule: str | None = None) -> list[dict]:
-    """Lignes de la feuille DONNEES (une par employé et par mois), dans le périmètre."""
+                    matricule: str | None = None, avec_marge: bool = False) -> list[dict]:
+    """Lignes de la feuille DONNEES (une par employé et par mois), dans le périmètre.
+    `montants` ne porte que la paie ; les rubriques d'activité sont dans `indicateurs`, CA et marge
+    individuels seulement avec `avec_marge` (droit marge:read)."""
     q = _situations_tableau(scope, annee, mois, service, site, recherche, matricule)
     rows = db.execute(q).all()
     montants: dict[int, dict[str, Decimal]] = defaultdict(dict)
+    indicateurs: dict[int, dict[str, Decimal]] = defaultdict(dict)
     if rows:
         ids = q.with_only_columns(SituationMensuelle.id).order_by(None)
-        mq = (select(Montant.situation_id, Rubrique.libelle, Montant.valeur)
+        mq = (select(Montant.situation_id, Rubrique.libelle, Montant.valeur, Rubrique.nature)
               .join(Rubrique, Rubrique.id == Montant.rubrique_id)
               .where(Montant.situation_id.in_(ids)))
-        for sid, rub, val in db.execute(mq):
-            montants[sid][rub] = Decimal(str(val))
+        for sid, rub, val, nature in db.execute(mq):
+            if nature == "paie":
+                montants[sid][rub] = Decimal(str(val))
+            elif avec_marge or rub not in (CA_INDIVIDUEL, MARGE_INDIVIDUELLE):
+                indicateurs[sid][rub] = Decimal(str(val))
     exclues: dict[tuple[int, int], frozenset[str]] = {}
     out = []
-    for sid, a, m, mat, nom, poste, ctr, act, site_, srv in rows:
+    for sid, a, m, mat, nom, poste, ctr, act, site_, srv, ref in rows:
         ex = exclues.get((a, m))
         if ex is None:
             ex = exclues[(a, m)] = exclues_a_date(db, a, m)
@@ -196,6 +222,8 @@ def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
             "montants": {k: texte_montant(v) for k, v in mt.items()},
             "total": texte_montant(total_ligne(mt, ex)),
             "exclusions": texte_montant(exclusions_ligne(mt, ex)),
+            "indicateurs": {k: texte_montant(v) for k, v in indicateurs.get(sid, {}).items()},
+            "reference": ref,
         })
     return out
 

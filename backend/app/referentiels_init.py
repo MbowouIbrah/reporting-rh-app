@@ -3,9 +3,10 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.kpi.moteur import RUBRIQUES_ACTIVITE
 from app.models.pilotage import Parametre
 from app.models.referentiel import (
     Activite,
@@ -34,6 +35,7 @@ RUBRIQUES = [
     ("Assurance Maladie", "FCFA"), ("Formation", "FCFA"),
     ("TVA & Marge MAD", "FCFA"),
 ]
+SERVICES_PRODUCTIFS = ["SAV PL", "SAV Engins"]
 # Règles d'exclusion du total de ligne à date d'effet (docs/P0_CADRAGE.md §1).
 EXCLUES_TOTAL_LIGNE = ["Absences (nb)", "Salaire brut garantie", "Primes sur ventes",
                        "Primes sur résultats", "Productivité Ateliers", "Commission"]
@@ -48,6 +50,7 @@ def _fill(db: Session, model, libelles: list[str]) -> None:
 
 def seed_referentiels(db: Session) -> None:
     """Idempotent : ne touche pas à ce qui existe déjà."""
+    services_existants = {s.id for s in db.scalars(select(Service))}
     for model, libelles in ((Service, SERVICES), (Activite, ACTIVITES),
                             (TypeContrat, CONTRATS), (Site, SITES)):
         _fill(db, model, libelles)
@@ -55,6 +58,15 @@ def seed_referentiels(db: Session) -> None:
     for ordre, (lib, unite) in enumerate(RUBRIQUES, start=1):
         if lib not in existantes:
             db.add(Rubrique(libelle=lib, unite=unite, ordre=ordre))
+    db.flush()
+    ordre = (db.scalar(select(func.max(Rubrique.ordre))) or 0) + 1
+    for lib, unite in RUBRIQUES_ACTIVITE:
+        if lib not in existantes:
+            db.add(Rubrique(libelle=lib, unite=unite, ordre=ordre, nature="activite"))
+            ordre += 1
+    for srv in db.scalars(select(Service).where(Service.libelle.in_(SERVICES_PRODUCTIFS))):
+        if srv.id not in services_existants:
+            srv.productif = True
     db.flush()
     rub = {r.libelle: r.id for r in db.scalars(select(Rubrique))}
     if not db.scalar(select(RubriqueRegle.id).limit(1)):

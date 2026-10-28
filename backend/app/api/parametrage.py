@@ -41,7 +41,7 @@ def _param(x: Parametre) -> dict:
 
 def _rubrique(r: Rubrique) -> dict:
     return {"id": r.id, "libelle": r.libelle, "unite": r.unite, "ordre": r.ordre,
-            "actif": r.actif, "moteur": r.libelle in MOTEUR}
+            "actif": r.actif, "moteur": r.libelle in MOTEUR, "nature": r.nature}
 
 
 @router.get("/parametrage")
@@ -61,6 +61,7 @@ class RubriqueIn(BaseModel):
     libelle: str
     unite: str
     ordre: int | None = None
+    nature: str = "paie"
 
 
 @router.post("/parametrage/rubriques", status_code=201)
@@ -71,15 +72,20 @@ def creer_rubrique(
     lib = body.libelle.strip()
     if not lib:
         raise HTTPException(422, "Libellé vide")
-    if body.unite not in ("FCFA", "jours"):
-        raise HTTPException(422, "Unité invalide (FCFA ou jours)")
+    if body.unite not in ("FCFA", "jours", "nombre"):
+        raise HTTPException(422, "Unité invalide (FCFA, jours ou nombre)")
+    if body.nature not in ("paie", "activite"):
+        raise HTTPException(422, "Nature invalide (paie ou activite)")
+    if body.nature == "paie" and body.unite == "nombre":
+        raise HTTPException(422, "Une rubrique de paie est en FCFA ou en jours")
     if db.scalar(select(Rubrique.id).where(Rubrique.libelle == lib)):
         raise HTTPException(409, "Libellé déjà utilisé")
     ordre = body.ordre
     if ordre is None:
         dernier = db.scalar(select(Rubrique.ordre).order_by(Rubrique.ordre.desc()).limit(1))
         ordre = (dernier or 0) + 1
-    r = Rubrique(libelle=lib, unite=body.unite, ordre=ordre, actif=True)
+    r = Rubrique(libelle=lib, unite=body.unite, ordre=ordre, actif=True,
+                 nature=body.nature)
     db.add(r)
     db.flush()
     audit.record(db, p.user_id, "create", "rubrique", r.id, None, _rubrique(r))
@@ -142,10 +148,12 @@ def ordonner_colonnes(
     libs = [c.rubrique for c in body.colonnes]
     if not libs or len(set(libs)) != len(libs) or any(x not in par_lib for x in libs):
         raise HTTPException(422, "Colonnes invalides")
+    if any(par_lib[x].nature != "paie" for x in libs):
+        raise HTTPException(422, "Une rubrique d'activité n'est pas une colonne de paie")
     if any(not c.exclu and par_lib[c.rubrique].unite != "FCFA" for c in body.colonnes):
         raise HTTPException(422, "Une rubrique en jours ne peut pas entrer dans le TOTAL")
     exclues = rubriques_exclues(db)
-    avant = _colonnes(toutes, exclues)
+    avant = _colonnes([r for r in toutes if r.nature == "paie"], exclues)
     recues = set(libs)
     places = iter([i for i, r in enumerate(toutes) if r.libelle in recues])
     for lib in libs:
@@ -161,7 +169,7 @@ def ordonner_colonnes(
         if c.exclu:
             db.add(RubriqueRegle(rubrique_id=rid, regle="exclu_total_ligne", date_debut=DEBUT))
     db.flush()
-    apres = _colonnes(toutes, rubriques_exclues(db))
+    apres = _colonnes([r for r in toutes if r.nature == "paie"], rubriques_exclues(db))
     audit.record(db, p.user_id, "update", "colonnes", None, {"colonnes": avant},
                  {"colonnes": apres})
     db.commit()
@@ -182,8 +190,11 @@ def creer_regle(
     authorize(p, "referentiel:write")
     if body.regle not in REGLES:
         raise HTTPException(422, "Règle inconnue")
-    if db.get(Rubrique, body.rubrique_id) is None:
+    rub = db.get(Rubrique, body.rubrique_id)
+    if rub is None:
         raise HTTPException(404, "Rubrique introuvable")
+    if rub.nature != "paie":
+        raise HTTPException(422, "Une rubrique d'activité n'entre pas dans le total de paie")
     # chevauchement avec une règle identique encore active à partir de la date de début
     for r in db.scalars(select(RubriqueRegle).where(
             RubriqueRegle.rubrique_id == body.rubrique_id, RubriqueRegle.regle == body.regle)):

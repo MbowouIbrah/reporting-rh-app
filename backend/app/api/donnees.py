@@ -13,7 +13,15 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.imports import modeles, service
 from app.imports.lecture import Feuille
-from app.imports.regles import ATTRIBUTS, BLOQUANT, MOIS, est_sans_matricule, nombre, valider
+from app.imports.regles import (
+    ATTRIBUTS,
+    BLOQUANT,
+    MOIS,
+    REFERENCE_COLONNE,
+    est_sans_matricule,
+    nombre,
+    valider,
+)
 from app.kpi.chargement import (
     charger_refs,
     charger_tableau,
@@ -21,13 +29,13 @@ from app.kpi.chargement import (
     options_tableau,
     rubriques_exclues,
 )
-from app.kpi.moteur import exclusions_ligne, total_ligne
+from app.kpi.moteur import CA_INDIVIDUEL, MARGE_INDIVIDUELLE, exclusions_ligne, total_ligne
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport
 from app.models.referentiel import Activite, Poste, Rubrique, Service, Site, TypeContrat
 from app.repos.scope import scope_for
 from app.security.deps import current_principal
-from app.security.policy import Principal, authorize
+from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/donnees", tags=["donnees"])
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -39,24 +47,38 @@ def _libelles(db: Session, model) -> dict[int, str]:
     return {r.id: r.libelle for r in db.scalars(select(model))}
 
 
-def _rubriques(db: Session) -> list[Rubrique]:
-    return list(db.scalars(select(Rubrique).where(Rubrique.actif).order_by(Rubrique.ordre)))
+MARGE_INDIVIDUELLE_LIBELLES = (CA_INDIVIDUEL, MARGE_INDIVIDUELLE)
 
 
-def _lignes(db: Session, annee: int, mois: int) -> list[dict]:
+def _rubriques(db: Session, avec_marge: bool = True) -> list[Rubrique]:
+    """Rubriques actives (paie puis activité). CA et marge individuels seulement avec marge:read."""
+    return [r for r in db.scalars(select(Rubrique).where(Rubrique.actif).order_by(Rubrique.ordre))
+            if avec_marge or r.libelle not in MARGE_INDIVIDUELLE_LIBELLES]
+
+
+def _rubrique_dict(r: Rubrique) -> dict:
+    return {"libelle": r.libelle, "unite": r.unite, "nature": r.nature}
+
+
+def _lignes(db: Session, annee: int, mois: int, avec_marge: bool = True) -> list[dict]:
     per = db.scalar(select(Periode).where(Periode.annee == annee, Periode.mois == mois))
     if per is None:
         return []
-    rub = {r.id: r.libelle for r in db.scalars(select(Rubrique))}
+    rub = {r.id: (r.libelle, r.nature) for r in db.scalars(select(Rubrique))}
     lib = {k: _libelles(db, m) for k, m in REFS.items()}
     exclues = exclues_a_date(db, annee, mois)
     montants: dict[int, dict[str, Decimal]] = {}
+    indicateurs: dict[int, dict[str, Decimal]] = {}
     for sid, rid, v in db.execute(
         select(Montant.situation_id, Montant.rubrique_id, Montant.valeur)
         .join(SituationMensuelle, SituationMensuelle.id == Montant.situation_id)
         .where(SituationMensuelle.periode_id == per.id)
     ):
-        montants.setdefault(sid, {})[rub[rid]] = v
+        libelle, nature = rub[rid]
+        if nature == "paie":
+            montants.setdefault(sid, {})[libelle] = v
+        elif avec_marge or libelle not in MARGE_INDIVIDUELLE_LIBELLES:
+            indicateurs.setdefault(sid, {})[libelle] = v
     out = []
     q = (select(SituationMensuelle, Salarie)
          .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
@@ -70,6 +92,8 @@ def _lignes(db: Session, annee: int, mois: int) -> list[dict]:
             "activite": lib["Activité"][sit.activite_id], "site": lib["Site"][sit.site_id],
             "service": lib["Service"][sit.service_id],
             "montants": {k: str(v) for k, v in m.items()},
+            "indicateurs": {k: str(v) for k, v in indicateurs.get(sit.id, {}).items()},
+            "reference": sit.reference_activite,
             "total": str(total_ligne(m, exclues)),
         })
     return out
@@ -79,9 +103,14 @@ def _lignes(db: Session, annee: int, mois: int) -> list[dict]:
 def donnees_du_mois(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le=12),
                     p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(p, "saisie:write")
+    marge = is_allowed(p, "marge:read")
     return {"annee": annee, "mois": mois,
-            "rubriques": [{"libelle": r.libelle, "unite": r.unite} for r in _rubriques(db)],
-            "lignes": _lignes(db, annee, mois)}
+            "rubriques": [_rubrique_dict(r) for r in _rubriques(db, marge)],
+            "lignes": _lignes(db, annee, mois, marge)}
+
+
+def _colonnes_activite(db: Session, avec_marge: bool) -> list[dict]:
+    return [_rubrique_dict(r) for r in _rubriques(db, avec_marge) if r.nature == "activite"]
 
 
 @router.get("/structure")
@@ -92,6 +121,7 @@ def structure(p: Principal = Depends(current_principal), db: Session = Depends(g
     colonnes = list(charger_refs(db).rubriques)
     exclues = rubriques_exclues(db)
     return {"colonnes": colonnes, "exclues": [c for c in colonnes if c in exclues],
+            "colonnes_activite": _colonnes_activite(db, is_allowed(p, "marge:read")),
             "filtres": options_tableau(db, scope_for(db, p))}
 
 
@@ -106,13 +136,16 @@ def tableau(annee: int | None = Query(None, ge=2000, le=2100),
     """Feuille DONNEES : une ligne par employé et par mois, dans le périmètre du demandeur."""
     authorize(p, "saisie:write")
     scope = scope_for(db, p)
+    marge = is_allowed(p, "marge:read")
     colonnes = list(charger_refs(db).rubriques)
     exclues = rubriques_exclues(db)
     return {"colonnes": colonnes,
             "exclues": [c for c in colonnes if c in exclues],
+            "colonnes_activite": _colonnes_activite(db, marge),
             "filtres": options_tableau(db, scope),
             "lignes": charger_tableau(db, scope, annee=annee, mois=mois, service=service,
-                                      site=site, recherche=q, matricule=matricule)}
+                                      site=site, recherche=q, matricule=matricule,
+                                      avec_marge=marge)}
 
 
 @router.get("/modele.xlsx")
@@ -124,13 +157,15 @@ def modele_mensuel(annee: int | None = Query(None, ge=2000, le=2100),
     authorize(p, "saisie:write")
     if (annee is None) != (mois is None) or (matricules and annee is None):
         raise HTTPException(422, "Préciser l'année et le mois ensemble.")
-    rubriques = [r.libelle for r in sorted(_rubriques(db), key=lambda r: r.id)]  # ordre de création
+    marge = is_allowed(p, "marge:read")
+    # ordre de création
+    rubriques = [r.libelle for r in sorted(_rubriques(db, marge), key=lambda r: r.id)]
     refs = {k: sorted(_libelles(db, m).values()) for k, m in REFS.items()}
     if not matricules:
         nom = f"donnees_{annee}_{mois:02d}.xlsx" if annee else "donnees_plusieurs_mois.xlsx"
         return Response(modeles.modele_mensuel(annee, mois, rubriques, refs, []), media_type=XLSX,
                         headers={"Content-Disposition": f'attachment; filename="{nom}"'})
-    existantes = {x["matricule"]: x for x in _lignes(db, annee, mois)}
+    existantes = {x["matricule"]: x for x in _lignes(db, annee, mois, marge)}
     fiche = [(m, c, _libelles(db, m)) for m, c in (
         (Poste, "poste_id"), (TypeContrat, "type_contrat_id"), (Activite, "activite_id"),
         (Site, "site_id"), (Service, "service_id"))]
@@ -142,10 +177,11 @@ def modele_mensuel(annee: int | None = Query(None, ge=2000, le=2100),
         e = existantes.get(sal.matricule)
         if e:
             attrs = [e["poste"], e["type_contrat"], e["activite"], e["site"], e["service"]]
-            vals = [Decimal(e["montants"][r]) if r in e["montants"] else None for r in rubriques]
+            tout = {**e["montants"], **e["indicateurs"]}
+            vals = [Decimal(tout[r]) if r in tout else None for r in rubriques] + [e["reference"]]
         else:
             attrs = [lib.get(getattr(sal, c)) for _m, c, lib in fiche]
-            vals = [None] * len(rubriques)
+            vals = [None] * (len(rubriques) + 1)
         mat = "" if est_sans_matricule(sal.matricule) else sal.matricule
         lignes.append([mat, sal.nom, *attrs, *vals])
     contenu = modeles.modele_mensuel(annee, mois, rubriques, refs, lignes)
@@ -163,7 +199,8 @@ class LigneIn(BaseModel):
     activite: str | None = None
     site: str | None = None
     service: str | None = None
-    montants: dict[str, str] = {}
+    montants: dict[str, str] = {}  # paie et activité, par libellé de rubrique
+    reference: str | None = None
 
 
 @router.post("/lignes", status_code=201)
@@ -175,10 +212,12 @@ def saisir_ligne(f: LigneIn, p: Principal = Depends(current_principal),
         raise HTTPException(422, "Mois invalide")
     sal = db.scalar(select(Salarie).where(Salarie.matricule_norm == f.matricule.strip().casefold()))
     nom = f.nom or (sal.nom if sal else None)
-    rubriques = [r.libelle for r in _rubriques(db)]
+    rubriques = [r.libelle for r in _rubriques(db, is_allowed(p, "marge:read"))]
     ligne = [f.annee, MOIS[f.mois - 1], f.matricule.strip(), nom, f.poste, f.type_contrat,
-             f.activite, f.site, f.service, *[f.montants.get(r) or None for r in rubriques]]
-    feuille = Feuille(entete_ligne=3, entetes=[*ATTRIBUTS, *rubriques], lignes=[(4, tuple(ligne))])
+             f.activite, f.site, f.service, *[f.montants.get(r) or None for r in rubriques],
+             f.reference or None]
+    feuille = Feuille(entete_ligne=3, entetes=[*ATTRIBUTS, *rubriques, REFERENCE_COLONNE],
+                      lignes=[(4, tuple(ligne))])
     sha = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
     lot = service.analyser_feuille(db, p.user_id, f"saisie {f.matricule}", feuille, sha, 0)
     if lot.statut != "pret":
@@ -201,7 +240,8 @@ class LigneSaisie(BaseModel):
     activite: str | None = None
     site: str | None = None
     service: str | None = None
-    montants: dict[str, str | None] = {}
+    montants: dict[str, str | None] = {}  # paie et activité, par libellé de rubrique
+    reference: str | None = None
 
 
 class SaisieIn(BaseModel):
@@ -229,9 +269,11 @@ def _montant(v: str | None):
 
 def _feuille(annee: int, mois: int, lignes: list[LigneSaisie], rubriques: list[str]) -> Feuille:
     """Grille -> feuille au format de l'import ; la ligne n de la grille porte le numéro n."""
-    return Feuille(entete_ligne=0, entetes=[*ATTRIBUTS, *rubriques], lignes=[(i, (
+    entetes = [*ATTRIBUTS, *rubriques, REFERENCE_COLONNE]
+    return Feuille(entete_ligne=0, entetes=entetes, lignes=[(i, (
         annee, MOIS[mois - 1], x.matricule.strip() or None, x.nom, x.poste, x.type_contrat,
-        x.activite, x.site, x.service, *[_montant(x.montants.get(r)) for r in rubriques]))
+        x.activite, x.site, x.service, *[_montant(x.montants.get(r)) for r in rubriques],
+        x.reference or None))
         for i, x in enumerate(lignes, start=1)])
 
 
@@ -241,11 +283,13 @@ def modele_saisie(corps: SaisieIn, p: Principal = Depends(current_principal),
     """Modèle xlsx tiré de l'assistant : exactement les lignes envoyées (employés cochés, valeurs
     déjà saisies dans la grille). Aucune ligne : modèle vide, en-tête et listes déroulantes."""
     authorize(p, "saisie:write")
-    rubriques = [r.libelle for r in sorted(_rubriques(db), key=lambda r: r.id)]  # ordre de création
+    rubriques = [r.libelle for r in sorted(_rubriques(db, is_allowed(p, "marge:read")),
+                                           key=lambda r: r.id)]  # ordre de création
     refs = {k: sorted(_libelles(db, m).values()) for k, m in REFS.items()}
     lignes = [["" if est_sans_matricule(x.matricule) else x.matricule.strip(), x.nom,
                x.poste, x.type_contrat, x.activite, x.site, x.service,
-               *[_montant(x.montants.get(r)) for r in rubriques]] for x in corps.lignes]
+               *[_montant(x.montants.get(r)) for r in rubriques], x.reference or None]
+              for x in corps.lignes]
     annee, mois = corps.annee, corps.mois
     contenu = modeles.modele_mensuel(annee, mois, rubriques, refs, lignes)
     return Response(contenu, media_type=XLSX, headers={
@@ -268,10 +312,11 @@ def preparation(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le
                 p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Employés à renseigner pour un mois : déjà saisi, présent le mois d'avant, attributs."""
     authorize(p, "saisie:write")
+    marge = is_allowed(p, "marge:read")
     lib = {k: _libelles(db, m) for k, m in REFS.items()}
-    saisies = {x["matricule"]: x for x in _lignes(db, annee, mois)}
+    saisies = {x["matricule"]: x for x in _lignes(db, annee, mois, marge)}
     pa, pm = (annee, mois - 1) if mois > 1 else (annee - 1, 12)
-    precedent = {x["matricule"] for x in _lignes(db, pa, pm)}
+    precedent = {x["matricule"] for x in _lignes(db, pa, pm, marge)}
     # Dernière situation connue avant le mois : poste, site, service... repris tels quels.
     derniere: dict[int, SituationMensuelle] = {}
     q = (select(SituationMensuelle).join(Periode, Periode.id == SituationMensuelle.periode_id)
@@ -289,9 +334,10 @@ def preparation(annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le
                      {a: lib[r].get(getattr(source, c)) for a, r, c in ATTRS_SAISIE})
         salaries.append({"matricule": sal.matricule, "nom": sal.nom, "saisi": e is not None,
                          "present_precedent": sal.matricule in precedent, "attributs": attributs,
-                         "montants": e["montants"] if e else {}})
+                         "montants": {**e["montants"], **e["indicateurs"]} if e else {},
+                         "reference": e["reference"] if e else None})
     return {"annee": annee, "mois": mois,
-            "rubriques": [{"libelle": r.libelle, "unite": r.unite} for r in _rubriques(db)],
+            "rubriques": [_rubrique_dict(r) for r in _rubriques(db, marge)],
             "exclues": sorted(exclues_a_date(db, annee, mois)),
             "referentiels": {a: sorted(lib[r].values()) for a, r, _c in ATTRS_SAISIE},
             "salaries": salaries}
@@ -302,7 +348,7 @@ def verifier(corps: SaisieIn, p: Principal = Depends(current_principal),
              db: Session = Depends(get_db)):
     """Contrôle de la grille sans rien écrire : anomalies par cellule et TOTAL de chaque ligne."""
     authorize(p, "saisie:write")
-    rubriques = [r.libelle for r in _rubriques(db)]
+    rubriques = [r.libelle for r in _rubriques(db, is_allowed(p, "marge:read"))]
     lignes, anos, _stats = valider(_feuille(corps.annee, corps.mois, corps.lignes, rubriques),
                                    service.charger_refs(db))
     exclues = exclues_a_date(db, corps.annee, corps.mois)
@@ -343,7 +389,7 @@ def creer_lot_saisie(corps: LotSaisieIn, p: Principal = Depends(current_principa
 
     if (lot_existant := deja()) is not None:
         return lot_existant
-    rubriques = [r.libelle for r in _rubriques(db)]
+    rubriques = [r.libelle for r in _rubriques(db, is_allowed(p, "marge:read"))]
     try:
         lot = service.analyser_feuille(
             db, p.user_id, f"Saisie {MOIS[corps.mois - 1]} {corps.annee}",

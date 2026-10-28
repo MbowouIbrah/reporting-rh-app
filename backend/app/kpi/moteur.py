@@ -14,6 +14,17 @@ COMMISSION = "Commission"
 FRAIS_MISSION = "Frais de mission"
 LOGEMENT = "Logement site déporté"
 PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
+# Rubriques de nature « activité » : jamais dans les montants de paie.
+VENTES = "Nombre de ventes"
+CLIENTS = "Nombre de clients"
+PRODUCTIVITE = "Indice de productivité"
+CA_INDIVIDUEL = "CA individuel"
+MARGE_INDIVIDUELLE = "Marge individuelle"
+RUBRIQUES_ACTIVITE = (
+    (VENTES, "nombre"), (CLIENTS, "nombre"), (PRODUCTIVITE, "nombre"),
+    (CA_INDIVIDUEL, "FCFA"), (MARGE_INDIVIDUELLE, "FCFA"),
+)
+REFERENCE_COLONNE = "Référence reporting"
 ZERO = Decimal(0)
 
 
@@ -37,6 +48,8 @@ class Ligne:
     montants: dict[str, Decimal] = field(default_factory=dict)  # libellé rubrique -> valeur
     type_site: str = "principal"
     poste: str | None = None
+    indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
+    reference: str | None = None  # référence reporting (texte libre)
 
 
 @dataclass(frozen=True)

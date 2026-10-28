@@ -28,6 +28,9 @@ MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet",
         "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 ATTRIBUTS = ["ANNÉE", "MOIS", "MATRICULE", "Noms", "Poste", "Type Contrat", "Activité", "Site",
              "Service"]
+# Colonne texte facultative : référence vers le reporting d'activité (lue comme le Poste).
+REFERENCE_COLONNE = "Référence reporting"
+REFERENCE_ALIAS = ("Référence Annick",)
 ANNEE_MIN, ANNEE_MAX = 2000, 2100
 ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # 15 chiffres avant la virgule ; décimales gardées telles quelles
@@ -59,6 +62,8 @@ class Refs:
     sites: dict[str, str]
     contrats: dict[str, str]
     rubriques: list[tuple[str, str]]  # (libellé, unité) dans l'ordre
+    # Rubriques de nature « activité » : colonnes facultatives, jamais dans les montants de paie.
+    rubriques_activite: list[tuple[str, str]] = field(default_factory=list)
     rubrique_alias: dict[str, str] = field(default_factory=dict)  # norm -> libellé canonique
     postes: set[str] = field(default_factory=set)  # normalisés
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
@@ -92,6 +97,11 @@ class Ligne:
     activite: str | None = None
     type_contrat: str | None = None
     montants: dict[str, Decimal] = field(default_factory=dict)
+    indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
+    reference: str | None = None
+    # colonnes d'activité et de référence présentes dans le fichier (absente = valeurs conservées)
+    colonnes_activite: tuple[str, ...] = ()
+    reference_presente: bool = False
     bloquant: bool = False
 
 
@@ -259,15 +269,26 @@ def interpretations(v) -> list[tuple[Decimal, str]]:
     return [(d, f"Corriger en {fr(d)}")]
 
 
+def _rubriques_canon(refs: Refs) -> dict[str, str]:
+    """En-tête normalisé -> libellé canonique, pour les rubriques de paie et d'activité."""
+    return ({norm(r): r for r, _ in refs.rubriques + refs.rubriques_activite}
+            | refs.rubrique_alias)
+
+
+def _texte_canon() -> dict[str, str]:
+    """Colonnes texte facultatives hors attributs : en-tête normalisé -> libellé canonique."""
+    return {norm(x): REFERENCE_COLONNE for x in (REFERENCE_COLONNE, *REFERENCE_ALIAS)}
+
+
 def entetes_reconnus(refs: Refs) -> set[str]:
     """En-têtes normalisés lus par les règles : seuls eux décident si une ligne est vide."""
-    return {norm(a) for a in ATTRIBUTS} | {norm(r) for r, _ in refs.rubriques} | set(refs.rubrique_alias)
+    return {norm(a) for a in ATTRIBUTS} | set(_rubriques_canon(refs)) | set(_texte_canon())
 
 
 def colonnes(entetes: list, refs: Refs) -> dict[str, int]:
     """Position de chaque colonne reconnue, par nom de référence (la première en cas de doublon)."""
-    rub_canon = {norm(r): r for r, _ in refs.rubriques} | refs.rubrique_alias
-    attr_canon = {norm(a): a for a in ATTRIBUTS}
+    rub_canon = _rubriques_canon(refs)
+    attr_canon = {norm(a): a for a in ATTRIBUTS} | _texte_canon()
     cols: dict[str, int] = {}
     for j, v in enumerate(entetes):
         if v is not None and str(v).strip() != "":
@@ -352,8 +373,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         anos.append(Anomalie(num, None if col is None else str(col)[:100], code, grav, None if val is None else str(val)[:500], msg))
 
     # ---- en-têtes
-    rub_canon = {norm(r): r for r, _ in refs.rubriques} | refs.rubrique_alias
-    attr_canon = {norm(a): a for a in ATTRIBUTS}
+    rub_canon = _rubriques_canon(refs)
+    attr_canon = {norm(a): a for a in ATTRIBUTS} | _texte_canon()
     cols: dict[str, int] = {}
     utiles: list[int] = []  # colonnes reconnues, doublons compris (même règle que la lecture)
     for j, v in enumerate(feuille.entetes):
@@ -374,7 +395,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 "garder une seule de ces colonnes.")
             continue
         cols[canon] = j
-        if canon in rub_canon.values() and norm(canon) != n:
+        if (canon in rub_canon.values() or canon == REFERENCE_COLONNE) and norm(canon) != n:
             add(feuille.entete_ligne, str(v), "ENTETE_ALIAS", AVERT, v, f"Renommée « {canon} ».")
     if feuille.ligne_ignoree:
         add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
@@ -426,7 +447,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         if ligne_vide(row, utiles):
             continue  # seules des colonnes non lues (calculées, inconnues) sont remplies
 
-        L = Ligne(num)
+        L = Ligne(num, colonnes_activite=tuple(n for n, _ in refs.rubriques_activite if n in cols),
+                  reference_presente=REFERENCE_COLONNE in cols)
         nb_avant = nb_bloq
         inconnu = False
 
@@ -521,6 +543,13 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 setattr(L, attr, t)
         if L.poste and norm(L.poste) not in refs.postes:
             postes_nouveaux.setdefault(norm(L.poste), (L.poste, []))[1].append(num)
+        if REFERENCE_COLONNE in cols:
+            t = texte(g(REFERENCE_COLONNE))
+            t = t and re.sub(r"\s+", " ", t)
+            if t and len(t) > 200:
+                add(num, REFERENCE_COLONNE, "TEXTE_TROP_LONG", BLOQUANT, t, "200 caractères maximum.")
+            elif t:
+                L.reference = t
 
         if L.annee and L.mois and mat and not re.search(r"\s", mat):
             cles[(L.annee, L.mois, mat.casefold())].append(num)
@@ -528,7 +557,11 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 "Service": L.service, "Site": L.site, "Type Contrat": L.type_contrat,
                 "Activité": L.activite}, L.nom or "", mat))
 
-        for nom, unite in refs.rubriques:
+        for nom, unite, activite_ in ([(n, u, False) for n, u in refs.rubriques]
+                                      + [(n, u, True) for n, u in refs.rubriques_activite]):
+            if nom not in cols:
+                continue  # colonne d'activité facultative absente du fichier
+            en_nombre = unite == "nombre"
             v = g(nom)
             if v is None or (isinstance(v, str) and not v.strip()):
                 continue  # cellule vide : pas de montant
@@ -565,6 +598,13 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 continue
             # Montant gardé tel qu'il vient, sans arrondi ; au moins 3 décimales (zéros ajoutés).
             q = val if val.as_tuple().exponent <= -3 else val.quantize(Decimal("0.001"))
+            if activite_:
+                if q < 0:
+                    add(num, nom, "MONTANT_NEGATIF", AVERT, vu,
+                        ("Valeur négative : erreur de signe ?" if en_nombre
+                         else "Montant négatif : régularisation ou erreur de signe ?"))
+                L.indicateurs[nom] = q
+                continue
             if unite == "jours":
                 if q < 0 or q > ABSENCES_MAX:
                     add(num, nom, "ABSENCES_HORS_BORNES", BLOQUANT, vu, f"Nombre de jours attendu, de 0 à {ABSENCES_MAX}.")
@@ -573,8 +613,9 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             L.montants[nom] = q
 
         # Un stagiaire peut ne toucher aucune paie : pas d'avertissement pour lui.
-        if nb_bloq == nb_avant and not inconnu and L.type_contrat != "Stage" and not any(
-                n in L.montants for n, u in refs.rubriques if u != "jours"):
+        # Une ligne qui n'a que des chiffres d'activité n'est pas une ligne sans montant.
+        if nb_bloq == nb_avant and not inconnu and L.type_contrat != "Stage" and not L.indicateurs \
+                and not any(n in L.montants for n, u in refs.rubriques if u != "jours"):
             premiere = next((n for n, u in refs.rubriques if u != "jours" and n in cols), None)
             if premiere:
                 add(num, premiere, "LIGNE_SANS_MONTANT", AVERT, None,

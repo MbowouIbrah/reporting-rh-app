@@ -5,6 +5,7 @@ from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, Stri
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
+from app.models.donnees import MontantExact
 
 
 class Parametre(Base):
@@ -27,6 +28,28 @@ class CaPeriode(Base):
     periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"), primary_key=True)
     valeur: Mapped[Decimal] = mapped_column(Numeric(18, 3))
     marge: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
+
+
+INDICATEURS = ("or", "devis", "factures")
+
+
+class ActiviteSaisie(Base):
+    """Indicateur d'activité saisi à la main (OR, devis, factures) par mois, site et service.
+    Case vide = pas de ligne."""
+
+    __tablename__ = "activite_saisie"
+    __table_args__ = (
+        UniqueConstraint("periode_id", "site_id", "service_id", "indicateur",
+                         name="uq_activite_saisie"),
+        CheckConstraint("indicateur IN ('or','devis','factures')", name="ck_activite_indicateur"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"))
+    site_id: Mapped[int] = mapped_column(ForeignKey("site.id"))
+    service_id: Mapped[int] = mapped_column(ForeignKey("service.id"))
+    indicateur: Mapped[str] = mapped_column(String(10))
+    valeur: Mapped[Decimal] = mapped_column(MontantExact)
 
 
 class Budget(Base):

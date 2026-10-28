@@ -76,10 +76,11 @@ def modele_mensuel(annee: int | None, mois: int | None, rubriques: list[str],
     """Feuille DONNEES identique à celle de l'Excel REPORTING RH : titre ligne 1, consigne ligne 2,
     en-tête ligne 3, rubriques dans l'ordre de l'Excel (pas l'ordre d'affichage de l'application).
 
-    lignes : [matricule, nom, poste, contrat, activité, site, service, *montants (rubriques)].
+    lignes : [matricule, nom, poste, contrat, activité, site, service, *montants (rubriques)] puis,
+    en option, la référence reporting. Les rubriques d'activité suivent celles de paie.
     annee et mois à None : modèle vide pour plusieurs mois, ANNÉE et MOIS saisis sur chaque ligne.
     """
-    from app.imports.regles import ATTRIBUTS, MOIS
+    from app.imports.regles import ATTRIBUTS, MOIS, REFERENCE_COLONNE
     from app.referentiels_init import RUBRIQUES
 
     # Rang dans l'Excel ; une rubrique absente de la liste d'origine (ajoutée ou renommée dans
@@ -105,14 +106,15 @@ def modele_mensuel(annee: int | None, mois: int | None, rubriques: list[str],
     ws["A2"] = (f"{periode} MATRICULE : clé unique (ex. EMP001). Cellule vide = pas de montant. "
                 "Importer ensuite ce fichier dans Administration > Données mensuelles.")
     ws["A2"].font = Font(italic=True)
-    entete(ws, 3, ATTRIBUTS + rubriques)
+    entete(ws, 3, ATTRIBUTS + rubriques + [REFERENCE_COLONNE])
     for i, ligne in enumerate(lignes, start=4):
         mat, nom, poste, contrat, activite, site, service, *montants = ligne
+        reference = montants[len(rubriques)] if len(montants) > len(rubriques) else None
         valeurs = [annee, MOIS[mois - 1], mat, nom, poste, contrat, activite, site, service,
-                   *(montants[k] for k in ordre)]
+                   *(montants[k] for k in ordre), reference]
         for j, v in enumerate(valeurs, start=1):
             c = ws.cell(i, j, v)
-            if j > len(ATTRIBUTS):
+            if len(ATTRIBUTS) < j <= len(ATTRIBUTS) + len(rubriques):
                 # Décimales seulement si nécessaires : « #,##0.### » laisse une virgule seule après un entier.
                 entier = v is None or Decimal(str(v)) == Decimal(str(v)).to_integral_value()
                 c.number_format = "#,##0" if entier else "#,##0.###"
@@ -120,7 +122,7 @@ def modele_mensuel(annee: int | None, mois: int | None, rubriques: list[str],
     derniere = max(500, len(lignes) + 3)
     for col, nom in ((2, "MOIS"), (5, "Poste"), (6, "Type Contrat"), (7, "Activité"), (8, "Site"), (9, "Service")):
         liste_deroulante(ws, plages[nom], col, 4, derniere)
-    filtre(ws, 3, len(ATTRIBUTS) + len(rubriques), derniere)
+    filtre(ws, 3, len(ATTRIBUTS) + len(rubriques) + 1, derniere)
     ws.freeze_panes = "E4"
     out = io.BytesIO()
     wb.save(out)

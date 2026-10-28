@@ -74,3 +74,33 @@ def test_0014_convertit_les_roles(tmp_path, monkeypatch):
                                              (3, "lecteur_perimetre"), (4, "lecteur_perimetre"),
                                              (5, "lecteur_global")]
     assert [bool(n) for *_, n in roles] == [True, True, False, True, True]
+
+
+def test_0016_donnees_activite(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'a.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0015")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO rubrique (libelle, unite, ordre, actif) "
+                       "VALUES ('Brut Réel', 'FCFA', 1, 1)"))
+        for i, lib in enumerate(("SAV PL", "SAV Engins", "Commerce VN"), start=1):
+            c.execute(text("INSERT INTO service (id, libelle, actif) VALUES (:i, :l, 1)"),
+                      {"i": i, "l": lib})
+    command.upgrade(cfg, "head")
+    with eng.begin() as c:
+        nat = dict(c.execute(text("SELECT libelle, nature FROM rubrique")).all())
+        assert nat["Brut Réel"] == "paie"
+        assert [k for k, v in nat.items() if v == "activite"] == [
+            "Nombre de ventes", "Nombre de clients", "Indice de productivité",
+            "CA individuel", "Marge individuelle"]
+        prod = {r[0] for r in c.execute(text("SELECT libelle FROM service WHERE productif"))}
+        assert prod == {"SAV PL", "SAV Engins"}
+        assert "reference_activite" in {x["name"] for x in inspect(c).get_columns(
+            "situation_mensuelle")}
+        assert "activite_saisie" in inspect(c).get_table_names()
+    command.downgrade(cfg, "0015")
+    with eng.begin() as c:
+        assert not c.execute(text("SELECT 1 FROM rubrique WHERE libelle = 'CA individuel'")).all()
+        assert "productif" not in {x["name"] for x in inspect(c).get_columns("service")}

@@ -76,7 +76,7 @@ def test_modele_mensuel_identique_a_la_feuille_donnees_excel():
     """Titre ligne 1, consigne ligne 2, en-tête ligne 3, rubriques dans l'ordre de l'Excel même si
     l'ordre d'affichage a été changé ; les montants suivent leur colonne."""
     from app.imports import modeles
-    from app.imports.regles import ATTRIBUTS
+    from app.imports.regles import ATTRIBUTS, REFERENCE_COLONNE
     from app.referentiels_init import RUBRIQUES
 
     v5 = [r for r, _ in RUBRIQUES]
@@ -87,9 +87,9 @@ def test_modele_mensuel_identique_a_la_feuille_donnees_excel():
         2026, 1, inverse, refs, [["E1", "Ann", "P", "CDI", "Front office", "Douala", "SAV PL",
                                   *montants]])))["DONNEES"]
     assert ws["A1"].value.startswith("FEUILLE DE DONNÉES CENTRALE") and ws["A2"].value
-    assert [x.value for x in ws[3]] == ATTRIBUTS + v5
+    assert [x.value for x in ws[3]] == ATTRIBUTS + v5 + [REFERENCE_COLONNE]
     rang = {r: m for r, m in zip(inverse, montants, strict=True)}
-    assert [c.value for c in ws[4]][len(ATTRIBUTS):] == [rang[r] for r in v5]
+    assert [c.value for c in ws[4]][len(ATTRIBUTS):-1] == [rang[r] for r in v5]
     assert "Ne pas modifier les colonnes ANNÉE et MOIS" in ws["A2"].value
 
 
@@ -104,7 +104,7 @@ def test_modele_mensuel_rubriques_hors_liste_excel_en_fin_dans_l_ordre_recu():
     ws = load_workbook(io.BytesIO(modeles.modele_mensuel(
         2026, 1, app, refs, [["E1", "Ann", "P", "CDI", "Front office", "Douala", "SAV PL",
                               *range(len(app))]])))["DONNEES"]
-    assert [x.value for x in ws[3]][len(ATTRIBUTS):] == [*v5, "Nouvelle prime", "Autre prime"]
+    assert [x.value for x in ws[3]][len(ATTRIBUTS):-1] == [*v5, "Nouvelle prime", "Autre prime"]
     assert ws.cell(4, len(ATTRIBUTS) + len(v5) + 1).value == 1  # le montant suit sa colonne
 
 

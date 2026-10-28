@@ -20,6 +20,7 @@ from app.imports.regles import (
     COMPOSANTES_BRUT,
     FACTEURS,
     MOIS,
+    REFERENCE_COLONNE,
     Refs,
     colonnes,
     employe_probable,
@@ -71,6 +72,7 @@ def charger_refs(db: Session) -> Refs:
 
     rubs = list(db.scalars(select(Rubrique).where(Rubrique.actif).order_by(Rubrique.ordre)))
     par_id = {r.id: r.libelle for r in rubs}
+    paie_ids = {r.id for r in rubs if r.nature == "paie"}
     alias = {a.alias_norm: par_id[a.cible_id]
              for a in db.scalars(select(RefAlias).where(RefAlias.dimension == "rubrique"))
              if a.cible_id in par_id}
@@ -91,12 +93,14 @@ def charger_refs(db: Session) -> Refs:
             .join(SituationMensuelle, SituationMensuelle.salarie_id == Salarie.id)
             .join(Periode, Periode.id == SituationMensuelle.periode_id)
             .join(Montant, Montant.situation_id == SituationMensuelle.id)):
-        if rub in par_id:
+        if rub in paie_ids:
             montants.setdefault((m, a, mo), {})[par_id[rub]] = v
     return Refs(
         services=index("service", Service), activites=index("activite", Activite),
         sites=index("site", Site), contrats=index("type_contrat", TypeContrat),
-        rubriques=[(r.libelle, r.unite) for r in rubs], rubrique_alias=alias,
+        rubriques=[(r.libelle, r.unite) for r in rubs if r.nature == "paie"],
+        rubriques_activite=[(r.libelle, r.unite) for r in rubs if r.nature != "paie"],
+        rubrique_alias=alias,
         postes=set(index("poste", Poste)), noms_connus=noms,
         annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
         historique=historique, montants=montants,
@@ -197,12 +201,23 @@ def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
             "matricule": L.matricule, "bloquant": L.bloquant,
             "donnees": {"nom": L.nom, "poste": L.poste, "service": L.service, "site": L.site,
                         "activite": L.activite, "type_contrat": L.type_contrat,
-                        "montants": {k: str(v) for k, v in L.montants.items()}},
+                        "montants": {k: str(v) for k, v in L.montants.items()},
+                        "indicateurs": {k: str(v) for k, v in L.indicateurs.items()},
+                        "reference": L.reference,
+                        "colonnes_activite": list(L.colonnes_activite),
+                        "reference_presente": L.reference_presente},
         } for L in lignes])
     if anos:
         db.execute(insert(ImportAnomalie), [{
             "lot_id": lot.id, "num_ligne": a.ligne, "colonne": a.colonne, "code": a.code,
             "gravite": a.gravite, "valeur": a.valeur, "message": a.message} for a in anos])
+
+
+def _activite_absente(donnees: dict, activite: set[str]) -> set[str]:
+    """Rubriques d'activité dont la colonne n'est pas dans le fichier : leurs valeurs en base restent.
+    Un lot sans cette information (ancien format) est lu comme avant : tout y est présent."""
+    presentes = donnees.get("colonnes_activite")
+    return set() if presentes is None else {n for n in activite if n not in presentes}
 
 
 def _saisie(v: str | None, numerique: bool):
@@ -315,7 +330,7 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
         tout.setdefault(dim, {})[valeur] = type_site
     refs = _refs_du_lot(db, lot, tout)
     cols = colonnes(feuille.entetes, refs)
-    texte_libre = set(ATTRIBUTS) - {"ANNÉE"}
+    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
     presents = {n for n, _ in feuille.lignes}
     traces = []
     for num, valeurs in corrections.items():
@@ -376,7 +391,7 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
         raise HTTPException(404, "Ligne introuvable")
     refs = _refs_du_lot(db, lot)
     cols = colonnes(feuille.entetes, refs)
-    texte_libre = set(ATTRIBUTS) - {"ANNÉE"}
+    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
     row, avant = list(feuille.lignes[k][1]), {}
     for col, v in valeurs.items():
         j = cols.get(col)
@@ -512,7 +527,8 @@ def ligne_du_lot(db: Session, lot_id: int, num: int) -> dict:
         raise HTTPException(404, "Ligne introuvable")
     lu = ({"annee": row.annee, "mois": row.mois, "matricule": row.matricule, **row.donnees} if row else
           {"annee": None, "mois": None, "matricule": None, "nom": None, "poste": None, "type_contrat": None,
-           "activite": None, "site": None, "service": None, "montants": {}})
+           "activite": None, "site": None, "service": None, "montants": {}, "indicateurs": {},
+           "reference": None})
     return {"ligne": num, **lu, "brut": brut, "choix": choix}
 
 
@@ -720,7 +736,7 @@ def _snapshot(db: Session, sit: SituationMensuelle) -> dict:
     return {
         "service_id": sit.service_id, "site_id": sit.site_id, "activite_id": sit.activite_id,
         "type_contrat_id": sit.type_contrat_id, "poste_id": sit.poste_id,
-        "lot_import_id": sit.lot_import_id,
+        "lot_import_id": sit.lot_import_id, "reference_activite": sit.reference_activite,
         "montants": {str(r): str(v) for r, v in montants},
     }
 
@@ -766,22 +782,27 @@ def apercu(db: Session, lot_id: int) -> dict:
     rows = [r for r in rows if r.annee and r.mois]
     existantes = _situations_existantes(db, rows)
     rub = {r.id: r.libelle for r in db.scalars(select(Rubrique))}
+    paie = {r.libelle for r in db.scalars(select(Rubrique).where(Rubrique.nature == "paie"))}
     lib = {a: {r.id: r.libelle for r in db.scalars(select(m))} for a, _c, m, _f in ATTRS_APERCU}
     connus = set(db.scalars(select(Salarie.matricule_norm)))
     exclues = {p: exclues_a_date(db, *p) for p in {(r.annee, r.mois) for r in rows}}
     lignes, compte = [], {"nouvelle": 0, "modifiee": 0, "identique": 0}
     for r in rows:
         k = _cle(r)
-        apres = {n: Decimal(v) for n, v in r.donnees["montants"].items()}
+        apres_paie = {n: Decimal(v) for n, v in r.donnees["montants"].items()}
+        apres = apres_paie | {n: Decimal(v) for n, v in (r.donnees.get("indicateurs") or {}).items()}
         ligne = {"annee": r.annee, "mois": r.mois, "matricule": r.matricule,
                  "nom": r.donnees.get("nom"), "nouveau_salarie": k[2] not in connus,
-                 "total_apres": str(total_ligne(apres, exclues[k[:2]]))}
+                 "total_apres": str(total_ligne(apres_paie, exclues[k[:2]]))}
         sit = existantes.get(k)
         if sit is None:
             ligne |= {"statut": "nouvelle", "total_avant": None, "changements": []}
         else:
             avant = {rub[rid]: v for rid, v in db.execute(
                 select(Montant.rubrique_id, Montant.valeur).where(Montant.situation_id == sit.id))}
+            for n in _activite_absente(r.donnees, set(rub.values()) - paie):
+                if n in avant:
+                    apres[n] = avant[n]  # colonne absente du fichier : valeur conservée
             chg = [{"colonne": col, "avant": lib[a].get(getattr(sit, f)), "apres": r.donnees.get(a)}
                    for a, col, _m, f in ATTRS_APERCU
                    if norm(lib[a].get(getattr(sit, f)) or "") != norm(r.donnees.get(a) or "")]
@@ -789,8 +810,14 @@ def apercu(db: Session, lot_id: int) -> dict:
                      "apres": None if n not in apres else str(apres[n])}
                     for n in [x for x in rub.values() if x in avant or x in apres]
                     if avant.get(n) != apres.get(n)]
+            if r.donnees.get("reference_presente", True) and (
+                    (sit.reference_activite or None) != (r.donnees.get("reference") or None)):
+                chg.append({"colonne": REFERENCE_COLONNE, "avant": sit.reference_activite,
+                            "apres": r.donnees.get("reference")})
             ligne |= {"statut": "modifiee" if chg else "identique",
-                      "total_avant": str(total_ligne(avant, exclues[k[:2]])), "changements": chg}
+                      "total_avant": str(total_ligne({n: v for n, v in avant.items() if n in paie},
+                                                     exclues[k[:2]])),
+                      "changements": chg}
         compte[ligne["statut"]] += 1
         lignes.append(ligne)
     nouveaux = {x["matricule"] for x in lignes if x["nouveau_salarie"]}
@@ -920,6 +947,18 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
         SituationMensuelle.periode_id.in_(pids), SituationMensuelle.salarie_id.in_(sids))))
     cles_fichier = {(periodes[(r.annee, r.mois)], salaries[r.matricule.casefold()]) for r in rows}
     a_remplacer = [s for s in existantes if (s.periode_id, s.salarie_id) in cles_fichier]
+    activite = set(db.scalars(select(Rubrique.libelle).where(Rubrique.nature != "paie")))
+    # valeurs d'activité et référence des situations remplacées, reprises si la colonne est absente
+    conserve: dict[tuple[int, int], tuple[str | None, dict[str, Decimal]]] = {}
+    if a_remplacer:
+        nom_rub = {i: n for n, i in rub.items()}
+        anciens: dict[int, dict[str, Decimal]] = {}
+        for sid_, rid_, v_ in db.execute(select(Montant.situation_id, Montant.rubrique_id, Montant.valeur)
+                                         .where(Montant.situation_id.in_([s.id for s in a_remplacer]))):
+            if nom_rub[rid_] in activite:
+                anciens.setdefault(sid_, {})[nom_rub[rid_]] = v_
+        conserve = {(s.periode_id, s.salarie_id): (s.reference_activite, anciens.get(s.id, {}))
+                    for s in a_remplacer}
     if a_remplacer:
         db.execute(insert(LotImportPrecedent), [{
             "lot_id": lot.id, "periode_id": s.periode_id, "salarie_id": s.salarie_id,
@@ -934,6 +973,10 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
         "activite_id": ids["activite"][r.donnees["activite"]],
         "type_contrat_id": ids["type_contrat"][r.donnees["type_contrat"]],
         "poste_id": postes.get(norm(r.donnees["poste"])) if r.donnees.get("poste") else None,
+        "reference_activite": (
+            r.donnees.get("reference") if r.donnees.get("reference_presente", True)
+            else conserve.get((periodes[(r.annee, r.mois)], salaries[r.matricule.casefold()]),
+                              (None, {}))[0]),
         "lot_import_id": lot.id} for r in rows]
     res = db.execute(insert(SituationMensuelle).returning(
         SituationMensuelle.id, SituationMensuelle.periode_id, SituationMensuelle.salarie_id), sits)
@@ -941,7 +984,12 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
     montants = [{
         "situation_id": sit_id[(periodes[(r.annee, r.mois)], salaries[r.matricule.casefold()])],
         "rubrique_id": rub[nom], "valeur": Decimal(v)}
-        for r in rows for nom, v in r.donnees["montants"].items()]
+        for r in rows
+        for nom, v in {
+            **{n: x for n, x in conserve.get(
+                (periodes[(r.annee, r.mois)], salaries[r.matricule.casefold()]), (None, {}))[1].items()
+               if n in _activite_absente(r.donnees, activite)},
+            **r.donnees["montants"], **(r.donnees.get("indicateurs") or {})}.items()]
     if montants:
         db.execute(insert(Montant), montants)
 
@@ -985,6 +1033,7 @@ def _annuler_valide(db: Session, lot: LotImport) -> None:
     res = db.execute(insert(SituationMensuelle).returning(
         SituationMensuelle.id, SituationMensuelle.periode_id, SituationMensuelle.salarie_id), [{
             "periode_id": p.periode_id, "salarie_id": p.salarie_id,
+            "reference_activite": p.etat.get("reference_activite"),
             **{k: p.etat[k] for k in ("service_id", "site_id", "activite_id", "type_contrat_id",
                                       "poste_id", "lot_import_id")}} for p in prec])
     sid = {(p, s): i for i, p, s in res}
