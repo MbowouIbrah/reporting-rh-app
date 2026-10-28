@@ -50,6 +50,18 @@ class Ligne:
     poste: str | None = None
     indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
     reference: str | None = None  # référence reporting (texte libre)
+    productif: bool = False  # service marqué productif
+
+
+@dataclass(frozen=True)
+class Saisie:
+    """OR, devis ou factures saisis pour un site et un service (indépendants de la paie)."""
+
+    service: str
+    site: str
+    type_site: str
+    indicateur: str  # or | devis | factures
+    valeur: Decimal
 
 
 @dataclass(frozen=True)
@@ -58,6 +70,7 @@ class PeriodeData:
     exclues: frozenset[str] = frozenset()  # rubriques hors TOTAL CHARGES à la date de la période
     ca: Decimal | None = None
     marge: Decimal | None = None  # saisie avec le CA
+    saisies: tuple[Saisie, ...] = ()
 
     def total(self, ligne: Ligne) -> Decimal:
         return total_ligne(ligne.montants, self.exclues)
@@ -121,6 +134,80 @@ def _ca_marge(pd: PeriodeData | None) -> dict:
     return {"ca": ca, "marge": marge, "taux_marge": f.taux_marge(ca, marge)}
 
 
+LIGNES_ACTIVITE = (
+    ("ventes", "Nombre de ventes"), ("clients", "Nombre de clients"),
+    ("productivite", "Indice de productivité (moyenne)"), ("or", "OR"), ("devis", "Devis"),
+    ("factures", "Factures"), ("productifs", "Productifs (effectif)"),
+    ("or_par_productif", "OR par productif"), ("factures_par_productif", "Factures par productif"),
+)
+DONNEES_ACTIVITE = ("ventes", "clients", "productivite", "or", "devis", "factures")
+
+
+def _somme_opt(vals) -> Decimal | None:
+    vals = list(vals)
+    return sum(vals, ZERO) if vals else None
+
+
+def _moyenne_opt(vals) -> Decimal | None:
+    vals = list(vals)
+    return sum(vals, ZERO) / len(vals) if vals else None
+
+
+def _ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
+    return None if a is None or not b else a / b
+
+
+def _activite(pd: PeriodeData | None) -> dict:
+    """Valeurs brutes d'activité d'un mois (CA et marge individuels n'y figurent pas).
+    Les effectifs productifs restent inconnus (None) tant que le mois n'a pas de ligne de paie."""
+    lignes = pd.lignes if pd else ()
+
+    def indic(nom):
+        return _somme_opt(L.indicateurs[nom] for L in lignes if nom in L.indicateurs)
+
+    def saisi(nom):
+        return _somme_opt(s.valeur for s in (pd.saisies if pd else ()) if s.indicateur == nom)
+
+    productifs = Decimal(len({L.salarie_id for L in lignes if L.productif})) if lignes else None
+    or_, factures = saisi("or"), saisi("factures")
+    return {
+        "ventes": indic(VENTES), "clients": indic(CLIENTS),
+        "productivite": _moyenne_opt(L.indicateurs[PRODUCTIVITE] for L in lignes
+                                     if PRODUCTIVITE in L.indicateurs),
+        "or": or_, "devis": saisi("devis"), "factures": factures, "productifs": productifs,
+        "or_par_productif": _ratio(or_, productifs),
+        "factures_par_productif": _ratio(factures, productifs),
+    }
+
+
+def _bloc_activite(a: dict, a1: dict) -> list[dict] | None:
+    """Bloc ACTIVITÉ : masqué (None) tant qu'aucune donnée d'activité n'existe des deux côtés."""
+    if all(a[k] is None and a1[k] is None for k in DONNEES_ACTIVITE):
+        return None
+    return [{"cle": k, "libelle": lib, **cell(a[k], a1[k])} for k, lib in LIGNES_ACTIVITE]
+
+
+def _activite_cumul(pds: dict[int, PeriodeData], mois: int) -> dict:
+    """Cumul de janvier à `mois` : sommes sur les mois qui ont la donnée, indice moyen sur toutes
+    les lignes renseignées, productifs en effectif moyen des mois de paie, ratios sur lui."""
+    tous = [m for m in sorted(pds) if m <= mois]
+    ok = avec_donnees(pds, mois)
+    par_mois = {m: _activite(pds[m]) for m in tous}
+
+    def somme(k):
+        return _somme_opt(par_mois[m][k] for m in tous if par_mois[m][k] is not None)
+
+    prods = _moyenne_opt(par_mois[m]["productifs"] for m in ok)
+    or_, factures = somme("or"), somme("factures")
+    return {
+        "ventes": somme("ventes"), "clients": somme("clients"),
+        "productivite": _moyenne_opt(L.indicateurs[PRODUCTIVITE] for m in tous
+                                     for L in pds[m].lignes if PRODUCTIVITE in L.indicateurs),
+        "or": or_, "devis": somme("devis"), "factures": factures, "productifs": prods,
+        "or_par_productif": _ratio(or_, prods), "factures_par_productif": _ratio(factures, prods),
+    }
+
+
 def cell(m: Decimal | None, m1: Decimal | None) -> dict:
     return {"m1": m1, "m": m, "var": f.variation(m, m1), "var_pct": f.variation_pct(m, m1)}
 
@@ -152,6 +239,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     refs = _contrats_vus(refs, cur, prev)
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
+    activite = _bloc_activite(_activite(cur), _activite(prev))
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
     eff, eff1 = len(cur.ids), len(prev.ids) if prev else None
@@ -315,6 +403,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     return {
         "synthese": synthese,
         "lignes_ca_marge": {"ca": cell(cur.ca, ca1), "marge": cell(cur.marge, marge1)},
+        "activite": activite,
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
@@ -479,7 +568,8 @@ def annuel(
                  "remuneration": remuneration(pds[m]) if _ok(pds.get(m)) else None,
                  "effectif_contrat": par_contrat(pds[m]) if _ok(pds.get(m)) else None,
                  # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
-                 **_ca_marge(pds.get(m))}
+                 **_ca_marge(pds.get(m)),
+                 "activite": _activite(pds.get(m))}
                 for m in range(1, 13)]
 
     def cumul(pds):
@@ -561,6 +651,7 @@ def annuel(
         "primes_ytd": primes_ytd,
         "ca_cumul": cell(ca_ytd, ca1),
         "lignes_ca_marge": {"ca": cell(ca_ytd, ca1), "marge": cell(marge_ytd, marge1)},
+        "activite": _bloc_activite(_activite_cumul(n, mois), _activite_cumul(n1, mois)),
         "commissions_cumul": cell(commissions_ytd,
                                   sum((n1[m].rubrique(COMMISSION) for m in ok1), ZERO)
                                   if ok1 else None),
@@ -607,6 +698,12 @@ def individuel(pds: dict[int, PeriodeData], salarie_id: int, refs: Refs) -> dict
             "contrat": ligne.contrat if ligne else None,
             "rubriques": {r: ligne.montants.get(r) for r in refs.rubriques} if ligne else None,
             "total": pd.total(ligne) if ligne and pd else None,
+            "activite": {
+                k: ligne.indicateurs.get(nom) for k, nom in (
+                    ("ventes", VENTES), ("clients", CLIENTS), ("productivite", PRODUCTIVITE),
+                    ("ca_individuel", CA_INDIVIDUEL), ("marge_individuelle", MARGE_INDIVIDUELLE))
+            } if ligne else None,
+            "reference": ligne.reference if ligne else None,
         })
     presents = [x["total"] for x in mois if x["present"]]
     cumul = sum(presents, ZERO)

@@ -15,11 +15,12 @@ from app.kpi.moteur import (
     Params,
     PeriodeData,
     Refs,
+    Saisie,
     exclusions_ligne,
     total_ligne,
 )
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
-from app.models.pilotage import Budget, CaPeriode, Parametre
+from app.models.pilotage import ActiviteSaisie, Budget, CaPeriode, Parametre
 from app.models.referentiel import (
     Activite,
     Poste,
@@ -117,7 +118,7 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
     q = apply_scope(
         select(SituationMensuelle.id, SituationMensuelle.salarie_id, Service.libelle,
                Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle,
-               SituationMensuelle.reference_activite)
+               SituationMensuelle.reference_activite, Service.productif)
         .join(Service, Service.id == SituationMensuelle.service_id)
         .join(Site, Site.id == SituationMensuelle.site_id)
         .join(Activite, Activite.id == SituationMensuelle.activite_id)
@@ -138,11 +139,21 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
             (montants if nature == "paie" else indicateurs)[sid][rub] = Decimal(str(val))
     saisie = db.get(CaPeriode, periode.id)
     lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste,
-                         indicateurs.get(sid, {}), ref)
-                   for sid, sal, srv, site, act, ctr, tsite, poste, ref in rows)
+                         indicateurs.get(sid, {}), ref, bool(prod))
+                   for sid, sal, srv, site, act, ctr, tsite, poste, ref, prod in rows)
+    sq = apply_scope(
+        select(Service.libelle, Site.libelle, Site.type_site, ActiviteSaisie.indicateur,
+               ActiviteSaisie.valeur)
+        .select_from(ActiviteSaisie)
+        .join(Service, Service.id == ActiviteSaisie.service_id)
+        .join(Site, Site.id == ActiviteSaisie.site_id)
+        .where(ActiviteSaisie.periode_id == periode.id),
+        scope, service=Service.libelle, site=Site.libelle)
+    saisies = tuple(Saisie(srv, site, tsite, ind, _dec(val))
+                    for srv, site, tsite, ind, val in db.execute(sq))
     return PeriodeData(lignes, exclues_a_date(db, annee, mois),
                        ca=_dec(saisie.valeur) if saisie else None,
-                       marge=_dec(saisie.marge) if saisie else None)
+                       marge=_dec(saisie.marge) if saisie else None, saisies=saisies)
 
 
 def _dec(v) -> Decimal | None:
@@ -261,8 +272,13 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
     # une activité ou une personne, donc ni marge ni taux.
     global_ = not (service or site or type_site or poste or activite or type_contrat
                     or salarie_id is not None)
+    # Une saisie (OR, devis, factures) n'existe qu'au niveau site et service.
+    saisies = () if (poste or activite or type_contrat or salarie_id is not None) else tuple(
+        s for s in pd.saisies
+        if (not service or s.service == service) and (not site or s.site == site)
+        and (not type_site or s.type_site == type_site))
     return PeriodeData(lignes, pd.exclues, ca=pd.ca if global_ else None,
-                       marge=pd.marge if global_ else None)
+                       marge=pd.marge if global_ else None, saisies=saisies)
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:

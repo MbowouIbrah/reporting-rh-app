@@ -154,8 +154,14 @@ def test_total_de_paie_inchange_par_les_colonnes_d_activite(make_client):
     apres = (get(c, "mensuel", annee=2026, mois=1).json(),
              get(c, "annuel", annee=2026, mois=1).json(),
              c.get(f"{API}/donnees/tableau", params={"annee": 2026, "mois": 1}).json())
-    assert apres[0] == avant[0]
-    assert apres[1] == avant[1]
+    def sans_activite(x):
+        if isinstance(x, dict):
+            return {k: sans_activite(v) for k, v in x.items() if k != "activite"}
+        return [sans_activite(v) for v in x] if isinstance(x, list) else x
+
+    for i in (0, 1):  # le bloc activité apparaît, tout le reste est identique
+        assert apres[i]["activite"] is not None
+        assert sans_activite(apres[i]) == sans_activite(avant[i])
     t_avant = {x["matricule"]: x["total"] for x in avant[2]["lignes"]}
     t_apres = {x["matricule"]: x["total"] for x in apres[2]["lignes"]}
     assert t_apres == t_avant and D(t_apres["E1"]) == D("1050")

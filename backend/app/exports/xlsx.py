@@ -108,6 +108,10 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
         c.append([None, "Effectifs", *_cell(r["d_contrat"]["total"])])
     _feuille(wb, "5 Contrat", ["Contrat · activité", "Indicateur", prec, cour, *var], c)
 
+    if r.get("activite"):
+        _feuille(wb, "6 Activité", ["Indicateur", prec, cour, *var],
+                 [[x["libelle"], *_cell(x)] for x in r["activite"]])
+
 
 def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
     wb = Workbook()

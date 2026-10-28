@@ -19,7 +19,8 @@ from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
-              "taux_marge_ytd", "ca_cumul", "ca_par_effectif", "lignes_ca_marge"}
+              "taux_marge_ytd", "ca_cumul", "ca_par_effectif", "lignes_ca_marge",
+              "ca_individuel", "marge_individuelle"}
 
 # Colonnes du reporting individuel (RETOURS_PRESENTATION §4, docs/QUESTIONS_CLIENT.md A3, B1,
 # B2) et les rubriques de DONNEES qu'elles reprennent, une par colonne : « Autres primes » = primes
@@ -70,6 +71,23 @@ def _sans_marge(x):
 
 def _sortie(p: Principal, data: dict) -> dict:
     return jsonable(data if is_allowed(p, "marge:read") else _sans_marge(data))
+
+
+def _activite_tous(lignes) -> dict:
+    """Indicateurs d'activité d'un groupe de salariés : sommes, indice de productivité en moyenne
+    des renseignés ; None si personne n'est renseigné."""
+    def valeurs(nom):
+        return [L.indicateurs[nom] for L in lignes if nom in L.indicateurs]
+
+    def somme(nom):
+        v = valeurs(nom)
+        return sum(v, Decimal(0)) if v else None
+
+    prod = valeurs(moteur.PRODUCTIVITE)
+    return {"ventes": somme(moteur.VENTES), "clients": somme(moteur.CLIENTS),
+            "productivite": sum(prod, Decimal(0)) / len(prod) if prod else None,
+            "ca_individuel": somme(moteur.CA_INDIVIDUEL),
+            "marge_individuelle": somme(moteur.MARGE_INDIVIDUELLE)}
 
 
 @router.get("/periodes")
@@ -341,18 +359,19 @@ def individuel_tous(
             "total": sum((montant(L, c) for L in lignes for c in rubriques if comptee(pd, c)),
                          zero),
             "deporte": any(L.type_site == "deporte" for L in lignes),
+            "activite": _activite_tous(lignes),
         })
     if sal is not None and not any(x["present"] for x in mois):
         raise HTTPException(404, "Matricule introuvable")  # hors périmètre : rien ne fuit
     audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id if sal else None, None,
                  {"annee": annee, "tous": sal is None})
     db.commit()
-    return jsonable({"annee": annee, "matricule": sal.matricule if sal else None,
-                     "nom": sal.nom if sal else None, "rubriques": rubriques,
-                     "exclues": [c for c in rubriques
-                                 if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
-                     "sources": {c: list(COLONNES_INDIVIDUEL[c]) for c in rubriques},
-                     "mois": mois})
+    return _sortie(p, {"annee": annee, "matricule": sal.matricule if sal else None,
+                       "nom": sal.nom if sal else None, "rubriques": rubriques,
+                       "exclues": [c for c in rubriques
+                                   if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
+                       "sources": {c: list(COLONNES_INDIVIDUEL[c]) for c in rubriques},
+                       "mois": mois})
 
 
 @router.get("/individuel")
@@ -372,4 +391,4 @@ def individuel(
     audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id, None, {"annee": annee})
     db.commit()
     res = moteur.individuel(pds, sal.id, ch.charger_refs(db))
-    return jsonable({"matricule": sal.matricule, "nom": sal.nom, "annee": annee, **res})
+    return _sortie(p, {"matricule": sal.matricule, "nom": sal.nom, "annee": annee, **res})
