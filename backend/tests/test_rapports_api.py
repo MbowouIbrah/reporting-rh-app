@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode, Salarie, SituationMensuelle
-from app.models.pilotage import CaPeriode
+from app.models.pilotage import ValeurSaisie
 from app.models.referentiel import Poste, Site
 from tests.test_import_regles import ligne, xlsx
 
@@ -38,7 +38,8 @@ def charge(make_client, db):
     assert lot["statut"] == "pret", lot
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
     pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
-    db.add(CaPeriode(periode_id=pid, valeur=D("10000"), marge=D("2500")))
+    db.add_all([ValeurSaisie(periode_id=pid, indicateur="ca", valeur=D("10000")),
+                ValeurSaisie(periode_id=pid, indicateur="marge", valeur=D("2500"))])
     db.commit()
     return c
 

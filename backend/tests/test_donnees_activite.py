@@ -159,9 +159,17 @@ def test_total_de_paie_inchange_par_les_colonnes_d_activite(make_client):
             return {k: sans_activite(v) for k, v in x.items() if k != "activite"}
         return [sans_activite(v) for v in x] if isinstance(x, list) else x
 
+    def chemins_differents(x, y, chemin=""):
+        if isinstance(x, dict) and isinstance(y, dict):
+            return {c for k in x.keys() | y.keys()
+                    for c in chemins_differents(x.get(k), y.get(k), f"{chemin}/{k}")}
+        return set() if x == y else {chemin}
+
     for i in (0, 1):  # le bloc activité apparaît, tout le reste est identique
         assert apres[i]["activite"] is not None
-        assert sans_activite(apres[i]) == sans_activite(avant[i])
+        # seuls le CA et la marge changent : ceux des employes remontent des qu'aucune saisie ne les remplace
+        diff = chemins_differents(sans_activite(avant[i]), sans_activite(apres[i]))
+        assert diff and all("ca" in c or "marge" in c or c == "/serie_n" for c in diff), diff
     t_avant = {x["matricule"]: x["total"] for x in avant[2]["lignes"]}
     t_apres = {x["matricule"]: x["total"] for x in apres[2]["lignes"]}
     assert t_apres == t_avant and D(t_apres["E1"]) == D("1050")

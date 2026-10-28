@@ -15,8 +15,11 @@ def lire(c, annee=2026, mois=10):
 
 
 def ca_marge(c, ca, marge, annee=2026, mois=10):
-    return c.put(f"{API}/pilotage/ca-marge",
-                 json={"annee": annee, "mois": mois, "ca": ca, "marge": marge})
+    """Saisie globale du CA et de la marge ; renvoie la vue du mois (ou l'erreur de la saisie)."""
+    r = c.put(f"{API}/pilotage/saisies",
+              json={"annee": annee, "mois": mois, "groupe": "ca_marge", "niveau": "global",
+                    "cases": [{"valeurs": {"ca": ca, "marge": marge}}]})
+    return lire(c, annee, mois) if r.status_code == 200 else r
 
 
 def budgets(c, lignes, annee=2026, mois=10):
@@ -55,7 +58,7 @@ def test_ca_marge_ouvre_le_mois_et_trace(db, make_client):
     assert D(j["taux_marge"]) == D("-200") / D("1000.5")
     assert nb_periodes(db) == 1
     actions = db.scalars(select(AuditEvent.action).order_by(AuditEvent.id)).all()
-    assert actions[-2:] == ["ouverture", "saisie_ca"]
+    assert actions[-2:] == ["ouverture", "saisie_pilotage"]
     # CA seul : la marge est effacée, le taux disparaît
     j = ca_marge(c, "500", None).json()
     assert j["ca"] == "500.000" and j["marge"] is None and j["taux_marge"] is None

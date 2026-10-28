@@ -1,7 +1,17 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -20,36 +30,32 @@ class Parametre(Base):
     date_debut: Mapped[date] = mapped_column(Date)
 
 
-class CaPeriode(Base):
-    """Chiffre d'affaires et marge saisis pour une période. Absent = pas de ligne."""
-
-    __tablename__ = "ca_periode"
-
-    periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"), primary_key=True)
-    valeur: Mapped[Decimal] = mapped_column(Numeric(18, 3))
-    marge: Mapped[Decimal | None] = mapped_column(Numeric(18, 3), nullable=True)
+INDICATEURS = ("ca", "marge", "or", "devis", "factures")
 
 
-INDICATEURS = ("or", "devis", "factures")
-
-
-class ActiviteSaisie(Base):
-    """Indicateur d'activité saisi à la main (OR, devis, factures) par mois, site et service.
+class ValeurSaisie(Base):
+    """Valeur saisie à la main pour un mois (CA, marge, OR, devis, factures) à un niveau :
+    aucun site ni service = global, un seul = site ou service, les deux = case site x service.
     Case vide = pas de ligne."""
 
-    __tablename__ = "activite_saisie"
+    __tablename__ = "valeur_saisie"
     __table_args__ = (
-        UniqueConstraint("periode_id", "site_id", "service_id", "indicateur",
-                         name="uq_activite_saisie"),
-        CheckConstraint("indicateur IN ('or','devis','factures')", name="ck_activite_indicateur"),
+        CheckConstraint("indicateur IN ('ca','marge','or','devis','factures')",
+                        name="ck_valeur_saisie_indicateur"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"))
-    site_id: Mapped[int] = mapped_column(ForeignKey("site.id"))
-    service_id: Mapped[int] = mapped_column(ForeignKey("service.id"))
     indicateur: Mapped[str] = mapped_column(String(10))
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("site.id"), nullable=True)
+    service_id: Mapped[int | None] = mapped_column(ForeignKey("service.id"), nullable=True)
     valeur: Mapped[Decimal] = mapped_column(MontantExact)
+
+
+# Un site ou un service absent compte pour 0 : la case globale est unique elle aussi.
+Index("uq_valeur_saisie", ValeurSaisie.periode_id, ValeurSaisie.indicateur,
+      func.coalesce(ValeurSaisie.site_id, 0), func.coalesce(ValeurSaisie.service_id, 0),
+      unique=True)
 
 
 class Budget(Base):

@@ -43,8 +43,9 @@ def test_effectifs_deduits_des_mois_et_ca_en_dernier(make_client):
     assert c.put(f"{API}/periodes/{pid}/ca", json={"valeur": "5000"}).status_code == 200
     d, st = etapes(c, 2026, 2)
     assert st["ca"] == "reportable" and "marge à saisir" in d["etapes"][3]["resume"]
-    r = c.put(f"{API}/pilotage/ca-marge",
-              json={"annee": 2026, "mois": 2, "ca": "5000", "marge": "800"})
+    r = c.put(f"{API}/pilotage/saisies",
+              json={"annee": 2026, "mois": 2, "groupe": "ca_marge", "niveau": "global",
+                    "cases": [{"valeurs": {"ca": "5000", "marge": "800"}}]})
     assert r.status_code == 200, r.text
     assert etapes(c, 2026, 2)[1]["ca"] == "fait"
 

@@ -28,7 +28,7 @@ from app.kpi.moteur import (
 )
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode
-from app.models.pilotage import ActiviteSaisie
+from app.models.pilotage import ValeurSaisie
 from app.models.referentiel import Service, Site
 from app.repos.scope import Scope
 from tests.test_donnees_activite import _sans_marge, charger, lig
@@ -176,8 +176,9 @@ def test_filtre_des_saisies():
 
 # ---------- API ----------
 
-PILOTAGE = f"{API}/pilotage/activite"
+PILOTAGE = f"{API}/pilotage/saisies"
 P26 = {"annee": 2026, "mois": 1}
+LECT = {**P26, "groupe": "activite"}
 
 
 def ids(db):
@@ -187,7 +188,24 @@ def ids(db):
 
 
 def put(c, lignes, **kw):
-    return c.put(PILOTAGE, json={**P26, **kw, "lignes": lignes})
+    """Saisie d'activité au niveau cellule : une ligne = un indicateur d'un couple site/service."""
+    cases: list[dict] = []
+    for x in lignes:
+        cle = (x["site_id"], x["service_id"])
+        cible = next((k for k in cases if (k["site_id"], k["service_id"]) == cle
+                      and x["indicateur"] not in k["valeurs"]), None)
+        if cible is None:
+            cible = {"site_id": cle[0], "service_id": cle[1], "valeurs": {}}
+            cases.append(cible)
+        cible["valeurs"][x["indicateur"]] = x["valeur"]
+    return c.put(PILOTAGE, json={**P26, **kw, "groupe": "activite", "niveau": "cellule",
+                                 "cases": cases})
+
+
+def valeurs(j):
+    """Valeurs renseignées d'une réponse de saisie : (site, service, indicateur) -> valeur."""
+    return {(x["site_id"], x["service_id"], i): v["valeur"] for x in j["cases"]
+            for i, v in x["valeurs"].items() if v["valeur"] is not None}
 
 
 def ln(db, site, service, indicateur, valeur):
@@ -197,7 +215,7 @@ def ln(db, site, service, indicateur, valeur):
 
 
 def nb_saisies(db):
-    return db.scalar(select(func.count()).select_from(ActiviteSaisie))
+    return db.scalar(select(func.count()).select_from(ValeurSaisie))
 
 
 def nb_periodes(db):
@@ -218,19 +236,19 @@ def test_saisie_ecriture_lecture_et_suppression(make_client, db):
     sav = next(x for x in j["services"] if x["libelle"] == "SAV PL")
     assert sav["productif"] is True
     assert next(x for x in j["services"] if x["libelle"] == "Commerce VN")["productif"] is False
-    vals = {(x["site_id"], x["service_id"], x["indicateur"]): x["valeur"] for x in j["valeurs"]}
+    vals = valeurs(j)
     assert vals[(sites["Douala"], services["SAV PL"], "or")] == "100.500"
     assert vals[(sites["Douala"], services["SAV PL"], "devis")] == "20.000"
     assert vals[(sites["Yaoundé"], services["Commerce VN"], "factures")] == "3.1234567"
-    assert c.get(PILOTAGE, params=P26).json() == j
+    assert c.get(PILOTAGE, params=LECT).json() == j
     actions = db.scalars(select(AuditEvent.action).order_by(AuditEvent.id)).all()
-    assert actions[-1] == "saisie_activite"
+    assert actions[-1] == "saisie_pilotage"
 
     # valeur modifiée, puis effacée par une valeur vide ou absente
     j = put(c, [ln(db, "Douala", "SAV PL", "or", "7"),
                 ln(db, "Douala", "SAV PL", "devis", ""),
                 ln(db, "Yaoundé", "Commerce VN", "factures", None)]).json()
-    assert [(x["indicateur"], x["valeur"]) for x in j["valeurs"]] == [("or", "7.000")]
+    assert list(valeurs(j).items()) == [((sites["Douala"], services["SAV PL"], "or"), "7.000")]
     assert nb_saisies(db) == 1
     # un envoi sans changement ne laisse pas de trace de plus
     n = db.scalar(select(func.count()).select_from(AuditEvent))
@@ -256,8 +274,8 @@ def test_saisie_validation_422_sans_rien_ecrire(make_client, db):
 
 def test_saisie_lecture_ne_cree_pas_de_periode(make_client, db):
     c = make_client(ADMIN)
-    j = c.get(PILOTAGE, params={"annee": 2026, "mois": 7}).json()
-    assert j["periode_id"] is None and j["valeurs"] == [] and j["sites"] and j["services"]
+    j = c.get(PILOTAGE, params={"annee": 2026, "mois": 7, "groupe": "activite"}).json()
+    assert j["periode_id"] is None and valeurs(j) == {} and j["sites"] and j["services"]
     assert nb_periodes(db) == 0
     # tout vide : le mois n'est pas ouvert
     r = put(c, [ln(db, "Douala", "SAV PL", "or", ""), ln(db, "Douala", "SAV PL", "devis", None)])
@@ -272,8 +290,8 @@ def test_saisie_droits(make_client, db):
     for who in (DRH, EQUIP):
         c = make_client(who)
         assert put(c, [ligne_ok]).status_code == 403
-        assert c.get(PILOTAGE, params=P26).status_code == 403  # lecture = droit d'import
-    assert make_client().get(PILOTAGE, params=P26).status_code == 401
+        assert c.get(PILOTAGE, params=LECT).status_code == 403  # lecture = droit d'import
+    assert make_client().get(PILOTAGE, params=LECT).status_code == 401
     assert nb_saisies(db) == 0 and nb_periodes(db) == 0
 
 
@@ -293,17 +311,17 @@ def test_saisie_hors_perimetre_403_et_lecture_restreinte(make_client, db, monkey
         assert r.status_code == 403, r.text
     assert nb_saisies(db) == avant
 
-    j = c.get(PILOTAGE, params=P26).json()
+    j = c.get(PILOTAGE, params=LECT).json()
     assert [x["libelle"] for x in j["sites"]] == ["Douala"]
     assert [x["libelle"] for x in j["services"]] == ["SAV PL"]
-    assert [(x["indicateur"], x["valeur"]) for x in j["valeurs"]] == [("or", "1.000")]
+    assert list(valeurs(j).values()) == ["1.000"]
     # dans le périmètre : écriture permise, les valeurs hors périmètre restent intactes
     r = put(c, [ln(db, "Douala", "SAV PL", "devis", "5")])
     assert r.status_code == 200 and nb_saisies(db) == avant + 1
 
     monkeypatch.setattr(pilotage, "scope_for", lambda _db, _p: Scope(False, {}))
     assert put(c, [ln(db, "Douala", "SAV PL", "devis", "6")]).status_code == 403
-    assert c.get(PILOTAGE, params=P26).json()["sites"] == []
+    assert c.get(PILOTAGE, params=LECT).json()["sites"] == []
 
 
 def test_saisies_restreintes_au_perimetre_a_la_lecture_des_rapports(make_client, db):

@@ -55,13 +55,15 @@ class Ligne:
 
 @dataclass(frozen=True)
 class Saisie:
-    """OR, devis ou factures saisis pour un site et un service (indépendants de la paie)."""
+    """Valeur d'un indicateur saisi ou calculé depuis les employés (CA, marge, OR, devis, factures),
+    à son niveau : site et service renseignés ou non selon que le niveau les distingue. Une valeur
+    None est une case attendue restée vide (le total est alors partiel)."""
 
-    service: str
-    site: str
-    type_site: str
-    indicateur: str  # or | devis | factures
-    valeur: Decimal
+    service: str | None
+    site: str | None
+    type_site: str | None
+    indicateur: str  # ca | marge | or | devis | factures
+    valeur: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,13 @@ class PeriodeData:
     ca: Decimal | None = None
     marge: Decimal | None = None  # saisie avec le CA
     saisies: tuple[Saisie, ...] = ()
+    vides: tuple[Saisie, ...] = ()  # cases attendues sans valeur (valeur None)
+
+    @property
+    def partiel(self) -> frozenset[str]:
+        """Indicateurs dont le total du mois existe mais ignore au moins une case attendue."""
+        avec = {s.indicateur for s in self.saisies}
+        return frozenset(s.indicateur for s in self.vides if s.indicateur in avec)
 
     def total(self, ligne: Ligne) -> Decimal:
         return total_ligne(ligne.montants, self.exclues)
@@ -180,11 +189,19 @@ def _activite(pd: PeriodeData | None) -> dict:
     }
 
 
-def _bloc_activite(a: dict, a1: dict) -> list[dict] | None:
-    """Bloc ACTIVITÉ : masqué (None) tant qu'aucune donnée d'activité n'existe des deux côtés."""
+def _avec_partiel(c: dict, partiel: bool) -> dict:
+    return {**c, "partiel": True} if partiel else c
+
+
+def _bloc_activite(a: dict, a1: dict, partiel: frozenset[str] = frozenset()) -> list[dict] | None:
+    """Bloc ACTIVITÉ : masqué (None) tant qu'aucune donnée d'activité n'existe des deux côtés.
+    `partiel` : indicateurs dont une case attendue manque ; le ratio qui en dépend l'est aussi."""
     if all(a[k] is None and a1[k] is None for k in DONNEES_ACTIVITE):
         return None
-    return [{"cle": k, "libelle": lib, **cell(a[k], a1[k])} for k, lib in LIGNES_ACTIVITE]
+    dep = {"or_par_productif": "or", "factures_par_productif": "factures"}
+    return [{"cle": k, "libelle": lib,
+             **_avec_partiel(cell(a[k], a1[k]), dep.get(k, k) in partiel)}
+            for k, lib in LIGNES_ACTIVITE]
 
 
 def _activite_cumul(pds: dict[int, PeriodeData], mois: int) -> dict:
@@ -239,7 +256,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     refs = _contrats_vus(refs, cur, prev)
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
-    activite = _bloc_activite(_activite(cur), _activite(prev))
+    activite = _bloc_activite(_activite(cur), _activite(prev), cur.partiel)
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
     eff, eff1 = len(cur.ids), len(prev.ids) if prev else None
@@ -402,7 +419,9 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                                    Decimal(eff1 + recrut - departs), Decimal(eff)))
     return {
         "synthese": synthese,
-        "lignes_ca_marge": {"ca": cell(cur.ca, ca1), "marge": cell(cur.marge, marge1)},
+        "lignes_ca_marge": {
+            "ca": _avec_partiel(cell(cur.ca, ca1), "ca" in cur.partiel),
+            "marge": _avec_partiel(cell(cur.marge, marge1), "marge" in cur.partiel)},
         "activite": activite,
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
@@ -607,6 +626,7 @@ def annuel(
     avec_marge1 = [m for m in avec_ca1 if n1[m].marge is not None]
     marge1 = sum((n1[m].marge for m in avec_marge1), ZERO) if avec_marge1 else None
     eff = blocs["effectif_global"]
+    partiel_n = frozenset().union(*(n[m].partiel for m in n if m <= mois))
 
     def ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
         return None if a is None or not b else a / b
@@ -650,8 +670,9 @@ def annuel(
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
         "ca_cumul": cell(ca_ytd, ca1),
-        "lignes_ca_marge": {"ca": cell(ca_ytd, ca1), "marge": cell(marge_ytd, marge1)},
-        "activite": _bloc_activite(_activite_cumul(n, mois), _activite_cumul(n1, mois)),
+        "lignes_ca_marge": {"ca": _avec_partiel(cell(ca_ytd, ca1), "ca" in partiel_n),
+                            "marge": _avec_partiel(cell(marge_ytd, marge1), "marge" in partiel_n)},
+        "activite": _bloc_activite(_activite_cumul(n, mois), _activite_cumul(n1, mois), partiel_n),
         "commissions_cumul": cell(commissions_ytd,
                                   sum((n1[m].rubrique(COMMISSION) for m in ok1), ZERO)
                                   if ok1 else None),

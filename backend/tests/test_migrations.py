@@ -21,7 +21,8 @@ def test_montee_et_descente(tmp_path, monkeypatch):
     assert TABLES <= set(inspect(create_engine(url)).get_table_names())
     assert TABLES3 <= set(inspect(create_engine(url)).get_table_names())
     assert "role_assignment" not in insp.get_table_names()
-    assert "marge" in {c["name"] for c in insp.get_columns("ca_periode")}
+    assert "valeur_saisie" in insp.get_table_names()
+    assert "ca_periode" not in insp.get_table_names()
     command.downgrade(cfg, "0007")
     cols = {c["name"] for c in inspect(create_engine(url)).get_columns("ca_periode")}
     assert "marge" not in cols and "valeur" in cols
@@ -99,8 +100,52 @@ def test_0016_donnees_activite(tmp_path, monkeypatch):
         assert prod == {"SAV PL", "SAV Engins"}
         assert "reference_activite" in {x["name"] for x in inspect(c).get_columns(
             "situation_mensuelle")}
-        assert "activite_saisie" in inspect(c).get_table_names()
+        assert "valeur_saisie" in inspect(c).get_table_names()
     command.downgrade(cfg, "0015")
     with eng.begin() as c:
         assert not c.execute(text("SELECT 1 FROM rubrique WHERE libelle = 'CA individuel'")).all()
         assert "productif" not in {x["name"] for x in inspect(c).get_columns("service")}
+
+
+def test_0017_valeur_saisie_reprend_et_restitue(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'v.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0016")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        for i in (1, 2):
+            c.execute(text("INSERT INTO periode (id, annee, mois) VALUES (:i, 2026, :i)"), {"i": i})
+        c.execute(text("INSERT INTO service (id, libelle, actif) VALUES (1, 'SAV', 1)"))
+        c.execute(text("INSERT INTO site (id, libelle, actif) VALUES (1, 'Douala', 1)"))
+        c.execute(text("INSERT INTO ca_periode (periode_id, valeur, marge) VALUES (1, 1000.5, 200)"))
+        c.execute(text("INSERT INTO ca_periode (periode_id, valeur, marge) VALUES (2, 50, NULL)"))
+        c.execute(text("INSERT INTO activite_saisie (periode_id, site_id, service_id, indicateur, "
+                       "valeur) VALUES (1, 1, 1, 'or', 7.25)"))
+    command.upgrade(cfg, "0017")
+    with eng.connect() as c:
+        tables = set(inspect(c).get_table_names())
+        assert "valeur_saisie" in tables and not {"ca_periode", "activite_saisie"} & tables
+        rows = sorted(c.execute(text("SELECT periode_id, indicateur, site_id, service_id, valeur "
+                                     "FROM valeur_saisie")).all())
+    assert [(r[0], r[1], r[2], r[3], float(r[4])) for r in rows] == [
+        (1, "ca", None, None, 1000.5), (1, "marge", None, None, 200.0),
+        (1, "or", 1, 1, 7.25), (2, "ca", None, None, 50.0)]
+    with eng.begin() as c:  # l'unicité traite les niveaux sans site ni service comme des valeurs
+        try:
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, 'ca', 1)"))
+            doublon = False
+        except Exception:
+            doublon = True
+    assert doublon
+    command.downgrade(cfg, "0016")
+    with eng.connect() as c:
+        assert "valeur_saisie" not in inspect(c).get_table_names()
+        ca = sorted((r[0], float(r[1]), None if r[2] is None else float(r[2])) for r in c.execute(
+            text("SELECT periode_id, valeur, marge FROM ca_periode")))
+        assert ca == [(1, 1000.5, 200.0), (2, 50.0, None)]
+        assert [(r[0], r[1], r[2], r[3], float(r[4])) for r in c.execute(text(
+            "SELECT periode_id, site_id, service_id, indicateur, valeur FROM activite_saisie"))
+        ] == [(1, 1, 1, "or", 7.25)]
+    command.upgrade(cfg, "head")

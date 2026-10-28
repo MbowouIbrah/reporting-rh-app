@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.kpi import niveaux as nv
 from app.kpi.moteur import (
     CA_INDIVIDUEL,
     MARGE_INDIVIDUELLE,
@@ -20,7 +21,7 @@ from app.kpi.moteur import (
     total_ligne,
 )
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
-from app.models.pilotage import ActiviteSaisie, Budget, CaPeriode, Parametre
+from app.models.pilotage import Budget, Parametre
 from app.models.referentiel import (
     Activite,
     Poste,
@@ -30,6 +31,7 @@ from app.models.referentiel import (
     Site,
     TypeContrat,
 )
+from app.repos import saisies as rs
 from app.repos.scope import Scope, apply_scope
 
 
@@ -137,28 +139,36 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
             # la paie et l'activité sont séparées dès la lecture : le moteur de paie ne voit
             # jamais une rubrique d'activité
             (montants if nature == "paie" else indicateurs)[sid][rub] = Decimal(str(val))
-    saisie = db.get(CaPeriode, periode.id)
     lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste,
                          indicateurs.get(sid, {}), ref, bool(prod))
                    for sid, sal, srv, site, act, ctr, tsite, poste, ref, prod in rows)
-    sq = apply_scope(
-        select(Service.libelle, Site.libelle, Site.type_site, ActiviteSaisie.indicateur,
-               ActiviteSaisie.valeur)
-        .select_from(ActiviteSaisie)
-        .join(Service, Service.id == ActiviteSaisie.service_id)
-        .join(Site, Site.id == ActiviteSaisie.site_id)
-        .where(ActiviteSaisie.periode_id == periode.id),
-        scope, service=Service.libelle, site=Site.libelle)
-    saisies = tuple(Saisie(srv, site, tsite, ind, _dec(val))
-                    for srv, site, tsite, ind, val in db.execute(sq))
-    return PeriodeData(lignes, exclues_a_date(db, annee, mois),
-                       ca=_dec(saisie.valeur) if saisie else None,
-                       marge=_dec(saisie.marge) if saisie else None, saisies=saisies)
+    saisies, vides = _saisies_visibles(db, scope, periode.id)
+    return PeriodeData(lignes, exclues_a_date(db, annee, mois), ca=_total(saisies, "ca"),
+                       marge=_total(saisies, "marge"), saisies=saisies, vides=vides)
 
 
-def _dec(v) -> Decimal | None:
-    """SQLite renvoie des float pour NUMERIC."""
-    return None if v is None else Decimal(str(v))
+def _saisies_visibles(db: Session, scope: Scope, pid: int) -> tuple[tuple[Saisie, ...],
+                                                                   tuple[Saisie, ...]]:
+    """Valeurs saisies ou calculées des deux groupes (CA et marge, activité) à leur niveau, dans
+    le périmètre : (cases avec valeur, cases attendues restées vides)."""
+    ctx = rs.contexte(db, pid)
+    avec: list[Saisie] = []
+    vides: list[Saisie] = []
+    for groupe in nv.GROUPES:
+        for case in rs.resolution(ctx, groupe).cases:
+            site, service = ctx.sites.get(case.site_id), ctx.services.get(case.service_id)
+            if not rs.dans_perimetre(scope, site and site.libelle, service and service.libelle):
+                continue
+            for ind, v in case.valeurs.items():
+                (avec if v.valeur is not None else vides).append(Saisie(
+                    service and service.libelle, site and site.libelle, site and site.type_site,
+                    ind, v.valeur))
+    return tuple(avec), tuple(vides)
+
+
+def _total(saisies: tuple[Saisie, ...], indicateur: str) -> Decimal | None:
+    vals = [s.valeur for s in saisies if s.indicateur == indicateur]
+    return sum(vals, Decimal(0)) if vals else None
 
 
 def texte_montant(v: Decimal) -> str:
@@ -268,17 +278,20 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
                    and (not activite or L.activite == activite)
                    and (not type_contrat or L.contrat == type_contrat)
                    and (salarie_id is None or L.salarie_id == salarie_id))
-    # Le CA est global : il n'existe pas pour un service, un site, un type de site, un poste,
-    # une activité ou une personne, donc ni marge ni taux.
-    global_ = not (service or site or type_site or poste or activite or type_contrat
-                    or salarie_id is not None)
-    # Une saisie (OR, devis, factures) n'existe qu'au niveau site et service.
-    saisies = () if (poste or activite or type_contrat or salarie_id is not None) else tuple(
-        s for s in pd.saisies
-        if (not service or s.service == service) and (not site or s.site == site)
-        and (not type_site or s.type_site == type_site))
-    return PeriodeData(lignes, pd.exclues, ca=pd.ca if global_ else None,
-                       marge=pd.marge if global_ else None, saisies=saisies)
+    # Une saisie (CA, marge, OR, devis, factures) n'est gardée que si son niveau permet de
+    # répondre au filtre : un filtre site ou type de site veut un site renseigné, un filtre service
+    # un service renseigné. Poste, activité, contrat et personne n'ont aucune saisie.
+    sans_saisie = poste or activite or type_contrat or salarie_id is not None
+
+    def gardee(s: Saisie) -> bool:
+        return not sans_saisie and (
+            (not service or (s.service is not None and s.service == service))
+            and (not site or (s.site is not None and s.site == site))
+            and (not type_site or (s.type_site is not None and s.type_site == type_site)))
+
+    saisies = tuple(s for s in pd.saisies if gardee(s))
+    return PeriodeData(lignes, pd.exclues, ca=_total(saisies, "ca"), marge=_total(saisies, "marge"),
+                       saisies=saisies, vides=tuple(s for s in pd.vides if gardee(s)))
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:

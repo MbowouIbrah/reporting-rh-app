@@ -9,7 +9,8 @@ from app.db.session import get_db
 from app.kpi import chargement as ch
 from app.models.donnees import Periode, Salarie, SituationMensuelle
 from app.models.imports import LotImport, StagingLigne
-from app.models.pilotage import Budget, CaPeriode
+from app.models.pilotage import Budget
+from app.repos import saisies
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
 
@@ -86,9 +87,7 @@ def parcours(
             f"{len(ecarts)} écart(s) bloquant(s)" if ecarts else "Tous les contrôles sont bons",
         )
 
-    saisie = db.get(CaPeriode, per.id)
-    ca = None if saisie is None else saisie.valeur
-    marge = None if saisie is None else saisie.marge
+    ca, marge = saisies.totaux_ca_marge(db, per.id)
     if ca is None:
         etape_ca = _etape("ca", "CA et marge", "reportable", "À saisir quand ils sont connus")
     elif marge is None:

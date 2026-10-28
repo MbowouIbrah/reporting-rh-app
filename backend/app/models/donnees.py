@@ -27,6 +27,13 @@ class MontantExact(sa.types.TypeDecorator):
     impl = Numeric
     cache_ok = True
 
+    def load_dialect_impl(self, dialect):
+        # SQLite renvoie un float : SQLAlchemy le formaterait à 10 décimales (1234567.891 devient
+        # 1234567.8910000001) ; on le relit tel quel, sa forme la plus courte étant l'exacte.
+        if dialect.name == "sqlite":
+            return dialect.type_descriptor(Numeric(asdecimal=False))
+        return dialect.type_descriptor(Numeric())
+
     def process_result_value(self, value, dialect):
         if value is None:
             return None

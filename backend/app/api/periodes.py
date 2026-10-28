@@ -14,8 +14,8 @@ from app.imports.service import DIM_MODELS
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
 from app.models.auth import PerimetreRegle, UtilisateurPortee
 from app.models.donnees import Periode
-from app.models.pilotage import CaPeriode
 from app.models.referentiel import TYPES_SITE, RefAlias, Rubrique
+from app.repos import saisies
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize, is_allowed
@@ -29,10 +29,8 @@ def _txt(v) -> str | None:
 
 
 def _periode(p: Periode, db: Session) -> dict:
-    saisie = db.get(CaPeriode, p.id)
-    return {"id": p.id, "annee": p.annee, "mois": p.mois,
-            "ca": _txt(saisie.valeur) if saisie else None,
-            "marge": _txt(saisie.marge) if saisie else None}
+    ca, marge = saisies.totaux_ca_marge(db, p.id)
+    return {"id": p.id, "annee": p.annee, "mois": p.mois, "ca": _txt(ca), "marge": _txt(marge)}
 
 
 def periode_ou_ouvrir(db: Session, p: Principal, annee: int, mois: int) -> Periode:
@@ -47,24 +45,16 @@ def periode_ou_ouvrir(db: Session, p: Principal, annee: int, mois: int) -> Perio
     return per
 
 
-def ecrire_ca_marge(db: Session, p: Principal, per: Periode,
-                    ca: Decimal | None, marge: Decimal | None) -> None:
-    """Remplace CA et marge du mois (None = effacé), avec trace d'audit. Pas de commit."""
-    if ca is None and marge is not None:
-        raise HTTPException(422, MARGE_SANS_CA)
-    avant = _periode(per, db)
-    ligne = db.get(CaPeriode, per.id)
-    if ca is None:
-        if ligne is not None:
-            db.delete(ligne)
-    elif ligne is None:
-        db.add(CaPeriode(periode_id=per.id, valeur=ca, marge=marge))
-    else:
-        ligne.valeur, ligne.marge = ca, marge
-    db.flush()
-    apres = _periode(per, db)
-    if apres != avant:  # un envoi sans changement ne laisse pas de trace vide
-        audit.record(db, p.user_id, "saisie_ca", "periode", per.id, avant, apres)
+def ecrire_ca_global(db: Session, p: Principal, per: Periode, ca: Decimal | None) -> None:
+    """CA global du mois (None = effacé, la marge globale avec lui), sans toucher à la marge sinon.
+    409 si le CA du mois est saisi par site ou service. Pas de commit."""
+    ctx = saisies.contexte(db, per.id)
+    niveau, defaut = saisies.niveau_groupe(ctx, "ca_marge")
+    if not defaut and niveau != "global":
+        raise HTTPException(409, "Le CA de ce mois est saisi par site ou service")
+    marge = ctx.lignes.get(("marge", None, None))
+    saisies.ecrire(db, p.user_id, per.id, "ca_marge", "global",
+                   {(None, None): {"ca": ca, "marge": marge if ca is not None else None}})
 
 
 @router.get("/periodes")
@@ -114,11 +104,9 @@ def saisir_ca(
     authorize(p, "saisie:write")
     authorize(p, "marge:read")
     per = _get(db, pid)
-    ligne = db.get(CaPeriode, pid)
     vide = body.valeur is None or not body.valeur.strip()
     # la marge déjà saisie est conservée avec le CA, effacée avec lui
-    ecrire_ca_marge(db, p, per, None if vide else parse_montant(body.valeur),
-                    ligne.marge if ligne and not vide else None)
+    ecrire_ca_global(db, p, per, None if vide else parse_montant(body.valeur))
     db.commit()
     return _periode(per, db)
 
@@ -158,7 +146,8 @@ class RefIn(BaseModel):
 
 def _valeur(dimension: str, r) -> dict:
     return {"id": r.id, "libelle": r.libelle, "actif": r.actif,
-            **({"type_site": r.type_site} if dimension == "site" else {})}
+            **({"type_site": r.type_site} if dimension == "site" else {}),
+            **({"productif": r.productif} if dimension == "service" else {})}
 
 
 @router.post("/referentiels/{dimension}", status_code=201)
@@ -229,6 +218,7 @@ class RefPatch(BaseModel):
     libelle: str | None = None
     actif: bool | None = None
     type_site: str | None = None
+    productif: bool | None = None
 
 
 @router.put("/referentiels/{dimension}/{rid}")
@@ -245,9 +235,13 @@ def modifier_referentiel(
         raise HTTPException(404, "Valeur introuvable")
     if body.type_site is not None and (dimension != "site" or body.type_site not in TYPES_SITE):
         raise HTTPException(422, "Type de site invalide")
+    if body.productif is not None and dimension != "service":
+        raise HTTPException(422, "Seul un service peut être productif")
     avant = {"libelle": row.libelle, "actif": row.actif}
     if dimension == "site":
         avant["type_site"] = row.type_site
+    if dimension == "service":
+        avant["productif"] = row.productif
     ancien = row.libelle
     nouveau = body.libelle.strip() if body.libelle is not None else ancien
     renomme = nouveau != ancien
@@ -279,6 +273,8 @@ def modifier_referentiel(
         row.actif = body.actif
     if body.type_site is not None:
         row.type_site = body.type_site
+    if body.productif is not None:
+        row.productif = body.productif
     if renomme:
         row.libelle = nouveau
         for r in [*regles, *portees]:
@@ -295,6 +291,8 @@ def modifier_referentiel(
              "comptes_maj": len({x.utilisateur_id for x in portees})}
     if dimension == "site":
         apres["type_site"] = row.type_site
+    if dimension == "service":
+        apres["productif"] = row.productif
     audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant, apres)
     db.commit()
     return {"id": rid, **apres}

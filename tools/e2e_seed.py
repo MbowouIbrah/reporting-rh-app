@@ -22,7 +22,7 @@ import app.models  # noqa: E402,F401
 from app.db.session import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.donnees import Periode  # noqa: E402
-from app.models.pilotage import CaPeriode  # noqa: E402
+from app.models.pilotage import ValeurSaisie  # noqa: E402
 from app.seed import run  # noqa: E402
 from tests.test_import_regles import xlsx  # noqa: E402
 from tests.test_rapports_api import API, XLSX, donnees  # noqa: E402
@@ -41,7 +41,7 @@ def main() -> None:
         assert lot["statut"] == "pret", lot
         assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
         pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
-        db.add(CaPeriode(periode_id=pid, valeur=Decimal("10000")))
+        db.add(ValeurSaisie(periode_id=pid, indicateur="ca", valeur=Decimal("10000")))
         db.commit()
     print("e2e seed ok")
 
