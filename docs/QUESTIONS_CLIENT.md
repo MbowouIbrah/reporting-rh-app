@@ -1,6 +1,6 @@
 # Questions à valider avec le client
 
-Mise à jour : 2026-10-16. Tant qu'un point n'est pas confirmé par écrit, l'application applique la réponse « appliquée aujourd'hui », qui reste une **supposition**.
+Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujourd'hui » vaut décision ; on avance sans attendre de validation. Le client corrige après coup s'il le souhaite. Seules restent en attente les informations que lui seul détient (G2, SMTP, adresse d'expédition, `APP_URL`).
 
 ## A. Réponses notées après la 1re présentation (à confirmer)
 
