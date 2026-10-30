@@ -44,6 +44,11 @@ def _feuille(wb: Workbook, titre: str, entetes: list[str], lignes: list[list]):
     return ws
 
 
+def _libelle(lib: str, c: dict) -> str:
+    """Mention « partiel » de l'écran (total auquel il manque une case attendue)."""
+    return f"{lib} (partiel)" if c.get("partiel") else lib
+
+
 def _cell(c: dict, avec_budget: bool = False) -> list:
     out = [c.get(k) for k in CELL]
     return out + [c.get(k) for k in BUDGET] if avec_budget else out
@@ -62,10 +67,14 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
     bud = ["Budget", "Écart", "% Budget"]
     total = next((x for x in r["a_type_charge"] if x["rubrique"] == TOTAL), None)
     ligne_total = [["TOTAL GÉNÉRAL", *_cell(total, True)]] if total else []
+    # CA et marge sous le total, hors total et sans budget ; absents sans droit marge.
+    cm = r.get("lignes_ca_marge")
+    ca_marge = [[_libelle(lib, cm[k]), *_cell(cm[k])]
+                for k, lib in (("ca", "Chiffre d'affaires"), ("marge", "Marge"))] if cm else []
 
     inclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and not x.get("exclu")]
     _feuille(wb, "1 Reporting global", ["Type de charge", prec, cour, *var, *bud],
-             [[x["rubrique"], *_cell(x, True)] for x in inclus] + ligne_total)
+             [[x["rubrique"], *_cell(x, True)] for x in inclus] + ligne_total + ca_marge)
     exclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and x.get("exclu")]
     if exclus:
         _feuille(wb, "Charges exclues", ["Charge exclue", prec, cour, *var, *bud],
@@ -110,7 +119,7 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
 
     if r.get("activite"):
         _feuille(wb, "6 Activité", ["Indicateur", prec, cour, *var],
-                 [[x["libelle"], *_cell(x)] for x in r["activite"]])
+                 [[_libelle(x["libelle"], x), *_cell(x)] for x in r["activite"]])
 
 
 def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:

@@ -2,8 +2,10 @@
 (GET et PUT /pilotage/saisies), niveau, droits, périmètre, audit, exactitude."""
 
 from decimal import Decimal as D
+from io import BytesIO
 
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import func, select
 
 from app.api import pilotage
@@ -417,6 +419,22 @@ def test_total_partiel_signale(make_client, db):
     saisir(c, "ca_marge", "cellule", [case(sites["Yaoundé"], services["Commerce VN"], ca="30")])
     cell = get(c, "mensuel", annee=2026, mois=1).json()["lignes_ca_marge"]["ca"]
     assert D(cell["m"]) == 530 and "partiel" not in cell
+
+
+def test_export_ca_marge_et_partiel(make_client):
+    c = make_client(ADMIN)
+    charger(c, [lig(**{BR: 1000, CA_INDIVIDUEL: 500}),
+                lig(MATRICULE="E3", Noms="Cy", Service="Commerce VN", Site="Yaoundé",
+                    **{BR: 500})])
+    for vue in ("mensuel", "annuel"):
+        r = get(c, f"{vue}/export", annee=2026, mois=1)
+        rows = {x[0]: x[1:] for x in load_workbook(BytesIO(r.content))["1 Reporting global"]
+                .iter_rows(min_row=2, values_only=True)}
+        assert D(str(rows["Chiffre d'affaires (partiel)"][1])) == 500, vue
+        assert "Marge" in rows, vue
+    r = get(make_client(EQUIP), "mensuel/export", annee=2026, mois=1)
+    noms = [x[0] for x in load_workbook(BytesIO(r.content))["1 Reporting global"].values]
+    assert not any(n and n.startswith(("Chiffre", "Marge")) for n in noms)
 
 
 def test_moteur_filtrer_et_partiel_sur_donnees_chargees(make_client, db):

@@ -19,7 +19,7 @@ export function Panneau({ titre, className, id, sansTitre, children }: { titre: 
   )
 }
 
-function Tete({ premiere, lib, budget }: { premiere: string; lib: Libelles; budget?: boolean }) {
+function Tete({ premiere, lib, budget, bourrage = 0 }: { premiere: string; lib: Libelles; budget?: boolean; bourrage?: number }) {
   return (
     <thead>
       <tr>
@@ -35,6 +35,7 @@ function Tete({ premiere, lib, budget }: { premiere: string; lib: Libelles; budg
             <th scope="col">% Budget</th>
           </>
         )}
+        <Bourrage n={bourrage} tete />
       </tr>
     </thead>
   )
@@ -43,12 +44,13 @@ function Tete({ premiere, lib, budget }: { premiere: string; lib: Libelles; budg
 /** Mention discrète d'un total auquel il manque une case attendue. */
 const Partiel = () => <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>
 
-function Ligne({ label, cell, budget, className, format = fcfa }: {
+function Ligne({ label, cell, budget, className, format = fcfa, bourrage = 0 }: {
   label: ReactNode
   cell: CellPartiel
   budget?: Budget | true
   className?: string
   format?: (v: CellPartiel['m']) => string
+  bourrage?: number
 }) {
   const b = budget === true ? undefined : budget
   return (
@@ -65,6 +67,7 @@ function Ligne({ label, cell, budget, className, format = fcfa }: {
           <td className={cls(b?.ecart_pct ?? null)}>{pct(b?.ecart_pct ?? null)}</td>
         </>
       )}
+      <Bourrage n={bourrage} />
     </tr>
   )
 }
@@ -108,10 +111,10 @@ const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factu
 export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libelles }) {
   return (
     <table className="dense tab-global aligne">
-      <Tete premiere="Indicateur" lib={lib} />
+      <Tete premiere="Indicateur" lib={lib} bourrage={COLONNES - 4} />
       <tbody>
         {lignes.map((l) => (
-          <Ligne key={l.cle} label={l.libelle} cell={l} format={RATIOS.has(l.cle) ? decimal2 : fcfa} />
+          <Ligne key={l.cle} label={l.libelle} cell={l} format={RATIOS.has(l.cle) ? decimal2 : fcfa} bourrage={COLONNES - 4} />
         ))}
       </tbody>
     </table>
