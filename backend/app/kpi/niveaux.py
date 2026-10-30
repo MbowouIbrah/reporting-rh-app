@@ -13,7 +13,13 @@ NIVEAUX = ("global", "site", "service", "cellule")
 GROUPES: dict[str, tuple[str, ...]] = {
     "ca_marge": ("ca", "marge"),
     "activite": ("or", "devis", "factures"),
+    "obj_ca_marge": ("obj_ca", "obj_marge"),
+    "obj_activite": ("obj_ventes", "obj_clients", "obj_factures", "obj_productivite"),
 }
+# Objectifs : jamais calculés depuis les employés, saisis au niveau global par défaut.
+GROUPES_OBJECTIFS = ("obj_ca_marge", "obj_activite")
+# Indicateurs dont le total de plusieurs cases est la moyenne simple et non la somme.
+MOYENNE = {"obj_productivite"}
 # Seuls ces indicateurs ont un niveau employé (rubriques « CA individuel », « Marge individuelle »).
 INDICATEURS_EMPLOYE = ("ca", "marge")
 
@@ -101,6 +107,7 @@ def projeter(cases: list[CaseResolue], cible: str,
     """Somme des valeurs de cases d'un niveau plus fin, rangées par case du niveau cible. Un
     indicateur n'est proposé pour une case cible que si au moins une case source est saisie."""
     somme: dict[tuple[Cle, str], Decimal] = {}
+    nombre: dict[tuple[Cle, str], int] = {}
     saisi: set[tuple[Cle, str]] = set()
     for c in cases:
         k = cle_du_niveau(cible, c.site_id, c.service_id)
@@ -108,17 +115,27 @@ def projeter(cases: list[CaseResolue], cible: str,
             v = c.valeurs[ind]
             if v.valeur is not None:
                 somme[(k, ind)] = somme.get((k, ind), ZERO) + v.valeur
+                nombre[(k, ind)] = nombre.get((k, ind), 0) + 1
             if v.origine == "saisi":
                 saisi.add((k, ind))
     out: dict[Cle, dict[str, Decimal]] = {}
     for k, ind in saisi:
-        out.setdefault(k, {})[ind] = somme[(k, ind)]
+        v = somme[(k, ind)] / nombre[(k, ind)] if ind in MOYENNE else somme[(k, ind)]
+        if saisissable(v):  # une moyenne sans fin (250 / 3) n'est pas proposée
+            out.setdefault(k, {})[ind] = v
     return out
+
+
+def saisissable(v: Decimal) -> bool:
+    """La valeur tient dans la précision d'une saisie (12 décimales au plus)."""
+    return v.normalize().as_tuple().exponent >= -12
 
 
 def niveau_par_defaut(groupe: str, employes: list[Employe]) -> str:
     """CA et marge : par case si des employés portent un CA ou une marge individuels, sinon global.
-    Activité : par case."""
+    Activité : par case. Objectifs : global."""
+    if groupe in GROUPES_OBJECTIFS:
+        return "global"
     if groupe == "activite":
         return "cellule"
     avec = any(e.valeurs.get(i) is not None for e in employes for i in INDICATEURS_EMPLOYE)
@@ -130,8 +147,13 @@ def totaliser(cases: tuple[CaseResolue, ...] | list[CaseResolue],
     totaux = {}
     for ind in indicateurs:
         vals = [c.valeurs[ind].valeur for c in cases if c.valeurs[ind].valeur is not None]
-        totaux[ind] = Total(sum(vals, ZERO) if vals else None, len(vals) < len(cases),
-                            len(vals), len(cases))
+        if not vals:
+            total = None
+        elif ind in MOYENNE:
+            total = sum(vals, ZERO) / len(vals)
+        else:
+            total = sum(vals, ZERO)
+        totaux[ind] = Total(total, len(vals) < len(cases), len(vals), len(cases))
     return totaux
 
 

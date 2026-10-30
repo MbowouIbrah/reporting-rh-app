@@ -6,6 +6,7 @@ from app.kpi.niveaux import (
     niveau_de,
     niveau_des_lignes,
     niveau_par_defaut,
+    projeter,
     resoudre,
 )
 
@@ -106,3 +107,42 @@ def test_une_valeur_saisie_hors_cases_attendues_n_est_pas_perdue():
 def test_exactitude_des_decimales():
     r = res(saisies={("ca", 1, 10): D("0.1234567"), ("ca", 2, 20): D("0.2")})
     assert r.totaux["ca"].valeur == D("0.3234567")
+
+
+# ---------- objectifs ----------
+
+
+def test_objectifs_niveau_par_defaut_global_sans_calcul_depuis_les_employes():
+    for g in ("obj_ca_marge", "obj_activite"):
+        assert niveau_par_defaut(g, []) == "global"
+        assert niveau_par_defaut(g, EMPLOYES) == "global"
+    r = res("obj_ca_marge", "cellule")
+    assert all(v.valeur is None and v.origine is None
+               for c in r.cases for v in c.valeurs.values())
+    assert set(r.totaux) == {"obj_ca", "obj_marge"}
+
+
+def test_objectif_de_productivite_total_en_moyenne_les_autres_en_somme():
+    saisies = {("obj_productivite", 1, 10): D("80"), ("obj_productivite", 2, 20): D("90"),
+               ("obj_ventes", 1, 10): D("5"), ("obj_ventes", 2, 20): D("7")}
+    r = res("obj_activite", "cellule", saisies)
+    assert r.totaux["obj_productivite"].valeur == 85
+    assert r.totaux["obj_ventes"].valeur == 12
+    assert r.totaux["obj_clients"].valeur is None
+
+
+def test_objectif_vide_ne_rend_pas_un_autre_objectif_partiel():
+    r = res("obj_activite", "site", {("obj_ventes", 1, None): D("5")})
+    assert r.totaux["obj_ventes"].partiel  # le site 2 est vide
+    assert (r.totaux["obj_ventes"].renseignes, r.totaux["obj_ventes"].attendus) == (1, 2)
+    assert r.totaux["obj_clients"].valeur is None and r.totaux["obj_clients"].partiel
+
+
+def test_projection_d_objectifs_somme_et_moyenne_pour_la_productivite():
+    r = res("obj_activite", "cellule", {
+        ("obj_productivite", 1, 10): D("80"), ("obj_productivite", 1, 20): D("90"),
+        ("obj_ventes", 1, 10): D("5"), ("obj_ventes", 1, 20): D("7")})
+    p = projeter(list(r.cases), "site", ("obj_productivite", "obj_ventes"))
+    assert p[(1, None)] == {"obj_productivite": D("85"), "obj_ventes": D("12")}
+    p = projeter(list(r.cases), "global", ("obj_productivite", "obj_ventes"))
+    assert p[(None, None)] == {"obj_productivite": D("85"), "obj_ventes": D("12")}

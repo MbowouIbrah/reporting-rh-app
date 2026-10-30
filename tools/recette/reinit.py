@@ -6,7 +6,8 @@ Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon <début de l'adress
 (admin@exemple.invalid -> <mot-de-passe-recette>).
 
 Contenu : comptes de comptes.csv, historique de paie (Excel REPORTING RH, 18 mois),
-CA et marge de ca_marge.csv, budgets de budgets.csv. Les mois suivants restent vides :
+CA et marge de ca_marge.csv, objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
+Les mois suivants restent vides :
 ils servent au test d'import en direct (voir LISEZMOI.md).
 """
 
@@ -213,6 +214,16 @@ def main() -> None:
                 "cases": [{"site_id": None, "service_id": None,
                            "valeurs": {"ca": m["ca"], "marge": m["marge"] or None}}]})
             assert r.status_code == 200, (m, r.text)
+
+    # Objectifs annuels globaux, répartis en 12 mois par le serveur (le reste va sur décembre).
+    objectifs = {"obj_ca_marge": {"obj_ca": "24000000000", "obj_marge": "3000000000"},
+                 "obj_activite": {"obj_ventes": "1200", "obj_clients": "600", "obj_factures": "2400"}}
+    for annee in (2025, 2026):
+        for groupe, totaux in objectifs.items():
+            r = c.put(f"{api}/pilotage/saisies/annee", json={
+                "annee": annee, "groupe": groupe, "niveau": "global",
+                "cases": [{"indicateur": i, "total": t} for i, t in totaux.items()]})
+            assert r.status_code == 200, (annee, groupe, r.text)
 
     par_mois: dict[tuple[int, int], list[dict]] = {}
     for b in _csv("budgets.csv"):

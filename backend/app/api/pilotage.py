@@ -30,6 +30,17 @@ from app.security.policy import Principal, authorize
 
 router = APIRouter(prefix="/pilotage", tags=["pilotage"])
 
+# Groupes de saisie réservés au droit marge:read (CA et marge, réels ou objectifs).
+GROUPES_MARGE = {"ca_marge", "obj_ca_marge"}
+
+# Comptés à l'unité (étude Q4.2) : un objectif de ventes, de clients ou de factures est entier.
+_NOMBRES = {"obj_ventes", "obj_clients", "obj_factures"}
+OBJECTIF_ENTIER = "Un objectif de ventes, de clients ou de factures est entier"
+
+
+def _entier(v: Decimal | None) -> bool:
+    return v is None or v == v.to_integral_value()
+
 
 def _txt(v) -> str | None:
     return None if v is None else format(Decimal(str(v)), "f")
@@ -186,6 +197,8 @@ def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int,
             for ind, t in nv.totaliser(source, inds).items():
                 if t.valeur is not None and any(c.valeurs[ind].origine == "saisi" for c in source):
                     a_repartir[ind] = t.valeur
+        for ind in nv.MOYENNE:  # une moyenne ne se répartit pas : pas de reste à répartir
+            a_repartir.pop(ind, None)
     vus_sites = {c.site_id for c in cases}
     vus_services = {c.service_id for c in cases}
     out = {
@@ -219,13 +232,13 @@ def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int,
 
 @router.get("/saisies")
 def lire_saisies(
-    groupe: Literal["ca_marge", "activite"],
+    groupe: Literal["ca_marge", "activite", "obj_ca_marge", "obj_activite"],
     annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le=12),
     niveau: Literal["global", "site", "service", "cellule"] | None = None,
     p: Principal = Depends(current_principal), db: Session = Depends(get_db),
 ):
     authorize(p, "import:read")
-    if groupe == "ca_marge":
+    if groupe in GROUPES_MARGE:
         authorize(p, "marge:read")
     return _vue_saisies(db, scope_for(db, p), groupe, annee, mois, niveau)
 
@@ -262,7 +275,10 @@ def _valider_saisies(ctx: saisies.Contexte, body: SaisiesIn) -> dict[nv.Cle, dic
             raise HTTPException(422, "Site ou service inconnu")
         if any(i not in inds for i in c.valeurs):
             raise HTTPException(422, "Indicateur inconnu")
-        vals = {i: _valeur_activite(v, negatif=(i == "marge")) for i, v in c.valeurs.items()}
+        vals = {i: _valeur_activite(v, negatif=(i in ("marge", "obj_marge")))
+                for i, v in c.valeurs.items()}
+        if any(i in _NOMBRES and not _entier(v) for i, v in vals.items()):
+            raise HTTPException(422, OBJECTIF_ENTIER)
         marge = vals["marge"] if "marge" in vals else ctx.lignes.get(("marge", *cle))
         if body.groupe == "ca_marge" and marge is not None:
             # CA de la même case : celui envoyé, sinon celui déjà saisi, sinon celui des employés
@@ -296,7 +312,7 @@ def saisir_saisies(
     authorize(p, "saisie:write")
     if body.groupe not in nv.GROUPES:
         raise HTTPException(422, "Groupe inconnu")
-    if body.groupe == "ca_marge":
+    if body.groupe in GROUPES_MARGE:
         authorize(p, "marge:read")
     scope = scope_for(db, p)
     ctx = saisies.contexte(db, saisies.periode_id(db, body.annee, body.mois))
@@ -309,3 +325,92 @@ def saisir_saisies(
     saisies.ecrire(db, p.user_id, per.id, body.groupe, body.niveau, valides)
     db.commit()
     return _vue_saisies(db, scope, body.groupe, body.annee, body.mois)
+
+
+# ---- objectif annuel réparti sur les 12 mois ----
+class TotalAnnuelIn(BaseModel):
+    site_id: int | None = None
+    service_id: int | None = None
+    indicateur: str
+    total: str | None = None
+
+
+class AnneeIn(BaseModel):
+    annee: int = Field(ge=2000, le=2100)
+    groupe: Literal["obj_ca_marge", "obj_activite"]
+    niveau: Literal["global", "site", "service", "cellule"]
+    cases: list[TotalAnnuelIn] = Field(max_length=5000)
+
+
+
+
+def repartir_annee(total: Decimal, moyenne: bool) -> list[Decimal]:
+    """12 valeurs mensuelles d'un total annuel, exactes à la précision du total saisi : le reste
+    de la division va sur décembre. Une moyenne (productivité) vaut la même valeur chaque mois."""
+    if moyenne:
+        return [total] * 12
+    signe, chiffres, exposant = total.as_tuple()
+    unites = int("".join(map(str, chiffres)))
+    q, r = divmod(unites, 12)
+    unite = Decimal((0, (1,), exposant))
+    mois = [Decimal(q) * unite] * 11 + [Decimal(q + r) * unite]
+    return [-m if signe else m for m in mois]
+
+
+@router.put("/saisies/annee")
+def repartir_objectif_annuel(
+    body: AnneeIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db),
+):
+    """Répartit des objectifs annuels en 12 mois (même écriture que la saisie mensuelle, une trace
+    d'audit par mois). Les mois déjà saisis sont écrasés et listés dans `ecrases`."""
+    authorize(p, "saisie:write")
+    if body.groupe in GROUPES_MARGE:
+        authorize(p, "marge:read")
+    inds = nv.GROUPES[body.groupe]
+    totaux: dict[nv.Cle, dict[str, Decimal]] = {}
+    for c in body.cases:
+        if c.indicateur not in inds:
+            raise HTTPException(422, "Indicateur inconnu")
+        t = _valeur_activite(c.total, negatif=(c.indicateur == "obj_marge"))
+        if c.indicateur in _NOMBRES and not _entier(t):
+            raise HTTPException(422, OBJECTIF_ENTIER)
+        cle = (c.site_id, c.service_id)
+        if c.indicateur in totaux.get(cle, {}):
+            raise HTTPException(422, "Case en double")
+        if t is not None:  # total vide = rien à répartir pour cette case
+            totaux.setdefault(cle, {})[c.indicateur] = t
+    scope = scope_for(db, p)
+    mensuels = {cle: {i: repartir_annee(t, i in nv.MOYENNE) for i, t in vals.items()}
+                for cle, vals in totaux.items()}
+    contextes, ecrases = {}, []
+    for m in range(1, 13):  # tout est contrôlé avant la moindre écriture
+        ctx = saisies.contexte(db, saisies.periode_id(db, body.annee, m))
+        corps = SaisiesIn(annee=body.annee, mois=m, groupe=body.groupe, niveau=body.niveau, cases=[
+            CaseIn(site_id=cle[0], service_id=cle[1],
+                   valeurs={i: format(v[m - 1], "f") for i, v in vals.items()})
+            for cle, vals in mensuels.items()])
+        valides = _valider_saisies(ctx, corps)
+        _verifier_perimetre(ctx, scope, body.groupe, body.niveau, valides)
+        contextes[m] = (ctx, valides)
+        autre_niveau = nv.niveau_des_lignes(
+            [(si, se) for (i, si, se) in ctx.lignes if i in nv.GROUPES[body.groupe]])
+        if (autre_niveau is not None and autre_niveau != body.niveau) or any(
+                ctx.lignes.get((i, *cle)) is not None for cle, vals in valides.items()
+                for i in vals):
+            ecrases.append(m)  # cases remplacées, ou lignes d'un autre niveau effacées
+    if not mensuels:
+        return {"annee": body.annee, "groupe": body.groupe, "niveau": body.niveau, "mois": [],
+                "ecrases": []}
+    if any(ctx.periode_id is None for ctx, _v in contextes.values()):
+        authorize(p, "periode:write")  # même droit que l'ouverture d'un mois
+    ecrits = []
+    for m, (_ctx, valides) in contextes.items():
+        per = periode_ou_ouvrir(db, p, body.annee, m)
+        saisies.ecrire(db, p.user_id, per.id, body.groupe, body.niveau, valides)
+        ecrits.append({"mois": m, "cases": [
+            {"site_id": cle[0], "service_id": cle[1],
+             "valeurs": {i: _txt_opt(v) for i, v in vals.items()}}
+            for cle, vals in valides.items()]})
+    db.commit()
+    return {"annee": body.annee, "groupe": body.groupe, "niveau": body.niveau, "mois": ecrits,
+            "ecrases": ecrases}

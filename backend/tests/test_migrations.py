@@ -1,5 +1,7 @@
+import pytest
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from alembic import command
 from app.core.config import settings
@@ -148,4 +150,43 @@ def test_0017_valeur_saisie_reprend_et_restitue(tmp_path, monkeypatch):
         assert [(r[0], r[1], r[2], r[3], float(r[4])) for r in c.execute(text(
             "SELECT periode_id, site_id, service_id, indicateur, valeur FROM activite_saisie"))
         ] == [(1, 1, 1, "or", 7.25)]
+    command.upgrade(cfg, "head")
+
+
+def test_0018_objectifs_acceptes_unicite_gardee_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'o.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0017")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO periode (id, annee, mois) VALUES (1, 2026, 1)"))
+        c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                       "VALUES (1, 'ca', 1000.5)"))
+        with pytest.raises(IntegrityError):
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, 'obj_ca', 5)"))
+    command.upgrade(cfg, "0018")
+    with eng.begin() as c:
+        assert c.execute(text("SELECT indicateur, valeur FROM valeur_saisie")).all() == [
+            ("ca", 1000.5)]
+        for ind in ("obj_ca", "obj_marge", "obj_ventes", "obj_clients", "obj_factures",
+                    "obj_productivite"):
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, :i, 5)"), {"i": ind})
+    with eng.begin() as c:  # la case globale reste unique
+        with pytest.raises(IntegrityError):
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, 'obj_ca', 6)"))
+    with eng.begin() as c:
+        with pytest.raises(IntegrityError):
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, 'inconnu', 6)"))
+    command.downgrade(cfg, "0017")
+    with eng.connect() as c:
+        assert c.execute(text("SELECT indicateur FROM valeur_saisie")).scalars().all() == ["ca"]
+    with eng.begin() as c:
+        with pytest.raises(IntegrityError):
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                           "VALUES (1, 'ca', 7)"))
     command.upgrade(cfg, "head")

@@ -67,14 +67,18 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
     bud = ["Budget", "Écart", "% Budget"]
     total = next((x for x in r["a_type_charge"] if x["rubrique"] == TOTAL), None)
     ligne_total = [["TOTAL GÉNÉRAL", *_cell(total, True)]] if total else []
-    # CA et marge sous le total, hors total et sans budget ; absents sans droit marge.
+    # « dont Frais de mission » : déjà compté dans le total, repris dessous avec son budget.
+    fm = r.get("frais_mission")
+    frais = [["dont Frais de mission", *_cell(fm, True)]] if fm else []
+    # CA et marge sous le total, hors total, avec leur objectif ; absents sans droit marge.
     cm = r.get("lignes_ca_marge")
-    ca_marge = [[_libelle(lib, cm[k]), *_cell(cm[k])]
+    ca_marge = [[_libelle(lib, cm[k]) + (" (objectif partiel)" if cm[k].get("budget_partiel")
+                                         else ""), *_cell(cm[k], True)]
                 for k, lib in (("ca", "Chiffre d'affaires"), ("marge", "Marge"))] if cm else []
 
     inclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and not x.get("exclu")]
     _feuille(wb, "1 Reporting global", ["Type de charge", prec, cour, *var, *bud],
-             [[x["rubrique"], *_cell(x, True)] for x in inclus] + ligne_total + ca_marge)
+             [[x["rubrique"], *_cell(x, True)] for x in inclus] + ligne_total + frais + ca_marge)
     exclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and x.get("exclu")]
     if exclus:
         _feuille(wb, "Charges exclues", ["Charge exclue", prec, cour, *var, *bud],

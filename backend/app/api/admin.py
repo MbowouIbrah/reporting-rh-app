@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.pilotage import GROUPES_MARGE
 from app.db.session import get_db
 from app.models.auth import (
     AuditEvent,
@@ -366,6 +367,15 @@ def list_audit(
     if entite_id:
         q = q.where(AuditEvent.entite_id == entite_id)
     q = q.offset(max(offset, 0)).limit(min(max(limit, 1), 500))
+    voit_marge = is_allowed(p, "marge:read")
+
+    def lisible(e: AuditEvent, d):
+        """Valeurs d'une saisie de CA, de marge ou de leurs objectifs masquées sans droit marge."""
+        if (voit_marge or e.action != "saisie_pilotage" or not isinstance(d, dict)
+                or d.get("groupe") not in GROUPES_MARGE):
+            return d
+        return {**d, "valeurs": None}
+
     return [
         {
             "id": e.id,
@@ -374,8 +384,8 @@ def list_audit(
             "action": e.action,
             "entite": e.entite,
             "entite_id": e.entite_id,
-            "avant": e.avant,
-            "apres": e.apres,
+            "avant": lisible(e, e.avant),
+            "apres": lisible(e, e.apres),
         }
         for e in db.scalars(q)
     ]

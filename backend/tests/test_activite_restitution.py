@@ -12,8 +12,11 @@ from sqlalchemy import func, select
 from app.api import pilotage
 from app.kpi.chargement import filtrer
 from app.kpi.moteur import (
+    ABSENCES,
     CA_INDIVIDUEL,
     CLIENTS,
+    COMMISSION,
+    FRAIS_MISSION,
     MARGE_INDIVIDUELLE,
     PRODUCTIVITE,
     VENTES,
@@ -29,7 +32,7 @@ from app.kpi.moteur import (
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode
 from app.models.pilotage import ValeurSaisie
-from app.models.referentiel import Service, Site
+from app.models.referentiel import Rubrique, Service, Site
 from app.repos.scope import Scope
 from tests.test_donnees_activite import _sans_marge, charger, lig
 from tests.test_donnees_api import ADMIN, API, BR, DRH
@@ -464,3 +467,313 @@ def test_pytest_import_garde():
         pilotage._valeur_activite("-1")
     assert pilotage._valeur_activite(" 1,50 ") == D("1.50")
     assert pilotage._valeur_activite("") is None
+
+
+# ---------- objectifs ----------
+
+
+def ligne_paie(sid, service="SAV PL", site="Douala", productif=False, **montants):
+    m = {"Brut Réel": D(1000), **{k.replace("_", " "): D(v) for k, v in montants.items()}}
+    return Ligne(sid, service, site, "Front office", "CDI", m, "principal", None, {}, None,
+                 productif)
+
+
+def periode(lignes=(), saisies=(), vides=(), ca=None, marge=None):
+    return PeriodeData(tuple(lignes), EXCL, ca=None if ca is None else D(ca),
+                       marge=None if marge is None else D(marge), saisies=tuple(saisies),
+                       vides=tuple(vides))
+
+
+def objectif(indicateur, valeur, site=None, service=None):
+    return Saisie(service, site, None, indicateur, None if valeur is None else D(valeur))
+
+
+def test_mensuel_objectifs_de_ca_marge_et_d_activite():
+    cur = periode(
+        [ligne(1, productif=True, **{VENTES: 3, CLIENTS: 2, PRODUCTIVITE: 2}),
+         ligne(2, productif=True, **{VENTES: 2, PRODUCTIVITE: 4})],
+        [saisie("factures", 90), objectif("obj_ventes", 4), objectif("obj_ventes", 6, "Yaoundé"),
+         objectif("obj_productivite", 3), objectif("obj_productivite", 5, "Yaoundé"),
+         objectif("obj_clients", 2), objectif("obj_factures", 100), objectif("obj_ca", 800),
+         objectif("obj_marge", 120)], ca=1000, marge=100)
+    r = mensuel(cur, None, REFS, Params())
+    o = r["objectifs"]
+    assert (o["ventes"], o["productivite"], o["clients"], o["factures"]) == (10, 4, 2, 100)
+    assert (o["ca"], o["marge"]) == (800, 120)
+    assert o["ms"] == Params().budget_employe * 2
+    par = {x["cle"]: x for x in r["activite"]}
+    assert (par["ventes"]["budget"], par["ventes"]["ecart"]) == (10, -5)
+    assert (par["productivite"]["budget"], par["productivite"]["ecart"]) == (4, -1)
+    assert (par["clients"]["budget"], par["factures"]["budget"]) == (2, 100)
+    assert par["factures"]["ecart"] == -10 and par["factures"]["ecart_pct"] == D("-0.1")
+    assert "budget" not in par["or"] and "budget" not in par["productifs"]
+    ca, marge = r["lignes_ca_marge"]["ca"], r["lignes_ca_marge"]["marge"]
+    assert (ca["budget"], ca["ecart"], ca["ecart_pct"]) == (800, 200, D("0.25"))
+    assert (marge["budget"], marge["ecart"]) == (120, -20)
+    assert not r["budget_partiel"]
+
+
+def test_mensuel_sans_objectif_aucun_budget_sur_les_lignes():
+    r = mensuel(periode([ligne(1, productif=True, **{VENTES: 3})], ca=10, marge=1), None, REFS,
+                Params())
+    assert all(r["objectifs"][k] is None for k in (
+        "ca", "marge", "ventes", "clients", "factures", "productivite", "frais_mission",
+        "commissions", "remuneration"))
+    par = {x["cle"]: x for x in r["activite"]}
+    assert par["ventes"]["budget"] is None and par["ventes"]["ecart"] is None
+    assert r["lignes_ca_marge"]["ca"]["budget"] is None
+    assert r["frais_mission"]["budget"] is None
+
+
+def test_objectif_vide_ne_rend_pas_le_reel_partiel_et_inversement():
+    base = [ligne(1, productif=True, **{VENTES: 3})]
+    # case d'objectif attendue mais vide, aucun objectif de ce type saisi : rien de partiel
+    cur = periode(base, [saisie("factures", 90)], [objectif("obj_factures", None, "Yaoundé")],
+                  ca=10)
+    r = mensuel(cur, None, REFS, Params())
+    par = {x["cle"]: x for x in r["activite"]}
+    assert "partiel" not in par["factures"] and "budget_partiel" not in par["factures"]
+    assert not r["budget_partiel"] and par["factures"]["budget"] is None
+    # un objectif saisi et une case d'objectif vide : l'objectif est partiel, pas le réel
+    cur = periode(base, [saisie("factures", 90), objectif("obj_factures", 100)],
+                  [objectif("obj_factures", None, "Yaoundé")])
+    r = mensuel(cur, None, REFS, Params())
+    par = {x["cle"]: x for x in r["activite"]}
+    assert par["factures"]["budget"] == 100 and par["factures"]["budget_partiel"] is True
+    assert "partiel" not in par["factures"] and r["budget_partiel"] is True
+    assert "budget_partiel" not in par["ventes"]
+    # le réel partiel n'entraîne pas l'objectif
+    cur = periode(base, [saisie("factures", 90), objectif("obj_factures", 100)],
+                  [objectif("factures", None, "Yaoundé")])
+    par = {x["cle"]: x for x in mensuel(cur, None, REFS, Params())["activite"]}
+    assert par["factures"]["partiel"] is True and "budget_partiel" not in par["factures"]
+
+
+def test_objectifs_de_ca_marge_hors_du_drapeau_budget_partiel():
+    """L'état partiel des objectifs CA et marge n'est pas exposé hors droit marge."""
+    cur = periode([ligne(1)], [objectif("obj_ca", 5)], [objectif("obj_ca", None, "Yaoundé")],
+                  ca=10)
+    r = mensuel(cur, None, REFS, Params())
+    assert r["lignes_ca_marge"]["ca"]["budget_partiel"] is True and not r["budget_partiel"]
+
+
+def test_budget_ms_f2_et_totaux_inchanges_par_les_objectifs():
+    seul = periode([ligne_paie(1, productif=True), ligne_paie(2)])
+    riche = periode([ligne_paie(1, productif=True), ligne_paie(2)],
+                    [objectif("obj_ventes", 5), objectif("obj_ca", 9), objectif("obj_marge", 1)])
+    p = Params(budget_employe=D(700))
+    bud = Budgets(rubrique={"Frais de mission": D(50), "Commission": D(20)})
+    a, b = (mensuel(x, None, REFS, p, bud) for x in (seul, riche))
+    for cle in ("synthese", "a_type_charge", "b_service_activite", "c_site", "controles"):
+        assert a[cle] == b[cle]
+    assert a["objectifs"]["ms"] == b["objectifs"]["ms"] == D(1400)  # budget par employé x effectif
+
+
+def test_mensuel_frais_mission_a_part_dans_le_total_avec_son_budget():
+    sans = periode([ligne_paie(1), ligne_paie(2)])
+    avec = periode([ligne_paie(1, Frais_de_mission=300), ligne_paie(2)])
+    bud = Budgets(rubrique={FRAIS_MISSION: D(250), COMMISSION: D(100), ABSENCES: D(7)})
+    r = mensuel(avec, None, REFS, Params(), bud)
+    fm = r["frais_mission"]
+    assert (fm["m"], fm["budget"], fm["ecart"], fm["ecart_pct"]) == (300, 250, 50, D("0.2"))
+    assert fm["m1"] is None
+    o = r["objectifs"]
+    assert (o["frais_mission"], o["commissions"]) == (250, 100)
+    assert o["remuneration"] == 350  # somme des budgets de rubrique, hors absences
+    # la ligne n'ajoute rien : le total de paie contient déjà les frais de mission
+    ms_sans = mensuel(sans, None, REFS, Params(), bud)["synthese"]
+    assert mensuel(avec, None, REFS, Params(), bud)["synthese"] != ms_sans  # 300 de plus
+    assert avec.ms - sans.ms == 300
+    prec = mensuel(avec, periode([ligne_paie(1, Frais_de_mission=100)]), REFS, Params())
+    assert (prec["frais_mission"]["m1"], prec["frais_mission"]["var"]) == (100, 200)
+
+
+def test_annuel_objectifs_cumules_sur_les_memes_mois_que_le_reel():
+    n = {1: periode([ligne(1, productif=True, **{VENTES: 3, PRODUCTIVITE: 2})],
+                    [objectif("obj_ventes", 4), objectif("obj_productivite", 3),
+                     objectif("obj_ca", 80)], ca=100, marge=10),
+         2: periode((), [objectif("obj_ventes", 50), objectif("obj_ca", 50)]),  # sans réel
+         3: periode([ligne(1, productif=True, **{VENTES: 5, PRODUCTIVITE: 4})],
+                    [objectif("obj_ventes", 6), objectif("obj_productivite", 5),
+                     objectif("obj_ca", 150), objectif("obj_marge", 30)], ca=200, marge=40),
+         4: periode([ligne(1, productif=True, **{VENTES: 9})],
+                    [objectif("obj_ventes", 900), objectif("obj_ca", 900)], ca=999)}
+    budgets = {1: Budgets(rubrique={FRAIS_MISSION: D(10)}),
+               3: Budgets(rubrique={FRAIS_MISSION: D(15)})}
+    r = annuel(n, {}, 3, REFS, Params(), budgets, {})
+    par = {x["cle"]: x for x in r["activite"]}
+    assert par["ventes"]["m"] == 8 and par["ventes"]["budget"] == 10  # mois 1 et 3 seulement
+    assert par["productivite"]["m"] == 3 and par["productivite"]["budget"] == 4  # moyenne
+    ca, marge = r["lignes_ca_marge"]["ca"], r["lignes_ca_marge"]["marge"]
+    assert (ca["m"], ca["budget"], ca["ecart"]) == (300, 230, 70)
+    assert (marge["m"], marge["budget"]) == (50, 30)  # le mois 1 n'a pas d'objectif de marge
+    assert r["frais_mission"]["budget"] == 25
+    assert r["serie_n"][0]["objectifs"]["ventes"] == 4
+    assert r["serie_n"][1]["objectifs"]["ventes"] == 50 and r["serie_n"][1]["objectifs"]["ms"] is None
+    assert r["serie_n"][0]["objectifs"]["frais_mission"] == 10
+    assert r["serie_n"][4]["objectifs"]["ventes"] is None
+    assert all("objectifs" not in s for s in r["serie_n1"])
+    assert not r["budget_partiel"]
+
+
+def test_annuel_objectif_partiel_signale_sans_toucher_au_reel():
+    n = {1: periode([ligne(1, productif=True, **{VENTES: 3})],
+                    [objectif("obj_ventes", 4)], [objectif("obj_ventes", None, "Yaoundé")])}
+    r = annuel(n, {}, 1, REFS, Params())
+    par = {x["cle"]: x for x in r["activite"]}
+    assert par["ventes"]["budget_partiel"] is True and "partiel" not in par["ventes"]
+    assert r["budget_partiel"] is True
+
+
+def test_annuel_nouvelles_rubriques_en_serie_sans_objectif():
+    n = {1: periode([ligne_paie(1, Assurance_Maladie=40, Formation=30,
+                                Carburant_véhicule_service=20, Crédit_téléphonique=10)])}
+    n1 = {1: periode([ligne_paie(1, Assurance_Maladie=4)])}
+    r = annuel(n, n1, 1, REFS, Params())
+    s = r["serie_n"][0]
+    assert (s["assurance"], s["formation"], s["carburant"], s["credit_telephonique"]) == (
+        40, 30, 20, 10)
+    assert r["serie_n"][1]["assurance"] is None
+    assert r["serie_n1"][0]["assurance"] == 4 and r["serie_n1"][0]["formation"] == 0
+    assert set(s["objectifs"]) >= {"ms", "frais_mission", "commissions", "remuneration"}
+    assert "assurance" not in s["objectifs"]  # ces rubriques n'ont pas d'objectif
+
+
+# ---------- objectifs : API ----------
+
+PIL = f"{API}/pilotage"
+
+
+def saisir_obj(c, groupe, niveau, cases):
+    r = c.put(PILOTAGE, json={**P26, "groupe": groupe, "niveau": niveau, "cases": cases})
+    assert r.status_code == 200, r.text
+
+
+def objectifs_charges(c, db):
+    """Réel (ca_marge + paie), objectifs d'activité et de CA/marge, budget de frais de mission."""
+    charger_activite(c)
+    saisir_obj(c, "ca_marge", "global", [{"valeurs": {"ca": "1000", "marge": "100"}}])
+    saisir_obj(c, "obj_ca_marge", "global", [{"valeurs": {"obj_ca": "912.5", "obj_marge": "157.5"}}])
+    saisir_obj(c, "obj_activite", "global", [{"valeurs": {
+        "obj_ventes": "10", "obj_clients": "3", "obj_productivite": "2", "obj_factures": "70"}}])
+    rid = db.scalar(select(Rubrique.id).where(Rubrique.libelle == "Frais de mission"))
+    r = c.put(f"{PIL}/budgets", json={**P26, "lignes": [
+        {"axe": "rubrique", "cible_id": rid, "valeur": "123"}]})
+    assert r.status_code == 200, r.text
+
+
+def test_api_mensuel_objectifs(make_client, db):
+    c = make_client(ADMIN)
+    objectifs_charges(c, db)
+    j = get(c, "mensuel", annee=2026, mois=1).json()
+    o = j["objectifs"]
+    assert (D(o["ca"]), D(o["marge"]), D(o["ventes"]), D(o["clients"])) == (D("912.5"), D("157.5"), 10, 3)
+    assert (D(o["productivite"]), D(o["factures"]), D(o["frais_mission"])) == (2, 70, 123)
+    assert D(o["ms"]) == 600000 * 3
+    assert D(j["lignes_ca_marge"]["ca"]["budget"]) == D("912.5")
+    assert D(j["lignes_ca_marge"]["ca"]["ecart"]) == D("87.5")
+    par = {x["cle"]: x for x in j["activite"]}
+    assert D(par["ventes"]["budget"]) == 10 and D(par["ventes"]["ecart"]) == -5
+    assert D(par["productivite"]["budget"]) == 2
+    assert D(j["frais_mission"]["budget"]) == 123 and j["budget_partiel"] is False
+
+
+def test_api_mensuel_objectif_global_masque_par_un_filtre_de_perimetre(make_client, db):
+    c = make_client(ADMIN)
+    objectifs_charges(c, db)
+    for filtre in ({"site": "Douala"}, {"service": "SAV PL"}, {"type_site": "principal"}):
+        j = get(c, "mensuel", annee=2026, mois=1, **filtre).json()
+        o = j["objectifs"]
+        assert all(o[k] is None for k in ("ca", "marge", "ventes", "clients", "factures",
+                                          "productivite")), filtre
+        assert j["lignes_ca_marge"]["ca"]["budget"] is None
+        assert o["frais_mission"] is None and o["remuneration"] is None  # budgets de rubrique
+        assert o["ms"] is not None  # budget par employé x effectif : suit le filtre
+        par = {x["cle"]: x for x in j["activite"]}
+        assert par["ventes"]["budget"] is None
+    # un objectif saisi par site répond au filtre de ce site
+    sites, _ = ids(db)
+    saisir_obj(c, "obj_activite", "site", [{"site_id": sites["Douala"],
+                                           "valeurs": {"obj_ventes": "7"}},
+                                          {"site_id": sites["Yaoundé"],
+                                           "valeurs": {"obj_ventes": "2"}}])
+    assert D(get(c, "mensuel", annee=2026, mois=1, site="Douala").json()["objectifs"]["ventes"]) \
+        == 7
+    assert D(get(c, "mensuel", annee=2026, mois=1).json()["objectifs"]["ventes"]) == 9
+
+
+def test_api_sans_droit_marge_aucun_objectif_de_ca_ni_de_marge(make_client, db):
+    c = make_client(ADMIN)
+    objectifs_charges(c, db)
+    _sans_marge(db)
+    for chemin in ("mensuel", "annuel"):
+        r = get(c, chemin, annee=2026, mois=1)
+        assert r.status_code == 200
+        assert "lignes_ca_marge" not in r.json()
+        assert '"obj_ca"' not in r.text and '"obj_marge"' not in r.text
+        assert "912.5" not in r.text and "157.5" not in r.text
+    m = get(c, "mensuel", annee=2026, mois=1).json()
+    assert "ca" not in m["objectifs"] and "marge" not in m["objectifs"]
+    assert D(m["objectifs"]["ventes"]) == 10 and D(m["objectifs"]["frais_mission"]) == 123
+    a = get(c, "annuel", annee=2026, mois=1).json()
+    assert all("ca" not in s["objectifs"] and "marge" not in s["objectifs"] for s in a["serie_n"])
+    assert D(a["serie_n"][0]["objectifs"]["ventes"]) == 10
+    par = {x["cle"]: x for x in a["activite"]}
+    assert D(par["ventes"]["budget"]) == 10
+
+
+def test_api_annuel_objectifs_et_nouvelles_rubriques(make_client, db):
+    c = make_client(ADMIN)
+    objectifs_charges(c, db)
+    j = get(c, "annuel", annee=2026, mois=1).json()
+    s = j["serie_n"][0]
+    assert D(s["objectifs"]["ca"]) == D("912.5") and D(s["objectifs"]["ventes"]) == 10
+    assert D(s["objectifs"]["frais_mission"]) == 123
+    assert j["serie_n"][1]["objectifs"]["ventes"] is None
+    assert {"assurance", "formation", "carburant", "credit_telephonique"} <= set(s)
+    assert D(j["lignes_ca_marge"]["ca"]["budget"]) == D("912.5")
+    assert D(j["frais_mission"]["budget"]) == 123
+    par = {x["cle"]: x for x in j["activite"]}
+    assert D(par["ventes"]["budget"]) == 10
+    assert get(c, "annuel", annee=2026, mois=1, site="Douala").json()[
+        "serie_n"][0]["objectifs"]["ventes"] is None
+
+
+def test_api_individuel_sans_objectif(make_client, db):
+    c = make_client(ADMIN)
+    objectifs_charges(c, db)
+    r = get(c, "individuel", annee=2026, matricule="E1")
+    assert r.status_code == 200
+    assert "objectif" not in r.text
+
+
+def test_api_objectif_vide_ne_rend_pas_le_reel_partiel(make_client, db):
+    c = make_client(ADMIN)
+    charger_activite(c)
+    sites, services = ids(db)
+    d, y = sites["Douala"], sites["Yaoundé"]
+    sav, vn = services["SAV PL"], services["Commerce VN"]
+    put(c, [ln(db, "Douala", "SAV PL", "factures", "50"),
+            ln(db, "Yaoundé", "Commerce VN", "factures", "40")])
+    # objectif de factures saisi pour une seule des deux cases attendues
+    saisir_obj(c, "obj_activite", "cellule", [
+        {"site_id": d, "service_id": sav, "valeurs": {"obj_factures": "60"}}])
+    j = get(c, "mensuel", annee=2026, mois=1).json()
+    par = {x["cle"]: x for x in j["activite"]}
+    assert D(par["factures"]["m"]) == 90 and "partiel" not in par["factures"]
+    assert D(par["factures"]["budget"]) == 60 and par["factures"]["budget_partiel"] is True
+    assert j["budget_partiel"] is True
+    del vn, y
+
+
+def test_annuel_objectif_partiel_si_un_mois_de_reel_n_a_pas_d_objectif():
+    avec = periode([ligne(1, productif=True, **{VENTES: 3})], [objectif("obj_ventes", 4),
+                                                              objectif("obj_ca", 8)], ca=10)
+    sans = periode([ligne(1, productif=True, **{VENTES: 2})], ca=10)
+    r = annuel({1: avec, 2: sans}, {}, 2, REFS, Params())
+    par = {x["cle"]: x for x in r["activite"]}
+    assert par["ventes"]["budget"] == 4 and par["ventes"]["budget_partiel"] is True
+    assert r["budget_partiel"] is True
+    assert r["lignes_ca_marge"]["ca"]["budget_partiel"] is True
+    r = annuel({1: avec, 2: avec}, {}, 2, REFS, Params())
+    assert not r["budget_partiel"] and "budget_partiel" not in r["lignes_ca_marge"]["ca"]

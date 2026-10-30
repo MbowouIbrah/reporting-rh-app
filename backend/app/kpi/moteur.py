@@ -13,6 +13,10 @@ ABSENCES = "Absences (nb)"
 COMMISSION = "Commission"
 FRAIS_MISSION = "Frais de mission"
 LOGEMENT = "Logement site déporté"
+ASSURANCE = "Assurance Maladie"
+FORMATION = "Formation"
+CARBURANT = "Carburant véhicule service"
+CREDIT_TEL = "Crédit téléphonique"
 PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
 # Rubriques de nature « activité » : jamais dans les montants de paie.
 VENTES = "Nombre de ventes"
@@ -138,6 +142,49 @@ def _ok(pd: PeriodeData | None) -> PeriodeData | None:
     return pd if pd is not None and pd.lignes else None
 
 
+# Ligne du rapport -> indicateur d'objectif saisi (groupes obj_ca_marge et obj_activite).
+OBJECTIF = {"ca": "obj_ca", "marge": "obj_marge", "ventes": "obj_ventes",
+            "clients": "obj_clients", "factures": "obj_factures",
+            "productivite": "obj_productivite"}
+OBJECTIFS_ACTIVITE = ("ventes", "clients", "productivite", "factures")
+
+
+def _objectifs(pd: PeriodeData | None, budgets: Budgets, params: Params) -> dict:
+    """Objectifs d'un mois (None = non défini) : masse salariale (budget par employé x effectif),
+    budgets de rubrique saisis (frais de mission, commissions, rémunération globale = toutes les
+    rubriques hors absences), puis valeurs d'objectif saisies (somme des cases, moyenne pour la
+    productivité)."""
+    saisies = pd.saisies if pd else ()
+
+    def saisi(cle: str) -> Decimal | None:
+        vals = [s.valeur for s in saisies if s.indicateur == OBJECTIF[cle]]
+        return (_moyenne_opt if cle == "productivite" else _somme_opt)(vals)
+
+    rub = budgets.rubrique
+    paie = [v for r, v in rub.items() if r != ABSENCES]
+    return {
+        "ms": f.budget(len(pd.ids), params.budget_employe) if _ok(pd) else None,
+        "frais_mission": rub.get(FRAIS_MISSION),
+        "commissions": rub.get(COMMISSION),
+        "remuneration": sum(paie, ZERO) if paie else None,
+        **{cle: saisi(cle) for cle in OBJECTIF},
+    }
+
+
+def _budget_partiel(partiel: frozenset[str]) -> bool:
+    """Un objectif d'activité (ventes, clients, productivité, factures) a une case attendue vide.
+    CA et marge n'y comptent pas : leur état n'est donné qu'avec le droit marge."""
+    return any(OBJECTIF[k] in partiel for k in OBJECTIFS_ACTIVITE)
+
+
+def _avec_objectif(c: dict, cle: str, objectif: Decimal | None,
+                   partiel: frozenset[str]) -> dict:
+    """Cellule du réel complétée de son objectif (budget, écart, écart %) ; `budget_partiel` si
+    une case attendue de l'objectif manque."""
+    out = {**c, **_bud(c["m"], objectif)}
+    return {**out, "budget_partiel": True} if OBJECTIF[cle] in partiel else out
+
+
 def _ca_marge(pd: PeriodeData | None) -> dict:
     ca, marge = (pd.ca, pd.marge) if pd else (None, None)
     return {"ca": ca, "marge": marge, "taux_marge": f.taux_marge(ca, marge)}
@@ -193,15 +240,21 @@ def _avec_partiel(c: dict, partiel: bool) -> dict:
     return {**c, "partiel": True} if partiel else c
 
 
-def _bloc_activite(a: dict, a1: dict, partiel: frozenset[str] = frozenset()) -> list[dict] | None:
+def _bloc_activite(a: dict, a1: dict, partiel: frozenset[str] = frozenset(),
+                   objectifs: dict | None = None) -> list[dict] | None:
     """Bloc ACTIVITÉ : masqué (None) tant qu'aucune donnée d'activité n'existe des deux côtés.
-    `partiel` : indicateurs dont une case attendue manque ; le ratio qui en dépend l'est aussi."""
+    `partiel` : indicateurs dont une case attendue manque ; le ratio qui en dépend l'est aussi.
+    `objectifs` : objectif de ventes, clients, productivité et factures (budget sur ces lignes)."""
     if all(a[k] is None and a1[k] is None for k in DONNEES_ACTIVITE):
         return None
     dep = {"or_par_productif": "or", "factures_par_productif": "factures"}
-    return [{"cle": k, "libelle": lib,
-             **_avec_partiel(cell(a[k], a1[k]), dep.get(k, k) in partiel)}
-            for k, lib in LIGNES_ACTIVITE]
+    def ligne(k: str) -> dict:
+        c = _avec_partiel(cell(a[k], a1[k]), dep.get(k, k) in partiel)
+        if objectifs is not None and k in OBJECTIFS_ACTIVITE:
+            c = _avec_objectif(c, k, objectifs.get(k), partiel)
+        return c
+
+    return [{"cle": k, "libelle": lib, **ligne(k)} for k, lib in LIGNES_ACTIVITE]
 
 
 def _activite_cumul(pds: dict[int, PeriodeData], mois: int) -> dict:
@@ -256,7 +309,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     refs = _contrats_vus(refs, cur, prev)
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
-    activite = _bloc_activite(_activite(cur), _activite(prev), cur.partiel)
+    objectifs = _objectifs(cur, budgets, params)
+    activite = _bloc_activite(_activite(cur), _activite(prev), cur.partiel, objectifs)
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
     eff, eff1 = len(cur.ids), len(prev.ids) if prev else None
@@ -420,8 +474,15 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     return {
         "synthese": synthese,
         "lignes_ca_marge": {
-            "ca": _avec_partiel(cell(cur.ca, ca1), "ca" in cur.partiel),
-            "marge": _avec_partiel(cell(cur.marge, marge1), "marge" in cur.partiel)},
+            "ca": _avec_objectif(_avec_partiel(cell(cur.ca, ca1), "ca" in cur.partiel),
+                                 "ca", objectifs["ca"], cur.partiel),
+            "marge": _avec_objectif(_avec_partiel(cell(cur.marge, marge1), "marge" in cur.partiel),
+                                    "marge", objectifs["marge"], cur.partiel)},
+        "frais_mission": {
+            **cell(cur.rubrique(FRAIS_MISSION), prev.rubrique(FRAIS_MISSION) if prev else None),
+            **_bud(cur.rubrique(FRAIS_MISSION), objectifs["frais_mission"])},
+        "objectifs": objectifs,
+        "budget_partiel": _budget_partiel(cur.partiel),
         "activite": activite,
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
@@ -563,9 +624,11 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 
 def annuel(
     n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
-    budgets: dict[int, Budgets] | None = None,
+    budgets: dict[int, Budgets] | None = None, params_mois: dict[int, Params] | None = None,
 ) -> dict:
-    """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul."""
+    """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul. `budgets` et
+    `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
+    défaut)."""
     refs = _contrats_vus(refs, *n.values(), *n1.values())
     def remuneration(pd: PeriodeData) -> Decimal:
         # comme `remuneration_globale` du mensuel : TOTAL CHARGES + exclusions hors absences
@@ -574,7 +637,7 @@ def annuel(
     def par_contrat(pd: PeriodeData) -> dict[str, int]:
         return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
 
-    def serie(pds):
+    def serie(pds, objectifs=None):
         return [{"mois": m,
                  "ms": pds[m].ms if _ok(pds.get(m)) else None,
                  "effectif": len(pds[m].ids) if _ok(pds.get(m)) else None,
@@ -584,11 +647,16 @@ def annuel(
                  if _ok(pds.get(m)) else None,
                  "frais_mission": pds[m].rubrique(FRAIS_MISSION) if _ok(pds.get(m)) else None,
                  "logement": pds[m].rubrique(LOGEMENT) if _ok(pds.get(m)) else None,
+                 "assurance": pds[m].rubrique(ASSURANCE) if _ok(pds.get(m)) else None,
+                 "formation": pds[m].rubrique(FORMATION) if _ok(pds.get(m)) else None,
+                 "carburant": pds[m].rubrique(CARBURANT) if _ok(pds.get(m)) else None,
+                 "credit_telephonique": pds[m].rubrique(CREDIT_TEL) if _ok(pds.get(m)) else None,
                  "remuneration": remuneration(pds[m]) if _ok(pds.get(m)) else None,
                  "effectif_contrat": par_contrat(pds[m]) if _ok(pds.get(m)) else None,
                  # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
                  **_ca_marge(pds.get(m)),
-                 "activite": _activite(pds.get(m))}
+                 "activite": _activite(pds.get(m)),
+                 **({"objectifs": objectifs[m]} if objectifs is not None else {})}
                 for m in range(1, 13)]
 
     def cumul(pds):
@@ -619,6 +687,28 @@ def annuel(
     s_n1 = ms_service(n1, ok1)
     complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
+    objectifs_n = {m: _objectifs(n.get(m), (budgets or {}).get(m, Budgets()),
+                                 (params_mois or {}).get(m, params)) for m in range(1, 13)}
+
+    manque: set[str] = set()
+
+    def objectif_cumul(cle: str, mois_reels) -> Decimal | None:
+        """Objectif sur les mêmes mois que le réel (moyenne des mois pour la productivité) ; un
+        mois de réel sans objectif rend l'objectif partiel."""
+        mois_reels = list(mois_reels)
+        vals = [objectifs_n[m][cle] for m in mois_reels if objectifs_n[m][cle] is not None]
+        if vals and len(vals) < len(mois_reels):
+            manque.add(OBJECTIF[cle])
+        return (_moyenne_opt if cle == "productivite" else _somme_opt)(vals)
+
+    def budget_cumul(nom: str) -> Decimal | None:
+        return _somme_opt(b for m in ok if m in (budgets or {})
+                          for b in [budgets[m].rubrique.get(nom)] if b is not None)
+
+    activite_n = {m: _activite(n[m]) for m in n if m <= mois}
+    objectifs_activite = {k: objectif_cumul(k, [m for m, a in activite_n.items()
+                                                 if a[k] is not None])
+                          for k in OBJECTIFS_ACTIVITE}
     # Résumé : cumuls N-1 sur la même période, part des MAD et CA par effectif moyen global
     # (docs/QUESTIONS_CLIENT.md C1, C3).
     avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]
@@ -627,6 +717,8 @@ def annuel(
     marge1 = sum((n1[m].marge for m in avec_marge1), ZERO) if avec_marge1 else None
     eff = blocs["effectif_global"]
     partiel_n = frozenset().union(*(n[m].partiel for m in n if m <= mois))
+    obj_ca, obj_marge = objectif_cumul("ca", avec_ca), objectif_cumul("marge", avec_marge)
+    partiel_obj = partiel_n | manque  # réel incomplet ou mois de réel sans objectif
 
     def ratio(a: Decimal | None, b: Decimal | None) -> Decimal | None:
         return None if a is None or not b else a / b
@@ -656,7 +748,7 @@ def annuel(
 
     return {
         **blocs,
-        "serie_n": serie(n),
+        "serie_n": serie(n, objectifs_n),
         "serie_n1": serie(n1),
         "cumul_ytd": {**cell(c if nb else None, c1 if nb1 else None), "nb_mois": nb,
                       "nb_mois_n1": nb1},
@@ -670,9 +762,18 @@ def annuel(
         "commissions_ytd": commissions_ytd,
         "primes_ytd": primes_ytd,
         "ca_cumul": cell(ca_ytd, ca1),
-        "lignes_ca_marge": {"ca": _avec_partiel(cell(ca_ytd, ca1), "ca" in partiel_n),
-                            "marge": _avec_partiel(cell(marge_ytd, marge1), "marge" in partiel_n)},
-        "activite": _bloc_activite(_activite_cumul(n, mois), _activite_cumul(n1, mois), partiel_n),
+        "lignes_ca_marge": {
+            "ca": _avec_objectif(_avec_partiel(cell(ca_ytd, ca1), "ca" in partiel_n), "ca",
+                                 obj_ca, partiel_obj),
+            "marge": _avec_objectif(_avec_partiel(cell(marge_ytd, marge1), "marge" in partiel_n),
+                                    "marge", obj_marge, partiel_obj)},
+        "frais_mission": {
+            **cell(cumul_rub(FRAIS_MISSION),
+                   sum((n1[m].rubrique(FRAIS_MISSION) for m in ok1), ZERO) if ok1 else None),
+            **_bud(cumul_rub(FRAIS_MISSION), budget_cumul(FRAIS_MISSION))},
+        "budget_partiel": _budget_partiel(partiel_obj),
+        "activite": _bloc_activite(_activite_cumul(n, mois), _activite_cumul(n1, mois), partiel_obj,
+                                   objectifs_activite),
         "commissions_cumul": cell(commissions_ytd,
                                   sum((n1[m].rubrique(COMMISSION) for m in ok1), ZERO)
                                   if ok1 else None),

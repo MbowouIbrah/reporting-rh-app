@@ -30,7 +30,8 @@ class Parametre(Base):
     date_debut: Mapped[date] = mapped_column(Date)
 
 
-INDICATEURS = ("ca", "marge", "or", "devis", "factures")
+INDICATEURS = ("ca", "marge", "or", "devis", "factures", "obj_ca", "obj_marge", "obj_ventes",
+               "obj_clients", "obj_factures", "obj_productivite")
 
 
 class ValeurSaisie(Base):
@@ -40,13 +41,15 @@ class ValeurSaisie(Base):
 
     __tablename__ = "valeur_saisie"
     __table_args__ = (
-        CheckConstraint("indicateur IN ('ca','marge','or','devis','factures')",
-                        name="ck_valeur_saisie_indicateur"),
+        CheckConstraint(
+            "indicateur IN ('ca','marge','or','devis','factures','obj_ca','obj_marge',"
+            "'obj_ventes','obj_clients','obj_factures','obj_productivite')",
+            name="ck_valeur_saisie_indicateur"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     periode_id: Mapped[int] = mapped_column(ForeignKey("periode.id"))
-    indicateur: Mapped[str] = mapped_column(String(10))
+    indicateur: Mapped[str] = mapped_column(String(20))
     site_id: Mapped[int | None] = mapped_column(ForeignKey("site.id"), nullable=True)
     service_id: Mapped[int | None] = mapped_column(ForeignKey("service.id"), nullable=True)
     valeur: Mapped[Decimal] = mapped_column(MontantExact)

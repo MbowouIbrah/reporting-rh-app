@@ -5,6 +5,9 @@ from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent
+from app.models.donnees import Periode
+from app.models.pilotage import Budget, ValeurSaisie
+from app.models.referentiel import Rubrique
 from tests import test_rapports_api as rapports
 
 API, DRH, EQUIP = rapports.API, rapports.DRH, rapports.EQUIP
@@ -103,3 +106,60 @@ def test_export_audite_et_404(charge, db):
         {"service": "SAV PL", "site": None, "type_site": None, "poste": None, "matricule": None,
          "activite": None, "type_contrat": None})
     assert get(charge, "mensuel/export", annee=2030, mois=1).status_code == 404
+
+
+# ---------- objectifs ----------
+
+
+def objectifs_janvier(db):
+    pid = db.scalar(select(Periode.id).where(Periode.annee == 2026, Periode.mois == 1))
+    rid = db.scalar(select(Rubrique.id).where(Rubrique.libelle == "Frais de mission"))
+    lignes_ = [ValeurSaisie(periode_id=pid, indicateur="obj_ca", valeur=D("12000")),
+               ValeurSaisie(periode_id=pid, indicateur="obj_marge", valeur=D("3000")),
+               Budget(periode_id=pid, axe="rubrique", cible_id=rid, valeur=D("123"))]
+    db.add_all(lignes_)
+    db.commit()
+
+
+def test_export_mensuel_budget_sur_ca_marge_et_ligne_frais_de_mission(charge, db):
+    objectifs_janvier(db)
+    ecran = get(charge, "mensuel", annee=2026, mois=1).json()
+    wb = classeur(get(charge, "mensuel/export", annee=2026, mois=1))
+    g = lignes(wb["1 Reporting global"])
+    ca, marge, fm = g["Chiffre d'affaires"], g["Marge"], g["dont Frais de mission"]
+    # colonnes : mois précédent, mois, variation, variation %, budget, écart, écart %
+    assert len(ca) == 7
+    assert D(str(ca[1])) == 10000 and D(str(ca[4])) == 12000 and D(str(ca[5])) == -2000
+    assert abs(float(ca[6]) - (-2000 / 12000)) < 1e-9
+    assert D(str(marge[4])) == 3000 and D(str(marge[5])) == -500
+    assert D(str(fm[1])) == 0 and D(str(fm[4])) == 123 and D(str(fm[5])) == -123
+    assert eq(ca[4], ecran["lignes_ca_marge"]["ca"]["budget"])
+    assert eq(fm[4], ecran["frais_mission"]["budget"])
+    # la ligne « dont » ne change pas le total ni les lignes de rubrique
+    blocs_identiques(wb, ecran)
+    noms = [r[0] for r in wb["1 Reporting global"].iter_rows(min_row=2, values_only=True)]
+    assert noms.index("dont Frais de mission") > noms.index("TOTAL GÉNÉRAL")
+    assert noms.count("Frais de mission") == 1
+
+
+def test_export_sans_droit_marge_ni_ca_ni_marge_ni_leur_objectif(make_client, charge, db):
+    objectifs_janvier(db)
+    equip = make_client(EQUIP)
+    for chemin in ("mensuel/export", "annuel/export"):
+        wb = classeur(get(equip, chemin, annee=2026, mois=1))
+        for ws in wb.worksheets:
+            for ligne in ws.iter_rows(values_only=True):
+                assert not (ligne[0] or "").startswith(("Chiffre", "Marge"))
+                assert 12000 not in ligne and 3000 not in ligne and 10000 not in ligne
+    g = lignes(classeur(get(equip, "mensuel/export", annee=2026, mois=1))["1 Reporting global"])
+    assert g["dont Frais de mission"][4] is None  # périmètre restreint : pas de budget de rubrique
+
+
+def test_export_annuel_budget_cumule(charge, db):
+    objectifs_janvier(db)
+    ecran = get(charge, "annuel", annee=2026, mois=2).json()
+    wb = classeur(get(charge, "annuel/export", annee=2026, mois=2))
+    g = lignes(wb["1 Reporting global"])
+    ca = g["Chiffre d'affaires"]
+    assert D(str(ca[4])) == 12000 and eq(ca[4], ecran["lignes_ca_marge"]["ca"]["budget"])
+    assert D(str(g["dont Frais de mission"][4])) == 123

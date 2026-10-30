@@ -20,7 +20,7 @@ from app.security.policy import Principal, authorize, is_allowed
 router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
               "taux_marge_ytd", "ca_cumul", "ca_par_effectif", "lignes_ca_marge",
-              "ca_individuel", "marge_individuelle"}
+              "ca_individuel", "marge_individuelle", "ca_avec_marge"}
 
 # Colonnes du reporting individuel (RETOURS_PRESENTATION §4, docs/QUESTIONS_CLIENT.md A3, B1,
 # B2) et les rubriques de DONNEES qu'elles reprennent, une par colonne : « Autres primes » = primes
@@ -254,11 +254,15 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
-    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site, **crit)
-               for m in moteur.avec_donnees(n, mois)}
+    # budgets et paramètres des 12 mois : la série des objectifs couvre toute l'année ; les blocs
+    # du cumul ne retiennent que les mois qui ont des données
+    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site, **crit) for m in n}
+    sans_budget_employe = crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None
+    params_mois = {m: (replace(pm, budget_employe=None) if sans_budget_employe else pm)
+                   for m, pm in ((m, ch.charger_params(db, annee, m)) for m in n)}
     refs = ch.charger_refs(db, type_site, scope)
     res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, refs,
-                        ch.charger_params(db, annee, mois), budgets)
+                        ch.charger_params(db, annee, mois), budgets, params_mois)
     return _sortie(p, res)
 
 
