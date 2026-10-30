@@ -25,6 +25,8 @@ export interface ValeurRef {
   libelle: string
   actif: boolean
   type_site?: string
+  /** Services seulement : compte dans l'effectif productif (OR et factures par productif). */
+  productif?: boolean
 }
 export interface ModifRef {
   dim: DimensionRef
@@ -32,6 +34,7 @@ export interface ModifRef {
   libelle?: string
   actif?: boolean
   type_site?: string
+  productif?: boolean
 }
 export const TYPES_SITE = ['principal', 'agence', 'deporte'] as const
 

@@ -30,15 +30,22 @@ const num = (s: string | null) => (s === null ? null : Number(s))
 async function ouvrirMois(page: Page, mois: string) {
   await page.goto('admin/saisie')
   await expect(page.getByRole('heading', { name: 'RENSEIGNER DES DONNÉES' })).toBeVisible()
-  await page.getByLabel('Année').selectOption('2026')
-  await page.getByLabel('Mois').selectOption({ label: mois })
-  await expect(page.getByRole('heading', { level: 3, name: `PILOTAGE DE ${mois.toUpperCase()} 2026` })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Année', exact: true }).selectOption('2026')
+  await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: mois })
+  await expect(page.getByRole('heading', { level: 3, name: `DONNÉES DE ${mois.toUpperCase()} 2026` })).toBeVisible()
 }
 
-const champCa = (page: Page) => page.getByLabel('Chiffre d’affaires', { exact: true })
-const champMarge = (page: Page) => page.getByLabel('Marge', { exact: true })
-const enregistrerCa = (page: Page) => page.getByRole('button', { name: 'Enregistrer le CA et la marge' })
-const tauxEnregistre = (page: Page) => page.getByText('Taux de marge enregistré').locator('..').locator('strong')
+// Grille « CA et marge » au niveau global : une seule ligne, deux cases, un bouton Enregistrer.
+const champCa = (page: Page) => page.getByRole('textbox', { name: 'CA : Global' })
+const champMarge = (page: Page) => page.getByRole('textbox', { name: 'Marge : Global' })
+const enregistrerCa = (page: Page) => page.getByRole('button', { name: 'Enregistrer', exact: true })
+const tauxEnregistre = (page: Page) => page.getByRole('row', { name: /^TOTAL/ }).getByRole('cell').last()
+const invalide = (page: Page) => page.locator('.erreur-case', { hasText: 'Valeur invalide' })
+
+async function ouvrirBudgets(page: Page, mois: string) {
+  await ouvrirMois(page, mois)
+  await page.getByRole('tab', { name: 'Budgets' }).click()
+}
 
 async function saisirCaMarge(page: Page, ca: string, marge: string) {
   await champCa(page).fill(ca)
@@ -46,6 +53,12 @@ async function saisirCaMarge(page: Page, ca: string, marge: string) {
   await enregistrerCa(page).click()
   await expect(page.getByText('Enregistré.', { exact: true })).toBeVisible()
 }
+
+// Même enregistrement que la grille : un seul niveau (global), les deux indicateurs de la case.
+const putCaMarge = (r: APIRequestContext, ca: string | null, marge: string | null) =>
+  r.put('api/v1/pilotage/saisies', {
+    data: { annee: ANNEE, mois: JUILLET, groupe: 'ca_marge', niveau: 'global', cases: [{ site_id: null, service_id: null, valeurs: { ca, marge } }] },
+  })
 
 async function ligneResume(page: Page, mois: string) {
   await page.goto('resume')
@@ -92,13 +105,13 @@ test.describe.serial('saisies de pilotage', () => {
     await expect(champCa(page)).toHaveValue(groupe('2100000000'))
     await saisirCaMarge(page, '2100000000,5', '315000000,25')
     let v = await pilotage(page.request)
-    expect(v.ca).toBe('2100000000.500')
-    expect(v.marge).toBe('315000000.250')
+    expect(Number(v.ca)).toBe(2100000000.5)
+    expect(Number(v.marge)).toBe(315000000.25)
 
     await saisirCaMarge(page, '2100000000,5', '-50000000')
     await expect(tauxEnregistre(page)).toHaveText(/^[-−]2,4\s%$/)
     v = await pilotage(page.request)
-    expect(v.marge).toBe('-50000000.000')
+    expect(Number(v.marge)).toBe(-50000000)
     expect(Number(v.taux_marge)).toBeLessThan(0)
 
     const ligne = await ligneResume(page, 'Juillet')
@@ -107,7 +120,7 @@ test.describe.serial('saisies de pilotage', () => {
     await expect(ligne).toContainText(/2\s100\s000\s001/)
 
     // Retour à une marge normale pour la suite de la recette
-    const rep = await page.request.put('api/v1/pilotage/ca-marge', { data: { annee: ANNEE, mois: JUILLET, ca: '2100000000', marge: '315000000' } })
+    const rep = await putCaMarge(page.request, '2100000000', '315000000')
     expect(rep.status()).toBe(200)
   })
 
@@ -116,36 +129,41 @@ test.describe.serial('saisies de pilotage', () => {
     await ouvrirMois(page, 'Juillet')
     await expect(champCa(page)).toHaveValue(groupe('2100000000'))
 
-    // Marge sans CA
+    // Marge sans CA : refusée par le serveur à l'enregistrement, le message s'affiche sous la grille
     await champCa(page).fill('')
-    await expect(page.getByRole('alert').filter({ hasText: 'Saisissez le CA du mois avant la marge.' })).toBeVisible()
-    await expect(enregistrerCa(page)).toBeDisabled()
-    // Montant non numérique
+    await enregistrerCa(page).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'sans chiffre d' })).toBeVisible()
+    // Montant non numérique : erreur sur la case, enregistrement bloqué
     await champCa(page).fill('abc')
-    await expect(page.getByRole('alert').filter({ hasText: 'Montant invalide' })).toBeVisible()
+    await expect(invalide(page)).toBeVisible()
+    await expect(page.getByText('1 valeur invalide', { exact: false })).toBeVisible()
     await expect(enregistrerCa(page)).toBeDisabled()
     // CA négatif
     await champCa(page).fill('-5')
-    await expect(page.getByRole('alert').filter({ hasText: 'Le CA ne peut pas être négatif.' })).toBeVisible()
+    await expect(invalide(page)).toBeVisible()
     await expect(enregistrerCa(page)).toBeDisabled()
     // Marge non numérique
     await champCa(page).fill('2100000000')
+    await expect(invalide(page)).toHaveCount(0)
     await champMarge(page).fill('douze')
-    await expect(page.getByRole('alert').filter({ hasText: 'Montant invalide' })).toBeVisible()
+    await expect(invalide(page)).toBeVisible()
     await expect(enregistrerCa(page)).toBeDisabled()
-    // Marge supérieure au CA : point d'attention, non bloquant
+    // Deux cases invalides : le compte au pluriel
+    await champCa(page).fill('abc')
+    await expect(page.getByText('2 valeurs invalides', { exact: false })).toBeVisible()
+    await champCa(page).fill('2100000000')
+    // Marge supérieure au CA : acceptée, non bloquante
     await champMarge(page).fill('3000000000')
-    await expect(page.getByRole('list', { name: 'Points d’attention' })).toContainText('La marge dépasse le CA')
+    await expect(invalide(page)).toHaveCount(0)
     await expect(enregistrerCa(page)).toBeEnabled()
 
     // Même refus côté serveur
-    const put = (ca: string | null, marge: string | null) => page.request.put('api/v1/pilotage/ca-marge', { data: { annee: ANNEE, mois: JUILLET, ca, marge } })
-    const sansCa = await put(null, '100')
+    const sansCa = await putCaMarge(page.request, null, '100')
     expect(sansCa.status()).toBe(422)
     expect((await sansCa.json()).detail).toContain('sans chiffre d')
-    expect((await put('abc', null)).status()).toBe(422)
-    expect((await put('-5', null)).status()).toBe(422)
-    expect((await put('1000', 'douze')).status()).toBe(422)
+    expect((await putCaMarge(page.request, 'abc', null)).status()).toBe(422)
+    expect((await putCaMarge(page.request, '-5', null)).status()).toBe(422)
+    expect((await putCaMarge(page.request, '1000', 'douze')).status()).toBe(422)
 
     const apres = await pilotage(page.request)
     expect(apres.ca).toBe(avant.ca)
@@ -157,7 +175,7 @@ test.describe.serial('saisies de pilotage', () => {
     for (const axe of ['service', 'site', 'rubrique'] as const) expect(avant.budgets[axe].every((x) => x.valeur === null), axe).toBe(true)
     expect(avant.reprise).not.toBeNull()
 
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirBudgets(page, 'Juillet')
     await expect(page.getByText(/Aucun budget pour Juillet 2026 : ceux de Juin 2026 pourront servir de point de départ\./)).toBeVisible()
     await page.getByRole('button', { name: 'Saisir les budgets de Juillet 2026 →' }).click()
     await expect(page.getByRole('heading', { name: 'BUDGETS — JUILLET 2026' })).toBeVisible()
@@ -209,7 +227,7 @@ test.describe.serial('saisies de pilotage', () => {
   })
 
   test('budgets : montants invalides, décimales, effacement', async ({ page }) => {
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirBudgets(page, 'Juillet')
     await page.getByRole('button', { name: 'Saisir les budgets de Juillet 2026 →' }).click()
     const cv = page.getByLabel('Budget Commerce VN (services)')
     const verifier = page.getByRole('button', { name: 'Vérifier avant d’enregistrer' })

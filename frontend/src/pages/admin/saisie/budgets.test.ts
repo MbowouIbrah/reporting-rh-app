@@ -27,7 +27,7 @@ test('vérification : changements et points d’attention', () => {
   const v = verifier(VUE, { 'rubrique:1': '10 000', 'rubrique:2': '', 'rubrique:3': '0', 'service:1': '1 400,000' })
   expect(v.changements.map((c) => [c.libelle, c.apres])).toEqual([['Brut', '10000'], ['Transport', null], ['Ancien', '0']])
   expect([v.ajouts.length, v.modifs.length, v.effaces.length]).toEqual([1, 1, 1])
-  expect(v.totaux.rubrique).toEqual({ avant: '1400.000', apres: '10000.000' })
+  expect(v.totaux.rubrique).toEqual({ avant: '1400.000', apres: '10000' })
   expect(v.points.map((p) => p.code)).toEqual(['EFFACE', 'TOTAUX', 'MANQUANT', 'ECART', 'ZERO', 'INACTIF'])
   expect(v.points.find((p) => p.code === 'ECART')!.lignes).toEqual(['Brut (types de charge) : 1 000 → 10 000'])
 })

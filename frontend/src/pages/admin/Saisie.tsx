@@ -5,14 +5,14 @@ import { useNavigate } from 'react-router-dom'
 import { usePilotage } from '../../api/pilotage'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
-import { Bouton, Carte, ChoixFichier } from '../../components/Kit'
+import { Bouton, Carte, ChoixFichier, Confirmer } from '../../components/Kit'
 import { MOIS } from '../../lib/format'
 import type { Ligne } from '../../lib/grille'
 import ApercuLot from './saisie/ApercuLot'
 import BarreParcours from './saisie/BarreParcours'
 import CarteBudgets from './saisie/CarteBudgets'
-import CarteCaMarge from './saisie/CarteCaMarge'
 import SaisieBudgets from './saisie/SaisieBudgets'
+import SaisieDonnees from './saisie/SaisieDonnees'
 import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } from './saisie/brouillon'
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
@@ -43,6 +43,10 @@ export default function Saisie() {
   const grille = useRef<{ lignes: Ligne[]; brouillonId: string } | null>(null)
   const navigate = useNavigate()
   const fichierRef = useRef<HTMLInputElement>(null)
+  // Saisie non enregistrée dans la grille de données : toute action qui la quitterait demande confirmation.
+  const [sale, setSale] = useState(false)
+  const [enAttente, setEnAttente] = useState<{ action: () => void } | null>(null)
+  const garde = (action: () => void) => (sale ? setEnAttente({ action }) : action())
 
   const prepa = usePreparation(annee, mois, etape.e === 'choix' || etape.e === 'grille')
   // Mois 0 : plusieurs mois dans un même fichier, chaque ligne porte son année et son mois.
@@ -73,13 +77,13 @@ export default function Saisie() {
         <div className="filtres saisie-periode" role="group" aria-label="Période à renseigner">
           <label>
             Année
-            <select value={annee} disabled={plusieurs} onChange={(e) => setChoixPeriode([Number(e.target.value), mois])}>
+            <select value={annee} disabled={plusieurs} onChange={(e) => garde(() => setChoixPeriode([Number(e.target.value), mois]))}>
               {annees.map((a) => <option key={a}>{a}</option>)}
             </select>
           </label>
           <label>
             Mois
-            <select value={mois} onChange={(e) => setChoixPeriode([annee, Number(e.target.value)])}>
+            <select value={mois} onChange={(e) => garde(() => setChoixPeriode([annee, Number(e.target.value)]))}>
               {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               <option value={0}>Plusieurs mois</option>
             </select>
@@ -100,7 +104,7 @@ export default function Saisie() {
                 <p className="note">Choisissez un mois précis pour saisir dans l’application.</p>
               ) : (
                 /* Mois figé : un rafraîchissement du « dernier mois saisi » ne doit plus le déplacer. */
-                <Bouton onClick={() => { setChoixPeriode([annee, mois]); setSelection(null); setBrouillon(lireBrouillon(cle)); setEtape({ e: 'choix' }) }}>
+                <Bouton onClick={() => garde(() => { setChoixPeriode([annee, mois]); setSelection(null); setBrouillon(lireBrouillon(cle)); setEtape({ e: 'choix' }) })}>
                   Étape 1 : choisir les employés de {periode} →
                 </Bouton>
               )}
@@ -122,31 +126,54 @@ export default function Saisie() {
               <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
                 <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
               </a>
-              <ChoixFichier libelle="Importer un fichier (.xlsx)" variante="primaire" accept={ACCEPT} inputRef={fichierRef} onFichier={choisirFichier} />
+              <ChoixFichier libelle="Importer un fichier (.xlsx)" variante="primaire" accept={ACCEPT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
             </div>
           </Carte>
         </div>
-        <h3 className="saisie-sous-bandeau">{plusieurs ? 'PILOTAGE DU MOIS' : `PILOTAGE DE ${periode.toUpperCase()}`}</h3>
+        <h3 className="saisie-sous-bandeau">{plusieurs ? 'DONNÉES DU MOIS' : `DONNÉES DE ${periode.toUpperCase()}`}</h3>
         {plusieurs ? (
-          /* CA, marge et budgets se rattachent à un seul mois : cartes visibles, action remplacée par la raison. */
+          /* CA, marge, activité et budgets se rattachent à un seul mois : cartes visibles, action remplacée par la raison. */
           <div className="saisie-cartes saisie-cartes-depart">
-            <Carte titre="Chiffre d’affaires et marge">
-              <p className="note">Montants globaux du mois en FCFA, saisis mois par mois.</p>
-              <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir le CA et la marge.</p></div>
+            <Carte titre="Chiffre d’affaires, marge et activité">
+              <p className="note">CA et marge en FCFA ; nombre d’OR, de devis et de factures. Saisis mois par mois.</p>
+              <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir ces chiffres.</p></div>
             </Carte>
             <Carte titre="Budgets du mois">
               <p className="note">Budgets par axe du MENSUEL, saisis mois par mois.</p>
               <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir les budgets.</p></div>
             </Carte>
           </div>
-        ) : pilotage.data ? (
-          <div className="saisie-cartes">
-            <CarteCaMarge key={periode} vue={pilotage.data} periode={periode} />
-            <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
-          </div>
         ) : (
-          <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+          <SaisieDonnees
+            annee={annee}
+            mois={mois}
+            periode={periode}
+            onModifs={setSale}
+            garde={garde}
+            budgets={
+              pilotage.data ? (
+                <div className="saisie-cartes">
+                  <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => garde(() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) })} />
+                </div>
+              ) : (
+                <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+              )
+            }
+          />
         )}
+        <Confirmer
+          ouvert={enAttente !== null}
+          titre="Quitter sans enregistrer ?"
+          confirmer="Quitter sans enregistrer"
+          onConfirmer={() => {
+            const a = enAttente
+            setEnAttente(null)
+            a?.action()
+          }}
+          onAnnuler={() => setEnAttente(null)}
+        >
+          <p>Les chiffres tapés dans la grille et non enregistrés seront perdus.</p>
+        </Confirmer>
       </section>
     )
   }

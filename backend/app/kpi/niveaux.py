@@ -90,6 +90,32 @@ def niveau_des_lignes(cles: list[Cle]) -> str | None:
     return None
 
 
+def plus_fin(source: str, cible: str) -> bool:
+    """Une valeur du niveau source se range sans ambiguïté dans une case du niveau cible."""
+    return (source == "cellule" and cible != "cellule") or (
+        source in ("site", "service") and cible == "global")
+
+
+def projeter(cases: list[CaseResolue], cible: str,
+             indicateurs: tuple[str, ...]) -> dict[Cle, dict[str, Decimal]]:
+    """Somme des valeurs de cases d'un niveau plus fin, rangées par case du niveau cible. Un
+    indicateur n'est proposé pour une case cible que si au moins une case source est saisie."""
+    somme: dict[tuple[Cle, str], Decimal] = {}
+    saisi: set[tuple[Cle, str]] = set()
+    for c in cases:
+        k = cle_du_niveau(cible, c.site_id, c.service_id)
+        for ind in indicateurs:
+            v = c.valeurs[ind]
+            if v.valeur is not None:
+                somme[(k, ind)] = somme.get((k, ind), ZERO) + v.valeur
+            if v.origine == "saisi":
+                saisi.add((k, ind))
+    out: dict[Cle, dict[str, Decimal]] = {}
+    for k, ind in saisi:
+        out.setdefault(k, {})[ind] = somme[(k, ind)]
+    return out
+
+
 def niveau_par_defaut(groupe: str, employes: list[Employe]) -> str:
     """CA et marge : par case si des employés portent un CA ou une marge individuels, sinon global.
     Activité : par case."""

@@ -13,7 +13,7 @@ import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
-import { cls, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { cls, decimal2, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { plafonner } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
 
@@ -34,6 +34,10 @@ const COLONNES = [
   'Carburant véhicule service',
 ]
 const LOGEMENT = 'Logement site déporté'
+
+type ColActivite = 'ventes' | 'clients' | 'productivite' | 'ca_individuel' | 'marge_individuelle'
+/** Montants (CA, marge) en FCFA entiers ; nombres de ventes ou de clients et indice : deux décimales au plus. */
+const texteActivite = (cle: ColActivite, v: string | null | undefined) => (cle === 'ca_individuel' || cle === 'marge_individuelle' ? fcfa(v) : decimal2(v))
 
 const MODELE_VIDE: IndividuelTous = {
   annee: 0, matricule: null, nom: null, rubriques: COLONNES,
@@ -83,6 +87,25 @@ export default function Individuel() {
   const val = (v: Val | undefined) => v ?? '0'
   const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
   const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
+
+  // Activité du périmètre : n'apparaît que si au moins un mois porte une valeur ; CA et marge individuels
+  // seulement avec le droit marge (clés absentes sinon).
+  const activites = (d?.mois ?? []).filter((m) => m.present && m.activite)
+  const aActivite = activites.some((m) => Object.values(m.activite ?? {}).some((v) => v != null))
+  const avecCaInd = activites.some((m) => m.activite && 'ca_individuel' in m.activite)
+  // Total de l'année calculé par le serveur (productivité = moyenne des mois renseignés).
+  const totalActivite = (cle: ColActivite) => d?.activite_total?.[cle] ?? null
+  const colsActivite: { cle: ColActivite; titre: string }[] = [
+    { cle: 'ventes', titre: 'Nombre de ventes' },
+    { cle: 'clients', titre: 'Nombre de clients' },
+    { cle: 'productivite', titre: 'Indice de productivité' },
+    ...(avecCaInd
+      ? [
+          { cle: 'ca_individuel' as const, titre: 'CA individuel' },
+          { cle: 'marge_individuelle' as const, titre: 'Marge individuelle' },
+        ]
+      : []),
+  ]
 
   // Le tableau s'étire sur la hauteur restante, sans dépasser la hauteur de ligne plafonnée
   const zone = useRef<HTMLElement>(null)
@@ -215,6 +238,41 @@ export default function Individuel() {
             </tbody>
           </table>
         </Panneau>
+      )}
+      {d && aActivite && (
+        <details className="section details-donnees">
+          <summary>
+            <span className="section-titre">Activité</span>
+          </summary>
+          <div className="section-corps">
+            <div className="table-scroll">
+              <table className="dense">
+                <thead>
+                  <tr>
+                    <th scope="col">Mois</th>
+                    {colsActivite.map((c) => <th key={c.cle} scope="col" className="num">{c.titre}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {activites.map((m) => (
+                    <tr key={m.mois}>
+                      <th scope="row">{MOIS[m.mois - 1]}</th>
+                      {colsActivite.map((c) => (
+                        <td key={c.cle} className="num">{texteActivite(c.cle, m.activite?.[c.cle])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="total">
+                    <th scope="row">Total</th>
+                    {colsActivite.map((c) => (
+                      <td key={c.cle} className="num">{texteActivite(c.cle, totalActivite(c.cle))}</td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
       )}
       {d && (
         <p className="note">

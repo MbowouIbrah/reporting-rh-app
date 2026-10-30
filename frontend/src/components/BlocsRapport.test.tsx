@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import type { Cell } from '../api/types'
-import { type Blocs, ServicesActivites, Sites, TypesCharge } from './BlocsRapport'
+import { Activite, type Blocs, ServicesActivites, Sites, TypesCharge } from './BlocsRapport'
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
@@ -89,4 +89,17 @@ test('reporting global : CA et marge sous le TOTAL GÉNÉRAL, budget vide, absen
   unmount()
   render(<TypesCharge d={{ a_type_charge: [total] } as unknown as Blocs} lib={{ prec: 'M-1', cour: 'M' }} />)
   expect(screen.queryByText("Chiffre d'affaires")).toBeNull()
+})
+
+test('Activité : lignes de l’activité, mention « partiel » seulement sur la ligne incomplète', () => {
+  const lignes = [
+    { cle: 'ventes', libelle: 'Ventes', ...cell, partiel: true as const },
+    { cle: 'productivite', libelle: 'Productivité', m1: '1.5', m: '2.25', var: '0.75', var_pct: '0.5' },
+  ]
+  render(<Activite lignes={lignes} lib={{ prec: 'M-1', cour: 'M' }} />)
+  expect(screen.getByRole('rowheader', { name: /Ventes\s*partiel/ })).toBeInTheDocument()
+  expect(screen.getByRole('rowheader', { name: 'Productivité' })).toBeInTheDocument()
+  expect(screen.getAllByText('partiel')).toHaveLength(1)
+  // Les ratios gardent deux décimales.
+  expect(screen.getByText(/2,25/)).toBeInTheDocument()
 })

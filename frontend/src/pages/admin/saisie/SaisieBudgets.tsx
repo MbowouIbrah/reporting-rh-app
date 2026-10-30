@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { apresEcriture, AXES, enregistrerBudgets, TITRES, type Axe, type Pilotage } from '../../../api/pilotage'
 import { Bouton, Confirmer } from '../../../components/Kit'
-import { fcfa, MOIS, montantValide, sansEspaces, somme, valeurBrute } from '../../../lib/format'
+import { budgetValide, fcfa, MOIS, somme, valeurBrute } from '../../../lib/format'
 import BarreParcours from './BarreParcours'
 import { cle, hauteur, normal, repartirColonnes, verifier, type Valeurs } from './budgets'
 import Etapes from './Etapes'
@@ -23,7 +23,7 @@ export default function SaisieBudgets({ vue, periode, onRetour }: { vue: Pilotag
   const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string; ok?: boolean }>({ cours: false })
   const [quitter, setQuitter] = useState(false)
 
-  const invalide = (k: string) => !!valeurs[k].trim() && !montantValide(sansEspaces(valeurs[k]))
+  const invalide = (k: string) => !!valeurs[k].trim() && !budgetValide(valeurs[k])
   const modifiees = Object.keys(valeurs).filter((k) => valeurs[k] !== base[k])
   const nbInvalides = Object.keys(valeurs).filter(invalide).length
   const vide = Object.values(valeurs).every((v) => !v.trim())

@@ -729,4 +729,16 @@ def individuel(pds: dict[int, PeriodeData], salarie_id: int, refs: Refs) -> dict
     presents = [x["total"] for x in mois if x["present"]]
     cumul = sum(presents, ZERO)
     return {"mois": mois, "cumul": cumul, "nb_mois": len(presents),
-            "moyenne": f.moyenne(cumul, len(presents))}
+            "moyenne": f.moyenne(cumul, len(presents)),
+            "activite_total": activite_total([x["activite"] for x in mois])}
+
+
+def activite_total(activites: list[dict | None]) -> dict:
+    """Total de l'année des indicateurs d'activité mensuels : productivité en moyenne des mois
+    renseignés, le reste additionné ; None si aucun mois n'est renseigné."""
+    out = {}
+    for k in ("ventes", "clients", "productivite", "ca_individuel", "marge_individuelle"):
+        vals = [a[k] for a in activites if a and a.get(k) is not None]
+        out[k] = (None if not vals else f.moyenne(sum(vals, ZERO), len(vals))
+                  if k == "productivite" else sum(vals, ZERO))
+    return out

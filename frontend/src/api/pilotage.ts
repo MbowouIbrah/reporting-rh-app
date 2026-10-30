@@ -1,4 +1,4 @@
-import { useQuery, type QueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query'
 import { api, queryRetry } from './client'
 import { qs } from './rapports'
 import type { Dec, Val } from './types'
@@ -46,8 +46,79 @@ export const usePilotage = (annee: number, mois: number, actif: boolean) =>
     retry: queryRetry,
   })
 
-export const enregistrerCaMarge = (annee: number, mois: number, ca: string | null, marge: string | null) =>
-  api<Pilotage>('/pilotage/ca-marge', put({ annee, mois, ca, marge }))
+export type Groupe = 'ca_marge' | 'activite'
+export type Niveau = 'global' | 'site' | 'service' | 'cellule'
+
+export interface ValeurSaisie {
+  /** Chiffre tapé dans cette case, null si la case est vide. */
+  saisi: Dec | null
+  /** Somme des chiffres des employés rattachés à la case. */
+  employes: Dec | null
+  /** Valeur retenue : le chiffre saisi s'il existe, sinon la somme des employés. */
+  valeur: Dec | null
+  origine: 'saisi' | 'calcule' | null
+  /** « Non réparti » : part du chiffre saisi que les cases du dessous n'expliquent pas. */
+  ecart: Dec | null
+  /** Somme des valeurs de l'ancien niveau, quand on affiche un niveau plus fin que celui en base. */
+  propose: Dec | null
+}
+
+export interface CaseSaisie {
+  site_id: number | null
+  service_id: number | null
+  valeurs: Record<string, ValeurSaisie>
+  /** Groupe CA et marge seulement : taux de la case, calculé par le serveur. */
+  taux_marge?: Val
+}
+
+export interface TotalSaisie {
+  valeur: Dec | null
+  partiel: boolean
+  renseignes: number
+  attendus: number
+}
+
+export interface VueSaisies {
+  annee: number
+  mois: number
+  groupe: Groupe
+  periode_id: number | null
+  indicateurs: string[]
+  /** Niveau affiché (celui demandé, sinon celui en base, sinon celui du dernier mois saisi). */
+  niveau: Niveau
+  /** Niveau en base pour ce mois, null si rien n'est enregistré. */
+  niveau_enregistre: Niveau | null
+  /** Vrai si le niveau n'a jamais été choisi pour ce mois : il vient de la règle par défaut. */
+  niveau_par_defaut: boolean
+  sites: { id: number; libelle: string }[]
+  services: { id: number; libelle: string; productif: boolean }[]
+  cases: CaseSaisie[]
+  totaux: Record<string, TotalSaisie>
+  /** Totaux de l'ancien niveau que la grille affichée ne permet pas de ranger dans une case. */
+  a_repartir: Record<string, Dec>
+  /** Groupe CA et marge seulement. */
+  taux_marge?: Val
+}
+
+export interface CaseEnvoyee {
+  site_id: number | null
+  service_id: number | null
+  valeurs: Record<string, string | null>
+}
+
+/** `niveau` facultatif : sans lui, le serveur choisit (celui en base, sinon celui du dernier mois saisi). */
+export const useSaisies = (groupe: Groupe, annee: number, mois: number, actif: boolean, niveau?: Niveau) =>
+  useQuery({
+    queryKey: ['saisies', groupe, annee, mois, niveau ?? null],
+    queryFn: () => api<VueSaisies>(`/pilotage/saisies${qs({ groupe, annee, mois, niveau })}`),
+    enabled: actif,
+    retry: queryRetry,
+    // Changer de niveau garde la grille à l'écran le temps de la requête.
+    placeholderData: keepPreviousData,
+  })
+
+export const enregistrerSaisies = (groupe: Groupe, annee: number, mois: number, niveau: Niveau, cases: CaseEnvoyee[]) =>
+  api<VueSaisies>('/pilotage/saisies', put({ annee, mois, groupe, niveau, cases }))
 
 export const enregistrerBudgets = (annee: number, mois: number, lignes: LigneBudget[]) =>
   api<Pilotage>('/pilotage/budgets', put({ annee, mois, lignes }))
@@ -55,5 +126,23 @@ export const enregistrerBudgets = (annee: number, mois: number, lignes: LigneBud
 /** Après une écriture : la vue du mois est remplacée, les rapports qui en dépendent sont rechargés. */
 export function apresEcriture(qc: QueryClient, vue: Pilotage) {
   qc.setQueryData(['pilotage', vue.annee, vue.mois], vue)
-  for (const k of ['annuel', 'mensuel', 'periodes', 'filtres']) qc.invalidateQueries({ queryKey: [k] })
+  rechargerRapports(qc)
+}
+
+/** Après une écriture de saisies : la vue du groupe est remplacée, la vue du mois et les rapports sont rechargés. */
+export function apresSaisies(qc: QueryClient, vue: VueSaisies) {
+  // Le niveau enregistré devient le niveau affiché : les autres niveaux déjà chargés ne valent plus.
+  qc.setQueryData(['saisies', vue.groupe, vue.annee, vue.mois, null], vue)
+  qc.setQueryData(['saisies', vue.groupe, vue.annee, vue.mois, vue.niveau], vue)
+  qc.invalidateQueries({
+    queryKey: ['saisies', vue.groupe, vue.annee, vue.mois],
+    predicate: (q) => q.queryKey[4] !== null && q.queryKey[4] !== vue.niveau,
+  })
+  qc.invalidateQueries({ queryKey: ['saisie', 'derniere-periode'] })
+  qc.invalidateQueries({ queryKey: ['pilotage'] })
+  rechargerRapports(qc)
+}
+
+function rechargerRapports(qc: QueryClient) {
+  for (const k of ['annuel', 'mensuel', 'periodes', 'filtres', 'individuel', 'individuel-tous']) qc.invalidateQueries({ queryKey: [k] })
 }

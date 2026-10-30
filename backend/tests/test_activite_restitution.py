@@ -409,17 +409,26 @@ def test_individuel_ca_et_marge_masques_sans_droit_marge(make_client, db):
     assert D(a["ventes"]) == 3 and D(a["productivite"]) == D("1.5")
     assert D(a["ca_individuel"]) == 500 and D(a["marge_individuelle"]) == 50
     assert j["mois"][1]["activite"] is None and j["mois"][0]["reference"] is None
+    tot = j["activite_total"]  # totaux de l'année calculés par le serveur
+    assert D(tot["ventes"]) == 3 and D(tot["productivite"]) == D("1.5")
+    assert D(tot["ca_individuel"]) == 500
     t = get(c, "individuel/tous", annee=2026).json()["mois"][0]["activite"]
     assert D(t["ventes"]) == 5 and D(t["clients"]) == 2 and D(t["productivite"]) == D("1.75")
     assert D(t["ca_individuel"]) == 800 and D(t["marge_individuelle"]) == 70
+    tt = get(c, "individuel/tous", annee=2026).json()["activite_total"]
+    assert D(tt["ventes"]) == 5 and D(tt["productivite"]) == D("1.75")
 
     _sans_marge(db)
     a = get(c, "individuel", annee=2026, matricule="E1").json()["mois"][0]["activite"]
     assert D(a["ventes"]) == 3 and D(a["productivite"]) == D("1.5")
     assert "ca_individuel" not in a and "marge_individuelle" not in a
+    tot = get(c, "individuel", annee=2026, matricule="E1").json()["activite_total"]
+    assert D(tot["ventes"]) == 3 and "ca_individuel" not in tot
     t = get(c, "individuel/tous", annee=2026).json()["mois"][0]["activite"]
     assert D(t["ventes"]) == 5
     assert "ca_individuel" not in t and "marge_individuelle" not in t
+    tt = get(c, "individuel/tous", annee=2026).json()["activite_total"]
+    assert D(tt["ventes"]) == 5 and "ca_individuel" not in tt
 
 
 def test_individuel_tous_aucune_valeur_renseignee(make_client):

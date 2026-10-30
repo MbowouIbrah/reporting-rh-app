@@ -16,6 +16,34 @@ export interface Cell {
   var_pct: Val
 }
 
+/** Cellule dont le total manque une case attendue (saisie incomplète). */
+export type CellPartiel = Cell & { partiel?: true }
+
+/** Ligne du bloc ACTIVITÉ ; `activite` vaut null tant qu'aucune donnée d'activité n'existe. */
+export type LigneActivite = { cle: string; libelle: string } & CellPartiel
+
+/** Indicateurs d'activité d'un mois (valeurs brutes, null si non renseignés). */
+export interface ActiviteMois {
+  ventes: Dec | null
+  clients: Dec | null
+  productivite: Dec | null
+  or: Dec | null
+  devis: Dec | null
+  factures: Dec | null
+  productifs: Dec | null
+  or_par_productif: Dec | null
+  factures_par_productif: Dec | null
+}
+
+/** Activité d'un employé sur un mois ou sur l'année ; CA et marge individuels absents sans la permission marge:read. */
+export interface ActiviteIndividuelle {
+  ventes: Dec | null
+  clients: Dec | null
+  productivite: Dec | null
+  ca_individuel?: Dec | null
+  marge_individuelle?: Dec | null
+}
+
 export interface Me {
   id: number
   email: string
@@ -89,7 +117,8 @@ export interface Mensuel {
   }
   a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
   /** Absent sans la permission marge:read. */
-  lignes_ca_marge?: { ca: Cell; marge: Cell }
+  lignes_ca_marge?: { ca: CellPartiel; marge: CellPartiel }
+  activite: LigneActivite[] | null
   b_service_activite: {
     service: string
     total: Cell & Budget
@@ -133,6 +162,7 @@ export interface SerieMois {
   ca?: Val
   marge?: Val
   taux_marge?: Val
+  activite?: ActiviteMois
 }
 
 export interface Annuel {
@@ -165,6 +195,7 @@ export interface Annuel {
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
   lignes_ca_marge?: Mensuel['lignes_ca_marge']
+  activite: LigneActivite[] | null
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']
   c_site_total?: Mensuel['c_site_total']
@@ -191,10 +222,13 @@ export interface Individuel {
     contrat: string | null
     rubriques: Record<string, Val> | null
     total: Dec | null
+    activite?: ActiviteIndividuelle | null
   }[]
   cumul: Dec
   nb_mois: number
   moyenne: Val
+  /** Ventes, clients, CA et marge s'additionnent ; la productivité est la moyenne des mois renseignés. */
+  activite_total?: ActiviteIndividuelle
 }
 
 export interface IndividuelTous {
@@ -206,6 +240,8 @@ export interface IndividuelTous {
   exclues?: string[]
   /** Rubriques de DONNEES derrière chaque colonne (ordre et hachuré enregistrés par rubrique). */
   sources?: Record<string, string[]>
+  /** Total de l'année des indicateurs d'activité (serveur). */
+  activite_total?: ActiviteIndividuelle
   mois: {
     mois: number
     present: boolean
@@ -215,5 +251,7 @@ export interface IndividuelTous {
     total?: Dec
     /** Un site déporté figure dans le mois (sinon logement sans objet). */
     deporte?: boolean
+    /** Activité du périmètre ; CA et marge individuels absents sans la permission marge:read. */
+    activite?: ActiviteIndividuelle
   }[]
 }

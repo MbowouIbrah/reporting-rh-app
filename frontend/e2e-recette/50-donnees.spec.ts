@@ -26,8 +26,8 @@ test.describe.serial('feuille DONNEES et correction de données', () => {
     await page.goto('admin')
     await expect(page.getByRole('heading', { name: 'ADMINISTRATION DES DONNÉES' })).toBeVisible({ timeout: 20_000 })
     await reinitialiserFiltres(page)
-    await page.getByLabel('Année').selectOption('2026')
-    await page.getByLabel('Mois').selectOption({ label: 'Août' })
+    await page.getByRole('combobox', { name: 'Année', exact: true }).selectOption('2026')
+    await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: 'Août' })
 
     // Une ligne affichée = une ligne de l'API : matricule, nom et service identiques
     const un = api.lignes[0]
@@ -66,7 +66,7 @@ test.describe.serial('feuille DONNEES et correction de données', () => {
     // Une seule ligne dans la grille : l'employé corrigé, avec une seule valeur retapée
     const saisir = async () => {
       await ouvrirSaisie(page)
-      await page.getByLabel('Mois').selectOption({ label: 'Août' })
+      await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: 'Août' })
       await page.getByRole('button', { name: /Étape 1 : choisir les employés/ }).click()
       await page.getByRole('button', { name: 'Tout décocher' }).click()
       await page.getByRole('searchbox').fill(cible.matricule)
@@ -112,8 +112,8 @@ test.describe.serial('feuille DONNEES et correction de données', () => {
   test('la correction apparaît dans la feuille DONNEES et dans le journal d’audit', async ({ page }) => {
     await page.goto('admin')
     await reinitialiserFiltres(page)
-    await page.getByLabel('Année').selectOption('2026')
-    await page.getByLabel('Mois').selectOption({ label: 'Août' })
+    await page.getByRole('combobox', { name: 'Année', exact: true }).selectOption('2026')
+    await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: 'Août' })
     const rang = page.getByRole('row', { name: new RegExp(`\\b${cible.matricule}\\b`) }).first()
     await expect(rang).toContainText(cible.nom)
     await expect(rang).toContainText(motif(cible.apres))

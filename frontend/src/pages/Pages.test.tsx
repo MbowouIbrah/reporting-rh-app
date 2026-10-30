@@ -8,6 +8,8 @@ import Annuel from './Annuel'
 import Individuel from './Individuel'
 import Resume from './Resume'
 
+// Bloc ACTIVITÉ de l'annuel : null tant qu'aucune donnée d'activité n'existe.
+let activiteAnnuel: unknown = null
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -50,6 +52,7 @@ function routes(avecMarge: boolean, perms: string[]) {
         mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
         ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
         ...(avecMarge ? { ca_ytd: null, marge_ytd: null, ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
+        activite: activiteAnnuel,
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
       }
@@ -135,6 +138,24 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
 test('Annuel : affiche la moyenne mensuelle', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
   expect(await screen.findByText(/Moyenne mensuelle/)).toBeInTheDocument()
+})
+
+test('Annuel : bloc Activité masqué sans donnée, affiché avec la mention « partiel »', async () => {
+  rendu(<Annuel />, '/annuel', ['report:read'])
+  await screen.findByText(/Moyenne mensuelle/)
+  expect(screen.queryByText('6. Activité')).toBeNull()
+  activiteAnnuel = [
+    { cle: 'ventes', libelle: 'Ventes', ...cell('12'), partiel: true },
+    { cle: 'productivite', libelle: 'Productivité', ...cell('1.5') },
+  ]
+  try {
+    rendu(<Annuel />, '/annuel', ['report:read'])
+    expect(await screen.findByText('6. Activité')).toBeInTheDocument()
+    expect(screen.getByRole('rowheader', { name: /Ventes\s*partiel/ })).toBeInTheDocument()
+    expect(screen.getByRole('rowheader', { name: 'Productivité' })).toBeInTheDocument()
+  } finally {
+    activiteAnnuel = null
+  }
 })
 
 test('Annuel : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {

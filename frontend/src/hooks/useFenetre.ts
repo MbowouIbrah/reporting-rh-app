@@ -26,21 +26,32 @@ export function useFenetre(total: number) {
       image = 0
       const entete = corps.querySelector<HTMLElement>('thead')?.offsetHeight ?? 0
       const ligne = corps.querySelector<HTMLElement>('tbody.fenetre > tr')?.offsetHeight
+      // Conteneur sans hauteur bornée (écran étroit) : c'est la page qui défile, la zone visible
+      // est celle de la fenêtre ; sinon le conteneur grandit avec les lignes et les rend toutes.
+      const haut = corps.getBoundingClientRect().top
       const suivante = {
-        defile: corps.scrollTop - entete,
-        vue: corps.clientHeight || window.innerHeight,
+        defile: corps.scrollTop + Math.max(0, -haut) - entete,
+        vue: Math.min(corps.clientHeight || window.innerHeight, window.innerHeight),
         hauteur: ligne || HAUTEUR_DEFAUT,
       }
       setMesure((m) => (m.defile === suivante.defile && m.vue === suivante.vue && m.hauteur === suivante.hauteur ? m : suivante))
     }
-    const planifier = () => { if (!image) image = requestAnimationFrame(lire) }
+    const planifier = (e?: unknown) => {
+      // Défilement sans effet sur la position du tableau (autre liste de la page) : ignoré.
+      const cible = e instanceof Event && e.type === 'scroll' ? e.target : null
+      if (cible && cible !== document && !(cible instanceof Node && cible.contains(corps))) return
+      if (!image) image = requestAnimationFrame(lire)
+    }
     lire()
-    corps.addEventListener('scroll', planifier, { passive: true })
+    // Capture : défilement du conteneur comme de la page ou d'un ancêtre.
+    document.addEventListener('scroll', planifier, { capture: true, passive: true })
+    window.addEventListener('resize', planifier)
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(planifier)
     ro?.observe(corps)
     if (corps.firstElementChild) ro?.observe(corps.firstElementChild)
     return () => {
-      corps.removeEventListener('scroll', planifier)
+      document.removeEventListener('scroll', planifier, { capture: true })
+      window.removeEventListener('resize', planifier)
       ro?.disconnect()
       cancelAnimationFrame(image)
     }

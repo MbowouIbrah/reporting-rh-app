@@ -117,3 +117,19 @@ Total (partiel)    20 500 000    1 860 000            ← lecture seule
 3. **Directeurs à périmètre** : avec un CA par site ou par service, voient-ils le CA de leur périmètre ? Recommandé : non, CA et marge restent réservés à `marge:read` (D5).
 4. **Budgets** : même mécanique à l'étape 7, avec les objectifs (recommandé), ou dès maintenant ?
 5. **Ventes et clients** : saisie possible au-dessus de l'employé (par site, par service) ? Recommandé : pas maintenant, ils viennent du fichier mensuel.
+
+## 10. Mise en œuvre (étapes 6.4 et 6.5)
+
+- Points du §9 validés le 28/10 : 1 « non réparti », 2 oui, 3 non, 4 étape 7, 5 pas maintenant.
+- **Changement de niveau** : `GET /pilotage/saisies?niveau=` rend la grille d'un autre niveau sans rien enregistrer. `niveau` = niveau affiché, `niveau_enregistre` = niveau en base. Si l'ancien niveau est plus fin, chaque case porte `propose` (somme du détail) et la grille est pré-remplie. Sinon, l'ancien total s'affiche « à répartir » (`a_repartir`) au-dessus de la grille.
+- **Niveau par défaut** : celui du dernier mois saisi, sinon celui du §4.
+- **Taux de marge** : calculé case par case par le serveur (`taux_marge`). Il est recalculé à l'écran seulement pour une ligne modifiée, en aperçu.
+- **Totaux d'activité de la fiche individuelle** : renvoyés par le serveur (`activite_total`). La productivité est une moyenne des mois renseignés, le reste est additionné.
+- **Montants à l'écran** : additions exactes, sans arrondi ni nombre à virgule flottante. La validation est la même qu'au serveur : 15 chiffres, 12 décimales au plus, signe accepté pour la marge.
+- **Ergonomie** :
+  - un bloc copié d'Excel se colle depuis une case ;
+  - Entrée descend d'une case, les flèches et Tab se déplacent comme dans un tableur ;
+  - les espaces de milliers s'affichent en sortant de la case ;
+  - une erreur s'affiche sur la case concernée ;
+  - la barre Enregistrer reste visible en bas, et Ctrl+S enregistre ;
+  - une saisie en cours n'est jamais effacée par un rechargement, et une alerte prévient en quittant l'écran avec des modifications non enregistrées.

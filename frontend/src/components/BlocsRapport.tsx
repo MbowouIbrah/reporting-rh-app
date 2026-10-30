@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useState } from 'react'
-import type { Budget, Cell, Mensuel } from '../api/types'
-import { cls, entier, fcfa, pct } from '../lib/format'
+import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
+import { cls, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
 export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
@@ -40,14 +40,23 @@ function Tete({ premiere, lib, budget }: { premiere: string; lib: Libelles; budg
   )
 }
 
-function Ligne({ label, cell, budget, className }: { label: ReactNode; cell: Cell; budget?: Budget | true; className?: string }) {
+/** Mention discrète d'un total auquel il manque une case attendue. */
+const Partiel = () => <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>
+
+function Ligne({ label, cell, budget, className, format = fcfa }: {
+  label: ReactNode
+  cell: CellPartiel
+  budget?: Budget | true
+  className?: string
+  format?: (v: CellPartiel['m']) => string
+}) {
   const b = budget === true ? undefined : budget
   return (
     <tr className={className}>
-      <th scope="row">{label}</th>
-      <td className="num">{fcfa(cell.m1)}</td>
-      <td className="num">{fcfa(cell.m)}</td>
-      <td className={cls(cell.var)}>{fcfa(cell.var)}</td>
+      <th scope="row">{label}{cell.partiel && <Partiel />}</th>
+      <td className="num">{format(cell.m1)}</td>
+      <td className="num">{format(cell.m)}</td>
+      <td className={cls(cell.var)}>{format(cell.var)}</td>
       <td className={cls(cell.var_pct)}>{pct(cell.var_pct)}</td>
       {budget !== undefined && (
         <>
@@ -87,6 +96,23 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
             <Ligne label="Marge" cell={d.lignes_ca_marge.marge} budget className="hors-total" />
           </>
         )}
+      </tbody>
+    </table>
+  )
+}
+
+// Indices et ratios : les décimales comptent (0,85 ne doit pas s'afficher « 1 »).
+const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif'])
+
+/** 6. Activité : ventes, clients, productivité, OR, devis, factures ; masqué par l'appelant quand `activite` est null. */
+export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libelles }) {
+  return (
+    <table className="dense tab-global aligne">
+      <Tete premiere="Indicateur" lib={lib} />
+      <tbody>
+        {lignes.map((l) => (
+          <Ligne key={l.cle} label={l.libelle} cell={l} format={RATIOS.has(l.cle) ? decimal2 : fcfa} />
+        ))}
       </tbody>
     </table>
   )

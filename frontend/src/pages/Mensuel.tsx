@@ -3,7 +3,7 @@ import { getMensuel } from '../api/rapports'
 import type { Mensuel as MensuelData } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison, libellePeriode } from '../components/FiltresPeriode'
-import { AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
+import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
@@ -100,6 +100,10 @@ function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string
               ],
             ],
           },
+          // Masqué tant qu'aucune donnée d'activité n'existe (activite null).
+          ...(d.activite
+            ? [{ id: 's-activite', titre: 'Activité', panneaux: [{ titre: '6. Activité', contenu: <Activite lignes={d.activite} lib={lib} /> }] }]
+            : []),
         ]}
       />
     </>

@@ -207,9 +207,11 @@ def main() -> None:
 
     for m in _csv("ca_marge.csv"):
         if m["ca"]:
-            r = c.put(f"{api}/pilotage/ca-marge", json={
+            r = c.put(f"{api}/pilotage/saisies", json={
                 "annee": int(m["annee"]), "mois": int(m["mois"]),
-                "ca": m["ca"], "marge": m["marge"] or None})
+                "groupe": "ca_marge", "niveau": "global",
+                "cases": [{"site_id": None, "service_id": None,
+                           "valeurs": {"ca": m["ca"], "marge": m["marge"] or None}}]})
             assert r.status_code == 200, (m, r.text)
 
     par_mois: dict[tuple[int, int], list[dict]] = {}

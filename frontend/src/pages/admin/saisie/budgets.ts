@@ -1,5 +1,5 @@
 import { AXES, TITRES, type Axe, type CibleBudget, type Pilotage } from '../../../api/pilotage'
-import { enMilli, fcfa, MOIS, sansEspaces, somme } from '../../../lib/format'
+import { comparer, ecartAbsolu, fcfa, MOIS, sansEspaces, signe, somme } from '../../../lib/format'
 
 export type Valeurs = Record<string, string>
 export const cle = (axe: Axe, id: number) => `${axe}:${id}`
@@ -43,7 +43,7 @@ export interface Verification {
   points: Point[]
 }
 
-const egal = (a: string | null, b: string | null) => (a == null || b == null ? a === b : enMilli(a) === enMilli(b))
+const egal = (a: string | null, b: string | null) => (a == null || b == null ? a === b : comparer(a, b) === 0)
 const ou = (c: Changement) => `${c.libelle} (${TITRES[c.axe].toLowerCase()})`
 
 /** Ce que l'enregistrement va changer, et les points à relire avant de le faire. */
@@ -62,13 +62,13 @@ export function verifier(vue: Pilotage, valeurs: Valeurs): Verification {
       const c: Changement = { axe, cible_id: x.cible_id, libelle: x.libelle, avant: x.valeur, apres: apres(x) }
       if (!egal(c.avant, c.apres)) tous.push(c)
       if (c.apres == null) continue
-      if (enMilli(c.apres) === 0n) zeros.push(ou(c))
+      if (signe(c.apres) === 0) zeros.push(ou(c))
       if (!x.actif) inactifs.push(ou(c))
       // Référence : le montant enregistré, sinon celui du mois proposé en reprise.
       const ref = c.avant ?? vue.reprise?.valeurs[axe][String(x.cible_id)] ?? null
-      if (ref != null && enMilli(ref) > 0n) {
-        const d = enMilli(c.apres) - enMilli(ref)
-        if ((d < 0n ? -d : d) * 2n > enMilli(ref)) ecarts.push(`${ou(c)} : ${fcfa(ref)} → ${fcfa(c.apres)}`)
+      if (ref != null && signe(ref) > 0) {
+        // Écart de plus de 50 % : le double de l'écart dépasse la référence.
+        if (comparer(somme([ecartAbsolu(c.apres, ref), ecartAbsolu(c.apres, ref)])!, ref) > 0) ecarts.push(`${ou(c)} : ${fcfa(ref)} → ${fcfa(c.apres)}`)
       }
     }
   }
@@ -77,7 +77,7 @@ export function verifier(vue: Pilotage, valeurs: Valeurs): Verification {
   const add = (code: string, titre: string, aide: string, lignes: string[]) => lignes.length && points.push({ code, titre, aide, lignes })
   add('EFFACE', 'Budgets effacés', 'Le montant enregistré sera supprimé : voulu ?', effaces.map((c) => `${ou(c)} : ${fcfa(c.avant)}`))
   const remplis = AXES.filter((a) => totaux[a].apres != null)
-  if (remplis.length > 1 && new Set(remplis.map((a) => enMilli(totaux[a].apres!))).size > 1) {
+  if (remplis.length > 1 && remplis.some((a) => comparer(totaux[a].apres!, totaux[remplis[0]].apres!) !== 0)) {
     add('TOTAUX', 'Totaux différents selon la répartition',
       'Types de charge, services et sites ne donnent pas le même total : oubli ou répartition à revoir ?',
       remplis.map((a) => `${TITRES[a]} : ${fcfa(totaux[a].apres)}`))

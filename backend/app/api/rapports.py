@@ -371,7 +371,9 @@ def individuel_tous(
                        "exclues": [c for c in rubriques
                                    if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
                        "sources": {c: list(COLONNES_INDIVIDUEL[c]) for c in rubriques},
-                       "mois": mois})
+                       "mois": mois,
+                       "activite_total": moteur.activite_total(
+                           [x.get("activite") for x in mois])})
 
 
 @router.get("/individuel")

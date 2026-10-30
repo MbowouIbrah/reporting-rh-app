@@ -109,8 +109,8 @@ test.describe.serial('gestion des employés', () => {
     expect(prop!.attributs).toMatchObject({ service: 'Commerce VN', site: 'Douala' })
 
     await page.goto('admin/saisie')
-    await page.getByLabel('Année').selectOption('2026')
-    await page.getByLabel('Mois').selectOption({ label: 'Septembre' })
+    await page.getByRole('combobox', { name: 'Année', exact: true }).selectOption('2026')
+    await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: 'Septembre' })
     await page.getByRole('button', { name: 'Étape 1 : choisir les employés de Septembre 2026 →' }).click()
     await page.getByRole('searchbox').fill(MATRICULE)
     await expect(page.getByRole('region', { name: 'Employés' })).toContainText(NOM)

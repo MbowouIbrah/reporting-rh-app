@@ -43,6 +43,7 @@ function Case({
   devise = true,
   libelle2,
   detail,
+  partiel,
   children,
 }: {
   titre: string
@@ -52,11 +53,16 @@ function Case({
   libelle2?: string
   /** Chiffres exacts affichés au survol (ou au focus clavier), comme les bulles des graphiques. */
   detail?: Detail
+  /** Total incomplet : une case attendue n'est pas renseignée. */
+  partiel?: boolean
   children?: ReactNode
 }) {
   return (
     <div className="tuile case" tabIndex={detail ? 0 : undefined}>
-      <span className="micro">{titre}</span>
+      <span className="micro">
+        {titre}
+        {partiel && <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>}
+      </span>
       <strong>
         {valeur}
         {devise && valeur !== '—' && <span className="devise"> FCFA</span>}
@@ -90,7 +96,7 @@ export default function Resume() {
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
   }
-  // CA et marge n'existent qu'au global : « — » dès qu'un filtre restreint les salariés.
+  // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
   const filtre = !!(base && (base.service || base.site || base.type_site || base.activite || base.type_contrat))
   const ann = useQuery({
     queryKey: ['annuel', base],
@@ -106,9 +112,13 @@ export default function Resume() {
   const erreur = premier ? null : ann.error
   // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
   const a = premier ? gab : ann.data
-  // Clés absentes de la réponse sans le droit « marge » ; présentes mais vides sous filtre.
+  // Clés absentes de la réponse sans le droit « marge » ; présentes mais null quand le filtre n'a pas de CA.
   const droitCa = a !== undefined && 'ca_ytd' in a
-  const aCa = droitCa && !filtre && a.serie_n.length > 0 && 'ca' in a.serie_n[0]
+  const aCa = droitCa && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && (!filtre || a.ca_ytd != null || a.serie_n.some((m) => m.ca != null))
+  // Tuile indisponible : sous filtre seulement, quand la valeur est null.
+  const sansCa = droitCa && filtre && a.ca_ytd == null
+  const sansMarge = droitCa && filtre && a.marge_ytd == null
+  const sansCaEff = droitCa && filtre && a.ca_par_effectif?.m == null
   const indispo = (titre: string) => (
     <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
   )
@@ -160,9 +170,9 @@ export default function Resume() {
           {/* Disposition du 16/10 : CA, commissions, masse salariale, MAD ; puis marge, primes,
               effectif global, CA par salarié. Effectifs = fin du dernier mois saisi. */}
           <div className="cases">
-            {droitCa && filtre && indispo('Chiffre d’affaires')}
-            {aCa && (
-              <Case titre="Chiffre d’affaires" valeur={compact(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
+            {sansCa && indispo('Chiffre d’affaires')}
+            {aCa && !sansCa && (
+              <Case titre="Chiffre d’affaires" partiel={a.lignes_ca_marge?.ca.partiel} valeur={compact(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.ca_cumul, an, n1)}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
               </Case>
             )}
@@ -195,10 +205,10 @@ export default function Resume() {
             </Case>
           </div>
           <div className="cases">
-            {droitCa && filtre && indispo('Marge')}
-            {aCa && (
+            {sansMarge && indispo('Marge')}
+            {aCa && !sansMarge && (
               // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
-              <Case titre="Marge" valeur={compact(a.marge_ytd)} libelle2="Taux de marge"
+              <Case titre="Marge" partiel={a.lignes_ca_marge?.marge.partiel} valeur={compact(a.marge_ytd)} libelle2="Taux de marge"
                 detail={[
                   ['Marge cumulée', exact(a.marge_ytd)],
                   ['CA des mois avec marge', exact(a.ca_avec_marge)],
@@ -218,8 +228,8 @@ export default function Resume() {
             >
               <Variation v={a.effectif_fin.var_pct} vs="" />
             </Case>
-            {droitCa && filtre && indispo('CA par salarié')}
-            {aCa && (
+            {sansCaEff && indispo('CA par salarié')}
+            {aCa && !sansCaEff && (
               <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
                 detail={[
                   ...comparaison(a.ca_par_effectif, an, n1),
@@ -231,10 +241,11 @@ export default function Resume() {
               </Case>
             )}
           </div>
-          {droitCa && filtre && (
+          {(sansCa || sansMarge) && (
             <p className="regle">
-              Le CA et la marge n’existent que pour l’ensemble de l’entreprise : ils ne sont pas disponibles
-              quand un service, un site, un type de site, une activité ou un contrat est choisi.
+              {sansCa && sansMarge ? 'Le CA et la marge ne sont pas disponibles' : sansCa ? 'Le CA n’est pas disponible' : 'La marge n’est pas disponible'}
+              {' '}pour ces filtres : {sansCa && sansMarge ? 'ils n’existent' : 'il n’existe'} que s’{sansCa && sansMarge ? 'ils sont saisis' : 'il est saisi'}
+              {' '}à ce niveau (site, service) ou renseigné{sansCa && sansMarge ? 's' : ''} par employé.
             </p>
           )}
         </>

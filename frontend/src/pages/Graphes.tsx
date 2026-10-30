@@ -10,7 +10,7 @@ import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode
 import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { compact, entier, fcfa, MOIS_COURTS } from '../lib/format'
+import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
 
@@ -19,6 +19,9 @@ import { useLocation } from 'react-router-dom'
 const C_MS = 'var(--data-1)'
 const C_FRAIS = 'var(--data-4)'
 const C_REMU = 'var(--data-5)'
+const C_VENTES = 'var(--data-2)'
+const C_CLIENTS = 'var(--data-3)'
+const C_OR = 'var(--data-1)'
 // Une couleur fixe par type de contrat, dans l'ordre du référentiel : un filtre ne la change pas.
 const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 // Année N-1 : série de comparaison, en retrait
@@ -26,6 +29,8 @@ const N1 = 'var(--muted-2)'
 const GRILLE = 'var(--rule)'
 // Ordre et titres d'origine ; seuls les deux derniers graphes changent de sujet.
 const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Rémunération globale (FCFA)']
+// Graphes d'activité : affichés seulement si le serveur a des chiffres d'activité sur l'année.
+const TITRES_ACTIVITE = ['Ventes par mois', 'Clients par mois', 'OR par productif et par mois']
 const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 const AXE_X = { dataKey: 'mois', interval: 'preserveStartEnd', minTickGap: 4, padding: { left: 12, right: 16 }, ...AXE } as const
 // Axe en millions seulement (« 0,5 M », « 45 M ») : une seule unité ; l'info-bulle donne la valeur en K ou M.
@@ -92,6 +97,12 @@ export default function Graphes() {
     frais1: num(n1?.[i]?.frais_mission),
     remu: num(m.remuneration),
     remu1: num(n1?.[i]?.remuneration),
+    ventes: num(m.activite?.ventes),
+    ventes1: num(n1?.[i]?.activite?.ventes),
+    clients: num(m.activite?.clients),
+    clients1: num(n1?.[i]?.activite?.clients),
+    orProd: num(m.activite?.or_par_productif),
+    orProd1: num(n1?.[i]?.activite?.or_par_productif),
     ...Object.fromEntries(contrats.map((c) => [c, m.effectif_contrat?.[c] ?? null])),
   }))
   // Valeur sur chaque point : la courbe la plus basse du mois écrit la sienne dessous, les autres dessus,
@@ -111,6 +122,12 @@ export default function Graphes() {
   }
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
   const avecN1 = !!n1?.some((m) => m.remuneration != null)
+  const aVentes = !!serie?.some((m) => m.ventes != null)
+  const aClients = !!serie?.some((m) => m.clients != null)
+  const aOr = !!serie?.some((m) => m.orProd != null)
+  const ventesN1 = !!serie?.some((m) => m.ventes1 != null)
+  const clientsN1 = !!serie?.some((m) => m.clients1 != null)
+  const orN1 = !!serie?.some((m) => m.orProd1 != null)
   const serieN = `${annee ?? ''}`
   const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
@@ -189,6 +206,45 @@ export default function Graphes() {
                 {avecN1 && <Area dataKey="remu1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
               </AreaChart>
             </Carte>
+            {aVentes && (
+              <Carte titre={TITRES_ACTIVITE[0]} lecture={`Nombre de ventes de chaque mois en ${serieN}${ventesN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+                <ComposedChart data={serie}>
+                  <CartesianGrid stroke={GRILLE} vertical={false} />
+                  <XAxis {...AXE_X} />
+                  <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+                  <Tooltip formatter={(v) => `${entier(Number(v))} ventes`} />
+                  <Legend {...LEGENDE} />
+                  <Bar dataKey="ventes" name={serieN} fill={C_VENTES} radius={[3, 3, 0, 0]} {...ANIM} />
+                  {ventesN1 && <Line dataKey="ventes1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
+                </ComposedChart>
+              </Carte>
+            )}
+            {aClients && (
+              <Carte titre={TITRES_ACTIVITE[1]} lecture={`Nombre de clients de chaque mois en ${serieN}${clientsN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+                <LineChart data={serie}>
+                  <CartesianGrid stroke={GRILLE} vertical={false} />
+                  <XAxis {...AXE_X} />
+                  <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+                  <Tooltip formatter={(v) => `${entier(Number(v))} clients`} />
+                  <Legend {...LEGENDE} />
+                  <Line dataKey="clients" name={serieN} stroke={C_CLIENTS} strokeWidth={2.5} dot={{ r: 3.5, fill: C_CLIENTS }} connectNulls={false} {...ANIM} />
+                  {clientsN1 && <Line dataKey="clients1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...ANIM} />}
+                </LineChart>
+              </Carte>
+            )}
+            {aOr && (
+              <Carte titre={TITRES_ACTIVITE[2]} lecture={`OR de chaque mois divisé par le nombre de productifs en ${serieN}${orN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+                <AreaChart data={serie}>
+                  <CartesianGrid stroke={GRILLE} vertical={false} />
+                  <XAxis {...AXE_X} />
+                  <YAxis width={44} tickCount={5} tickFormatter={(v) => decimal2(String(v))} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+                  <Tooltip formatter={(v) => decimal2(String(v))} />
+                  <Legend {...LEGENDE} />
+                  <Area dataKey="orProd" name={serieN} stroke={C_OR} strokeWidth={2.5} fill={C_OR} fillOpacity={0.15} dot={{ r: 3, fill: C_OR }} connectNulls={false} {...ANIM} />
+                  {orN1 && <Area dataKey="orProd1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+                </AreaChart>
+              </Carte>
+            )}
           </>
         )}
       </div>
@@ -210,6 +266,9 @@ export default function Graphes() {
                     ))}
                     <th scope="col">Frais de mission</th>
                     <th scope="col">Rémunération globale</th>
+                    {aVentes && <th scope="col">Ventes</th>}
+                    {aClients && <th scope="col">Clients</th>}
+                    {aOr && <th scope="col">OR par productif</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -223,6 +282,9 @@ export default function Graphes() {
                       ))}
                       <td className="num">{fcfa(m.frais)}</td>
                       <td className="num">{fcfa(m.remu)}</td>
+                      {aVentes && <td className="num">{entier(m.ventes)}</td>}
+                      {aClients && <td className="num">{entier(m.clients)}</td>}
+                      {aOr && <td className="num">{decimal2(m.orProd == null ? null : String(m.orProd))}</td>}
                     </tr>
                   ))}
                 </tbody>

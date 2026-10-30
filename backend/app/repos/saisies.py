@@ -78,6 +78,21 @@ def niveau_groupe(ctx: Contexte, groupe: str) -> tuple[str, bool]:
     return nv.niveau_par_defaut(groupe, ctx.employes), True
 
 
+def niveau_precedent(db: Session, annee: int, mois: int, groupe: str) -> str | None:
+    """Niveau du dernier mois antérieur qui a des lignes saisies du groupe ; None si aucun."""
+    inds = nv.GROUPES[groupe]
+    pid = db.scalar(
+        select(Periode.id).join(ValeurSaisie, ValeurSaisie.periode_id == Periode.id)
+        .where(ValeurSaisie.indicateur.in_(inds),
+               Periode.annee * 12 + Periode.mois < annee * 12 + mois)
+        .order_by(Periode.annee.desc(), Periode.mois.desc()).limit(1))
+    if pid is None:
+        return None
+    rows = db.execute(select(ValeurSaisie.site_id, ValeurSaisie.service_id)
+                      .where(ValeurSaisie.periode_id == pid, ValeurSaisie.indicateur.in_(inds)))
+    return nv.niveau_des_lignes([(si, se) for si, se in rows])
+
+
 def resolution(ctx: Contexte, groupe: str, niveau: str | None = None) -> nv.Resolution:
     niveau = niveau or niveau_groupe(ctx, groupe)[0]
     return nv.resoudre(

@@ -2,6 +2,7 @@ import type { Val } from '../api/types'
 
 const NF = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 })
 const NF1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
+const NF2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 })
 
 /** Séparateur de milliers : espace insécable pleine largeur (l'espace fine de fr-FR colle les groupes à l'écran). */
 export const SEP = '\u00a0'
@@ -22,6 +23,12 @@ export function fcfa(v: Val | number | undefined): string {
   if (v === null || v === undefined) return '—'
   if (v === 'n/a') return '—'
   return espacer(NF.format(Number(v)))
+}
+
+/** Indice ou ratio d'activité (productivité, OR par productif) : deux décimales au plus. Number() sert à l'affichage seulement. */
+export function decimal2(v: Val | undefined): string {
+  if (v === null || v === undefined || v === 'n/a') return '—'
+  return espacer(NF2.format(Number(v)))
 }
 
 /** Montant abrégé pour les indicateurs et les graphes : « 125,4 M », « 830 K » (une décimale) ; les tableaux gardent fcfa. */
@@ -55,35 +62,71 @@ export const entier = (v: number | null | undefined) => (v == null ? '—' : esp
 export const isNeg = (v: Val | undefined) => v != null && v !== 'n/a' && Number(v) < 0
 export const cls = (v: Val | undefined) => (isNeg(v) ? 'num neg' : 'num')
 
-/** Décimal ("-1200.5") en millièmes entiers, pour comparer ou additionner sans flottant. */
-export function enMilli(v: string): bigint {
-  const [e, d = ''] = v.split('.')
-  const milli = BigInt(e.replace('-', '') || '0') * 1000n + BigInt(d.padEnd(3, '0').slice(0, 3))
-  return e.startsWith('-') ? -milli : milli
+/**
+ * Décimaux exacts, sans flottant et sans arrondi : chaque valeur est ramenée à un entier (BigInt)
+ * à l'échelle de la valeur qui a le plus de décimales, ce qui permet de comparer et d'additionner.
+ */
+export function aligner(valeurs: string[]): { n: bigint[]; echelle: number } {
+  const lues = valeurs.map((v) => {
+    const t = v.trim()
+    const [e, d = ''] = t.replace('-', '').split('.')
+    return { neg: t.startsWith('-'), e: e || '0', d }
+  })
+  const echelle = Math.max(0, ...lues.map((x) => x.d.length))
+  const n = lues.map((x) => {
+    const abs = BigInt(x.e) * 10n ** BigInt(echelle) + BigInt(x.d.padEnd(echelle, '0') || '0')
+    return x.neg ? -abs : abs
+  })
+  return { n, echelle }
 }
 
-/** Somme de montants décimaux (3 décimales) en entiers, sans flottant. null si aucune valeur. */
-export function somme(valeurs: Val[]): string | null {
-  let total = 0n
-  let n = 0
-  for (const v of valeurs) {
-    if (v === null || v === 'n/a') continue
-    total += enMilli(v)
-    n += 1
-  }
-  if (n === 0) return null
+/** Entier à une échelle donnée en décimal texte ("-120050" à l'échelle 2 -> "-1200.50"). */
+export function depuisEntier(total: bigint, echelle: number): string {
   const abs = total < 0n ? -total : total
-  return `${total < 0n ? '-' : ''}${abs / 1000n}.${String(abs % 1000n).padStart(3, '0')}`
+  const signe = total < 0n ? '-' : ''
+  if (echelle === 0) return `${signe}${abs}`
+  const texte = String(abs).padStart(echelle + 1, '0')
+  return `${signe}${texte.slice(0, -echelle)}.${texte.slice(-echelle)}`
 }
 
-/** Montant saisi : chiffres, virgule ou point, 3 décimales au plus (NUMERIC(18,3)). */
-export const montantValide = (v: string) => /^\d+([.,]\d{0,3})?$/.test(v.trim())
+/** Compare deux décimaux : -1, 0 ou 1. */
+export function comparer(a: string, b: string): number {
+  const { n: [x, y] } = aligner([a, b])
+  return x < y ? -1 : x > y ? 1 : 0
+}
+
+/** Signe d'un décimal : -1, 0 ou 1. */
+export const signe = (v: string) => comparer(v, '0')
+
+/** Somme exacte de décimaux à échelle variable, sans arrondi. null si aucune valeur. */
+export function somme(valeurs: (Val | undefined)[]): string | null {
+  const presentes = valeurs.filter((v): v is string => v != null && v !== 'n/a')
+  if (presentes.length === 0) return null
+  const { n, echelle } = aligner(presentes)
+  return depuisEntier(n.reduce((s, x) => s + x, 0n), echelle)
+}
+
+/** Écart absolu exact entre deux décimaux. */
+export function ecartAbsolu(a: string, b: string): string {
+  const { n: [x, y], echelle } = aligner([a, b])
+  return depuisEntier(x > y ? x - y : y - x, echelle)
+}
+
+// Règle du serveur pour CA, marge, ventes, clients, productivité : 15 chiffres, 12 décimales au plus.
+const ACTIVITE = /^\d{1,15}([.,]\d{1,12})?$/
+const ACTIVITE_SIGNE = /^-?\d{1,15}([.,]\d{1,12})?$/
+
+/** Valeur d'activité saisie (milliers tolérés) : mêmes limites que le serveur. */
+export const montantValide = (v: string) => ACTIVITE.test(sansEspaces(v))
+
+/** Valeur pouvant être négative (une marge), séparateurs de milliers tolérés. */
+export const montantSigneValide = (v: string) => ACTIVITE_SIGNE.test(sansEspaces(v))
+
+/** Budget saisi : chiffres, virgule ou point, 3 décimales au plus (le serveur arrondit à 3). */
+export const budgetValide = (v: string) => /^\d+([.,]\d{0,3})?$/.test(sansEspaces(v))
 
 /** Montant tapé ou collé sans ses séparateurs de milliers (espaces, espaces insécables). */
 export const sansEspaces = (v: string) => v.replace(/[\s  ]/g, '')
-
-/** Montant pouvant être négatif (une marge), séparateurs de milliers tolérés. */
-export const montantSigneValide = (v: string) => /^-?\d+([.,]\d{0,3})?$/.test(sansEspaces(v))
 
 /** Décimal du serveur sans zéros de fin, sans passer par un flottant ("1200.500" -> "1200.5"). */
 export const sansZerosFinaux = (v: string) => (v.includes('.') ? v.replace(/0+$/, '').replace(/\.$/, '') : v)

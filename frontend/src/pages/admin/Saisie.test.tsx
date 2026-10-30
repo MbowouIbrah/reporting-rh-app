@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { AuthProvider } from '../../auth/AuthContext'
 import Saisie from './Saisie'
 import BandeauEnregistre from './saisie/Enregistre'
 
@@ -35,9 +36,45 @@ const PILOTAGE = {
   totaux: { rubrique: null, service: '300.000', site: null }, reprise: null,
 }
 
+const vierge = { saisi: null, employes: null, valeur: null, origine: null, ecart: null, propose: null }
+const SITES = [{ id: 1, libelle: 'Douala' }, { id: 2, libelle: 'Yaoundé' }]
+const SERVICES = [{ id: 1, libelle: 'SAV PL', productif: true }]
+const SAISIES_CA = {
+  annee: 2026, mois: 2, groupe: 'ca_marge', periode_id: null, indicateurs: ['ca', 'marge'],
+  niveau: 'global', niveau_enregistre: null, niveau_par_defaut: true, a_repartir: {}, sites: SITES, services: SERVICES,
+  cases: [{
+    site_id: null, service_id: null,
+    valeurs: { ca: { saisi: null, employes: '800000.000', valeur: '800000.000', origine: 'calcule', ecart: null }, marge: vierge },
+  }],
+  totaux: {
+    ca: { valeur: '800000.000', partiel: false, renseignes: 1, attendus: 1 },
+    marge: { valeur: null, partiel: true, renseignes: 0, attendus: 1 },
+  },
+  taux_marge: null,
+}
+const SAISIES_ACTIVITE = {
+  annee: 2026, mois: 2, groupe: 'activite', periode_id: 4, indicateurs: ['or', 'devis', 'factures'],
+  niveau: 'site', niveau_enregistre: 'site', niveau_par_defaut: false, a_repartir: {}, sites: SITES, services: SERVICES,
+  cases: [
+    { site_id: 1, service_id: null, valeurs: {
+      or: { saisi: '500.000', employes: null, valeur: '500.000', origine: 'saisi', ecart: null },
+      devis: { saisi: '300.000', employes: '280.000', valeur: '300.000', origine: 'saisi', ecart: '20.000' },
+      factures: vierge } },
+    { site_id: 2, service_id: null, valeurs: { or: vierge, devis: vierge, factures: vierge } },
+  ],
+  totaux: {
+    or: { valeur: '500.000', partiel: true, renseignes: 1, attendus: 2 },
+    devis: { valeur: '300.000', partiel: true, renseignes: 1, attendus: 2 },
+    factures: { valeur: null, partiel: true, renseignes: 0, attendus: 2 },
+  },
+}
+
 const appels: { url: string; corps?: unknown }[] = []
 let anomalies: unknown[] = []
-function rendu() {
+let reponsePut: (corps: Record<string, unknown>) => Response = () => new Response('{}')
+/** Réponse du GET /pilotage/saisies, remplaçable par un test ; sinon le niveau demandé est celui renvoyé. */
+let reponseGet: ((url: URL) => unknown) | null = null
+function rendu(perms = ['import:read', 'marge:read']) {
   appels.length = 0
   localStorage.clear()
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, init) => {
@@ -55,23 +92,39 @@ function rendu() {
     if (url.includes('/donnees/lots')) return new Response(JSON.stringify(LOT), { status: 201 })
     if (url.includes('/apercu')) return new Response(JSON.stringify(APERCU))
     if (url.includes('/valider')) return new Response(JSON.stringify({ ...LOT, statut: 'valide' }))
-    if (url.includes('/pilotage/ca-marge')) return new Response(JSON.stringify({ ...PILOTAGE, periode_id: 4, ca: '1000000.000', marge: '-50000.000', taux_marge: '-0.05' }))
+    if (url.includes('/auth/me')) return new Response(JSON.stringify({ id: 1, email: 'admin@exemple.invalid', fonction: '', permissions: perms }))
+    if (url.includes('/pilotage/saisies')) {
+      if (init?.method === 'PUT') return reponsePut(JSON.parse(String(init.body)))
+      const adresse = new URL(url, 'http://localhost')
+      if (reponseGet) return new Response(JSON.stringify(reponseGet(adresse)))
+      const base = url.includes('groupe=activite') ? SAISIES_ACTIVITE : SAISIES_CA
+      const niveau = adresse.searchParams.get('niveau')
+      return new Response(JSON.stringify(niveau ? { ...base, niveau } : base))
+    }
     if (url.includes('/pilotage')) return new Response(JSON.stringify(PILOTAGE))
     return new Response('{}')
   })
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={['/admin/saisie']}>
-        <Routes>
-          <Route path="/admin/saisie" element={<Saisie />} />
-          <Route path="/admin" element={<BandeauEnregistre />} />
-        </Routes>
-      </MemoryRouter>
+    <QueryClientProvider client={qc}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/admin/saisie']}>
+          <Routes>
+            <Route path="/admin/saisie" element={<Saisie />} />
+            <Route path="/admin" element={<BandeauEnregistre />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
+  return qc
 }
 const saisirLeMois = async () => fireEvent.click(await screen.findByRole('button', { name: 'Étape 1 : choisir les employés de Février 2026 →' }))
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  reponsePut = () => new Response('{}')
+  reponseGet = null
+})
 
 test('mois proposé, cases, grille avec collage Excel, aperçu et choix « garder »', async () => {
   rendu()
@@ -134,32 +187,212 @@ test('mois proposé, cases, grille avec collage Excel, aperçu et choix « garde
   expect(localStorage.getItem('saisie:2026-02')).toBeNull()
 })
 
-test('pilotage du mois : CA et marge saisis ensemble, résumé des budgets', async () => {
+test('données du mois : CA et marge saisis à plat, case vide calculée depuis les employés, corps du PUT', async () => {
+  reponsePut = () => new Response(JSON.stringify({
+    ...SAISIES_CA,
+    periode_id: 4,
+    niveau_enregistre: 'global',
+    cases: [{ site_id: null, service_id: null, valeurs: {
+      ca: { saisi: '1000000.000', employes: '800000.000', valeur: '1000000.000', origine: 'saisi', ecart: '200000.000' },
+      marge: { saisi: '-50000.000', employes: null, valeur: '-50000.000', origine: 'saisi', ecart: null },
+    } }],
+    totaux: {
+      ca: { valeur: '1000000.000', partiel: false, renseignes: 1, attendus: 1 },
+      marge: { valeur: '-50000.000', partiel: false, renseignes: 1, attendus: 1 },
+    },
+    taux_marge: '-0.05',
+  }))
   rendu()
-  expect(await screen.findByRole('heading', { name: 'PILOTAGE DE FÉVRIER 2026' })).toBeInTheDocument()
-  const ca = await screen.findByRole('textbox', { name: 'Chiffre d’affaires' })
-  const marge = screen.getByRole('textbox', { name: 'Marge' })
-  const enregistrer = screen.getByRole('button', { name: 'Enregistrer le CA et la marge' })
+  expect(await screen.findByRole('heading', { name: 'DONNÉES DE FÉVRIER 2026' })).toBeInTheDocument()
+  expect(await screen.findByRole('tab', { name: 'CA et marge' })).toHaveAttribute('aria-selected', 'true')
+  const ca = await screen.findByRole('textbox', { name: 'CA : Global' })
+  const marge = screen.getByRole('textbox', { name: 'Marge : Global' })
+  // Case vide : grise, valeur des employés en indication.
+  expect(ca).toHaveValue('')
+  expect(ca.getAttribute('placeholder')).toMatch(/^800\s000$/)
+  expect(ca).toHaveAttribute('title', 'Somme des employés')
+  expect(ca.closest('td')).toHaveClass('calcule')
+  expect(marge.closest('td')).not.toHaveClass('calcule')
+  expect(screen.getByRole('link', { name: 'Détail par employé' })).toHaveAttribute('href', '/admin')
+  const enregistrer = screen.getByRole('button', { name: 'Enregistrer' })
   expect(enregistrer).toBeDisabled() // rien de modifié
-  // Marge sans CA : refusée avant tout envoi.
-  fireEvent.change(marge, { target: { value: '-50 000' } })
-  expect(screen.getByText('Saisissez le CA du mois avant la marge.')).toBeInTheDocument()
-  expect(enregistrer).toBeDisabled()
   fireEvent.change(ca, { target: { value: '-1' } })
-  expect(screen.getByText(/Le CA ne peut pas être négatif/)).toBeInTheDocument()
+  expect(ca).toHaveAttribute('aria-invalid', 'true')
+  expect(enregistrer).toBeDisabled()
   fireEvent.change(ca, { target: { value: '1 000 000' } })
+  fireEvent.change(marge, { target: { value: '-50 000' } })
   fireEvent.click(enregistrer)
   await screen.findByText('Enregistré.')
-  const envoi = appels.find((a) => a.url.includes('/pilotage/ca-marge'))!
-  expect(envoi.corps).toEqual({ annee: 2026, mois: 2, ca: '1000000', marge: '-50000' })
-  // Taux calculé par le serveur ; champs remis au format affiché.
-  expect(screen.getByText('Taux de marge enregistré').nextSibling).toHaveTextContent(/-5\s%/)
-  expect(ca).toHaveValue('1 000 000')
-  // Budgets : nombre saisi et total par axe.
-  const services = screen.getByText('Services').closest('li')!
+  const envoi = appels.find((a) => a.url.includes('/pilotage/saisies') && a.corps)!
+  expect(envoi.corps).toEqual({
+    annee: 2026, mois: 2, groupe: 'ca_marge', niveau: 'global',
+    cases: [{ site_id: null, service_id: null, valeurs: { ca: '1000000', marge: '-50000' } }],
+  })
+  // Champs remis au format affiché, taux et part non répartie donnés par le serveur.
+  expect((screen.getByRole('textbox', { name: 'CA : Global' }) as HTMLInputElement).value).toMatch(/^1\s000\s000$/)
+  expect(screen.getByText(/non réparti : 200\s000/)).toBeInTheDocument()
+  expect(screen.getAllByText(/-5\s%/).length).toBeGreaterThan(0)
+  // Budgets : onglet dédié, nombre saisi et total par axe.
+  fireEvent.click(screen.getByRole('tab', { name: 'Budgets' }))
+  const services = (await screen.findByText('Services')).closest('li')!
   expect(services).toHaveTextContent(/1 sur 1/)
   expect(services).toHaveTextContent(/300\sFCFA/)
   expect(screen.getByRole('button', { name: 'Saisir les budgets de Février 2026 →' })).toBeInTheDocument()
+})
+
+test('changement de niveau : confirmation avant d’effacer les chiffres saisis, puis une ligne par site', async () => {
+  reponsePut = (corps) => new Response(JSON.stringify({ ...SAISIES_CA, niveau: corps.niveau, niveau_enregistre: corps.niveau }))
+  rendu()
+  const ca = await screen.findByRole('textbox', { name: 'CA : Global' })
+  fireEvent.change(ca, { target: { value: '900000' } })
+  fireEvent.click(screen.getByRole('radio', { name: 'Par site' }))
+  const dialogue = screen.getByRole('dialog', { name: 'Changer de niveau de saisie ?' })
+  expect(dialogue).toHaveTextContent('Les chiffres tapés et non enregistrés seront effacés.')
+  // Annuler : on reste au niveau global, le chiffre tapé est gardé.
+  fireEvent.click(within(dialogue).getByRole('button', { name: 'Annuler' }))
+  expect(screen.getByRole('radio', { name: 'Global' })).toBeChecked()
+  expect((screen.getByRole('textbox', { name: 'CA : Global' }) as HTMLInputElement).value).toMatch(/^900\s000$/)
+  fireEvent.click(screen.getByRole('radio', { name: 'Par site' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Changer de niveau de saisie ?' })).getByRole('button', { name: 'Changer de niveau' }))
+  expect(screen.getByRole('radio', { name: 'Par site' })).toBeChecked()
+  // Le niveau choisi est demandé au serveur ; la grille par site arrive avec sa réponse.
+  fireEvent.change(await screen.findByRole('textbox', { name: 'CA : Douala' }), { target: { value: '600 000' } })
+  expect(appels.some((a) => a.url.includes('/pilotage/saisies') && a.url.includes('niveau=site'))).toBe(true)
+  expect(screen.queryByRole('textbox', { name: 'CA : Global' })).toBeNull()
+  expect(screen.getByRole('textbox', { name: 'CA : Yaoundé' })).toHaveValue('')
+  // Total recalculé en local, incomplet tant qu'un site n'est pas renseigné.
+  expect(within(screen.getByRole('row', { name: /TOTAL/ })).getByText('partiel (1 site sur 2)')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  await screen.findByText('Enregistré.')
+  const envoi = appels.find((a) => a.url.includes('/pilotage/saisies') && a.corps)!
+  expect(envoi.corps).toEqual({
+    annee: 2026, mois: 2, groupe: 'ca_marge', niveau: 'site',
+    cases: [
+      { site_id: 1, service_id: null, valeurs: { ca: '600000', marge: null } },
+      { site_id: 2, service_id: null, valeurs: { ca: null, marge: null } },
+    ],
+  })
+})
+
+test('OR, devis, factures : total partiel, part non répartie, erreur du serveur affichée', async () => {
+  reponsePut = () => new Response(JSON.stringify({ detail: 'Mois clos : saisie impossible.' }), { status: 409 })
+  rendu()
+  fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
+  expect(await screen.findByRole('textbox', { name: 'OR : Douala' })).toHaveValue('500')
+  expect(screen.getByRole('radio', { name: 'Par site' })).toBeChecked()
+  expect(screen.getByText(/non réparti : 20/)).toBeInTheDocument()
+  const total = within(screen.getByRole('row', { name: /TOTAL/ }))
+  expect(total.getAllByText('partiel (1 site sur 2)')).toHaveLength(2)
+  expect(total.getByText('partiel (0 site sur 2)')).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Factures : Yaoundé' }), { target: { value: '70' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Mois clos')
+})
+
+test('sans le droit marge : pas d’onglet CA et marge, on arrive sur l’activité', async () => {
+  rendu(['import:read'])
+  await screen.findByRole('tab', { name: 'OR, devis, factures' })
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'OR : Douala' })).toBeInTheDocument())
+  expect(screen.queryByRole('tab', { name: 'CA et marge' })).toBeNull()
+  expect(screen.getByRole('tab', { name: 'OR, devis, factures' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('sans le droit de lecture des imports : seul l’onglet Budgets, aucune grille demandée', async () => {
+  rendu([])
+  await screen.findByRole('tab', { name: 'Budgets' })
+  expect(screen.getAllByRole('tab')).toHaveLength(1)
+  expect(screen.queryByRole('tab', { name: 'OR, devis, factures' })).toBeNull()
+  expect(appels.some((a) => a.url.includes('/pilotage/saisies'))).toBe(false)
+})
+
+test('changement de niveau : la grille est pré-remplie par la proposition du serveur et la part à répartir est affichée', async () => {
+  reponseGet = (url) => {
+    const niveau = url.searchParams.get('niveau') ?? 'global'
+    if (niveau === 'global') return { ...SAISIES_CA, niveau_enregistre: 'global', niveau_par_defaut: false }
+    return {
+      ...SAISIES_CA, niveau, niveau_enregistre: 'global', niveau_par_defaut: false,
+      a_repartir: { marge: '50000.000' },
+      cases: [{ site_id: 1, service_id: null, valeurs: { ca: { ...vierge, propose: '600000.000' }, marge: vierge } }],
+    }
+  }
+  rendu()
+  await screen.findByRole('textbox', { name: 'CA : Global' })
+  fireEvent.click(screen.getByRole('radio', { name: 'Par site' })) // rien de tapé : pas de confirmation
+  const douala = await screen.findByRole('textbox', { name: 'CA : Douala' })
+  expect((douala as HTMLInputElement).value).toMatch(/^600\s000$/)
+  expect(screen.getByRole('textbox', { name: 'CA : Yaoundé' })).toHaveValue('')
+  expect(screen.getByText(/À répartir : Marge 50\s000/)).toBeInTheDocument()
+  // La proposition n'est pas enregistrée : le bouton est actif.
+  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled()
+})
+
+test('collage d’un bloc Excel, Entrée vers la case du dessous', async () => {
+  rendu()
+  fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
+  const orDouala = await screen.findByRole('textbox', { name: 'OR : Douala' })
+  orDouala.focus()
+  fireEvent.keyDown(orDouala, { key: 'Enter' })
+  expect(screen.getByRole('textbox', { name: 'OR : Yaoundé' })).toHaveFocus()
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'OR : Yaoundé' }), { key: 'Enter', shiftKey: true })
+  expect(orDouala).toHaveFocus()
+  // Deux lignes, trois colonnes, milliers et virgule acceptés ; une ligne de trop est ignorée.
+  const bloc = '10\t1 200,5\t30\n40\t50\t60\n70\t80\t90'
+  fireEvent.paste(orDouala, { clipboardData: { getData: () => bloc } })
+  expect((screen.getByRole('textbox', { name: 'Devis : Douala' }) as HTMLInputElement).value).toMatch(/^1\s200,5$/)
+  expect(screen.getByRole('textbox', { name: 'Factures : Yaoundé' })).toHaveValue('60')
+  expect(screen.getByText(/6 cases collées ; 1 ligne hors de la grille ignorée/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled()
+})
+
+test('validation identique au serveur : 12 décimales au plus, erreur visible sur la case', async () => {
+  rendu()
+  fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
+  const or = await screen.findByRole('textbox', { name: 'OR : Yaoundé' })
+  fireEvent.change(or, { target: { value: '1,123456789012' } })
+  expect(or).not.toHaveAttribute('aria-invalid')
+  fireEvent.change(or, { target: { value: '1,1234567890123' } })
+  expect(or).toHaveAttribute('aria-invalid', 'true')
+  expect(or).toHaveAccessibleDescription('Valeur invalide')
+  expect(screen.getByText(/1 valeur invalide :/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  fireEvent.change(or, { target: { value: '1 234 567 890 123 456' } }) // 16 chiffres
+  expect(or).toHaveAttribute('aria-invalid', 'true')
+})
+
+test('saisie en cours gardée au rechargement, alerte en quittant, confirmation en changeant de mois, Ctrl+S', async () => {
+  reponsePut = (corps) => new Response(JSON.stringify({ ...SAISIES_ACTIVITE, niveau: corps.niveau }))
+  let serveur = '500.000'
+  reponseGet = () => ({
+    ...SAISIES_ACTIVITE,
+    cases: [{ ...SAISIES_ACTIVITE.cases[0], valeurs: { ...SAISIES_ACTIVITE.cases[0].valeurs, or: { ...vierge, saisi: serveur, valeur: serveur, origine: 'saisi' } } }, SAISIES_ACTIVITE.cases[1]],
+  })
+  const qc = rendu()
+  fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
+  const yaounde = await screen.findByRole('textbox', { name: 'OR : Yaoundé' })
+  const alerte = () => {
+    const e = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(e)
+    return e.defaultPrevented
+  }
+  expect(alerte()).toBe(false)
+  fireEvent.change(yaounde, { target: { value: '70' } })
+  expect(alerte()).toBe(true)
+  // Rechargement : la case tapée reste, la case intacte reprend la valeur du serveur.
+  serveur = '900.000'
+  await act(async () => { await qc.invalidateQueries({ queryKey: ['saisies'] }) })
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'OR : Douala' })).toHaveValue('900'))
+  expect(screen.getByRole('textbox', { name: 'OR : Yaoundé' })).toHaveValue('70')
+  // Changer de mois : confirmation, annuler garde la saisie.
+  fireEvent.change(screen.getByLabelText('Mois'), { target: { value: '3' } })
+  const dialogue = screen.getByRole('dialog', { name: 'Quitter sans enregistrer ?' })
+  fireEvent.click(within(dialogue).getByRole('button', { name: 'Annuler' }))
+  expect(screen.getByLabelText('Mois')).toHaveValue('2')
+  expect(screen.getByRole('textbox', { name: 'OR : Yaoundé' })).toHaveValue('70')
+  // Ctrl+S enregistre.
+  fireEvent.keyDown(window, { key: 's', ctrlKey: true })
+  await screen.findByText('Enregistré.')
+  expect(appels.some((a) => a.url.includes('/pilotage/saisies') && a.corps)).toBe(true)
+  expect(alerte()).toBe(false)
 })
 
 test('erreur signalée par le serveur : cellule en rouge, message, enregistrement bloqué', async () => {
@@ -266,10 +499,10 @@ test('plusieurs mois : modèle vide sans date, saisie dans l’application rése
   expect(lien.getAttribute('href')).toMatch(/modele\.xlsx\?$/)
   expect(screen.queryByRole('button', { name: /Étape 1/ })).toBeNull()
   expect(screen.getByText('Choisissez un mois précis pour saisir dans l’application.')).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: 'PILOTAGE DU MOIS' })).toBeInTheDocument()
-  expect(screen.getByText('Choisissez un mois précis pour saisir le CA et la marge.')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'DONNÉES DU MOIS' })).toBeInTheDocument()
+  expect(screen.getByText('Choisissez un mois précis pour saisir ces chiffres.')).toBeInTheDocument()
   expect(screen.getByText('Choisissez un mois précis pour saisir les budgets.')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: /Enregistrer le CA|Saisir les budgets/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /Enregistrer|Saisir les budgets/ })).toBeNull()
 })
 
 test('nouvel employé : ajouté depuis le choix des employés, matricule unique, repris dans la grille', async () => {

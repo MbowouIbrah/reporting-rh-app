@@ -13,7 +13,7 @@ const ECRITURES: Appel[] = [
   { methode: 'DELETE', url: 'perimetres/1' },
   { methode: 'POST', url: 'salaries', data: { matricule: 'INTRUS1', nom: 'Intrus' } },
   { methode: 'PUT', url: 'salaries/1', data: { matricule: 'EMP001', nom: 'Piraté' } },
-  { methode: 'PUT', url: 'pilotage/ca-marge', data: { annee: 2026, mois: 6, ca: '1', marge: '1' } },
+  { methode: 'PUT', url: 'pilotage/saisies', data: { annee: 2026, mois: 6, groupe: 'ca_marge', niveau: 'global', cases: [{ site_id: null, service_id: null, valeurs: { ca: '1', marge: '1' } }] } },
   { methode: 'PUT', url: 'pilotage/budgets', data: { annee: 2026, mois: 6, lignes: [] } },
   { methode: 'POST', url: 'donnees/lignes', data: { annee: 2026, mois: 6, matricule: 'EMP001', montants: {} } },
   { methode: 'POST', url: 'donnees/verifier', data: { annee: 2026, mois: 6, lignes: [] } },

@@ -142,6 +142,7 @@ export function Confirmer({
   onAnnuler: () => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const idTitre = useId()
   useEffect(() => {
     const d = ref.current
     if (!d) return
@@ -149,8 +150,8 @@ export function Confirmer({
     if (!ouvert && d.open) d.close?.() ?? d.removeAttribute('open')
   }, [ouvert])
   return (
-    <dialog ref={ref} className="confirmer" aria-labelledby="confirmer-titre" onCancel={onAnnuler}>
-      <h3 id="confirmer-titre">{titre}</h3>
+    <dialog ref={ref} className="confirmer" aria-labelledby={idTitre} onCancel={onAnnuler}>
+      <h3 id={idTitre}>{titre}</h3>
       {children}
       <div className="confirmer-actions">
         <Bouton variante="secondaire" onClick={onAnnuler}>

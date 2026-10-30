@@ -94,7 +94,7 @@ def test_lecture_ca_individuel_des_employes_par_cellule_par_defaut(make_client, 
     d = par_cle(j)
     v = d[(sites["Douala"], services["SAV PL"])]["ca"]
     assert v == {"saisi": None, "employes": "800.000", "valeur": "800.000", "origine": "calcule",
-                 "ecart": None}
+                 "ecart": None, "propose": None}
     assert d[(sites["Yaoundé"], services["Commerce VN"])]["marge"]["valeur"] == "20.000"
     assert j["totaux"]["ca"]["valeur"] == "1000.000" and not j["totaux"]["ca"]["partiel"]
     assert D(j["taux_marge"]) == D("0.07")
@@ -118,7 +118,8 @@ def test_ecriture_global(make_client, db):
     r = saisir(c, "ca_marge", "global", [case(ca="1000,5", marge="-200")])
     assert r.status_code == 200, r.text
     j = r.json()
-    assert (j["niveau"], j["niveau_par_defaut"]) == ("global", False)
+    assert (j["niveau"], j["niveau_par_defaut"], j["niveau_enregistre"]) == ("global", False,
+                                                                           "global")
     assert j["cases"][0]["valeurs"]["ca"]["valeur"] == "1000.500"
     assert j["cases"][0]["valeurs"]["marge"]["valeur"] == "-200.000"
     assert j["totaux"]["ca"]["valeur"] == "1000.500" and not j["totaux"]["ca"]["partiel"]
@@ -432,3 +433,56 @@ def test_moteur_filtrer_et_partiel_sur_donnees_chargees(make_client, db):
     assert filtrer(pd, None, None, salarie_id=1).ca is None
     assert mensuel(pd, None, REFS, Params())["lignes_ca_marge"]["ca"]["m"] == 1000
     assert charger_periode(db, RESTREINT, 2026, 1).ca == 800
+
+
+# ---------- changement de niveau à l'affichage ----------
+
+
+def test_niveau_demande_propose_la_somme_d_un_niveau_plus_fin(make_client, db):
+    c = make_client(ADMIN)
+    sites, services = ids(db)
+    d, y = sites["Douala"], sites["Yaoundé"]
+    sav, vn = services["SAV PL"], services["Commerce VN"]
+    saisir(c, "ca_marge", "cellule", [case(d, sav, ca="100.5", marge="10"),
+                                     case(d, vn, ca="50"), case(y, vn, ca="7")])
+    j = lire(c, niveau="site").json()
+    assert (j["niveau"], j["niveau_enregistre"]) == ("site", "cellule")
+    v = par_cle(j)
+    assert D(v[(d, None)]["ca"]["propose"]) == D("150.5")
+    assert D(v[(d, None)]["marge"]["propose"]) == 10
+    assert D(v[(y, None)]["ca"]["propose"]) == 7 and v[(y, None)]["marge"]["propose"] is None
+    assert j["a_repartir"] == {}
+    g = lire(c, niveau="global").json()
+    assert D(g["cases"][0]["valeurs"]["ca"]["propose"]) == D("157.5")
+    assert nb_lignes(db) == 4  # la lecture n'écrit rien
+
+
+def test_niveau_demande_plus_fin_donne_le_total_a_repartir(make_client, db):
+    c = make_client(ADMIN)
+    sites, _services = ids(db)
+    saisir(c, "ca_marge", "site", [case(site=sites["Douala"], ca="600", marge="60")])
+    j = lire(c, niveau="service").json()
+    assert j["niveau"] == "service"
+    assert all(x["valeurs"]["ca"]["propose"] is None for x in j["cases"])
+    assert {k: D(v) for k, v in j["a_repartir"].items()} == {"ca": 600, "marge": 60}
+    assert lire(c).json()["a_repartir"] == {}  # niveau en base : rien à répartir
+
+
+def test_niveau_par_defaut_celui_du_dernier_mois_saisi(make_client, db):
+    c = make_client(ADMIN)
+    sites, _services = ids(db)
+    saisir(c, "activite", "site", [case(site=sites["Douala"], **{"or": "3"})])
+    j = c.get(URL, params={"annee": 2026, "mois": 3, "groupe": "activite"}).json()
+    assert (j["niveau"], j["niveau_par_defaut"], j["niveau_enregistre"]) == ("site", True, None)
+    assert lire(c, "activite", niveau="service").json()["niveau"] == "service"
+    assert lire(c, niveau="inconnu").status_code == 422
+
+
+def test_taux_de_marge_par_case(make_client, db):
+    c = make_client(ADMIN)
+    sites, _services = ids(db)
+    j = saisir(c, "ca_marge", "site", [case(site=sites["Douala"], ca="200", marge="50"),
+                                      case(site=sites["Yaoundé"], ca="100")]).json()
+    t = {x["site_id"]: x["taux_marge"] for x in j["cases"]}
+    assert D(t[sites["Douala"]]) == D("0.25") and t[sites["Yaoundé"]] is None
+    assert "taux_marge" not in lire(c, "activite", niveau="site").json()["cases"][0]

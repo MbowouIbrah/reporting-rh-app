@@ -82,12 +82,12 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
       { onSuccess: () => setLibelle(''), onError: (x) => setErreurAjout(x.message) },
     )
   }
-  const changer = (v: ValeurRef, b: { actif?: boolean; type_site?: string }) => {
+  const changer = (v: ValeurRef, b: { actif?: boolean; type_site?: string; productif?: boolean }) => {
     setErreur(null)
     modifier.mutate({ dim, id: v.id, ...b }, { onError: surErreur })
   }
 
-  const colonnes = sites ? ['Libellé', 'Type de site', 'Statut', 'Actions'] : ['Libellé', 'Statut', 'Actions']
+  const colonnes = sites ? ['Libellé', 'Type de site', 'Statut', 'Actions'] : ['Libellé', 'Productif', 'Statut', 'Actions']
   if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
   if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
   const valeurs = q.data?.valeurs ?? []
@@ -156,6 +156,17 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                     >
                       {TYPES_SITE.map((t) => <option key={t} value={t}>{LIBELLE_TYPE_SITE[t]}</option>)}
                     </select>
+                  </td>
+                )}
+                {!sites && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Productif : ${v.libelle}`}
+                      checked={!!v.productif}
+                      disabled={modifier.isPending}
+                      onChange={(e) => changer(v, { productif: e.target.checked })}
+                    />
                   </td>
                 )}
                 <td><span className={v.actif ? 'statut statut-ok' : 'statut'}>{v.actif ? 'Actif' : 'Inactif'}</span></td>

@@ -22,7 +22,8 @@ CATALOGUE: tuple[Permission, ...] = (
                "Noms des salariés, fiche individuelle (chaque consultation est journalisée).",
                frozenset({"nominatif:read"})),
     Permission("marge", "Voir le CA et la marge",
-               "Le CA et la marge n'existent qu'au global.",
+               "CA et marge saisis (global, site, service ou case) et CA et marge individuels "
+               "des employés.",
                frozenset({"marge:read"}), True),
     Permission("import", "Importer la paie",
                "Dépôt des fichiers mensuels et décisions d'import.",

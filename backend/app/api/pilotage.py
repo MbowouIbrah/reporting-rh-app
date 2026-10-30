@@ -147,19 +147,51 @@ def _libelle_permis(scope: Scope, dim: str, lib: str) -> bool:
     return bool(scope.rules) and (dim not in scope.rules or lib in scope.rules[dim])
 
 
-def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int) -> dict:
+def _taux_txt(ca: Decimal | None, marge: Decimal | None) -> str | None:
+    taux = f.taux_marge(ca, marge)
+    return taux if isinstance(taux, str) or taux is None else str(taux)
+
+
+def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int,
+                 niveau: str | None = None) -> dict:
+    """`niveau` : niveau à afficher (par défaut celui en base, sinon celui du dernier mois saisi,
+    sinon celui des employés). Si l'affiché diffère de celui en base, chaque case porte
+    `propose` (anciennes valeurs d'un niveau plus fin, additionnées) ; ce qui ne se range pas
+    dans une case est dans `a_repartir`."""
     pid = saisies.periode_id(db, annee, mois)
     ctx = saisies.contexte(db, pid)
-    niveau, defaut = saisies.niveau_groupe(ctx, groupe)
+
+    def vu(c: nv.CaseResolue) -> bool:
+        return saisies.case_visible(ctx, scope, c.site_id, c.service_id)
+
+    en_base, defaut = saisies.niveau_groupe(ctx, groupe)
+    enregistre = None if defaut else en_base
+    if niveau is None:
+        niveau = enregistre or saisies.niveau_precedent(db, annee, mois, groupe) or en_base
     res = saisies.resolution(ctx, groupe, niveau)
-    cases = [c for c in res.cases if saisies.case_visible(ctx, scope, c.site_id, c.service_id)]
+    cases = [c for c in res.cases if vu(c)]
     inds = nv.GROUPES[groupe]
     totaux = nv.totaliser(cases, inds)
+    proposes: dict[nv.Cle, dict[str, Decimal]] = {}
+    a_repartir: dict[str, Decimal] = {}
+    if enregistre is not None and enregistre != niveau:
+        source = [c for c in saisies.resolution(ctx, groupe, enregistre).cases if vu(c)]
+        if nv.plus_fin(enregistre, niveau):
+            proposes = nv.projeter(source, niveau, inds)
+            cibles = {c.cle for c in cases}
+            for k in [k for k in proposes if k not in cibles]:
+                for ind, v in proposes.pop(k).items():
+                    a_repartir[ind] = a_repartir.get(ind, Decimal(0)) + v
+        else:
+            for ind, t in nv.totaliser(source, inds).items():
+                if t.valeur is not None and any(c.valeurs[ind].origine == "saisi" for c in source):
+                    a_repartir[ind] = t.valeur
     vus_sites = {c.site_id for c in cases}
     vus_services = {c.service_id for c in cases}
     out = {
         "annee": annee, "mois": mois, "groupe": groupe, "periode_id": pid,
         "indicateurs": list(inds), "niveau": niveau, "niveau_par_defaut": defaut,
+        "niveau_enregistre": enregistre,
         "sites": [{"id": i, "libelle": r.libelle} for i, r in ctx.sites.items()
                   if (r.actif or i in vus_sites) and _libelle_permis(scope, "site", r.libelle)],
         "services": [{"id": i, "libelle": r.libelle, "productif": r.productif}
@@ -169,16 +201,19 @@ def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int) 
         "cases": [{"site_id": c.site_id, "service_id": c.service_id,
                    "valeurs": {i: {"saisi": _txt_opt(v.saisi), "employes": _txt_opt(v.employes),
                                    "valeur": _txt_opt(v.valeur), "origine": v.origine,
-                                   "ecart": _txt_opt(v.ecart)}
+                                   "ecart": _txt_opt(v.ecart),
+                                   "propose": _txt_opt(proposes.get(c.cle, {}).get(i))}
                                for i, v in c.valeurs.items()}}
                   for c in cases],
         "totaux": {i: {"valeur": _txt_opt(t.valeur), "partiel": t.partiel,
                        "renseignes": t.renseignes, "attendus": t.attendus}
                    for i, t in totaux.items()},
+        "a_repartir": {i: format(v, "f") for i, v in a_repartir.items()},
     }
     if groupe == "ca_marge":
-        taux = f.taux_marge(totaux["ca"].valeur, totaux["marge"].valeur)
-        out["taux_marge"] = taux if isinstance(taux, str) or taux is None else str(taux)
+        out["taux_marge"] = _taux_txt(totaux["ca"].valeur, totaux["marge"].valeur)
+        for c, sortie in zip(cases, out["cases"], strict=True):
+            sortie["taux_marge"] = _taux_txt(c.valeurs["ca"].valeur, c.valeurs["marge"].valeur)
     return out
 
 
@@ -186,12 +221,13 @@ def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int) 
 def lire_saisies(
     groupe: Literal["ca_marge", "activite"],
     annee: int = Query(ge=2000, le=2100), mois: int = Query(ge=1, le=12),
+    niveau: Literal["global", "site", "service", "cellule"] | None = None,
     p: Principal = Depends(current_principal), db: Session = Depends(get_db),
 ):
     authorize(p, "import:read")
     if groupe == "ca_marge":
         authorize(p, "marge:read")
-    return _vue_saisies(db, scope_for(db, p), groupe, annee, mois)
+    return _vue_saisies(db, scope_for(db, p), groupe, annee, mois, niveau)
 
 
 class CaseIn(BaseModel):
