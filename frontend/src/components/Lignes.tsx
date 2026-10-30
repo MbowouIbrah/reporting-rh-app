@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Budget as BudgetCols, Cell, Val } from '../api/types'
-import { cls, fcfa, pct } from '../lib/format'
+import { cls, clsCharge, fcfa, pct } from '../lib/format'
 
 type Budget = BudgetCols
 
@@ -28,8 +28,8 @@ export function LigneCell({
       {budget && (
         <>
           <td className="num">{fcfa(budget.budget ?? null)}</td>
-          <td className={cls(budget.ecart ?? null)}>{fcfa(budget.ecart ?? null)}</td>
-          <td className={cls(budget.ecart_pct ?? null)}>{pct(budget.ecart_pct ?? null)}</td>
+          <td className={clsCharge(budget.ecart ?? null)}>{fcfa(budget.ecart ?? null)}</td>
+          <td className={clsCharge(budget.ecart_pct ?? null)}>{pct(budget.ecart_pct ?? null)}</td>
         </>
       )}
     </tr>

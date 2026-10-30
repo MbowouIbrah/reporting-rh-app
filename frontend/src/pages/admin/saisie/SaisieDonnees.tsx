@@ -13,8 +13,11 @@ import {
 import { Link } from 'react-router-dom'
 import { usePeut } from '../../../auth/AuthContext'
 import {
+  apresAnnee,
   apresSaisies,
   enregistrerSaisies,
+  estObjectif,
+  repartirAnnee,
   useSaisies,
   type CaseEnvoyee,
   type Groupe,
@@ -23,7 +26,7 @@ import {
 } from '../../../api/pilotage'
 import Etat, { etatErreur } from '../../../components/Etat'
 import { Bouton, Confirmer } from '../../../components/Kit'
-import { comparer, decimal2, fcfa, montantSigneValide, montantValide, pct, sansEspaces, signe, somme, valeurBrute } from '../../../lib/format'
+import { comparer, decimal2, fcfa, montantSigneValide, montantValide, pct, moyenne, sansEspaces, signe, somme, valeurBrute } from '../../../lib/format'
 import { lireTSV, nettoyer } from '../../../lib/grille'
 
 const NIVEAUX: { id: Niveau; libelle: string; colonne: string; mot: [string, string] }[] = [
@@ -39,11 +42,26 @@ const COLONNES: Record<string, string> = {
   or: 'Nombre d’OR',
   devis: 'Nombre de devis',
   factures: 'Nombre de factures',
+  obj_ca: 'Objectif de CA (FCFA)',
+  obj_marge: 'Objectif de marge (FCFA)',
+  obj_ventes: 'Objectif de ventes',
+  obj_clients: 'Objectif de clients',
+  obj_factures: 'Objectif de factures',
+  obj_productivite: 'Objectif de productivité',
 }
-const COURT: Record<string, string> = { ca: 'CA', marge: 'Marge', or: 'OR', devis: 'Devis', factures: 'Factures' }
+const COURT: Record<string, string> = {
+  ca: 'CA', marge: 'Marge', or: 'OR', devis: 'Devis', factures: 'Factures',
+  obj_ca: 'Objectif CA', obj_marge: 'Objectif marge', obj_ventes: 'Objectif ventes', obj_clients: 'Objectif clients',
+  obj_factures: 'Objectif factures', obj_productivite: 'Objectif productivité',
+}
+const MONTANTS = new Set(['ca', 'marge', 'obj_ca', 'obj_marge'])
+const SIGNES = new Set(['marge', 'obj_marge'])
+const MOYENNES = new Set(['obj_productivite'])
+// Comptés à l'unité : un objectif de ventes, de clients ou de factures est entier (comme le serveur).
+const NOMBRES = new Set(['obj_ventes', 'obj_clients', 'obj_factures'])
 
-/** CA et marge en FCFA entiers ; nombres d'OR, de devis et de factures : deux décimales au plus. */
-const montrer = (ind: string, v: string | null | undefined) => (ind === 'ca' || ind === 'marge' ? fcfa(v) : decimal2(v ?? null))
+/** CA et marge (et leurs objectifs) en FCFA entiers ; les autres chiffres : deux décimales au plus. */
+const montrer = (ind: string, v: string | null | undefined) => (MONTANTS.has(ind) ? fcfa(v) : decimal2(v ?? null))
 
 interface Ligne {
   cle: string
@@ -86,7 +104,8 @@ const saisiDe = (vue: VueSaisies, l: Ligne, i: string) =>
 
 // Mêmes limites que le serveur : 15 chiffres, 12 décimales au plus (signe seulement pour la marge).
 const normal = (v: string) => sansEspaces(v).replace(',', '.')
-const valide = (ind: string, v: string) => !v.trim() || (ind === 'marge' ? montantSigneValide(v) : montantValide(v))
+const valide = (ind: string, v: string) =>
+  !v.trim() || (SIGNES.has(ind) ? montantSigneValide(v) : montantValide(v) && (!NOMBRES.has(ind) || /^\d+([.,]0*)?$/.test(sansEspaces(v))))
 const nonNul = (v: string | null | undefined) => v != null && signe(v) !== 0
 
 /** Deux saisies de même valeur, quelle que soit leur mise en forme ("1 200,50" = "1200.5"). */
@@ -129,6 +148,8 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
   const base = useMemo(() => valeursDe(vue), [vue])
   const inds = vue.indicateurs
   const avecTaux = groupe === 'ca_marge'
+  const objectif = estObjectif(groupe)
+  const [annuel, setAnnuel] = useState(false)
   const niveauAffiche = demandeNiveau ?? vue.niveau
   const defNiveau = NIVEAUX.find((n) => n.id === vue.niveau)
 
@@ -164,7 +185,9 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
   const totalLocal = (i: string) => {
     const vals = lignes.map((l) => effective(l, i))
     const presentes = vals.filter((x): x is string => x != null)
-    return { valeur: somme(presentes), partiel: presentes.length < vals.length, renseignes: presentes.length, attendus: vals.length }
+    // Productivité : moyenne exacte des cases renseignées, sinon somme.
+    const valeur = MOYENNES.has(i) ? moyenne(presentes) : somme(presentes)
+    return { valeur, partiel: presentes.length < vals.length, renseignes: presentes.length, attendus: vals.length }
   }
   // Chiffres du serveur tant que la grille est telle qu'il l'a enregistrée ; calcul local dès qu'une case change.
   const inchangee = (l: Ligne) => inds.every((i) => memeValeur(texte(l, i), saisiDe(vue, l, i)))
@@ -322,9 +345,18 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
         ))}
       </fieldset>
       <p className="note" id={idNote}>
-        {groupe === 'ca_marge' ? `Montants de ${periode} en FCFA.` : `Chiffres de ${periode}.`} Une case laissée vide se calcule à partir des chiffres des employés.{' '}
-        Entrée passe à la case du dessous ; vous pouvez coller un bloc copié dans Excel.{' '}
-        <Link to="/admin">Détail par employé</Link>
+        {objectif ? (
+          <>
+            Objectifs de {periode}{groupe === 'obj_ca_marge' ? ' en FCFA' : ''}. Une case laissée vide n’a pas d’objectif ; la productivité se moyenne, les autres objectifs s’additionnent.{' '}
+            Entrée passe à la case du dessous ; vous pouvez coller un bloc copié dans Excel.
+          </>
+        ) : (
+          <>
+            {groupe === 'ca_marge' ? `Montants de ${periode} en FCFA.` : `Chiffres de ${periode}.`} Une case laissée vide se calcule à partir des chiffres des employés.{' '}
+            Entrée passe à la case du dessous ; vous pouvez coller un bloc copié dans Excel.{' '}
+            <Link to="/admin">Détail par employé</Link>
+          </>
+        )}
       </p>
       {aRepartir.length > 0 && (
         <p className="saisie-a-repartir" role="status">
@@ -406,12 +438,17 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
       <div className="saisie-pied">
         <span className="note">
           {nbInvalides > 0
-            ? `${nbInvalides} valeur${nbInvalides > 1 ? 's' : ''} invalide${nbInvalides > 1 ? 's' : ''} : chiffres, virgule ou point, 12 décimales au plus${groupe === 'ca_marge' ? ' (signe − permis pour la marge)' : ''}.`
+            ? `${nbInvalides} valeur${nbInvalides > 1 ? 's' : ''} invalide${nbInvalides > 1 ? 's' : ''} : chiffres, virgule ou point, 12 décimales au plus${groupe === 'ca_marge' || groupe === 'obj_ca_marge' ?' (signe − permis pour la marge)' : ''}.`
             : modifie ? 'Modifications non enregistrées.' : envoi.ok ? 'Enregistré.' : info || 'Aucune modification.'}
           {nbInvalides === 0 && modifie && info ? ` ${info}` : ''}
         </span>
         {envoi.erreur && <p className="champ-erreur" role="alert">{envoi.erreur}</p>}
         <span className="sr-only" role="status">{envoi.ok && !modifie ? 'Enregistrement terminé.' : ''}</span>
+        {objectif && lignes.length > 0 && (
+          <Bouton variante="secondaire" onClick={() => setAnnuel(true)} disabled={sale || enAttente || envoi.cours} title={sale ? 'Enregistrez d’abord le mois en cours' : undefined}>
+            Répartir un objectif annuel
+          </Bouton>
+        )}
         <Bouton onClick={enregistrer} disabled={!aEnregistrer}>
           {envoi.cours ? 'Enregistrement…' : 'Enregistrer'}
         </Bouton>
@@ -428,7 +465,96 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
       >
         <p>Les chiffres tapés et non enregistrés seront effacés.</p>
       </Confirmer>
+      {annuel && (
+        <RepartirAnnee
+          vue={vue}
+          groupe={groupe}
+          lignes={lignes}
+          onFerme={(msg) => {
+            setAnnuel(false)
+            if (msg) {
+              setEnvoi({ cours: false })
+              setInfo(msg)
+            }
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** Objectifs annuels par case, répartis par le serveur sur les 12 mois de l'année affichée (même niveau). */
+function RepartirAnnee({ vue, groupe, lignes, onFerme }: { vue: VueSaisies; groupe: Groupe; lignes: Ligne[]; onFerme: (msg?: string) => void }) {
+  const qc = useQueryClient()
+  const inds = vue.indicateurs
+  const [totaux, setTotaux] = useState<Valeurs>({})
+  const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string }>({ cours: false })
+  const texte = (l: Ligne, i: string) => totaux[cleVal(l, i)] ?? ''
+  const nbInvalides = lignes.reduce((n, l) => n + inds.filter((i) => !valide(i, texte(l, i))).length, 0)
+  const nbRemplis = lignes.reduce((n, l) => n + inds.filter((i) => texte(l, i).trim()).length, 0)
+
+  const repartir = async () => {
+    setEnvoi({ cours: true })
+    const cases = lignes.flatMap((l) =>
+      inds.filter((i) => texte(l, i).trim()).map((i) => ({ site_id: l.site_id, service_id: l.service_id, indicateur: i, total: normal(texte(l, i)) })),
+    )
+    try {
+      const r = await repartirAnnee(groupe, vue.annee, vue.niveau, cases)
+      apresAnnee(qc, groupe, vue.annee)
+      const n = r.ecrases.length
+      onFerme(`Objectifs ${vue.annee} répartis sur les 12 mois${n ? ` ; ${n} mois déjà saisi${n > 1 ? 's' : ''} remplacé${n > 1 ? 's' : ''}` : ''}.`)
+    } catch (e) {
+      setEnvoi({ cours: false, erreur: e instanceof Error ? e.message : 'Répartition impossible.' })
+    }
+  }
+
+  return (
+    <Confirmer
+      ouvert
+      titre={`Répartir un objectif annuel ${vue.annee}`}
+      confirmer={envoi.cours ? 'Répartition…' : 'Répartir sur 12 mois'}
+      desactive={envoi.cours || nbRemplis === 0 || nbInvalides > 0}
+      onConfirmer={repartir}
+      onAnnuler={() => onFerme()}
+    >
+      <p>
+        Tapez le total de l’année : chaque mois reçoit un douzième (le reste va sur décembre) ; la productivité garde la même valeur chaque mois.{' '}
+        Les objectifs déjà saisis de ces cases sont remplacés sur toute l’année.
+      </p>
+      <table className="dense saisie-donnees">
+        <caption className="sr-only">Objectifs annuels {vue.annee}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{NIVEAUX.find((n) => n.id === vue.niveau)?.colonne}</th>
+            {inds.map((i) => <th key={i} scope="col" className="num">{COLONNES[i] ?? i}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((l) => (
+            <tr key={l.cle}>
+              <th scope="row">{l.libelle}</th>
+              {inds.map((i) => {
+                const ko = !valide(i, texte(l, i))
+                return (
+                  <td key={i} className={`num${ko ? ' ko' : ''}`}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      aria-label={`${COURT[i] ?? i} annuel : ${l.libelle}`}
+                      aria-invalid={ko || undefined}
+                      value={texte(l, i)}
+                      onChange={(e) => setTotaux((p) => ({ ...p, [cleVal(l, i)]: e.target.value }))}
+                    />
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {nbInvalides > 0 && <p className="champ-erreur">{nbInvalides} valeur{nbInvalides > 1 ? 's' : ''} invalide{nbInvalides > 1 ? 's' : ''}.</p>}
+      {envoi.erreur && <p className="champ-erreur" role="alert">{envoi.erreur}</p>}
+    </Confirmer>
   )
 }
 
@@ -441,7 +567,7 @@ function OngletGroupe({ groupe, annee, mois, periode, onModifs }: { groupe: Grou
   return <Grille vue={q.data} groupe={groupe} periode={periode} demandeNiveau={choix} enAttente={q.isPlaceholderData} onNiveau={setChoix} onModifs={onModifs} />
 }
 
-type Onglet = 'ca_marge' | 'activite' | 'budgets'
+type Onglet = Groupe | 'budgets'
 
 interface Props {
   annee: number
@@ -461,6 +587,8 @@ export default function SaisieDonnees({ annee, mois, periode, budgets, onModifs,
   const onglets: { id: Onglet; libelle: string }[] = [
     ...(avecLecture && avecMarge ? [{ id: 'ca_marge' as const, libelle: 'CA et marge' }] : []),
     ...(avecLecture ? [{ id: 'activite' as const, libelle: 'OR, devis, factures' }] : []),
+    ...(avecLecture && avecMarge ? [{ id: 'obj_ca_marge' as const, libelle: 'Objectifs CA et marge' }] : []),
+    ...(avecLecture ? [{ id: 'obj_activite' as const, libelle: 'Objectifs d’activité' }] : []),
     { id: 'budgets', libelle: 'Budgets' },
   ]
   // L'onglet de départ est retenu dès qu'un onglet de saisie existe : un droit qui arrive ensuite (marge) ne change pas d'onglet sous les doigts.

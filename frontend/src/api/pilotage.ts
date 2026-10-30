@@ -46,7 +46,9 @@ export const usePilotage = (annee: number, mois: number, actif: boolean) =>
     retry: queryRetry,
   })
 
-export type Groupe = 'ca_marge' | 'activite'
+export type Groupe = 'ca_marge' | 'activite' | 'obj_ca_marge' | 'obj_activite'
+/** Groupes d'objectifs : jamais calculés depuis les employés. */
+export const estObjectif = (g: Groupe) => g === 'obj_ca_marge' || g === 'obj_activite'
 export type Niveau = 'global' | 'site' | 'service' | 'cellule'
 
 export interface ValeurSaisie {
@@ -119,6 +121,34 @@ export const useSaisies = (groupe: Groupe, annee: number, mois: number, actif: b
 
 export const enregistrerSaisies = (groupe: Groupe, annee: number, mois: number, niveau: Niveau, cases: CaseEnvoyee[]) =>
   api<VueSaisies>('/pilotage/saisies', put({ annee, mois, groupe, niveau, cases }))
+
+export interface TotalAnnuel {
+  site_id: number | null
+  service_id: number | null
+  indicateur: string
+  total: string
+}
+
+export interface ReponseAnnee {
+  annee: number
+  groupe: Groupe
+  niveau: Niveau
+  mois: { mois: number; cases: CaseEnvoyee[] }[]
+  /** Mois dont un objectif déjà saisi a été remplacé. */
+  ecrases: number[]
+}
+
+/** Objectifs annuels répartis par le serveur sur les 12 mois (reste de la division sur décembre). */
+export const repartirAnnee = (groupe: Groupe, annee: number, niveau: Niveau, cases: TotalAnnuel[]) =>
+  api<ReponseAnnee>('/pilotage/saisies/annee', put({ annee, groupe, niveau, cases }))
+
+/** Après une répartition annuelle : tous les mois du groupe et les rapports sont rechargés. */
+export function apresAnnee(qc: QueryClient, groupe: Groupe, annee: number) {
+  qc.invalidateQueries({ queryKey: ['saisies', groupe, annee] })
+  qc.invalidateQueries({ queryKey: ['saisie', 'derniere-periode'] })
+  qc.invalidateQueries({ queryKey: ['pilotage'] })
+  rechargerRapports(qc)
+}
 
 export const enregistrerBudgets = (annee: number, mois: number, lignes: LigneBudget[]) =>
   api<Pilotage>('/pilotage/budgets', put({ annee, mois, lignes }))

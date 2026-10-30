@@ -142,6 +142,11 @@ Ce fichier Excel (avec macros) contient le **reporting individuel des commerciau
 - **Questions** :
   - Q4.1 Les objectifs des chiffres qui ne sont pas des montants (ventes, clients, factures, productivité) : qui les saisit, et à quel niveau (toute l'entreprise, site, service) ?
   - Q4.2 Un objectif différent chaque mois, ou l'objectif annuel divisé par 12 ?
+- **Réalisé** (étude `etude-objectifs.md`) :
+  - Q4.1 : l'administrateur saisit les objectifs dans Saisie des données, au niveau global, site ou service ; CA et marge restent réservés au droit marge.
+  - Q4.2 : les deux. Saisie mois par mois, ou total annuel réparti ÷ 12 (le reste sur décembre). Ventes, clients et factures sont entiers ; la productivité est une moyenne.
+  - Tableaux mensuel et annuel : colonnes objectif et écart pour CA, marge et activité ; graphiques avec la courbe d'objectif.
+  - Écart en vert quand il est bon (résultat au-dessus de l'objectif, charge sous le budget), en rouge sinon.
 
 ### 5. Stagiaires
 - **Décision** : dans le fichier, la colonne « Type Contrat » vaut **Stage**. Les autres colonnes peuvent rester vides.
@@ -193,6 +198,7 @@ Ce fichier Excel (avec macros) contient le **reporting individuel des commerciau
 - **À faire** : une ligne à part, bien visible, dans les tableaux mensuel et annuel, avec son budget.
 - **Questions** :
   - Q11.1 Les frais de mission restent-ils aussi dans la masse salariale ?
+- **Réalisé** : ils restent dans la masse salariale. Ligne « dont Frais de mission » sous le total, avec le budget de la rubrique, dans les tableaux mensuel et annuel.
 
 ### 12. Choisir les graphiques à afficher
 - **Pas encore de réponse.** La liste va passer de 4 à environ 20 graphiques, donc ce choix devient utile.

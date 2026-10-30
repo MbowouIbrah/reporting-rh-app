@@ -1,9 +1,9 @@
 import { Fragment, type ReactNode, useState } from 'react'
 import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
-import { cls, decimal2, entier, fcfa, pct } from '../lib/format'
+import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
-export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
+export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
 export interface Libelles {
   prec: string
   cour: string
@@ -19,7 +19,12 @@ export function Panneau({ titre, className, id, sansTitre, children }: { titre: 
   )
 }
 
-function Tete({ premiere, lib, budget, bourrage = 0 }: { premiere: string; lib: Libelles; budget?: boolean; bourrage?: number }) {
+const LIB_BUDGET = ['Budget', 'Écart', '% Budget']
+const LIB_OBJECTIF = ['Objectif', 'Écart', 'Écart %']
+
+function Tete({ premiere, lib, budget, libBudget = LIB_BUDGET, bourrage = 0 }: {
+  premiere: string; lib: Libelles; budget?: boolean; libBudget?: string[]; bourrage?: number
+}) {
   return (
     <thead>
       <tr>
@@ -30,9 +35,9 @@ function Tete({ premiere, lib, budget, bourrage = 0 }: { premiere: string; lib: 
         <th scope="col">Var. %</th>
         {budget && (
           <>
-            <th scope="col">Budget</th>
-            <th scope="col">Écart</th>
-            <th scope="col">% Budget</th>
+            {libBudget.map((t) => (
+              <th scope="col" key={t}>{t}</th>
+            ))}
           </>
         )}
         <Bourrage n={bourrage} tete />
@@ -44,15 +49,20 @@ function Tete({ premiere, lib, budget, bourrage = 0 }: { premiere: string; lib: 
 /** Mention discrète d'un total auquel il manque une case attendue. */
 const Partiel = () => <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>
 
-function Ligne({ label, cell, budget, className, format = fcfa, bourrage = 0 }: {
+/** Sens de l'écart : une charge qui dépasse son budget est mauvaise ; un résultat (CA, marge, ventes...) qui dépasse son objectif est bon. */
+type Sens = 'charge' | 'resultat'
+
+function Ligne({ label, cell, budget, className, format = fcfa, sens = 'charge', bourrage = 0 }: {
   label: ReactNode
   cell: CellPartiel
-  budget?: Budget | true
+  budget?: (Budget & { budget_partiel?: true }) | true
   className?: string
   format?: (v: CellPartiel['m']) => string
+  sens?: Sens
   bourrage?: number
 }) {
   const b = budget === true ? undefined : budget
+  const cE = sens === 'resultat' ? clsResultat : clsCharge
   return (
     <tr className={className}>
       <th scope="row">{label}{cell.partiel && <Partiel />}</th>
@@ -62,9 +72,9 @@ function Ligne({ label, cell, budget, className, format = fcfa, bourrage = 0 }: 
       <td className={cls(cell.var_pct)}>{pct(cell.var_pct)}</td>
       {budget !== undefined && (
         <>
-          <td className="num">{fcfa(b?.budget ?? null)}</td>
-          <td className={cls(b?.ecart ?? null)}>{fcfa(b?.ecart ?? null)}</td>
-          <td className={cls(b?.ecart_pct ?? null)}>{pct(b?.ecart_pct ?? null)}</td>
+          <td className="num">{format(b?.budget ?? null)}{b?.budget_partiel && <Partiel />}</td>
+          <td className={cE(b?.ecart ?? null)}>{format(b?.ecart ?? null)}</td>
+          <td className={cE(b?.ecart_pct ?? null)}>{pct(b?.ecart_pct ?? null)}</td>
         </>
       )}
       <Bourrage n={bourrage} />
@@ -81,7 +91,7 @@ function Bourrage({ n, tete }: { n: number; tete?: boolean }) {
   return tete ? <th className="bourrage" colSpan={n} aria-hidden="true" /> : <td className="bourrage" colSpan={n} aria-hidden="true" />
 }
 
-/** 1. Reporting global : types de charge, TOTAL GÉNÉRAL, puis CA et marge (hors total, sans budget). */
+/** 1. Reporting global : types de charge, TOTAL GÉNÉRAL, « dont Frais de mission » (déjà dans le total), puis CA et marge (hors total, avec objectif). */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
@@ -93,10 +103,11 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
           <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
         ))}
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
+        {d.frais_mission && <Ligne label="dont Frais de mission" cell={d.frais_mission} budget={d.frais_mission} className="dont" />}
         {d.lignes_ca_marge && (
           <>
-            <Ligne label="Chiffre d'affaires" cell={d.lignes_ca_marge.ca} budget className="hors-total" />
-            <Ligne label="Marge" cell={d.lignes_ca_marge.marge} budget className="hors-total" />
+            <Ligne label="Chiffre d'affaires" cell={d.lignes_ca_marge.ca} budget={d.lignes_ca_marge.ca} sens="resultat" className="hors-total" />
+            <Ligne label="Marge" cell={d.lignes_ca_marge.marge} budget={d.lignes_ca_marge.marge} sens="resultat" className="hors-total" />
           </>
         )}
       </tbody>
@@ -107,14 +118,28 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
 // Indices et ratios : les décimales comptent (0,85 ne doit pas s'afficher « 1 »).
 const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif'])
 
-/** 6. Activité : ventes, clients, productivité, OR, devis, factures ; masqué par l'appelant quand `activite` est null. */
+// Lignes d'activité qui portent un objectif ; ce sont des résultats (le dépasser est bon).
+const AVEC_OBJECTIF = new Set(['ventes', 'clients', 'productivite', 'factures'])
+
+/** 6. Activité : ventes, clients, productivité, OR, devis, factures ; masqué par l'appelant quand `activite` est null.
+ *  Les colonnes Objectif / Écart / Écart % occupent les trois dernières colonnes de la grille (plus de bourrage) dès que le serveur les envoie. */
 export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libelles }) {
+  const objectif = lignes.some((l) => 'budget' in l)
+  const bourrage = objectif ? 0 : COLONNES - 4
   return (
     <table className="dense tab-global aligne">
-      <Tete premiere="Indicateur" lib={lib} bourrage={COLONNES - 4} />
+      <Tete premiere="Indicateur" lib={lib} budget={objectif} libBudget={LIB_OBJECTIF} bourrage={bourrage} />
       <tbody>
         {lignes.map((l) => (
-          <Ligne key={l.cle} label={l.libelle} cell={l} format={RATIOS.has(l.cle) ? decimal2 : fcfa} bourrage={COLONNES - 4} />
+          <Ligne
+            key={l.cle}
+            label={l.libelle}
+            cell={l}
+            budget={objectif ? (AVEC_OBJECTIF.has(l.cle) ? l : true) : undefined}
+            sens="resultat"
+            format={RATIOS.has(l.cle) ? decimal2 : fcfa}
+            bourrage={bourrage}
+          />
         ))}
       </tbody>
     </table>
@@ -177,8 +202,8 @@ const Valeurs = ({ c }: { c: Cell }) => (
 const Budgets = ({ b, rowSpan }: { b: Budget; rowSpan?: number }) => (
   <>
     <td className="num budget" rowSpan={rowSpan}>{fcfa(b.budget ?? null)}</td>
-    <td className={`${cls(b.ecart ?? null)} budget`} rowSpan={rowSpan}>{fcfa(b.ecart ?? null)}</td>
-    <td className={`${cls(b.ecart_pct ?? null)} budget`} rowSpan={rowSpan}>{pct(b.ecart_pct ?? null)}</td>
+    <td className={`${clsCharge(b.ecart ?? null)} budget`} rowSpan={rowSpan}>{fcfa(b.ecart ?? null)}</td>
+    <td className={`${clsCharge(b.ecart_pct ?? null)} budget`} rowSpan={rowSpan}>{pct(b.ecart_pct ?? null)}</td>
   </>
 )
 

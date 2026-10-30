@@ -115,7 +115,7 @@ Total (partiel)    20 500 000    1 860 000            ← lecture seule
 1. **Quand un total et son détail sont tous deux saisis** : le total saisi fait foi et l'écart s'affiche en « non réparti » (recommandé), ou le calcul remplace toujours le total ?
 2. **CA individuel (DONNEES)** : doit-il remonter dans le CA des rapports quand rien n'est saisi au-dessus ? Recommandé : oui. Cela remplace le choix provisoire Q0.3 (« seul le CA saisi fait foi »).
 3. **Directeurs à périmètre** : avec un CA par site ou par service, voient-ils le CA de leur périmètre ? Recommandé : non, CA et marge restent réservés à `marge:read` (D5).
-4. **Budgets** : même mécanique à l'étape 7, avec les objectifs (recommandé), ou dès maintenant ?
+4. **Budgets** : même mécanique à l'étape 7, avec les objectifs (recommandé), ou dès maintenant ? *Fait à l'étape 7 : les objectifs (groupes `obj_ca_marge` et `obj_activite`) utilisent la même table et les mêmes niveaux ; les budgets de charges restent dans la table `budget`.*
 5. **Ventes et clients** : saisie possible au-dessus de l'employé (par site, par service) ? Recommandé : pas maintenant, ils viennent du fichier mensuel.
 
 ## 10. Mise en œuvre (étapes 6.4 et 6.5)

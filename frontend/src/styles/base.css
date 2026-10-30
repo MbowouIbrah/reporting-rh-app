@@ -83,6 +83,7 @@ table.dense thead th.libelle { text-align: left; }
 table.dense tbody th { font-weight: 500; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .neg { color: var(--red-deep); }
+.bon { color: var(--success); }
 tr.total th, tr.total td { background: var(--red-soft); font-weight: 700; }
 tr.exclu th { font-style: italic; color: var(--muted); }
 tr.groupe th, tr.groupe td { background: var(--paper-3); font-weight: 700; }
@@ -360,8 +361,11 @@ table.dense td.num { text-align: right; }
    CA et marge du reporting global sous le total, en orange des classeurs, hors total */
 .rapport-excel .panneau table.dense tbody tr.total:nth-child(n) > * { background: var(--peche); color: var(--brun); border-top: 2px solid var(--brun); border-bottom: 2px solid var(--brun); }
 .rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n) > * { background: var(--rapport-hors-total); color: var(--rapport-hors-total-texte); font-weight: var(--fw-bold); }
-/* Trait fin entre le total et CA/Marge, trait épais seulement à la fin du groupe */
-.rapport-excel .panneau table.dense tbody tr.total:nth-child(n):has(+ tr.hors-total) > * { border-bottom: 1px solid var(--rule); }
+/* Trait fin entre le total et la ligne qui le suit (dont Frais de mission, CA), trait épais seulement à la fin du groupe */
+.rapport-excel .panneau table.dense tbody tr.total:nth-child(n):has(+ tr.hors-total, + tr.dont) > * { border-bottom: 1px solid var(--rule); }
+/* « dont » : ligne incluse dans le total, en retrait et plus discrète */
+.rapport-excel .panneau table.tab-global tbody tr.dont:nth-child(n) > * { font-style: italic; color: var(--muted); }
+.rapport-excel .panneau table.tab-global tbody tr.dont:nth-child(n) > th { padding-left: calc(12px + var(--sp-4)); }
 .rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n):not(:has(+ tr.hors-total)) > * { border-bottom: 2px solid var(--brun); }
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -440,6 +444,7 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-excel .graphe-zone { padding: 8px; height: 240px; }
 .graphes-excel .details-donnees { margin-top: var(--sp-3); }
 .graphes-excel .graphe-lecture { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.35; }
+.graphes-excel .graphe-note { padding: 0 16px 8px; font-style: italic; }
 @media (min-width: 1360px) {
   .graphes-excel .graphes { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--v, 8px); margin: 0 0 var(--v, 8px); }
   .graphes-excel .graphe-zone { flex: 1; min-height: 0; height: auto; }

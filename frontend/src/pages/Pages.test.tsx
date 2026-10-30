@@ -5,11 +5,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
 import RequireAuth from '../auth/RequireAuth'
 import Annuel from './Annuel'
+import Graphes from './Graphes'
 import Individuel from './Individuel'
 import Resume from './Resume'
 
 // Bloc ACTIVITÉ de l'annuel : null tant qu'aucune donnée d'activité n'existe.
 let activiteAnnuel: unknown = null
+// Série mensuelle avec CA et marge renseignés (droit marge).
+let serieCa = false
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -43,7 +46,7 @@ function routes(avecMarge: boolean, perms: string[]) {
       }
     if (url.includes('/rapports/annuel'))
       return {
-        serie_n: serie.map((s) => (avecMarge ? { ...s, ca: null, marge: null, taux_marge: null } : s)),
+        serie_n: serie.map((s) => (avecMarge ? { ...s, ca: serieCa && s.mois <= 2 ? '5000' : null, marge: serieCa && s.mois <= 2 ? '800' : null, taux_marge: null } : s)),
         serie_n1: serie, cumul_ytd: { ...cell('2000'), nb_mois: 2, nb_mois_n1: 2 },
         moyenne_mensuelle: cell('1000'), cumul_annee_n1: null, par_service: [],
         commissions_cumul: cell('10'), primes_cumul: cell('5'), effectif_moyen: cell('4'),
@@ -188,4 +191,21 @@ test('Individuel sans nominatif:read : renvoyé au Résumé, la page n’est pas
   rendu(<p>Accueil</p>, '/individuel', ['report:read'])
   expect(await screen.findByText('Accueil')).toBeInTheDocument()
   expect(screen.queryByText('Accès refusé')).not.toBeInTheDocument()
+})
+
+test('Graphes : CA et marge par mois absents sans données de marge, affichés avec', async () => {
+  const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
+  // La note n'existe qu'une fois les données chargées (le squelette n'a que les titres).
+  expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
+  expect(screen.queryByText('CA par mois (FCFA)')).toBeNull()
+  expect(screen.queryByText('Marge par mois (FCFA)')).toBeNull()
+  unmount()
+  serieCa = true
+  try {
+    rendu(<Graphes />, '/graphes', ['report:read', 'marge:read'], true)
+    expect(await screen.findByText('CA par mois (FCFA)')).toBeInTheDocument()
+    expect(screen.getByText('Marge par mois (FCFA)')).toBeInTheDocument()
+  } finally {
+    serieCa = false
+  }
 })

@@ -1,4 +1,4 @@
-import { budgetValide, cls, comparer, compact, ecartAbsolu, fcfa, montantSigneValide, montantValide, pct, signe, somme, valeurBrute } from './format'
+import { budgetValide, cls, clsCharge, comparer, compact, ecartAbsolu, fcfa, montantSigneValide, montantValide, moyenne, pct, signe, somme, valeurBrute } from './format'
 
 test('fcfa : séparateur, absent et n/a', () => {
   expect(fcfa('1234567')).toBe('1\u00a0234\u00a0567')
@@ -74,4 +74,20 @@ test('budgetValide : trois décimales au plus', () => {
   expect(budgetValide('1 200,125')).toBe(true)
   expect(budgetValide('1200,1256')).toBe(false)
   expect(budgetValide('-5')).toBe(false)
+})
+
+test("écart d'une charge : dépasser le budget est rouge, rester en dessous est vert", () => {
+  expect(clsCharge('1500')).toBe('num neg')
+  expect(clsCharge('-200')).toBe('num bon')
+  expect(clsCharge('0')).toBe('num')
+  expect(clsCharge(null)).toBe('num')
+  expect(clsCharge('n/a')).toBe('num')
+})
+
+describe('moyenne', () => {
+  it('reste exacte, sans float', () => {
+    expect(moyenne(['80', '90'])).toBe('85')
+    expect(moyenne(['0.1', '0.2'])).toBe('0.15')
+    expect(moyenne([])).toBeNull()
+  })
 })

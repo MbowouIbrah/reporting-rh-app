@@ -61,6 +61,7 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | F1 | Garder le filtre automatique sur les en-têtes des fichiers Excel téléchargés (modèles d'import, rapport d'import) ? | Gardé. |
 | F2 | Budget de masse salariale de la synthèse : budget par employé × effectif, ou somme des budgets saisis par site ? | Budget par employé × effectif. |
 | F3 | Export annuel : reprendre la disposition de l'onglet ANNUEL de l'Excel (rubriques, activités, sites, contrats, effectifs) ? | Disposition propre à l'application. |
+| F4 | Objectif annuel réparti sur l'année : un petit total (ex. 10 ventes) donne 0 de janvier à novembre et 10 en décembre. Garder cette règle, ou arrondir mois par mois (1 par mois, le reste en décembre) ? | Total ÷ 12, le reste en décembre. |
 
 ## G. Mise en service
 

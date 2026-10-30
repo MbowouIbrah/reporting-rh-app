@@ -103,3 +103,59 @@ test('Activité : lignes de l’activité, mention « partiel » seulement sur l
   // Les ratios gardent deux décimales.
   expect(screen.getByText(/2,25/)).toBeInTheDocument()
 })
+
+const lib = { prec: 'M-1', cour: 'M' }
+const cellsTr = (tr: Element) => [...tr.querySelectorAll('td')]
+
+test('écart d’un résultat (CA, marge) : dépasser l’objectif est bon, rester dessous est mauvais', () => {
+  const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...cell }
+  const objectif = { ...cell, budget: '100', ecart: '20', ecart_pct: '0.2' }
+  const manque = { ...cell, budget: '100', ecart: '-30', ecart_pct: '-0.3' }
+  const blocs = { a_type_charge: [total], lignes_ca_marge: { ca: objectif, marge: manque } } as unknown as Blocs
+  render(<TypesCharge d={blocs} lib={lib} />)
+  const ca = cellsTr(screen.getByText("Chiffre d'affaires").closest('tr')!)
+  expect(ca.slice(-2).map((c) => c.className)).toEqual(['num bon', 'num bon'])
+  const marge = cellsTr(screen.getByText('Marge').closest('tr')!)
+  expect(marge.slice(-2).map((c) => c.className)).toEqual(['num neg', 'num neg'])
+})
+
+test('reporting global : « dont Frais de mission » juste sous le TOTAL GÉNÉRAL, avec son budget', () => {
+  const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...cell, budget: '20', ecart: '8', ecart_pct: '0.4' }
+  const frais = { ...cell, budget: '9', ecart: '3', ecart_pct: '0.33' }
+  const blocs = { a_type_charge: [total], frais_mission: frais, lignes_ca_marge: { ca: cell, marge: cell } } as unknown as Blocs
+  render(<TypesCharge d={blocs} lib={lib} />)
+  const lignes = screen.getAllByRole('row').map((r) => r.querySelector('th')?.textContent)
+  expect(lignes.slice(-4)).toEqual(['TOTAL GÉNÉRAL', 'dont Frais de mission', "Chiffre d'affaires", 'Marge'])
+  const ligne = screen.getByText('dont Frais de mission').closest('tr')!
+  expect(ligne).toHaveClass('dont')
+  expect(ligne).toHaveTextContent(/10.*12.*9.*3/)
+  render(<TypesCharge d={{ a_type_charge: [total] } as unknown as Blocs} lib={lib} />)
+  expect(screen.getAllByText('dont Frais de mission')).toHaveLength(1)
+})
+
+test('reporting global : mention « partiel » sur un budget de CA incomplet', () => {
+  const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...cell }
+  const ca = { ...cell, budget: '100', ecart: '5', ecart_pct: '0.05', budget_partiel: true as const }
+  render(<TypesCharge d={{ a_type_charge: [total], lignes_ca_marge: { ca, marge: cell } } as unknown as Blocs} lib={lib} />)
+  expect(screen.getAllByText('partiel')).toHaveLength(1)
+  expect(cellsTr(screen.getByText("Chiffre d'affaires").closest('tr')!).at(-3)).toHaveTextContent('partiel')
+})
+
+test('Activité : colonnes Objectif, Écart et Écart % sur les lignes qui ont un objectif, grille à 7 colonnes', () => {
+  const lignes = [
+    { cle: 'ventes', libelle: 'Ventes', ...cell, budget: '10', ecart: '2', ecart_pct: '0.2' },
+    { cle: 'productivite', libelle: 'Productivité', ...cell, budget: '3', ecart: '-0.5', ecart_pct: '-0.1667' },
+    { cle: 'devis', libelle: 'Devis', ...cell },
+  ]
+  render(<Activite lignes={lignes} lib={lib} />)
+  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Indicateur', 'M-1', 'M', 'Variation', 'Var. %', 'Objectif', 'Écart', 'Écart %'])
+  const ventes = cellsTr(screen.getByText('Ventes').closest('tr')!)
+  expect(ventes).toHaveLength(7)
+  expect(ventes.slice(-2).map((c) => c.className)).toEqual(['num bon', 'num bon'])
+  const prod = cellsTr(screen.getByText('Productivité').closest('tr')!)
+  expect(prod.slice(-2).map((c) => c.className)).toEqual(['num neg', 'num neg'])
+  // Sans objectif sur la ligne : cellules vides, pas de couleur.
+  const devis = cellsTr(screen.getByText('Devis').closest('tr')!)
+  expect(devis).toHaveLength(7)
+  expect(devis.slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
+})

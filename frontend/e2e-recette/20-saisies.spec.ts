@@ -268,6 +268,20 @@ test.describe.serial('saisies de pilotage', () => {
     expect(valeur(await pilotage(page.request), 'service', 'Commerce VN')).toBe('5123456.000')
   })
 
+  test('objectifs d’activité : objectif annuel réparti sur les 12 mois', async ({ page }) => {
+    await ouvrirMois(page, 'Juillet')
+    await page.getByRole('tab', { name: 'Objectifs d’activité' }).click()
+    // La base de recette a déjà 1 200 ventes sur 2026 (100 par mois)
+    const ventes = page.getByRole('textbox', { name: 'Objectif ventes : Global' })
+    await expect(ventes).toHaveValue('100')
+
+    await page.getByRole('button', { name: 'Répartir un objectif annuel' }).click()
+    await page.getByRole('textbox', { name: 'Objectif ventes annuel : Global' }).fill('2400')
+    await page.getByRole('button', { name: 'Répartir sur 12 mois' }).click()
+    await expect(page.getByText('Objectifs 2026 répartis sur les 12 mois ; 12 mois déjà saisis remplacés.')).toBeVisible()
+    await expect(ventes).toHaveValue('200')
+  })
+
   test('brouillon de saisie : gardé après rechargement, repris, abandonné', async ({ page }) => {
     await ouvrirMois(page, 'Septembre')
     await page.getByRole('button', { name: 'Étape 1 : choisir les employés de Septembre 2026 →' }).click()

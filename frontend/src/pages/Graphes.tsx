@@ -22,6 +22,16 @@ const C_REMU = 'var(--data-5)'
 const C_VENTES = 'var(--data-2)'
 const C_CLIENTS = 'var(--data-3)'
 const C_OR = 'var(--data-1)'
+const C_CA = 'var(--data-1)'
+const C_MARGE = 'var(--data-5)'
+const C_COMMISSIONS = 'var(--data-3)'
+const C_PRODUCTIVITE = 'var(--data-2)'
+const C_FACTURES = 'var(--data-4)'
+const C_ABSENCES = 'var(--data-6)'
+const C_CHARGE = 'var(--data-1)'
+// Objectif : pointillés rouges, distincts des pointillés gris de l'année précédente
+const C_OBJECTIF = 'var(--red)'
+const OBJECTIF = { name: 'Objectif', stroke: C_OBJECTIF, strokeWidth: 2, strokeDasharray: '6 4', dot: false, connectNulls: false } as const
 // Une couleur fixe par type de contrat, dans l'ordre du référentiel : un filtre ne la change pas.
 const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 // Année N-1 : série de comparaison, en retrait
@@ -56,7 +66,7 @@ const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as con
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v))
 
-function Carte({ titre, lecture, children }: { titre: string; lecture?: string; children: ReactNode }) {
+function Carte({ titre, lecture, note, children }: { titre: string; lecture?: string; note?: string; children: ReactNode }) {
   return (
     <figure className="graphe">
       <figcaption>{titre}</figcaption>
@@ -66,7 +76,44 @@ function Carte({ titre, lecture, children }: { titre: string; lecture?: string; 
           {children as React.ReactElement}
         </ResponsiveContainer>
       </div>
+      {note && <p className="graphe-lecture graphe-note">{note}</p>}
     </figure>
+  )
+}
+
+type Unite = 'fcfa' | 'entier' | 'decimal'
+const HAUT = [0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)] as [number, (max: number) => number]
+
+/** Graphe mensuel type : barres (ou courbe) de l'année, année précédente en gris, objectif en pointillés rouges.
+ *  Rien n'est affiché tant que la série n'a aucune valeur (droit marge absent, donnée non saisie). */
+function GrapheMois({ serie, titre, lecture, cle, objectif, couleur, unite = 'fcfa', suffixe = '', courbe, anim, serieN, serieN1 }: {
+  serie: Record<string, unknown>[]; titre: string; lecture: string; cle: string; objectif?: string; couleur: string
+  unite?: Unite; suffixe?: string; courbe?: boolean; anim: object; serieN: string; serieN1: string
+}) {
+  const a = (k: string) => serie.some((m) => m[k] != null)
+  if (!a(cle)) return null
+  const avecN1 = a(`${cle}1`)
+  const avecObj = !!objectif && a(objectif)
+  const note = `${lecture}${avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${avecObj ? ' ; en pointillés rouges, l’objectif' : ''}.`
+  const axe = unite === 'fcfa' ? <YAxis {...AXE_FCFA} />
+    : unite === 'entier' ? <YAxis allowDecimals={false} width={36} tickCount={5} domain={HAUT} {...AXE} />
+    : <YAxis width={44} tickCount={5} tickFormatter={(v) => decimal2(String(v))} domain={HAUT} {...AXE} />
+  const bulle = (v: unknown) => (unite === 'fcfa' ? BULLE_FCFA(v) : `${unite === 'entier' ? entier(Number(v)) : decimal2(String(v))}${suffixe}`)
+  return (
+    <Carte titre={titre} lecture={note}>
+      <ComposedChart data={serie}>
+        <CartesianGrid stroke={GRILLE} vertical={false} />
+        <XAxis {...AXE_X} />
+        {axe}
+        <Tooltip formatter={bulle} />
+        <Legend {...LEGENDE} />
+        {courbe
+          ? <Line dataKey={cle} name={serieN} stroke={couleur} strokeWidth={2.5} dot={{ r: 3.5, fill: couleur }} connectNulls={false} {...anim} />
+          : <Bar dataKey={cle} name={serieN} fill={couleur} radius={[3, 3, 0, 0]} {...anim} />}
+        {avecN1 && <Line dataKey={`${cle}1`} name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...anim} />}
+        {avecObj && <Line dataKey={objectif} {...OBJECTIF} {...anim} />}
+      </ComposedChart>
+    </Carte>
   )
 }
 
@@ -97,6 +144,38 @@ export default function Graphes() {
     frais1: num(n1?.[i]?.frais_mission),
     remu: num(m.remuneration),
     remu1: num(n1?.[i]?.remuneration),
+    objMs: num(m.objectifs?.ms),
+    objFrais: num(m.objectifs?.frais_mission),
+    objRemu: num(m.objectifs?.remuneration),
+    objVentes: num(m.objectifs?.ventes),
+    objClients: num(m.objectifs?.clients),
+    ca: num(m.ca),
+    ca1: num(n1?.[i]?.ca),
+    objCa: num(m.objectifs?.ca),
+    marge: num(m.marge),
+    marge1: num(n1?.[i]?.marge),
+    objMarge: num(m.objectifs?.marge),
+    comm: num(m.commissions),
+    comm1: num(n1?.[i]?.commissions),
+    objComm: num(m.objectifs?.commissions),
+    prod: num(m.activite?.productivite),
+    prod1: num(n1?.[i]?.activite?.productivite),
+    objProd: num(m.objectifs?.productivite),
+    fact: num(m.activite?.factures),
+    fact1: num(n1?.[i]?.activite?.factures),
+    objFact: num(m.objectifs?.factures),
+    absences: num(m.absences),
+    absences1: num(n1?.[i]?.absences),
+    assurance: num(m.assurance),
+    assurance1: num(n1?.[i]?.assurance),
+    formation: num(m.formation),
+    formation1: num(n1?.[i]?.formation),
+    logement: num(m.logement),
+    logement1: num(n1?.[i]?.logement),
+    credit: num(m.credit_telephonique),
+    credit1: num(n1?.[i]?.credit_telephonique),
+    carburant: num(m.carburant),
+    carburant1: num(n1?.[i]?.carburant),
     ventes: num(m.activite?.ventes),
     ventes1: num(n1?.[i]?.activite?.ventes),
     clients: num(m.activite?.clients),
@@ -128,9 +207,13 @@ export default function Graphes() {
   const ventesN1 = !!serie?.some((m) => m.ventes1 != null)
   const clientsN1 = !!serie?.some((m) => m.clients1 != null)
   const orN1 = !!serie?.some((m) => m.orProd1 != null)
+  // Objectif tracé seulement s'il est défini sur au moins un mois
+  const aObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => !!serie?.some((m) => m[k] != null)
+  const lectObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => (aObj(k) ? ' ; en pointillés rouges, l’objectif' : '')
   const serieN = `${annee ?? ''}`
   const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
+  const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
 
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
@@ -155,7 +238,7 @@ export default function Graphes() {
           <>
             {/* Retour du 16/10 : même présentation que la rémunération globale (aire N, pointillés N-1) ;
                 l'effectif a son propre graphe. */}
-            <Carte titre={TITRES[0]} lecture={`Masse salariale de chaque mois en ${serieN}${comparaison}.`}>
+            <Carte titre={TITRES[0]} lecture={`Masse salariale de chaque mois en ${serieN}${comparaison}${lectObj('objMs')}.`}>
               <AreaChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
@@ -164,6 +247,7 @@ export default function Graphes() {
                 <Legend {...LEGENDE} />
                 <Area dataKey="ms" name={serieN} stroke={C_MS} strokeWidth={2.5} fill={C_MS} fillOpacity={0.15} dot={{ r: 3, fill: C_MS }} connectNulls={false} {...ANIM} />
                 {avecN1 && <Area dataKey="ms1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+                {aObj('objMs') && <Area dataKey="objMs" fill="none" {...OBJECTIF} {...ANIM} />}
               </AreaChart>
             </Carte>
             {/* Une courbe par type de contrat, valeur inscrite sur chaque point. */}
@@ -184,7 +268,7 @@ export default function Graphes() {
                 })}
               </LineChart>
             </Carte>
-            <Carte titre={TITRES[2]} lecture={`Frais de mission payés chaque mois en ${serieN}${comparaison}.`}>
+            <Carte titre={TITRES[2]} lecture={`Frais de mission payés chaque mois en ${serieN}${comparaison}${lectObj('objFrais')}.`}>
               <ComposedChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
@@ -193,9 +277,10 @@ export default function Graphes() {
                 <Legend {...LEGENDE} />
                 <Bar dataKey="frais" name={serieN} fill={C_FRAIS} radius={[3, 3, 0, 0]} {...ANIM} />
                 {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
+                {aObj('objFrais') && <Line dataKey="objFrais" {...OBJECTIF} {...ANIM} />}
               </ComposedChart>
             </Carte>
-            <Carte titre={TITRES[3]} lecture={`Salaire, prime, rémunération et charges : total de chaque mois en ${serieN}${comparaison}.`}>
+            <Carte titre={TITRES[3]} lecture={`Salaire, prime, rémunération et charges : total de chaque mois en ${serieN}${comparaison}${lectObj('objRemu')}.`} note="L’objectif de rémunération globale n’apparaît pas quand un filtre (service, site, poste…) est appliqué.">
               <AreaChart data={serie}>
                 <CartesianGrid stroke={GRILLE} vertical={false} />
                 <XAxis {...AXE_X} />
@@ -204,10 +289,11 @@ export default function Graphes() {
                 <Legend {...LEGENDE} />
                 <Area dataKey="remu" name={serieN} stroke={C_REMU} strokeWidth={2.5} fill={C_REMU} fillOpacity={0.15} dot={{ r: 3, fill: C_REMU }} connectNulls={false} {...ANIM} />
                 {avecN1 && <Area dataKey="remu1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+                {aObj('objRemu') && <Area dataKey="objRemu" fill="none" {...OBJECTIF} {...ANIM} />}
               </AreaChart>
             </Carte>
             {aVentes && (
-              <Carte titre={TITRES_ACTIVITE[0]} lecture={`Nombre de ventes de chaque mois en ${serieN}${ventesN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+              <Carte titre={TITRES_ACTIVITE[0]} lecture={`Nombre de ventes de chaque mois en ${serieN}${ventesN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objVentes')}.`}>
                 <ComposedChart data={serie}>
                   <CartesianGrid stroke={GRILLE} vertical={false} />
                   <XAxis {...AXE_X} />
@@ -216,11 +302,12 @@ export default function Graphes() {
                   <Legend {...LEGENDE} />
                   <Bar dataKey="ventes" name={serieN} fill={C_VENTES} radius={[3, 3, 0, 0]} {...ANIM} />
                   {ventesN1 && <Line dataKey="ventes1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
+                  {aObj('objVentes') && <Line dataKey="objVentes" {...OBJECTIF} {...ANIM} />}
                 </ComposedChart>
               </Carte>
             )}
             {aClients && (
-              <Carte titre={TITRES_ACTIVITE[1]} lecture={`Nombre de clients de chaque mois en ${serieN}${clientsN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+              <Carte titre={TITRES_ACTIVITE[1]} lecture={`Nombre de clients de chaque mois en ${serieN}${clientsN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objClients')}.`}>
                 <LineChart data={serie}>
                   <CartesianGrid stroke={GRILLE} vertical={false} />
                   <XAxis {...AXE_X} />
@@ -229,6 +316,7 @@ export default function Graphes() {
                   <Legend {...LEGENDE} />
                   <Line dataKey="clients" name={serieN} stroke={C_CLIENTS} strokeWidth={2.5} dot={{ r: 3.5, fill: C_CLIENTS }} connectNulls={false} {...ANIM} />
                   {clientsN1 && <Line dataKey="clients1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...ANIM} />}
+                  {aObj('objClients') && <Line dataKey="objClients" {...OBJECTIF} {...ANIM} />}
                 </LineChart>
               </Carte>
             )}
@@ -245,6 +333,18 @@ export default function Graphes() {
                 </AreaChart>
               </Carte>
             )}
+            {/* CA et marge : présents dans la série seulement avec le droit marge ; sinon aucun graphe. */}
+            <GrapheMois {...commun} titre="CA par mois (FCFA)" lecture={`Chiffre d’affaires de chaque mois en ${serieN}`} cle="ca" objectif="objCa" couleur={C_CA} />
+            <GrapheMois {...commun} titre="Marge par mois (FCFA)" lecture={`Marge de chaque mois en ${serieN}`} cle="marge" objectif="objMarge" couleur={C_MARGE} />
+            <GrapheMois {...commun} titre="Commissions par mois (FCFA)" lecture={`Commissions de chaque mois en ${serieN}`} cle="comm" objectif="objComm" couleur={C_COMMISSIONS} />
+            <GrapheMois {...commun} titre="Productivité par mois" lecture={`Indice de productivité de chaque mois en ${serieN}`} cle="prod" objectif="objProd" couleur={C_PRODUCTIVITE} unite="decimal" courbe />
+            <GrapheMois {...commun} titre="Factures par mois" lecture={`Nombre de factures de chaque mois en ${serieN}`} cle="fact" objectif="objFact" couleur={C_FACTURES} unite="entier" suffixe=" factures" />
+            <GrapheMois {...commun} titre="Absences par mois (jours)" lecture={`Jours d’absence de chaque mois en ${serieN}`} cle="absences" couleur={C_ABSENCES} unite="decimal" suffixe=" j" />
+            <GrapheMois {...commun} titre="Assurance par mois (FCFA)" lecture={`Assurance payée chaque mois en ${serieN}`} cle="assurance" couleur={C_CHARGE} />
+            <GrapheMois {...commun} titre="Formation par mois (FCFA)" lecture={`Formation payée chaque mois en ${serieN}`} cle="formation" couleur={C_CHARGE} />
+            <GrapheMois {...commun} titre="Logement site déporté par mois (FCFA)" lecture={`Logement des sites déportés payé chaque mois en ${serieN}`} cle="logement" couleur={C_CHARGE} />
+            <GrapheMois {...commun} titre="Crédit téléphonique par mois (FCFA)" lecture={`Crédit téléphonique payé chaque mois en ${serieN}`} cle="credit" couleur={C_CHARGE} />
+            <GrapheMois {...commun} titre="Carburant par mois (FCFA)" lecture={`Carburant payé chaque mois en ${serieN}`} cle="carburant" couleur={C_CHARGE} />
           </>
         )}
       </div>

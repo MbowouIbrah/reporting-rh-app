@@ -21,3 +21,5 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 | B-015 | 2026-10-09 | 08c | Budget MS de la synthèse : reste budget_employe × effectif ; le relier au total des budgets par site saisis si l'admin le souhaite | 3 | À faire |
 | B-016 | 2026-10-19 | 11 | Historique des enregistrements : liste des imports et saisies passés, annulation d'un enregistrement précis (pas seulement le dernier), voire suivi des modifications ligne par ligne façon versions | 2 | À faire |
 | B-017 | 2026-10-19 | 11 | Contrôles d'import manquants (test août) : ANNÉE/MOIS différent du mois choisi, montant ×10 ou saisi en milliers vs M-1, Brut Réel ≠ somme des composantes, « 45.000 » lu 45 sans alerte claire, formule sans valeur calculée perdue, ligne sans aucun montant | 2 | Fait (G5, G4, G12) |
+| B-018 | 2026-10-30 | 12 | Export xlsx : la feuille « 6 Activité » ne montre pas encore les objectifs (l'écran et le PDF les montrent) ; à faire quand l'xlsx sera proposé à l'écran | 3 | À faire |
+| B-019 | 2026-10-30 | 12 | Migration 0018 (objectifs) à rejouer sur PostgreSQL 16 avant la mise en service (testée sur SQLite seulement) | 2 | À faire |

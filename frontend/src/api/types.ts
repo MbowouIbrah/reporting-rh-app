@@ -19,8 +19,25 @@ export interface Cell {
 /** Cellule dont le total manque une case attendue (saisie incomplète). */
 export type CellPartiel = Cell & { partiel?: true }
 
+/** Cellule du réel avec son objectif (budget, écart, écart %) ; `budget_partiel` si une case attendue de l'objectif manque. */
+export type CellObjectif = CellPartiel & Budget & { budget_partiel?: true }
+
 /** Ligne du bloc ACTIVITÉ ; `activite` vaut null tant qu'aucune donnée d'activité n'existe. */
-export type LigneActivite = { cle: string; libelle: string } & CellPartiel
+export type LigneActivite = { cle: string; libelle: string } & CellObjectif
+
+/** Objectifs d'un mois (null = non défini) ; `ca` et `marge` absents sans la permission marge:read. */
+export interface Objectifs {
+  ms: Dec | null
+  frais_mission: Dec | null
+  commissions: Dec | null
+  remuneration: Dec | null
+  ventes: Dec | null
+  clients: Dec | null
+  factures: Dec | null
+  productivite: Dec | null
+  ca?: Dec | null
+  marge?: Dec | null
+}
 
 /** Indicateurs d'activité d'un mois (valeurs brutes, null si non renseignés). */
 export interface ActiviteMois {
@@ -117,7 +134,12 @@ export interface Mensuel {
   }
   a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
   /** Absent sans la permission marge:read. */
-  lignes_ca_marge?: { ca: CellPartiel; marge: CellPartiel }
+  lignes_ca_marge?: { ca: CellObjectif; marge: CellObjectif }
+  /** Ligne « dont Frais de mission » : comptée dans la masse salariale, avec le budget de la rubrique. */
+  frais_mission?: Cell & Budget
+  objectifs?: Objectifs
+  /** Un objectif d'activité a une case attendue vide. */
+  budget_partiel?: boolean
   activite: LigneActivite[] | null
   b_service_activite: {
     service: string
@@ -157,12 +179,18 @@ export interface SerieMois {
   primes: Dec | null
   frais_mission: Dec | null
   logement: Dec | null
+  assurance?: Dec | null
+  formation?: Dec | null
+  carburant?: Dec | null
+  credit_telephonique?: Dec | null
   remuneration: Dec | null
   effectif_contrat: Record<string, number> | null
   ca?: Val
   marge?: Val
   taux_marge?: Val
   activite?: ActiviteMois
+  /** Objectifs du mois (série N seulement). */
+  objectifs?: Objectifs
 }
 
 export interface Annuel {
@@ -195,6 +223,8 @@ export interface Annuel {
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
   lignes_ca_marge?: Mensuel['lignes_ca_marge']
+  frais_mission?: Mensuel['frais_mission']
+  budget_partiel?: boolean
   activite: LigneActivite[] | null
   b_service_activite: Mensuel['b_service_activite']
   c_site: Mensuel['c_site']

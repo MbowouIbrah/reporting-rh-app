@@ -61,6 +61,10 @@ export const entier = (v: number | null | undefined) => (v == null ? '—' : esp
 
 export const isNeg = (v: Val | undefined) => v != null && v !== 'n/a' && Number(v) < 0
 export const cls = (v: Val | undefined) => (isNeg(v) ? 'num neg' : 'num')
+/** Écart à l'objectif d'un résultat (CA, marge, ventes, clients, factures, productivité) : le dépasser est bon (vert), rester en dessous est mauvais (rouge). */
+export const clsResultat = (v: Val | undefined) => (isNeg(v) ? 'num neg' : v != null && v !== 'n/a' && Number(v) > 0 ? 'num bon' : 'num')
+/** Écart d'une charge : au-dessus du budget (positif) en rouge, en dessous en vert. */
+export const clsCharge = (v: Val | undefined) => (isNeg(v) ? 'num bon' : v != null && v !== 'n/a' && Number(v) > 0 ? 'num neg' : 'num')
 
 /**
  * Décimaux exacts, sans flottant et sans arrondi : chaque valeur est ramenée à un entier (BigInt)
@@ -104,6 +108,19 @@ export function somme(valeurs: (Val | undefined)[]): string | null {
   if (presentes.length === 0) return null
   const { n, echelle } = aligner(presentes)
   return depuisEntier(n.reduce((s, x) => s + x, 0n), echelle)
+}
+
+/** Moyenne exacte, comme le serveur : null si elle ne tient pas en 12 décimales (division sans fin). */
+export function moyenne(valeurs: string[]): string | null {
+  if (valeurs.length === 0) return null
+  const { n, echelle } = aligner(valeurs)
+  const total = n.reduce((s, x) => s + x, 0n)
+  const nb = BigInt(valeurs.length)
+  for (let e = echelle; e <= 12; e++) {
+    const t = total * 10n ** BigInt(e - echelle)
+    if (t % nb === 0n) return depuisEntier(t / nb, e)
+  }
+  return null
 }
 
 /** Écart absolu exact entre deux décimaux. */
