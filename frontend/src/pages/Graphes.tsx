@@ -11,6 +11,7 @@ import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
+import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
 import ChoixGraphes from '../components/ChoixGraphes'
@@ -155,8 +156,8 @@ export default function Graphes() {
   const choix = useChoixGraphes()
   const v = choix.visible
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
-  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
-  const salaries = useSalaries(f.filtres?.annee)
+  const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
+  const salaries = useSalaries(f.filtres?.annee, f.filtres?.calendrier)
   const ann = useQuery({
     queryKey: ['annuel', f.filtres],
     queryFn: () => getAnnuel(f.filtres!),
@@ -248,7 +249,7 @@ export default function Graphes() {
   // Objectif tracé seulement s'il est défini sur au moins un mois
   const aObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => !!serie?.some((m) => m[k] != null)
   const lectObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => (aObj(k) ? ' ; en pointillés rouges, l’objectif' : '')
-  const serieN = `${annee ?? ''}`
+  const serieN = annee === undefined ? '' : libelleExercice(annee, f.filtres?.calendrier)
   const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
@@ -261,7 +262,7 @@ export default function Graphes() {
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {serie && !rapport && <ChoixGraphes graphes={dispo} choix={choix} />}
       {f.vide && <Etat type="vide" />}

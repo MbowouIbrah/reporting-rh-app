@@ -1,3 +1,4 @@
+import type { Calendrier } from '../lib/exercice'
 import { api } from './client'
 import type { Annuel, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
 
@@ -15,6 +16,8 @@ export interface FiltresPage {
   /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */
   ref_annee?: number
   ref_mois?: number
+  /** Pages annuelles en année fiscale : `annee` = début de l'exercice ; absent = civil. */
+  calendrier?: Calendrier
 }
 
 export const qs = (o: Record<string, string | number | undefined>) => {
@@ -32,12 +35,14 @@ export const reinitialiser = (jeton: string, password: string) =>
   api<{ status: string }>('/auth/reinitialiser', { method: 'POST', body: JSON.stringify({ jeton, password }) })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 export const getPeriodes = () => api<Periode[]>('/rapports/periodes')
-export const getFiltres = (annee: number) => api<Filtres>(`/rapports/filtres${qs({ annee })}`)
-export const getSalaries = (annee: number) => api<Salarie[]>(`/rapports/salaries${qs({ annee })}`)
+export const getFiltres = (annee: number, calendrier?: Calendrier) =>
+  api<Filtres>(`/rapports/filtres${qs({ annee, calendrier })}`)
+export const getSalaries = (annee: number, calendrier?: Calendrier) =>
+  api<Salarie[]>(`/rapports/salaries${qs({ annee, calendrier })}`)
 export const getMensuel = (f: FiltresPage) => api<Mensuel>(`/rapports/mensuel${qs({ ...f })}`)
 export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({ ...f })}`)
-export const getIndividuel = (annee: number, matricule: string) =>
-  api<Individuel>(`/rapports/individuel${qs({ annee, matricule })}`)
+export const getIndividuel = (annee: number, matricule: string, calendrier?: Calendrier) =>
+  api<Individuel>(`/rapports/individuel${qs({ annee, matricule, calendrier })}`)
 
 export const getIndividuelTous = (p: {
   annee: number
@@ -46,6 +51,7 @@ export const getIndividuelTous = (p: {
   site?: string
   type_site?: string
   poste?: string
+  calendrier?: Calendrier
 }) =>
   api<IndividuelTous>(`/rapports/individuel/tous${qs(p)}`)
 

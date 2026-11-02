@@ -4,12 +4,13 @@ import type { ReactNode } from 'react'
 import { getAnnuel } from '../api/rapports'
 import type { Cell, Val } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
+import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -84,7 +85,7 @@ function Case({
 }
 
 export default function Resume() {
-  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
+  const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
   // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi. Poste et employé ne s'appliquent pas ici.
   const base = f.filtres && {
     annee: f.filtres.annee,
@@ -95,6 +96,7 @@ export default function Resume() {
     type_site: f.filtres.type_site,
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
+    calendrier: f.filtres.calendrier,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
   const filtre = !!(base && (base.service || base.site || base.type_site || base.activite || base.type_contrat))
@@ -107,8 +109,8 @@ export default function Resume() {
   const [premier, relais] = useAttente(ann.isLoading)
   const [maj, relaisMaj] = useAttente(ann.isPlaceholderData)
   const gab = useGabarit('annuel', ann.data, !ann.isPlaceholderData)
-  const an = f.filtres ? `${f.filtres.annee}` : ''
-  const n1 = f.filtres ? `${f.filtres.ref_annee ?? f.filtres.annee - 1}` : ''
+  const an = f.filtres ? libelleExercice(f.filtres.annee, f.filtres.calendrier) : ''
+  const n1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const erreur = premier ? null : ann.error
   // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
   const a = premier ? gab : ann.data
@@ -123,7 +125,12 @@ export default function Resume() {
     <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
   )
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
-  const moisFin = a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
+  // Dernier mois saisi avec sa vraie année (en fiscal, l'exercice 2025-26 finit en 2026).
+  const finN = f.filtres && a?.mois_fin ? (a.annee_fin ?? f.filtres.annee) : undefined
+  const ecart = f.filtres ? f.filtres.annee - (f.filtres.ref_annee ?? f.filtres.annee - 1) : 1
+  const moisFin = finN && a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
+  const finAn = finN ? `${finN}` : an
+  const finN1 = finN ? `${finN - ecart}` : n1
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -133,7 +140,7 @@ export default function Resume() {
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {premier && !gab && (
@@ -190,11 +197,11 @@ export default function Resume() {
             <Case titre="MAD globaux" valeur={montrer(a.mad_fin.m)} devise={false}
               libelle2="Pourcentage MAD sites déportés"
               detail={[
-                [`MAD globaux ${moisFin} ${an}`, dec(a.mad_fin.m)],
-                [`MAD globaux ${moisFin} ${n1}`, dec(a.mad_fin.m1)],
+                [`MAD globaux ${moisFin} ${finAn}`, dec(a.mad_fin.m)],
+                [`MAD globaux ${moisFin} ${finN1}`, dec(a.mad_fin.m1)],
                 ['MAD sites déportés', dec(a.mad_deportes_fin.m)],
                 ['Part des MAD globaux', taux(a.mad_deportes_fin.part)],
-                [`MAD sites déportés ${moisFin} ${n1}`, dec(a.mad_deportes_fin.m1)],
+                [`MAD sites déportés ${moisFin} ${finN1}`, dec(a.mad_deportes_fin.m1)],
               ]}
             >
               <span className="second">
@@ -223,7 +230,7 @@ export default function Resume() {
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
-              libelle2={`Évolution par rapport à ${moisFin} ${n1}`}
+              libelle2={`Évolution par rapport à ${moisFin} ${finN1}`}
               detail={parContrat(a.effectif_fin_contrat, dec)}
             >
               <Variation v={a.effectif_fin.var_pct} vs="" />

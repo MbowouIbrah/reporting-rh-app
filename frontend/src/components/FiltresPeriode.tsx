@@ -4,6 +4,7 @@ import type { FiltresPage } from '../api/rapports'
 import type { Periode } from '../api/types'
 import ChoixSalarie, { type Salarie } from './ChoixSalarie'
 import type { ClePartagee, Partage } from '../lib/filtresPartages'
+import { libelleExercice } from '../lib/exercice'
 import { MOIS_COURTS } from '../lib/format'
 import BoutonReinitialiser from './BoutonReinitialiser'
 import ChoixPeriode, { type OptionPeriode } from './ChoixPeriode'
@@ -25,6 +26,8 @@ interface Props {
   avecMois?: boolean
   /** Sélecteur « Comparer à » : une année (annuel) ou une période (mensuel). */
   comparaison?: 'annee' | 'periode'
+  /** Choix « Année civile / Année fiscale » (pages annuelles). */
+  avecCalendrier?: boolean
   periodes?: Periode[]
   /** Champs supplémentaires, alignés sur la même ligne que les filtres. */
   children?: ReactNode
@@ -41,7 +44,7 @@ export const moisPrecedent = (annee: number, mois: number) =>
 
 /** Libellé de la colonne de comparaison des tableaux : la période choisie, sinon le mois ou l'année d'avant. */
 export function libelleComparaison(f: FiltresPage, mode: 'annee' | 'periode') {
-  if (mode === 'annee') return `${f.ref_annee ?? f.annee - 1}`
+  if (mode === 'annee') return libelleExercice(f.ref_annee ?? f.annee - 1, f.calendrier)
   const p = f.ref_annee && f.ref_mois ? { annee: f.ref_annee, mois: f.ref_mois } : moisPrecedent(f.annee, f.mois)
   return libellePeriode(p)
 }
@@ -62,9 +65,9 @@ export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onCh
       <label>
         Comparer à
         <select value={f.ref_annee ?? ''} onChange={(e) => onChange({ cmp_annee: e.target.value })}>
-          <option value="">{f.annee - 1}</option>
+          <option value="">{libelleExercice(f.annee - 1, f.calendrier)}</option>
           {autres.map((a) => (
-            <option key={a} value={a}>{a}</option>
+            <option key={a} value={a}>{libelleExercice(a, f.calendrier)}</option>
           ))}
         </select>
       </label>
@@ -102,6 +105,37 @@ function ChoixMoisAnnee({ filtres: f, periodes, onChange }: {
         onChange({ annee, mois })
       }}
     />
+  )
+}
+
+/** Année civile (janvier → décembre) ou fiscale (avril → mars). */
+export function ChoixCalendrier({ filtres: f, onChange }: { filtres: FiltresPage; onChange: (patch: Patch) => void }) {
+  return (
+    <label>
+      Calendrier
+      <select value={f.calendrier ?? 'civil'} onChange={(e) => onChange({ calendrier: e.target.value === 'fiscal' ? 'fiscal' : undefined })}>
+        <option value="civil">Année civile</option>
+        <option value="fiscal">Année fiscale (avril → mars)</option>
+      </select>
+    </label>
+  )
+}
+
+/** Année (civil) ou exercice « 2026-27 » (fiscal). */
+export function ChoixAnnee({ filtres: f, annees, onChange }: {
+  filtres: FiltresPage
+  annees: number[]
+  onChange: (patch: Patch) => void
+}) {
+  return (
+    <label>
+      {f.calendrier === 'fiscal' ? 'Exercice' : 'Année'}
+      <select value={f.annee} onChange={(e) => onChange({ annee: e.target.value })}>
+        {annees.map((a) => (
+          <option key={a} value={a}>{libelleExercice(a, f.calendrier)}</option>
+        ))}
+      </select>
+    </label>
   )
 }
 
@@ -174,7 +208,7 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 }
 
 export default function FiltresPeriode({
-  filtres, annees, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, periodes,
+  filtres, annees, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
   children, onChange, partage,
 }: Props) {
   const avecType = !!typesSite?.length
@@ -183,6 +217,7 @@ export default function FiltresPeriode({
   const avecContrat = !!typesContrat?.length
   // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, période d'avant, tous).
   const cles: ClePartagee[] = [
+    ...(avecCalendrier ? (['calendrier', 'exercice'] as const) : []),
     'annee',
     ...(avecMois ? (['mois'] as const) : []),
     ...(comparaison === 'annee' ? (['cmp_annee'] as const) : comparaison === 'periode' ? (['cmp_periode'] as const) : []),
@@ -200,14 +235,10 @@ export default function FiltresPeriode({
       {avecMois ? (
         <ChoixMoisAnnee filtres={filtres} periodes={periodes ?? []} onChange={onChange} />
       ) : (
-        <label>
-          Année
-          <select value={filtres.annee} onChange={(e) => onChange({ annee: e.target.value })}>
-            {annees.map((a) => (
-              <option key={a}>{a}</option>
-            ))}
-          </select>
-        </label>
+        <>
+          {avecCalendrier && <ChoixCalendrier filtres={filtres} onChange={onChange} />}
+          <ChoixAnnee filtres={filtres} annees={annees} onChange={onChange} />
+        </>
       )}
       {comparaison && (
         <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />

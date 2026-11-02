@@ -180,6 +180,8 @@ export type SousTotalFamille = { famille: Famille; hors_total: Dec | null; hors_
 
 export interface SerieMois {
   mois: number
+  /** Année civile du mois (l'exercice fiscal chevauche deux années). */
+  annee?: number
   ms: Dec | null
   effectif: number | null
   absences: Dec | null
@@ -226,6 +228,7 @@ export interface Annuel {
   effectif_moyen: Cell
   /** Dernier mois saisi de la période : base de l'effectif de fin. */
   mois_fin: number | null
+  annee_fin?: number | null
   effectif_fin: Cell
   effectif_fin_contrat: Record<string, Cell & { part: Val }>
   mad_fin: Cell
@@ -259,6 +262,8 @@ export interface Individuel {
   annee: number
   mois: {
     mois: number
+    /** Vraie année du mois (exercice fiscal : avril → mars). */
+    annee?: number
     present: boolean
     service: string | null
     site: string | null
@@ -287,6 +292,7 @@ export interface IndividuelTous {
   activite_total?: ActiviteIndividuelle
   mois: {
     mois: number
+    annee?: number
     present: boolean
     effectif?: number
     montants?: Record<string, Val>

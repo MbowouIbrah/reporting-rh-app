@@ -9,16 +9,17 @@ import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { entier, fcfa, MOIS } from '../lib/format'
+import { libelleCumul, libelleExercice } from '../lib/exercice'
+import { entier, fcfa } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 
 function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
-  const { annee, mois } = f
-  const lib = { prec: libelleComparaison(f, 'annee'), cour: `${annee}` }
+  const { annee, mois, calendrier } = f
+  const lib = { prec: libelleComparaison(f, 'annee'), cour: libelleExercice(annee, calendrier) }
   return (
     <>
       <p className="bandeau ok">
-        <span>Cumul de janvier à {MOIS[mois - 1].toLowerCase()} {annee}</span>
+        <span>{libelleCumul(annee, mois, calendrier)}</span>
         <span>Moyenne mensuelle : <strong className="val">{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
         {d.marge_ytd !== undefined && <span>Marge cumulée : <strong className="val">{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge ?? 0)} mois saisis)</span>}
       </p>
@@ -64,8 +65,8 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
 }
 
 export default function Annuel() {
-  const f = useFiltres({ avecMois: false, comparaison: 'annee' })
-  const salaries = useSalaries(f.filtres?.annee)
+  const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
+  const salaries = useSalaries(f.filtres?.annee, f.filtres?.calendrier)
   const q = useQuery({
     queryKey: ['annuel', f.filtres],
     queryFn: () => getAnnuel(f.filtres!),
@@ -81,15 +82,15 @@ export default function Annuel() {
     <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
       {premier && !gab && f.filtres && (
         <RapportSquelette
-          lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: `${f.filtres.annee}` }}
+          lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: libelleExercice(f.filtres.annee, f.filtres.calendrier) }}
           bandeau={
             <>
-              <span>Cumul de janvier à {MOIS[f.filtres.mois - 1].toLowerCase()} {f.filtres.annee}</span>
+              <span>{libelleCumul(f.filtres.annee, f.filtres.mois, f.filtres.calendrier)}</span>
               <span>Moyenne mensuelle : <strong className="val">—</strong></span>
               <span>Marge cumulée : <strong className="val">—</strong></span>
             </>

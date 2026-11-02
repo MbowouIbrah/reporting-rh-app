@@ -107,6 +107,7 @@ Ce fichier Excel (avec macros) contient le **reporting individuel des commerciau
 - **À faire** :
   - un choix « année civile / année fiscale » dans les filtres ;
   - l'appliquer au rapport annuel, aux cumuls depuis le début de l'année et aux graphiques.
+- **Réalisé par défaut** (étude `etude-annee-fiscale.md`) : choix « Année civile / Année fiscale (avril → mars) » dans les filtres des pages Annuel, Graphes, Résumé et Individuel. En fiscal, l'année s'appelle « 2026-27 », les tableaux et graphiques vont d'avril à mars et le bandeau dit « Cumul d'avril 2026 à février 2027 ». La page Mensuel ne change pas. Les objectifs annuels se répartissent encore de janvier à décembre (backlog B-023, attend Q2.1).
 - **Questions** :
   - Q2.1 Les budgets sont-ils saisis par année fiscale ou par année civile ?
 

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { facettes, sansIncompatibles, useFiltres } from './useFiltres'
+import { avecCascade, facettes, sansIncompatibles, useFiltres } from './useFiltres'
 
 const PERIODES = [{ annee: 2025, mois: 12 }, { annee: 2026, mois: 1 }, { annee: 2026, mois: 2 }]
 
@@ -43,6 +43,30 @@ test('un lien qui porte des filtres les impose dès le premier rendu', async () 
     wrapper: enveloppe('/?annee=2025&cmp_annee=2026'),
   })
   await waitFor(() => expect(result.current.filtres).toMatchObject({ annee: 2025, mois: 12, ref_annee: 2026 }))
+})
+
+test("changer de calendrier ou d'exercice remet la comparaison annuelle à zéro, sans toucher au mois", () => {
+  const actuel = { annee: '2026', mois: '2', cmp_annee: '2025', cmp_periode: '2025-12', service: 'SAV PL' }
+  expect(avecCascade({ calendrier: 'fiscal' }, actuel)).toEqual({ calendrier: 'fiscal', cmp_annee: undefined })
+  expect(avecCascade({ exercice: 2024 }, actuel)).toEqual({ exercice: 2024, cmp_annee: undefined })
+  expect(avecCascade({ calendrier: 'fiscal' }, { ...actuel, calendrier: 'fiscal' })).toEqual({ calendrier: 'fiscal' })
+})
+
+test("en fiscal : années d'exercice, exercice et mois par défaut", async () => {
+  const { result } = renderHook(() => useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true }), {
+    wrapper: enveloppe('/?calendrier=fiscal'),
+  })
+  await waitFor(() => expect(result.current.filtres).toMatchObject({ annee: 2025, mois: 2, calendrier: 'fiscal' }))
+  expect(result.current.calendrier).toBe('fiscal')
+  expect(result.current.annees).toEqual([2025])
+  // une page sans calendrier reste civile
+  const civil = renderHook(() => useFiltres({ comparaison: 'periode' }), { wrapper: enveloppe() })
+  await waitFor(() => expect(civil.result.current.filtres).toMatchObject({ annee: 2026, mois: 2 }))
+  expect(civil.result.current.filtres?.calendrier).toBeUndefined()
+  // choisir un exercice ne change pas l'année civile de Mensuel
+  act(() => result.current.set({ annee: 2024 }))
+  expect(result.current.filtres).toMatchObject({ annee: 2024, mois: 3 })
+  expect(civil.result.current.filtres).toMatchObject({ annee: 2026, mois: 2 })
 })
 
 // [service, site, type de site, activité, contrat, poste]

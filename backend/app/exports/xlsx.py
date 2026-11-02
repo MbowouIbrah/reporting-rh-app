@@ -8,6 +8,8 @@ from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from app.kpi import exercice as ex
+
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
         "septembre", "octobre", "novembre", "décembre"]
 CELL = ("m1", "m", "var", "var_pct")
@@ -146,16 +148,24 @@ def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
     return _sortie(wb)
 
 
-def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None) -> bytes:
+def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None,
+           calendrier: str = "civil") -> bytes:
+    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul."""
     wb = Workbook()
+    fiscal = calendrier == "fiscal"
+    debut = f"d'{MOIS[ex.DEBUT_FISCAL - 1]} {annee}" if fiscal else "de janvier"
+    fin = ex.fin_cumul(annee, mois, calendrier)[0]
     lignes = [
-        ["Période", f"Cumul de janvier à {MOIS[mois - 1]} {annee}"],
+        ["Période", f"Cumul {debut} à {MOIS[mois - 1]} {fin}"],
         ["Moyenne mensuelle", r["moyenne_mensuelle"]["m"]],
         ["Mois saisis", r["cumul_ytd"]["nb_mois"]],
     ]
     if "marge_ytd" in r:
         lignes.append(["Marge cumulée", r["marge_ytd"]])
         lignes.append(["Mois avec marge saisie", r["nb_mois_marge"]])
-    _feuille(wb, "Synthèse", ["Indicateur", str(annee)], lignes)
-    _blocs(wb, r, str(ref_annee or annee - 1), str(annee))
+    ref = ref_annee or annee - 1
+    def nom(a: int) -> str:
+        return f"{a}-{(a + 1) % 100:02d}" if fiscal else str(a)
+    _feuille(wb, "Synthèse", ["Indicateur", nom(annee)], lignes)
+    _blocs(wb, r, nom(ref), nom(annee))
     return _sortie(wb)

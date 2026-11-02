@@ -9,7 +9,9 @@ from app.db.session import get_db
 from app.exports import xlsx
 from app.imports.regles import norm
 from app.kpi import chargement as ch
+from app.kpi import exercice as ex
 from app.kpi import moteur
+from app.kpi.exercice import Calendrier
 from app.models.donnees import Periode, Salarie
 from app.models.referentiel import Rubrique
 from app.repos.scope import scope_for
@@ -102,10 +104,10 @@ def periodes(p: Principal = Depends(current_principal), db: Session = Depends(ge
     return out
 
 
-def _lignes_annee(db: Session, p: Principal, annee: int):
+def _lignes_annee(db: Session, p: Principal, annee: int, calendrier: Calendrier = "civil"):
     scope = scope_for(db, p)
-    for m in range(1, 13):
-        pd = ch.charger_periode(db, scope, annee, m)
+    for a, m in ex.mois_exercice(annee, calendrier):
+        pd = ch.charger_periode(db, scope, a, m)
         if pd is not None:
             yield from pd.lignes
 
@@ -113,11 +115,12 @@ def _lignes_annee(db: Session, p: Principal, annee: int):
 @router.get("/filtres")
 def filtres(
     annee: int = Query(ge=2000, le=2100),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     authorize(p, "report:read")
-    lignes = list(_lignes_annee(db, p, annee))
+    lignes = list(_lignes_annee(db, p, annee, calendrier))
     # Combinaisons présentes : le front n'offre, pour chaque filtre, que les valeurs compatibles
     # avec les autres filtres choisis (jamais d'option qui mène à un résultat vide).
     combinaisons = sorted(
@@ -137,11 +140,12 @@ def filtres(
 @router.get("/salaries")
 def salaries(
     annee: int = Query(ge=2000, le=2100),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     authorize(p, "nominatif:read")
-    ids = {L.salarie_id for L in _lignes_annee(db, p, annee)}
+    ids = {L.salarie_id for L in _lignes_annee(db, p, annee, calendrier)}
     rows = db.scalars(select(Salarie).where(Salarie.id.in_(ids))) if ids else []
     return sorted(({"matricule": r.matricule, "nom": r.nom} for r in rows),
                   key=lambda x: x["matricule"])
@@ -237,7 +241,10 @@ def mensuel_export(
 
 
 def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
-            matricule=None, activite=None, type_contrat=None) -> dict:
+            matricule=None, activite=None, type_contrat=None,
+            calendrier: Calendrier = "civil") -> dict:
+    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
+    l'exercice). Le moteur reçoit des rangs 1 à 12 (kpi/exercice.py)."""
     authorize(p, "report:read")
     scope = scope_for(db, p)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
@@ -245,31 +252,34 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
         out = {}
-        for m in range(1, 13):
-            pd = ch.filtrer(ch.charger_periode(db, scope, a, m), service, site, **crit)
+        for r, (y, m) in enumerate(ex.mois_exercice(a, calendrier), 1):
+            pd = ch.filtrer(ch.charger_periode(db, scope, y, m), service, site, **crit)
             if pd is not None:
-                out[m] = pd
+                out[r] = pd
         return out
 
+    reels = ex.mois_exercice(annee, calendrier)
+    fin = 12 if mois is None else ex.rang(mois, calendrier)
+    ref = ref_annee or annee - 1
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
     # budgets et paramètres des 12 mois : la série des objectifs couvre toute l'année ; les blocs
     # du cumul ne retiennent que les mois qui ont des données
-    budgets = {m: ch.charger_budgets(db, scope, annee, m, service, site, **crit) for m in n}
+    budgets = {r: ch.charger_budgets(db, scope, *reels[r - 1], service, site, **crit) for r in n}
     sans_budget_employe = crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None
-    params_mois = {m: (replace(pm, budget_employe=None) if sans_budget_employe else pm)
-                   for m, pm in ((m, ch.charger_params(db, annee, m)) for m in n)}
+    params_mois = {r: (replace(pm, budget_employe=None) if sans_budget_employe else pm)
+                   for r, pm in ((r, ch.charger_params(db, *reels[r - 1])) for r in n)}
     refs = ch.charger_refs(db, type_site, scope)
-    res = moteur.annuel(n, annee_pds(ref_annee or annee - 1), mois, refs,
-                        ch.charger_params(db, annee, mois), budgets, params_mois)
-    return _sortie(p, res)
+    res = moteur.annuel(n, annee_pds(ref), fin, refs,
+                        ch.charger_params(db, *reels[fin - 1]), budgets, params_mois)
+    return _sortie(p, ex.en_mois_reels(res, annee, ref, calendrier))
 
 
 @router.get("/annuel")
 def annuel(
     annee: int = Query(ge=2000, le=2100),
-    mois: int = Query(12, ge=1, le=12),
+    mois: int | None = Query(None, ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
@@ -278,17 +288,18 @@ def annuel(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite, type_contrat)
+                   activite, type_contrat, calendrier)
 
 
 @router.get("/annuel/export")
 def annuel_export(
     annee: int = Query(ge=2000, le=2100),
-    mois: int = Query(12, ge=1, le=12),
+    mois: int | None = Query(None, ge=1, le=12),
     service: str | None = None,
     site: str | None = None,
     ref_annee: int | None = Query(None, ge=2000, le=2100),
@@ -297,17 +308,21 @@ def annuel_export(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite, type_contrat)
-    audit.record(db, p.user_id, "export", "rapport_annuel", f"{annee}-{mois:02d}", None,
+                  activite, type_contrat, calendrier)
+    an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
+    audit.record(db, p.user_id, "export", "rapport_annuel", f"{an_fin}-{mois_fin:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
-                  "type_contrat": type_contrat})
+                  "type_contrat": type_contrat, "calendrier": calendrier})
     db.commit()
-    return _xlsx(xlsx.annuel(res, annee, mois, ref_annee), f"reporting-annuel-{annee}.xlsx")
+    suffixe = "-fiscal" if calendrier == "fiscal" else ""
+    return _xlsx(xlsx.annuel(res, annee, mois_fin, ref_annee, calendrier),
+                 f"reporting-annuel-{annee}{suffixe}.xlsx")
 
 
 @router.get("/individuel/tous")
@@ -318,6 +333,7 @@ def individuel_tous(
     site: str | None = Query(None, max_length=100),
     type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
     poste: str | None = Query(None, max_length=200),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -346,18 +362,18 @@ def individuel_tous(
     def comptee(pd, col: str) -> bool:
         return not all(r in pd.exclues for r in COLONNES_INDIVIDUEL[col])
     mois = []
-    for m in range(1, 13):
-        pd = ch.charger_periode(db, scope, annee, m)
+    for a, m in ex.mois_exercice(annee, calendrier):
+        pd = ch.charger_periode(db, scope, a, m)
         lignes = [] if pd is None else [
             L for L in pd.lignes
             if (sal is None or L.salarie_id == sal.id)
             and (not service or L.service == service) and (not site or L.site == site)
             and (not type_site or L.type_site == type_site) and (not poste or L.poste == poste)]
         if pd is None or not lignes:
-            mois.append({"mois": m, "present": False})
+            mois.append({"annee": a, "mois": m, "present": False})
             continue
         mois.append({
-            "mois": m, "present": True, "effectif": len(lignes),
+            "annee": a, "mois": m, "present": True, "effectif": len(lignes),
             "montants": {c: sum((montant(L, c) for L in lignes), zero) for c in rubriques},
             "staff": {c: sum(1 for L in lignes if montant(L, c) != 0) for c in rubriques},
             "total": sum((montant(L, c) for L in lignes for c in rubriques if comptee(pd, c)),
@@ -368,9 +384,10 @@ def individuel_tous(
     if sal is not None and not any(x["present"] for x in mois):
         raise HTTPException(404, "Matricule introuvable")  # hors périmètre : rien ne fuit
     audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id if sal else None, None,
-                 {"annee": annee, "tous": sal is None})
+                 {"annee": annee, "tous": sal is None, "calendrier": calendrier})
     db.commit()
-    return _sortie(p, {"annee": annee, "matricule": sal.matricule if sal else None,
+    return _sortie(p, {"annee": annee, "calendrier": calendrier,
+                       "matricule": sal.matricule if sal else None,
                        "nom": sal.nom if sal else None, "rubriques": rubriques,
                        "exclues": [c for c in rubriques
                                    if all(r in exclues for r in COLONNES_INDIVIDUEL[c])],
@@ -384,17 +401,22 @@ def individuel_tous(
 def individuel(
     annee: int = Query(ge=2000, le=2100),
     matricule: str = Query(min_length=1, max_length=30),
+    calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     authorize(p, "nominatif:read")
     sal = db.scalar(select(Salarie).where(Salarie.matricule_norm == norm(matricule)))
     scope = scope_for(db, p)
-    pds = {m: pd for m in range(1, 13)
-           if (pd := ch.charger_periode(db, scope, annee, m)) is not None}
+    reels = ex.mois_exercice(annee, calendrier)
+    pds = {r: pd for r, (a, m) in enumerate(reels, 1)
+           if (pd := ch.charger_periode(db, scope, a, m)) is not None}
     if sal is None or not any(L.salarie_id == sal.id for pd in pds.values() for L in pd.lignes):
         raise HTTPException(404, "Matricule introuvable")
-    audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id, None, {"annee": annee})
+    audit.record(db, p.user_id, "lecture_fiche", "salarie", sal.id, None,
+                 {"annee": annee, "calendrier": calendrier})
     db.commit()
     res = moteur.individuel(pds, sal.id, ch.charger_refs(db))
-    return _sortie(p, {"matricule": sal.matricule, "nom": sal.nom, "annee": annee, **res})
+    res["mois"] = ex.serie_reelle(res["mois"], annee, calendrier)
+    return _sortie(p, {"matricule": sal.matricule, "nom": sal.nom, "annee": annee,
+                       "calendrier": calendrier, **res})

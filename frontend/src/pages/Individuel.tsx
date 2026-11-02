@@ -8,12 +8,13 @@ import { Panneau } from '../components/BlocsRapport'
 import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import ConfirmerColonne from '../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../components/Etat'
-import { ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
+import { ChoixAnnee, ChoixCalendrier, ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
 import { cls, decimal2, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { type Calendrier, ordreMois } from '../lib/exercice'
 import { plafonner } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
 
@@ -42,12 +43,13 @@ const texteActivite = (cle: ColActivite, v: string | null | undefined) => (cle =
 const MODELE_VIDE: IndividuelTous = {
   annee: 0, matricule: null, nom: null, rubriques: COLONNES,
   exclues: ['Salaire brut garanti', 'Commission', 'Primes de productivité', 'Primes sur ventes', 'Primes sur résultats'],
-  mois: MOIS.map((_, i) => ({ mois: i + 1, present: false })),
+  mois: [],
 }
+const modeleVide = (cal?: Calendrier): IndividuelTous => ({ ...MODELE_VIDE, mois: ordreMois(cal).map((m) => ({ mois: m, present: false })) })
 
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
-  const f = useFiltres({ avecMois: false })
+  const f = useFiltres({ avecMois: false, avecCalendrier: true })
   const matricule = f.partage.matricule ?? ''
   const setMatricule = (m: string) => f.set({ matricule: m })
   const annee = f.filtres?.annee
@@ -55,17 +57,18 @@ export default function Individuel() {
   const site = f.filtres?.site
   const typeSite = f.filtres?.type_site
   const poste = f.filtres?.poste
-  const salaries = useSalaries(annee)
+  const calendrier = f.filtres?.calendrier
+  const salaries = useSalaries(annee, calendrier)
   const q = useQuery({
-    queryKey: ['individuel-tous', annee, matricule, service, site, typeSite, poste],
-    queryFn: () => getIndividuelTous({ annee: annee!, matricule, service, site, type_site: typeSite, poste }),
+    queryKey: ['individuel-tous', annee, matricule, service, site, typeSite, poste, calendrier],
+    queryFn: () => getIndividuelTous({ annee: annee!, matricule, service, site, type_site: typeSite, poste, calendrier }),
     enabled: annee !== undefined,
     placeholderData: keepPreviousData,
   })
   // Premier chargement : le vrai tableau (colonnes et mois sont statiques) avec des valeurs vides,
   // que le squelette commun masque ; seules les valeurs chargent.
   const [maj, relais] = useAttente(q.isPlaceholderData || q.isLoading)
-  const d = q.data ?? (q.isLoading ? MODELE_VIDE : undefined)
+  const d = q.data ?? (q.isLoading ? modeleVide(calendrier) : undefined)
   // Comme DONNEES : colonnes exclues du total (hachurées) d'abord, juste après le mois, puis les
   // colonnes comptées dans le TOTAL MENSUEL (servi par le serveur, sans les hachurées).
   // Ordre global (serveur, commun avec DONNEES), modifiable en glissant les en-têtes par qui a le droit ;
@@ -147,19 +150,13 @@ export default function Individuel() {
           {f.postes.length > 0 && (
             <ChoixPoste valeur={poste ?? ''} postes={f.postes} tous="(Tous)" onChange={(v) => f.set({ poste: v })} />
           )}
-          <label>
-            Année
-            <select value={f.filtres.annee} onChange={(e) => f.set({ annee: e.target.value })}>
-              {f.annees.map((a) => (
-                <option key={a}>{a}</option>
-              ))}
-            </select>
-          </label>
+          <ChoixCalendrier filtres={f.filtres} onChange={f.set} />
+          <ChoixAnnee filtres={f.filtres} annees={f.annees} onChange={f.set} />
           <div className="filtres-actions">
             <BoutonReinitialiser
-              actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee'] as const).some((k) => f.partage[k])}
+              actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee', 'calendrier', 'exercice'] as const).some((k) => f.partage[k])}
               onClick={() =>
-                f.set({ matricule: undefined, site: undefined, service: undefined, type_site: undefined, poste: undefined, annee: undefined })
+                f.set({ matricule: undefined, site: undefined, service: undefined, type_site: undefined, poste: undefined, annee: undefined, exercice: undefined, calendrier: undefined })
               }
             />
           </div>
