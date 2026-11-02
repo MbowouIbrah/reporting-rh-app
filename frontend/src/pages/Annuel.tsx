@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { type FiltresPage, getAnnuel } from '../api/rapports'
 import type { Annuel as AnnuelData } from '../api/types'
-import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
+import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
@@ -30,7 +30,6 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
             panneaux: [
               [
                 { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={lib} /> },
-                { titre: 'Charges exclues du total', contenu: <TypesExclus d={d} lib={lib} /> },
               ],
             ],
           },

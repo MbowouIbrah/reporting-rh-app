@@ -62,6 +62,10 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | F2 | Budget de masse salariale de la synthèse : budget par employé × effectif, ou somme des budgets saisis par site ? | Budget par employé × effectif. |
 | F3 | Export annuel : reprendre la disposition de l'onglet ANNUEL de l'Excel (rubriques, activités, sites, contrats, effectifs) ? | Disposition propre à l'application. |
 | F4 | Objectif annuel réparti sur l'année : un petit total (ex. 10 ventes) donne 0 de janvier à novembre et 10 en décembre. Garder cette règle, ou arrondir mois par mois (1 par mois, le reste en décembre) ? | Total ÷ 12, le reste en décembre. |
+| F5 | Familles du tableau des types de charge : Brut Réel et Salaire brut garanti = Salaire ; Bonus, primes exceptionnelles, sur ventes, sur résultats, productivité, commission = Primes ; frais de mission, logement, carburant, crédit téléphonique = Avantages et frais ; le reste = Charges. Correct ? | Oui, ce classement ; une rubrique nouvelle va dans Charges. |
+| F6 | Le graphique « Salaire par mois » montre le Salaire brut garanti (et non le Brut Réel) ? | Salaire brut garanti. |
+| F7 | Le Bonus est dans le Brut Réel et aussi compté à part : double compte voulu ? Même question pour la rémunération globale (masse salariale + rubriques hors total). | Inchangé, en attente de confirmation. |
+| F8 | Choix des graphiques : gardé par navigateur, ou à retrouver sur tous les postes de l'utilisateur ? | Par navigateur. |
 
 ## G. Mise en service
 

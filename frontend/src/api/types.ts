@@ -128,11 +128,16 @@ export interface Mensuel {
     commissions: Cell
     primes_total: Cell
     primes: ({ rubrique: string } & Cell)[]
+    salaire?: Cell
+    primes_toutes?: Cell
     ca?: Val
     marge?: Val
     taux_marge?: Val
   }
-  a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
+  /** `famille` : null sur TOTAL CHARGES. */
+  a_type_charge: ({ rubrique: string; exclu: boolean; famille?: Famille | null } & Cell & Budget)[]
+  /** Sous-totaux par famille (lignes comptées seulement : leur somme vaut le TOTAL CHARGES). */
+  a_familles?: SousTotalFamille[]
   /** Absent sans la permission marge:read. */
   lignes_ca_marge?: { ca: CellObjectif; marge: CellObjectif }
   /** Ligne « dont Frais de mission » : comptée dans la masse salariale, avec le budget de la rubrique. */
@@ -170,6 +175,9 @@ export interface Mensuel {
   controles: Controle[]
 }
 
+export type Famille = 'salaire' | 'primes' | 'avantages' | 'charges'
+export type SousTotalFamille = { famille: Famille; hors_total: Dec | null; hors_total_m1: Dec | null } & Cell & Budget
+
 export interface SerieMois {
   mois: number
   ms: Dec | null
@@ -177,6 +185,10 @@ export interface SerieMois {
   absences: Dec | null
   commissions: Dec | null
   primes: Dec | null
+  /** Salaire brut garantie. */
+  salaire?: Dec | null
+  /** Les six primes (Bonus, exceptionnelles, ventes, résultats, productivité, commission). */
+  primes_toutes?: Dec | null
   frais_mission: Dec | null
   logement: Dec | null
   assurance?: Dec | null
@@ -222,6 +234,7 @@ export interface Annuel {
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
   a_type_charge: Mensuel['a_type_charge']
+  a_familles?: Mensuel['a_familles']
   lignes_ca_marge?: Mensuel['lignes_ca_marge']
   frais_mission?: Mensuel['frais_mission']
   budget_partiel?: boolean

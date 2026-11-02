@@ -18,6 +18,21 @@ FORMATION = "Formation"
 CARBURANT = "Carburant véhicule service"
 CREDIT_TEL = "Crédit téléphonique"
 PRIMES = ("Primes sur ventes", "Primes sur résultats", "Productivité Ateliers")
+# Demande 8 (choix par défaut, docs/etude-salaire-primes-graphiques.md §2) : familles des
+# rubriques dans le tableau des types de charge ; une rubrique inconnue va dans « charges ».
+SALAIRE = "Salaire brut garantie"
+PRIMES_TOUTES = ("Bonus", "Primes exceptionnelles", *PRIMES, COMMISSION)
+FAMILLES = {
+    "Brut Réel": "salaire", SALAIRE: "salaire",
+    **{r: "primes" for r in PRIMES_TOUTES},
+    FRAIS_MISSION: "avantages", LOGEMENT: "avantages", CARBURANT: "avantages",
+    CREDIT_TEL: "avantages",
+}
+ORDRE_FAMILLES = ("salaire", "primes", "avantages", "charges")
+
+
+def famille(rubrique: str) -> str:
+    return FAMILLES.get(rubrique, "charges")
 # Rubriques de nature « activité » : jamais dans les montants de paie.
 VENTES = "Nombre de ventes"
 CLIENTS = "Nombre de clients"
@@ -291,6 +306,43 @@ def _somme(cells: list[dict], budget: bool = False) -> dict:
     return {**cell(m, m1), **(_bud(m, tot("budget")) if budget else {})}
 
 
+def _part(pd: PeriodeData | None, r: str, compte: bool) -> Decimal | None:
+    """Montant de la rubrique compté dans le total (compte=True) ou hors total, selon les
+    exclusions de CETTE période (une exclusion peut changer d'un mois à l'autre)."""
+    if pd is None:
+        return None
+    return pd.rubrique(r) if (r in pd.exclues) != compte else ZERO
+
+
+def _familles(a_type: list[dict], parts: dict[str, tuple]) -> list[dict]:
+    """Sous-totaux par famille présente. `parts[r]` = (compté N, compté N-1, hors total N,
+    hors total N-1), chaque mois avec ses propres exclusions : la somme des sous-totaux vaut
+    le TOTAL CHARGES. Budget seulement si chaque rubrique comptée non vide en a un."""
+    def tot(lignes, i):
+        vals = [parts[x["rubrique"]][i] for x in lignes]
+        vals = [v for v in vals if v is not None]
+        return sum(vals, ZERO) if vals else None
+
+    def hors(lignes, i):
+        v = tot(lignes, i)
+        return v if v else None
+
+    out = []
+    for fam in ORDRE_FAMILLES:
+        lignes = [x for x in a_type if x.get("famille") == fam]
+        if not lignes:
+            continue
+        # rubrique comptée sans budget ni montant : sans effet ; avec montant compté (un mois au
+        # moins, selon les exclusions de chaque mois) : budget partiel
+        budgets = [x.get("budget") for x in lignes
+                   if parts[x["rubrique"]][0] or (not x["exclu"] and x.get("budget") is not None)]
+        budget = sum(budgets, ZERO) if budgets and all(b is not None for b in budgets) else None
+        m = tot(lignes, 0)
+        out.append({"famille": fam, **cell(m, tot(lignes, 1)), **_bud(m, budget),
+                    "hors_total": hors(lignes, 2), "hors_total_m1": hors(lignes, 3)})
+    return out
+
+
 def _par(pd: PeriodeData | None, cle, mesure) -> dict:
     out: dict = defaultdict(lambda: ZERO)
     for L in pd.lignes if pd else ():
@@ -338,6 +390,10 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
         "primes_total": cell(sum((cur.rubrique(r) for r in PRIMES), ZERO),
                              sum((prev.rubrique(r) for r in PRIMES), ZERO) if prev else None),
+        "salaire": cell(cur.rubrique(SALAIRE), prev.rubrique(SALAIRE) if prev else None),
+        "primes_toutes": cell(sum((cur.rubrique(r) for r in PRIMES_TOUTES), ZERO),
+                              sum((prev.rubrique(r) for r in PRIMES_TOUTES), ZERO)
+                              if prev else None),
         "primes": [
             {"rubrique": r, **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
             for r in PRIMES
@@ -348,14 +404,17 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         return lambda pd, L: L.montants.get(rub, ZERO)
 
     a_type = [
-        {"rubrique": r, "exclu": r in cur.exclues,
+        {"rubrique": r, "exclu": r in cur.exclues, "famille": famille(r),
          **cell(cur.rubrique(r), prev.rubrique(r) if prev else None),
          **_bud(cur.rubrique(r), budgets.rubrique.get(r))}
         for r in refs.rubriques if r != ABSENCES
     ]
     # chemin indépendant de PeriodeData.ms : somme des rubriques comptées dans le total
-    ms_a = sum((x["m"] for x in a_type if not x["exclu"]), ZERO)
-    ms_a1 = sum((x["m1"] for x in a_type if not x["exclu"]), ZERO) if prev else None
+    parts = {x["rubrique"]: (_part(cur, x["rubrique"], True), _part(prev, x["rubrique"], True),
+                             _part(cur, x["rubrique"], False), _part(prev, x["rubrique"], False))
+             for x in a_type}
+    ms_a = sum((p[0] for p in parts.values()), ZERO)
+    ms_a1 = sum((p[1] for p in parts.values()), ZERO) if prev else None
 
     def total(pd, L):
         return pd.total(L)
@@ -485,8 +544,9 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "budget_partiel": _budget_partiel(cur.partiel),
         "activite": activite,
         "a_type_charge": a_type
-        + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
+        + [{"rubrique": "TOTAL CHARGES", "exclu": False, "famille": None, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
+        "a_familles": _familles(a_type, parts),
         "b_service_activite": b_service,
         "c_site": c_site,
         "c_site_total": c_site_total,
@@ -535,14 +595,19 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 
     exclues = n[ok[-1]].exclues if ok else frozenset()
     a_type = [
-        {"rubrique": r, "exclu": r in exclues,
+        {"rubrique": r, "exclu": r in exclues, "famille": famille(r),
          **cell(cum(n, ok, lambda pd, r=r: pd.rubrique(r)),
                 cum(n1, ok1, lambda pd, r=r: pd.rubrique(r))),
          **bud("rubrique", r, cum(n, ok, lambda pd, r=r: pd.rubrique(r)))}
         for r in refs.rubriques if r != ABSENCES
     ]
     ms_n, ms_n1 = cum(n, ok, lambda pd: pd.ms), cum(n1, ok1, lambda pd: pd.ms)
-    a_type.append({"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_n, ms_n1),
+    parts = {x["rubrique"]: tuple(cum(pds, mois, lambda pd, r=x["rubrique"], c=c: _part(pd, r, c))
+                                  for c in (True, False) for pds, mois in ((n, ok), (n1, ok1)))
+             for x in a_type}
+    familles = _familles(a_type, parts)
+    a_type.append({"rubrique": "TOTAL CHARGES", "exclu": False, "famille": None,
+                   **cell(ms_n, ms_n1),
                    **bud("rubrique", "TOTAL CHARGES", ms_n)})
 
     b_service = []
@@ -609,6 +674,7 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
         for c in refs.contrats for a in refs.activites]
     return {
         "a_type_charge": a_type,
+        "a_familles": familles,
         "b_service_activite": b_service,
         "c_site": c_site,
         "c_site_total": {"ms": _somme([c["ms"] for c in c_site], budget=True),
@@ -644,6 +710,9 @@ def annuel(
                  "absences": pds[m].rubrique(ABSENCES) if _ok(pds.get(m)) else None,
                  "commissions": pds[m].rubrique(COMMISSION) if _ok(pds.get(m)) else None,
                  "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
+                 if _ok(pds.get(m)) else None,
+                 "salaire": pds[m].rubrique(SALAIRE) if _ok(pds.get(m)) else None,
+                 "primes_toutes": sum((pds[m].rubrique(r) for r in PRIMES_TOUTES), ZERO)
                  if _ok(pds.get(m)) else None,
                  "frais_mission": pds[m].rubrique(FRAIS_MISSION) if _ok(pds.get(m)) else None,
                  "logement": pds[m].rubrique(LOGEMENT) if _ok(pds.get(m)) else None,
@@ -779,6 +848,11 @@ def annuel(
                                   if ok1 else None),
         "primes_cumul": cell(primes_ytd, sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES), ZERO)
                              if ok1 else None),
+        "salaire_cumul": cell(cumul_rub(SALAIRE),
+                              sum((n1[m].rubrique(SALAIRE) for m in ok1), ZERO) if ok1 else None),
+        "primes_toutes_cumul": cell(
+            sum((n[m].rubrique(r) for m in ok for r in PRIMES_TOUTES), ZERO) if nb else None,
+            sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES_TOUTES), ZERO) if ok1 else None),
         "frais_mission_ytd": cumul_rub(FRAIS_MISSION),
         "logement_ytd": cumul_rub(LOGEMENT),
         "effectif_moyen": eff,

@@ -175,7 +175,7 @@ Ce fichier Excel (avec macros) contient le **reporting individuel des commerciau
 - **Questions** : aucune.
 
 ### 8. Séparer salaire et primes
-- **Pas encore de réponse.**
+- **Réalisé par défaut** (étude `etude-salaire-primes-graphiques.md`) : tableau des types de charge en 4 familles (Salaire, Primes, Avantages et frais, Charges) avec un sous-total par famille ; les primes hors total restent dans leur famille, marquées « (hors total) », non comptées. Graphiques « Salaire par mois » et « Primes par mois ». Colonne Famille dans l'Excel.
 - **Questions** :
   - Q8.1 Quelles rubriques font partie du « salaire », et lesquelles des « primes » ?
   - Q8.2 Certaines primes (primes sur ventes, primes sur résultats, productivité ateliers, commission) sont aujourd'hui **sorties du total**. Faut-il les montrer quand même dans la partie « primes » ?
@@ -201,8 +201,7 @@ Ce fichier Excel (avec macros) contient le **reporting individuel des commerciau
 - **Réalisé** : ils restent dans la masse salariale. Ligne « dont Frais de mission » sous le total, avec le budget de la rubrique, dans les tableaux mensuel et annuel.
 
 ### 12. Choisir les graphiques à afficher
-- **Pas encore de réponse.** La liste va passer de 4 à environ 20 graphiques, donc ce choix devient utile.
-- **À faire (proposition)** : des cases à cocher dans les filtres. Le choix est retenu pour chaque utilisateur.
+- **Réalisé par défaut** (étude `etude-salaire-primes-graphiques.md`) : menu « Graphiques (n/N) » sous les filtres, une case par graphique et « Tout afficher ». Le choix est gardé dans le navigateur de chaque utilisateur ; le PDF ne contient que les graphiques cochés.
 - **Questions** :
   - Q12.1 Le choix doit-il être retenu à la prochaine connexion ?
   - Q12.2 L'export PDF doit-il contenir seulement les graphiques choisis ?

@@ -159,3 +159,27 @@ test('Activité : colonnes Objectif, Écart et Écart % sur les lignes qui ont u
   expect(devis).toHaveLength(7)
   expect(devis.slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
 })
+
+test('TypesCharge groupe les rubriques par famille, avec sous-total et rubrique hors total marquée', () => {
+  const r = (rubrique: string, famille: string, exclu = false) => ({ rubrique, famille, exclu, ...cell })
+  const blocs = {
+    a_type_charge: [
+      r('Salaire brut garantie', 'salaire'),
+      r('Bonus', 'primes', true),
+      r('Prime sur ventes', 'primes'),
+      { rubrique: 'TOTAL CHARGES', famille: null, exclu: false, ...cell },
+    ],
+    a_familles: [
+      { famille: 'salaire', hors_total: null, hors_total_m1: null, ...cell },
+      { famille: 'primes', hors_total: '12', hors_total_m1: '10', ...cell },
+    ],
+  } as unknown as Blocs
+  const { container } = render(<TypesCharge d={blocs} lib={lib} />)
+  const lignes = [...container.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th')?.textContent)
+  expect(lignes.slice(0, 7)).toEqual([
+    'Salaire', 'Salaire brut garantie', 'Sous-total Salaire',
+    'Primes', 'Bonus (hors total)', 'Prime sur ventes', 'Sous-total Primes',
+  ])
+  expect(container.querySelector('tr.exclu th')?.textContent).toBe('Bonus (hors total)')
+  expect(container.querySelectorAll('tr.sous-total')).toHaveLength(2)
+})

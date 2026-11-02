@@ -127,8 +127,8 @@ def test_export_mensuel_budget_sur_ca_marge_et_ligne_frais_de_mission(charge, db
     wb = classeur(get(charge, "mensuel/export", annee=2026, mois=1))
     g = lignes(wb["1 Reporting global"])
     ca, marge, fm = g["Chiffre d'affaires"], g["Marge"], g["dont Frais de mission"]
-    # colonnes : mois précédent, mois, variation, variation %, budget, écart, écart %
-    assert len(ca) == 7
+    # colonnes : mois précédent, mois, variation, variation %, budget, écart, écart %, famille
+    assert len(ca) == 8 and ca[7] is None  # CA hors familles
     assert D(str(ca[1])) == 10000 and D(str(ca[4])) == 12000 and D(str(ca[5])) == -2000
     assert abs(float(ca[6]) - (-2000 / 12000)) < 1e-9
     assert D(str(marge[4])) == 3000 and D(str(marge[5])) == -500

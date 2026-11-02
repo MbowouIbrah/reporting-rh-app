@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
@@ -16,6 +16,7 @@ let serieCa = false
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
+  salaire: i < 2 ? '700' : null, primes_toutes: i < 2 ? '120' : null,
 }))
 
 function routes(avecMarge: boolean, perms: string[]) {
@@ -203,9 +204,33 @@ test('Graphes : CA et marge par mois absents sans données de marge, affichés a
   serieCa = true
   try {
     rendu(<Graphes />, '/graphes', ['report:read', 'marge:read'], true)
-    expect(await screen.findByText('CA par mois (FCFA)')).toBeInTheDocument()
-    expect(screen.getByText('Marge par mois (FCFA)')).toBeInTheDocument()
+    expect(await screen.findByRole('checkbox', { name: 'CA par mois (FCFA)' })).toBeInTheDocument()
+    expect(screen.getAllByText('Marge par mois (FCFA)')).toHaveLength(2)
   } finally {
     serieCa = false
   }
+})
+
+test('Graphes : salaire et primes par mois, choix des graphiques mémorisé dans le navigateur', async () => {
+  localStorage.clear()
+  const legende = (t: string) => [...document.querySelectorAll('figcaption')].some((f) => f.textContent === t)
+  const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
+  expect(await screen.findByText('Graphiques (6/6)')).toBeInTheDocument()
+  expect(legende('Salaire par mois (FCFA)')).toBe(true)
+  expect(legende('Primes par mois (FCFA)')).toBe(true)
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Salaire par mois (FCFA)' }))
+  expect(legende('Salaire par mois (FCFA)')).toBe(false)
+  expect(screen.getByText('Graphiques (5/6)')).toBeInTheDocument()
+  expect(JSON.parse(localStorage.getItem('reporting-rh.graphes.1.evolution')!)).toEqual(['salaire'])
+  unmount()
+  // Rechargé : le choix est relu ; tout masquer affiche le message, « Tout afficher » rétablit tout.
+  rendu(<Graphes />, '/graphes', ['report:read'])
+  expect(await screen.findByText('Graphiques (5/6)')).toBeInTheDocument()
+  expect(legende('Salaire par mois (FCFA)')).toBe(false)
+  for (const c of screen.getAllByRole('checkbox')) if ((c as HTMLInputElement).checked) fireEvent.click(c)
+  expect(screen.getByText('Aucun graphique choisi.')).toBeInTheDocument()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Tout afficher' })[0])
+  expect(screen.getByText('Graphiques (6/6)')).toBeInTheDocument()
+  expect(localStorage.getItem('reporting-rh.graphes.1.evolution')).toBeNull()
+  localStorage.clear()
 })

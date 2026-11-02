@@ -1,9 +1,9 @@
 import { Fragment, type ReactNode, useState } from 'react'
-import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
+import type { Budget, Cell, CellPartiel, Famille, LigneActivite, Mensuel } from '../api/types'
 import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
-export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
+export type Blocs = Pick<Mensuel, 'a_type_charge' | 'a_familles' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
 export interface Libelles {
   prec: string
   cour: string
@@ -91,17 +91,44 @@ function Bourrage({ n, tete }: { n: number; tete?: boolean }) {
   return tete ? <th className="bourrage" colSpan={n} aria-hidden="true" /> : <td className="bourrage" colSpan={n} aria-hidden="true" />
 }
 
-/** 1. Reporting global : types de charge, TOTAL GÉNÉRAL, « dont Frais de mission » (déjà dans le total), puis CA et marge (hors total, avec objectif). */
+export const LIB_FAMILLE: Record<Famille, string> = {
+  salaire: 'Salaire',
+  primes: 'Primes',
+  avantages: 'Avantages et frais',
+  charges: 'Charges',
+}
+
+/** 1. Reporting global : types de charge regroupés par famille (titre, rubriques, sous-total ; les rubriques hors total
+ *  restent dans leur famille, marquées et non comptées), TOTAL GÉNÉRAL, « dont Frais de mission » (déjà dans le total),
+ *  puis CA et marge (hors total, avec objectif). Sans `a_familles` : liste simple des rubriques comptées. */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
-  const inclus = d.a_type_charge.filter((r) => r !== total && !r.exclu)
+  const rubriques = d.a_type_charge.filter((r) => r !== total)
   return (
     <table className="dense tab-global aligne">
       <Tete premiere="Type de charge" lib={lib} budget />
       <tbody>
-        {inclus.map((r) => (
-          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
-        ))}
+        {d.a_familles
+          ? d.a_familles.map((f) => (
+              <Fragment key={f.famille}>
+                <tr className="famille">
+                  <th scope="rowgroup" colSpan={COLONNES + 1}>{LIB_FAMILLE[f.famille]}</th>
+                </tr>
+                {rubriques.filter((r) => r.famille === f.famille).map((r) => (
+                  <Ligne
+                    key={r.rubrique}
+                    label={r.exclu ? <>{r.rubrique} <span className="mention-hors-total">(hors total)</span></> : r.rubrique}
+                    cell={r}
+                    budget={r}
+                    className={r.exclu ? 'exclu' : undefined}
+                  />
+                ))}
+                <Ligne label={`Sous-total ${LIB_FAMILLE[f.famille]}`} cell={f} budget={f} className="sous-total" />
+              </Fragment>
+            ))
+          : rubriques.filter((r) => !r.exclu).map((r) => (
+              <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
+            ))}
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
         {d.frais_mission && <Ligne label="dont Frais de mission" cell={d.frais_mission} budget={d.frais_mission} className="dont" />}
         {d.lignes_ca_marge && (
@@ -171,22 +198,6 @@ export function RapportSquelette({ lib, bandeau }: { lib: Libelles; bandeau: Rea
         </table>
       </Panneau>
     </div>
-  )
-}
-
-/** 1 bis. Charges exclues du total général : tableau distinct. */
-export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
-  const exclus = d.a_type_charge.filter((r) => r.rubrique !== 'TOTAL CHARGES' && r.exclu)
-  if (exclus.length === 0) return null
-  return (
-    <table className="dense tab-global aligne">
-      <Tete premiere="Charge exclue" lib={lib} budget />
-      <tbody>
-        {exclus.map((r) => (
-          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
-        ))}
-      </tbody>
-    </table>
   )
 }
 
