@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query'
 import { api, queryRetry } from './client'
 import { qs } from './rapports'
+import type { Calendrier } from '../lib/exercice'
 import type { Dec, Val } from './types'
 
 export const AXES = ['rubrique', 'service', 'site'] as const
@@ -133,18 +134,21 @@ export interface ReponseAnnee {
   annee: number
   groupe: Groupe
   niveau: Niveau
-  mois: { mois: number; cases: CaseEnvoyee[] }[]
-  /** Mois dont un objectif déjà saisi a été remplacé. */
+  calendrier: Calendrier
+  mois: { annee: number; mois: number; cases: CaseEnvoyee[] }[]
+  /** Mois (numéros, uniques dans l'exercice) dont un objectif déjà saisi a été remplacé. */
   ecrases: number[]
 }
 
-/** Objectifs annuels répartis par le serveur sur les 12 mois (reste de la division sur décembre). */
-export const repartirAnnee = (groupe: Groupe, annee: number, niveau: Niveau, cases: TotalAnnuel[]) =>
-  api<ReponseAnnee>('/pilotage/saisies/annee', put({ annee, groupe, niveau, cases }))
+/** Objectifs annuels répartis par le serveur sur les 12 mois de l'année civile ou de l'exercice fiscal
+ *  (avril `annee` → mars `annee + 1`) ; le reste de la division va sur le dernier mois. */
+export const repartirAnnee = (groupe: Groupe, annee: number, niveau: Niveau, cases: TotalAnnuel[], calendrier: Calendrier = 'civil') =>
+  api<ReponseAnnee>('/pilotage/saisies/annee', put({ annee, groupe, niveau, cases, calendrier }))
 
 /** Après une répartition annuelle : tous les mois du groupe et les rapports sont rechargés. */
-export function apresAnnee(qc: QueryClient, groupe: Groupe, annee: number) {
+export function apresAnnee(qc: QueryClient, groupe: Groupe, annee: number, calendrier: Calendrier = 'civil') {
   qc.invalidateQueries({ queryKey: ['saisies', groupe, annee] })
+  if (calendrier === 'fiscal') qc.invalidateQueries({ queryKey: ['saisies', groupe, annee + 1] })
   qc.invalidateQueries({ queryKey: ['saisie', 'derniere-periode'] })
   qc.invalidateQueries({ queryKey: ['pilotage'] })
   rechargerRapports(qc)

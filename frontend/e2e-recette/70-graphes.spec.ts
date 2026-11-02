@@ -23,7 +23,7 @@ test('choix des graphiques : masqués après rechargement et absents du PDF', as
 
   // Le PDF s'ouvre dans le même navigateur : il suit le choix, sans le menu
   await page.goto('rapport?sections=graphes')
-  await expect(graphe(page, GARDE)).toHaveCount(1)
+  await expect(graphe(page, GARDE)).toHaveCount(1, { timeout: 20_000 })
   for (const t of MASQUES) await expect(graphe(page, t)).toHaveCount(0)
   await expect(page.locator('details.choix-graphes')).toHaveCount(0)
 

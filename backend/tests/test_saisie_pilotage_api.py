@@ -611,6 +611,21 @@ def test_repartition_annuelle_entier_le_reste_va_sur_decembre(make_client, db):
         == list(range(1, 13))
 
 
+def test_repartition_annuelle_sur_l_exercice_fiscal_le_reste_va_sur_mars(make_client, db):
+    c = make_client(ADMIN)
+    r = c.put(ANNEE, json={"annee": 2026, "groupe": "obj_activite", "niveau": "global",
+                           "calendrier": "fiscal", "cases": [total("obj_ventes", "100")]})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    attendu = [(2026, m) for m in range(4, 13)] + [(2027, m) for m in range(1, 4)]
+    assert [(m["annee"], m["mois"]) for m in j["mois"]] == attendu
+    assert [D(m["cases"][0]["valeurs"]["obj_ventes"]) for m in j["mois"]] == [D(8)] * 11 + [D(12)]
+    assert D(valeurs_du_mois(c, "obj_activite", "obj_ventes", 4)[0]) == 8
+    assert nb_periodes(db) == 12 and nb_lignes(db, "obj_ventes") == 12
+    # en civil, janvier à mars 2026 sont neufs : seuls avril à décembre sont remplacés
+    assert repartir(c, "obj_activite", "global", [total("obj_ventes", "24")]).json()["ecrases"]         == list(range(4, 13))
+
+
 def test_repartition_annuelle_decimales_exactes_negatif_et_productivite(make_client):
     c = make_client(ADMIN)
     r = repartir(c, "obj_ca_marge", "global", [total("obj_ca", "10,5"), total("obj_marge", "-100")])
@@ -647,8 +662,9 @@ def test_repartition_annuelle_par_site_audit_par_mois_et_rien_si_vide(make_clien
     n = nb_periodes(db)
     r = repartir(c, "obj_activite", "site", [total("obj_ventes", "", sites["Douala"])],
                  annee=2027)
-    assert r.json() == {"annee": 2027, "groupe": "obj_activite", "niveau": "site", "mois": [],
-                        "ecrases": []}
+    assert r.json() == {"annee": 2027, "calendrier": "civil", "groupe": "obj_activite",
+                        "niveau": "site",
+                        "mois": [], "ecrases": []}
     assert nb_periodes(db) == n
 
 

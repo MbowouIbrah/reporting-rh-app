@@ -20,6 +20,7 @@ from app.db.session import get_db
 from app.kpi import formules as f
 from app.kpi import niveaux as nv
 from app.kpi.chargement import exclues_a_date
+from app.kpi.exercice import Calendrier, mois_exercice
 from app.models.donnees import Periode
 from app.models.pilotage import Budget
 from app.models.referentiel import Rubrique
@@ -340,13 +341,16 @@ class AnneeIn(BaseModel):
     groupe: Literal["obj_ca_marge", "obj_activite"]
     niveau: Literal["global", "site", "service", "cellule"]
     cases: list[TotalAnnuelIn] = Field(max_length=5000)
+    # fiscal : exercice d'avril `annee` à mars `annee + 1` (le reste va sur mars)
+    calendrier: Calendrier = "civil"
 
 
 
 
 def repartir_annee(total: Decimal, moyenne: bool) -> list[Decimal]:
     """12 valeurs mensuelles d'un total annuel, exactes à la précision du total saisi : le reste
-    de la division va sur décembre. Une moyenne (productivité) vaut la même valeur chaque mois."""
+    de la division va sur le dernier mois. Une moyenne (productivité) vaut la même valeur chaque
+    mois."""
     if moyenne:
         return [total] * 12
     signe, chiffres, exposant = total.as_tuple()
@@ -361,8 +365,9 @@ def repartir_annee(total: Decimal, moyenne: bool) -> list[Decimal]:
 def repartir_objectif_annuel(
     body: AnneeIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db),
 ):
-    """Répartit des objectifs annuels en 12 mois (même écriture que la saisie mensuelle, une trace
-    d'audit par mois). Les mois déjà saisis sont écrasés et listés dans `ecrases`."""
+    """Répartit des objectifs annuels sur les 12 mois de l'année civile ou de l'exercice fiscal
+    (même écriture que la saisie mensuelle, une trace d'audit par mois). Les mois déjà saisis sont
+    écrasés et listés dans `ecrases` (numéros de mois, uniques dans l'exercice)."""
     authorize(p, "saisie:write")
     if body.groupe in GROUPES_MARGE:
         authorize(p, "marge:read")
@@ -383,15 +388,16 @@ def repartir_objectif_annuel(
     mensuels = {cle: {i: repartir_annee(t, i in nv.MOYENNE) for i, t in vals.items()}
                 for cle, vals in totaux.items()}
     contextes, ecrases = {}, []
-    for m in range(1, 13):  # tout est contrôlé avant la moindre écriture
-        ctx = saisies.contexte(db, saisies.periode_id(db, body.annee, m))
-        corps = SaisiesIn(annee=body.annee, mois=m, groupe=body.groupe, niveau=body.niveau, cases=[
+    for rg, (an, m) in enumerate(mois_exercice(body.annee, body.calendrier)):
+        # tout est contrôlé avant la moindre écriture
+        ctx = saisies.contexte(db, saisies.periode_id(db, an, m))
+        corps = SaisiesIn(annee=an, mois=m, groupe=body.groupe, niveau=body.niveau, cases=[
             CaseIn(site_id=cle[0], service_id=cle[1],
-                   valeurs={i: format(v[m - 1], "f") for i, v in vals.items()})
+                   valeurs={i: format(v[rg], "f") for i, v in vals.items()})
             for cle, vals in mensuels.items()])
         valides = _valider_saisies(ctx, corps)
         _verifier_perimetre(ctx, scope, body.groupe, body.niveau, valides)
-        contextes[m] = (ctx, valides)
+        contextes[(an, m)] = (ctx, valides)
         autre_niveau = nv.niveau_des_lignes(
             [(si, se) for (i, si, se) in ctx.lignes if i in nv.GROUPES[body.groupe]])
         if (autre_niveau is not None and autre_niveau != body.niveau) or any(
@@ -399,18 +405,18 @@ def repartir_objectif_annuel(
                 for i in vals):
             ecrases.append(m)  # cases remplacées, ou lignes d'un autre niveau effacées
     if not mensuels:
-        return {"annee": body.annee, "groupe": body.groupe, "niveau": body.niveau, "mois": [],
-                "ecrases": []}
+        return {"annee": body.annee, "calendrier": body.calendrier, "groupe": body.groupe,
+                "niveau": body.niveau, "mois": [], "ecrases": []}
     if any(ctx.periode_id is None for ctx, _v in contextes.values()):
         authorize(p, "periode:write")  # même droit que l'ouverture d'un mois
     ecrits = []
-    for m, (_ctx, valides) in contextes.items():
-        per = periode_ou_ouvrir(db, p, body.annee, m)
+    for (an, m), (_ctx, valides) in contextes.items():
+        per = periode_ou_ouvrir(db, p, an, m)
         saisies.ecrire(db, p.user_id, per.id, body.groupe, body.niveau, valides)
-        ecrits.append({"mois": m, "cases": [
+        ecrits.append({"annee": an, "mois": m, "cases": [
             {"site_id": cle[0], "service_id": cle[1],
              "valeurs": {i: _txt_opt(v) for i, v in vals.items()}}
             for cle, vals in valides.items()]})
     db.commit()
-    return {"annee": body.annee, "groupe": body.groupe, "niveau": body.niveau, "mois": ecrits,
-            "ecrases": ecrases}
+    return {"annee": body.annee, "calendrier": body.calendrier, "groupe": body.groupe,
+            "niveau": body.niveau, "mois": ecrits, "ecrases": ecrases}

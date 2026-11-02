@@ -27,6 +27,8 @@ import {
 import Etat, { etatErreur } from '../../../components/Etat'
 import { Bouton, Confirmer } from '../../../components/Kit'
 import { comparer, decimal2, fcfa, montantSigneValide, montantValide, pct, moyenne, sansEspaces, signe, somme, valeurBrute } from '../../../lib/format'
+import { exerciceDe, libelleExercice, type Calendrier } from '../../../lib/exercice'
+import { lirePartage } from '../../../lib/filtresPartages'
 import { lireTSV, nettoyer } from '../../../lib/grille'
 
 const NIVEAUX: { id: Niveau; libelle: string; colonne: string; mot: [string, string] }[] = [
@@ -483,11 +485,16 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
   )
 }
 
-/** Objectifs annuels par case, répartis par le serveur sur les 12 mois de l'année affichée (même niveau). */
+/** Objectifs annuels par case, répartis par le serveur sur les 12 mois de l'année civile ou de l'exercice
+ *  fiscal qui contient le mois affiché (même niveau). Le calendrier proposé est celui des rapports. */
 function RepartirAnnee({ vue, groupe, lignes, onFerme }: { vue: VueSaisies; groupe: Groupe; lignes: Ligne[]; onFerme: (msg?: string) => void }) {
   const qc = useQueryClient()
   const inds = vue.indicateurs
   const [totaux, setTotaux] = useState<Valeurs>({})
+  const [cal, setCal] = useState<Calendrier>(() => (lirePartage().calendrier === 'fiscal' ? 'fiscal' : 'civil'))
+  const annee = exerciceDe(vue.annee, vue.mois, cal)
+  const nom = libelleExercice(annee, cal)
+  const periode = cal === 'fiscal' ? `d’avril ${annee} à mars ${annee + 1}` : `de janvier à décembre ${annee}`
   const [envoi, setEnvoi] = useState<{ cours: boolean; erreur?: string }>({ cours: false })
   const texte = (l: Ligne, i: string) => totaux[cleVal(l, i)] ?? ''
   const nbInvalides = lignes.reduce((n, l) => n + inds.filter((i) => !valide(i, texte(l, i))).length, 0)
@@ -499,10 +506,10 @@ function RepartirAnnee({ vue, groupe, lignes, onFerme }: { vue: VueSaisies; grou
       inds.filter((i) => texte(l, i).trim()).map((i) => ({ site_id: l.site_id, service_id: l.service_id, indicateur: i, total: normal(texte(l, i)) })),
     )
     try {
-      const r = await repartirAnnee(groupe, vue.annee, vue.niveau, cases)
-      apresAnnee(qc, groupe, vue.annee)
+      const r = await repartirAnnee(groupe, annee, vue.niveau, cases, cal)
+      apresAnnee(qc, groupe, annee, cal)
       const n = r.ecrases.length
-      onFerme(`Objectifs ${vue.annee} répartis sur les 12 mois${n ? ` ; ${n} mois déjà saisi${n > 1 ? 's' : ''} remplacé${n > 1 ? 's' : ''}` : ''}.`)
+      onFerme(`Objectifs ${nom} répartis sur les 12 mois${n ? ` ; ${n} mois déjà saisi${n > 1 ? 's' : ''} remplacé${n > 1 ? 's' : ''}` : ''}.`)
     } catch (e) {
       setEnvoi({ cours: false, erreur: e instanceof Error ? e.message : 'Répartition impossible.' })
     }
@@ -511,18 +518,25 @@ function RepartirAnnee({ vue, groupe, lignes, onFerme }: { vue: VueSaisies; grou
   return (
     <Confirmer
       ouvert
-      titre={`Répartir un objectif annuel ${vue.annee}`}
+      titre={`Répartir un objectif annuel ${nom}`}
       confirmer={envoi.cours ? 'Répartition…' : 'Répartir sur 12 mois'}
       desactive={envoi.cours || nbRemplis === 0 || nbInvalides > 0}
       onConfirmer={repartir}
       onAnnuler={() => onFerme()}
     >
+      <label>
+        Calendrier
+        <select value={cal} onChange={(e) => setCal(e.target.value === 'fiscal' ? 'fiscal' : 'civil')}>
+          <option value="civil">Année civile</option>
+          <option value="fiscal">Année fiscale (avril → mars)</option>
+        </select>
+      </label>
       <p>
-        Tapez le total de l’année : chaque mois reçoit un douzième (le reste va sur décembre) ; la productivité garde la même valeur chaque mois.{' '}
-        Les objectifs déjà saisis de ces cases sont remplacés sur toute l’année.
+        Tapez le total {cal === 'fiscal' ? 'de l’exercice' : 'de l’année'}, réparti {periode} : chaque mois reçoit un douzième (le reste va sur {cal === 'fiscal' ? 'mars' : 'décembre'}) ; la productivité garde la même valeur chaque mois.{' '}
+        Les objectifs déjà saisis de ces cases sont remplacés sur ces 12 mois.
       </p>
       <table className="dense saisie-donnees">
-        <caption className="sr-only">Objectifs annuels {vue.annee}</caption>
+        <caption className="sr-only">Objectifs annuels {nom}</caption>
         <thead>
           <tr>
             <th scope="col">{NIVEAUX.find((n) => n.id === vue.niveau)?.colonne}</th>
