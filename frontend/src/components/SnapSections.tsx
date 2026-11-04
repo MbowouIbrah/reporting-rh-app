@@ -36,26 +36,42 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
     // (inertie du pavé tactile) restent ignorés tant qu'ils se suivent de près.
     let enMouvement = false
     let dernier = 0
+    let depart = -1e9
     let secours = 0
+    let dernierTableau = -1e9
     const liberer = () => {
       enMouvement = false
       window.clearTimeout(secours)
     }
     const surMolette = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) < 4 || racine.scrollHeight <= racine.clientHeight) return
+      if (e.deltaY === 0 || racine.scrollHeight <= racine.clientHeight) return
       const bas = e.deltaY > 0
-      const corps = (e.target as HTMLElement).closest('.panneau-corps')
-      if (corps && (bas ? corps.scrollTop + corps.clientHeight < corps.scrollHeight - 1 : corps.scrollTop > 0)) return
-      e.preventDefault()
       const t = performance.now()
-      const memeGeste = t - dernier < 160
+      const corps = (e.target as HTMLElement).closest('.panneau-corps')
+      if (corps && (bas ? corps.scrollTop + corps.clientHeight < corps.scrollHeight - 1 : corps.scrollTop > 0)) {
+        dernierTableau = t
+        return
+      }
+      // Tableau arrivé au bout : le geste en cours s'arrête là, il faut relâcher puis relancer pour changer de section
+      if (corps && corps.scrollHeight > corps.clientHeight + 1 && t - dernierTableau < 300) {
+        e.preventDefault()
+        dernierTableau = t
+        return
+      }
+      // Tous les crans sont bloqués, même les petits de fin d'inertie : laissés au navigateur, ils
+      // interrompaient le défilement doux et l'accrochage recalait la section après coup (à-coup).
+      e.preventDefault()
+      // Crans rapprochés = même geste, mais seulement dans la seconde qui suit un changement de section :
+      // une molette qui envoie des crans sans pause ne doit jamais rester bloquée.
+      const memeGeste = t - dernier < 160 && t - depart < 1000
       dernier = t
-      if (enMouvement || memeGeste) return
+      if (enMouvement || memeGeste || Math.abs(e.deltaY) < 4) return
       const liste = [...racine.querySelectorAll<HTMLElement>('.snap-section')]
       const courant = liste.reduce((m, s, i) => (Math.abs(s.offsetTop - racine.scrollTop) < Math.abs(liste[m].offsetTop - racine.scrollTop) ? i : m), 0)
       const cible = liste[courant + (bas ? 1 : -1)]
       if (!cible) return
       enMouvement = true
+      depart = t
       secours = window.setTimeout(liberer, 900) // navigateur sans scrollend
       aller(cible.id)
     }

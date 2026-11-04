@@ -68,6 +68,9 @@
 .page-ecran.relais :is(tbody tr, .cases .case):nth-child(n + 10) { --mv-r: 9; }
 .page-ecran.relais tfoot tr { --mv-r: 10; }
 
+/* Graphes : la vue choisie (un groupe ou tous) remplace son squelette en fondu. */
+.graphes-arrivee, .graphes-tout .snap-zone { animation: var(--mv-entree) var(--mv-dur-page) var(--mv-courbe) backwards; }
+
 @media (prefers-reduced-motion: reduce) {
   :root { --mv-entree: none; --mv-sortie: none; --mv-surgir: none; }
   .page-ecran :is(tbody td.num, tfoot td.num, tbody .var, .val, .sk-texte, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) { animation: none !important; }

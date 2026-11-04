@@ -6,6 +6,7 @@ import {
 
 /** Le groupe d'ouverture doit être affiché : sinon il passe au premier groupe affiché. */
 function normaliser(c: ConfigGroupes): ConfigGroupes {
+  if (c.ordre.length === 1) return { ...c, defaut: c.ordre[0] } // un seul groupe : c'est lui, par défaut
   if (c.defaut === VUE_TOUT || c.ordre.includes(c.defaut)) return c
   return { ...c, defaut: c.ordre[0] ?? VUE_TOUT }
 }
@@ -15,6 +16,8 @@ interface Edition {
   id: string | null
   nom: string
   graphes: string[]
+  /** Groupe d'origine : seul le nom change, les graphiques sont fixes. */
+  origine?: boolean
 }
 
 /**
@@ -61,25 +64,52 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     ? tousLesGroupes(sansNomsPerso(travail), nomsSaisis)
     : tousLesGroupes({ ...travail, noms: nomsSaisis }, noms)
   const parId = new Map(tous.map((g) => [g.id, g]))
-  const affiches = [...new Set(travail.ordre)].filter((id) => parId.has(id))
-  const masques = tous.filter((g) => !affiches.includes(g.id))
-  const lignes: Groupe[] = [...affiches.map((id) => parId.get(id)!), ...masques]
+  // Place de chaque ligne fixe pendant la fenêtre : cocher ou décocher ne la déplace pas
+  const [rang, setRang] = useState<string[]>(() => {
+    const ids = tousLesGroupes(config).map((g) => g.id)
+    return [...new Set([...config.ordre.filter((id) => ids.includes(id)), ...ids])]
+  })
+  const ids = [...new Set([...rang, ...tous.map((g) => g.id)])].filter((id) => parId.has(id))
+  const lignes: Groupe[] = ids.map((id) => parId.get(id)!)
+  const affiches = ids.filter((id) => travail.ordre.includes(id))
+  // Groupe par défaut toujours choisi, même quand on ouvre sur tous les groupes
+  const [groupe, setGroupe] = useState(config.defaut !== VUE_TOUT ? config.defaut : (config.ordre[0] ?? ''))
+  const groupeDefaut = travail.defaut !== VUE_TOUT ? travail.defaut : affiches.includes(groupe) ? groupe : (affiches[0] ?? '')
   const maj = (c: ConfigGroupes) => setTravail(normaliser(c))
+  const montrer = (montres: string[], tout = travail.defaut === VUE_TOUT, ordreLignes = ids) => {
+    const ordre = ordreLignes.filter((id) => montres.includes(id))
+    const g = ordre.includes(groupeDefaut) ? groupeDefaut : (ordre[0] ?? '')
+    setGroupe(g)
+    maj({ ...travail, ordre, defaut: tout && ordre.length > 1 ? VUE_TOUT : g || VUE_TOUT })
+  }
 
+  // Décocher un groupe quand tous sont ouverts revient au groupe par défaut (comme « tout cocher »)
   const basculer = (id: string) =>
-    maj({ ...travail, ordre: affiches.includes(id) ? affiches.filter((x) => x !== id) : [...affiches, id] })
+    affiches.includes(id) ? montrer(affiches.filter((x) => x !== id), false) : montrer([...affiches, id])
+  // Tout décocher garde seulement le groupe par défaut
+  const toutAfficher = (oui: boolean) => (oui ? montrer(ids, true) : montrer([groupeDefaut], false))
+  const choisirDefaut = (id: string) => {
+    setGroupe(id)
+    maj({ ...travail, defaut: id })
+  }
   const deplacer = (id: string, sens: -1 | 1) => {
-    const i = affiches.indexOf(id)
+    const i = ids.indexOf(id)
     const j = i + sens
-    if (i < 0 || j < 0 || j >= affiches.length) return
-    const o = [...affiches]
+    if (i < 0 || j < 0 || j >= ids.length) return
+    const o = [...ids]
     ;[o[i], o[j]] = [o[j], o[i]]
-    maj({ ...travail, ordre: o })
+    setRang(o)
+    maj({ ...travail, ordre: o.filter((x) => affiches.includes(x)) })
   }
   const supprimer = (id: string) =>
     maj({ ...travail, perso: travail.perso.filter((g) => g.id !== id), ordre: affiches.filter((x) => x !== id) })
   const seulementMesGroupes = () => maj({ ...travail, ordre: travail.perso.map((g) => g.id) })
-  const retablir = () => maj(retablirOrigine(travail))
+  const retablir = () => {
+    const c = retablirOrigine(travail)
+    setRang([...c.ordre, ...travail.perso.map((g) => g.id)])
+    setGroupe(c.defaut)
+    maj(c)
+  }
 
   const nomsChanges = () => {
     const avant = GROUPES_ORIGINE.filter((g) => noms[g.id]).map((g) => [g.id, noms[g.id]])
@@ -107,6 +137,13 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     e.preventDefault()
     if (!edition) return
     const nom = edition.nom.trim()
+    if (edition.origine && edition.id) {
+      const id = edition.id
+      const parDefaut = onNoms ? GROUPES_ORIGINE.find((g) => g.id === id)!.nom : (noms[id] ?? GROUPES_ORIGINE.find((g) => g.id === id)!.nom)
+      setBrouillon({ ...brouillon, [id]: nom === parDefaut ? '' : nom })
+      setEdition(null)
+      return
+    }
     if (!nom || !edition.graphes.length) return
     const groupe: Groupe = { id: edition.id ?? nouvelId(), nom, graphes: edition.graphes }
     if (edition.id) maj({ ...travail, perso: travail.perso.map((g) => (g.id === groupe.id ? groupe : g)) })
@@ -121,18 +158,38 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
 
   const choixGraphes = edition ? GRAPHES.filter((g) => dispo.has(g.id) || edition.graphes.includes(g.id)) : []
   const plein = !!edition && edition.graphes.length >= MAX_PAR_GROUPE
-  const nomValide = !!edition && edition.nom.trim().length > 0
+  const nomValide = !!edition && (edition.origine || edition.nom.trim().length > 0)
 
   return (
     <dialog ref={ref} className="perso-groupes" aria-labelledby={idTitre} onCancel={onAnnuler}>
       {edition ? (
         <form className="perso-edition" onSubmit={valider}>
           <h3 id={idTitre}>{edition.id ? 'Modifier le groupe' : 'Nouveau groupe'}</h3>
-          <p className="perso-aide">Donnez un nom au groupe et cochez jusqu’à {MAX_PAR_GROUPE} graphiques.</p>
+          <p className="perso-aide">
+            {edition.origine
+              ? `Changez le nom du groupe (${onNoms ? 'vu par tous' : 'vu par vous seul'}) ; ses graphiques sont fixes.`
+              : `Donnez un nom au groupe et cochez jusqu’à ${MAX_PAR_GROUPE} graphiques.`}
+          </p>
           <label className="perso-nom">
             Nom du groupe
-            <input type="text" value={edition.nom} maxLength={MAX_NOM} required onChange={(e) => setEdition({ ...edition, nom: e.target.value })} />
+            <input
+              type="text"
+              value={edition.nom}
+              maxLength={MAX_NOM}
+              required={!edition.origine}
+              placeholder={edition.origine && edition.id ? (onNoms ? undefined : noms[edition.id]) ?? GROUPES_ORIGINE.find((g) => g.id === edition.id)?.nom : undefined}
+              onChange={(e) => setEdition({ ...edition, nom: e.target.value })} />
           </label>
+          {edition.origine ? (
+            <section className="perso-graphes-fixes" aria-label="Graphiques du groupe">
+              <h4>Graphiques du groupe</h4>
+              <ul>
+                {edition.graphes.map((id) => (
+                  <li key={id}>{GRAPHES.find((g) => g.id === id)?.titre ?? id}</li>
+                ))}
+              </ul>
+            </section>
+          ) : (
           <fieldset>
             <legend>Graphiques ({edition.graphes.length}/{MAX_PAR_GROUPE})</legend>
             <ul>
@@ -151,6 +208,7 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
               ))}
             </ul>
           </fieldset>
+          )}
           <div className="perso-actions-bas perso-pied">
             <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition(null)}>
               Annuler
@@ -164,10 +222,14 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
         <>
           <h3 id={idTitre}>Personnaliser les groupes</h3>
           <p className="perso-aide">Choisissez les groupes affichés, leur ordre et celui qui s’ouvre en premier.</p>
+          <label className="perso-defaut perso-tout">
+            <input type="checkbox" checked={travail.defaut === VUE_TOUT} disabled={ids.length < 2} onChange={(e) => toutAfficher(e.target.checked)} />
+            Afficher tous les groupes
+          </label>
           <ul className="perso-liste">
             {lignes.map((g) => {
               const affiche = affiches.includes(g.id)
-              const i = affiches.indexOf(g.id)
+              const i = ids.indexOf(g.id)
               const perso = travail.perso.some((p) => p.id === g.id)
               return (
                 <li key={g.id} className={affiche ? undefined : 'masque'}>
@@ -180,7 +242,7 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
                     <button type="button" className="perso-icone" aria-label={`Monter ${g.nom}`} disabled={!affiche || i === 0} onClick={() => deplacer(g.id, -1)}>
                       <ArrowUp aria-hidden="true" size={16} />
                     </button>
-                    <button type="button" className="perso-icone" aria-label={`Descendre ${g.nom}`} disabled={!affiche || i === affiches.length - 1} onClick={() => deplacer(g.id, 1)}>
+                    <button type="button" className="perso-icone" aria-label={`Descendre ${g.nom}`} disabled={!affiche || i === ids.length - 1} onClick={() => deplacer(g.id, 1)}>
                       <ArrowDown aria-hidden="true" size={16} />
                     </button>
                     <label className="perso-defaut">
@@ -188,49 +250,33 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
                         type="radio"
                         name="defaut"
                         aria-label={`Ouvrir sur ${g.nom}`}
-                        checked={travail.defaut === g.id}
+                        checked={groupeDefaut === g.id}
                         disabled={!affiche}
-                        onChange={() => maj({ ...travail, defaut: g.id })}
+                        onChange={() => choisirDefaut(g.id)}
+                        onClick={() => travail.defaut === VUE_TOUT && choisirDefaut(g.id)}
                       />
                       par défaut
                     </label>
+                    <button
+                      type="button"
+                      className="bouton bouton-lien"
+                      aria-label={`Modifier ${g.nom}`}
+                      onClick={() => setEdition({ id: g.id, nom: g.nom, graphes: [...g.graphes], origine: !perso })}
+                    >
+                      Modifier
+                    </button>
                     {perso && (
-                      <>
-                        <button type="button" className="bouton bouton-lien" onClick={() => setEdition({ id: g.id, nom: g.nom, graphes: [...g.graphes] })}>
-                          Modifier
-                        </button>
-                        <button type="button" className="bouton bouton-lien" onClick={() => supprimer(g.id)}>
-                          Supprimer
-                        </button>
-                      </>
+                      <button type="button" className="bouton bouton-lien" onClick={() => supprimer(g.id)}>
+                        Supprimer
+                      </button>
                     )}
                   </span>
                 </li>
               )
             })}
           </ul>
-          <label className="perso-defaut perso-tout">
-            <input type="radio" name="defaut" checked={travail.defaut === VUE_TOUT} onChange={() => maj({ ...travail, defaut: VUE_TOUT })} />
-            Ouvrir sur : tous les groupes
-          </label>
 
-            <section className="perso-formulaire perso-noms" aria-label="Noms des groupes">
-              <h4>{onNoms ? 'Noms des groupes (vus par tous)' : 'Noms des groupes (vus par vous seul)'}</h4>
-              {GROUPES_ORIGINE.map((g) => (
-                <label key={g.id} className="perso-nom">
-                  {g.nom}
-                  <input
-                    type="text"
-                    value={brouillon[g.id] ?? ''}
-                    placeholder={onNoms ? g.nom : (noms[g.id] ?? g.nom)}
-                    maxLength={MAX_NOM}
-                    onChange={(e) => setBrouillon({ ...brouillon, [g.id]: e.target.value })}
-                  />
-                </label>
-              ))}
-            </section>
-
-            <div className="perso-outils">
+          <div className="perso-outils">
               <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition({ id: null, nom: '', graphes: [] })} disabled={travail.perso.length >= 20}>
                 Nouveau groupe
               </button>

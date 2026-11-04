@@ -44,9 +44,9 @@ test('vueInitiale : réglage par défaut, « tout », sinon premier groupe affic
   expect(vueInitiale({ ...CONFIG_ORIGINE, defaut: 'ventes' }, [])).toBe('tout')
 })
 
-test('descGroupe : titres séparés par des virgules, sans « (FCFA) »', () => {
-  expect(descGroupe(GROUPES_ORIGINE[0])).toBe('Masse salariale mensuelle, Rémunération globale, Effectif, Absences par mois (jours)')
-  expect(descGroupe({ graphes: ['inconnu', 'ca'] })).toBe('CA par mois')
+test('descGroupe : noms courts séparés par des virgules', () => {
+  expect(descGroupe(GROUPES_ORIGINE[0])).toBe('Masse salariale, Rémunération, Effectif, Absences')
+  expect(descGroupe({ graphes: ['inconnu', 'ca'] })).toBe('CA')
 })
 
 test('lireConfig : réglage valide repris, forme mauvaise rejetée', () => {

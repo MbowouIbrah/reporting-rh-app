@@ -101,8 +101,10 @@ test('groupes de graphiques : un administrateur renomme un groupe d’origine, l
 
   try {
     const f = await ouvrir()
-    await expect(f.getByText('Noms des groupes (vus par tous)')).toBeVisible()
-    await f.getByLabel(DEFAUT, { exact: true }).fill(NOUVEAU)
+    await f.getByRole('button', { name: `Modifier ${DEFAUT}` }).click()
+    await expect(f.getByText(/vu par tous/)).toBeVisible()
+    await f.getByLabel('Nom du groupe').fill(NOUVEAU)
+    await f.getByRole('button', { name: 'Valider' }).click()
     await f.getByRole('button', { name: 'Enregistrer' }).click()
     await expect(f).toHaveCount(0)
 
@@ -115,7 +117,9 @@ test('groupes de graphiques : un administrateur renomme un groupe d’origine, l
     await page.goto('graphes')
     await expect(menu(page)).toBeVisible()
     const f = await ouvrir()
-    await f.getByLabel(DEFAUT, { exact: true }).fill('')
+    await f.getByRole('button', { name: `Modifier ${NOUVEAU}` }).click()
+    await f.getByLabel('Nom du groupe').fill('')
+    await f.getByRole('button', { name: 'Valider' }).click()
     await f.getByRole('button', { name: 'Enregistrer' }).click()
     await expect(f).toHaveCount(0)
   }

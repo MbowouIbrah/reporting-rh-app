@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { type FiltresPage, getAnnuel } from '../api/rapports'
 import type { Annuel as AnnuelData } from '../api/types'
-import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge } from '../components/BlocsRapport'
+import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
@@ -9,20 +9,14 @@ import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { libelleCumul, libelleExercice } from '../lib/exercice'
-import { entier, fcfa } from '../lib/format'
+import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 
 function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
-  const { annee, mois, calendrier } = f
+  const { annee, calendrier } = f
   const lib = { prec: libelleComparaison(f, 'annee'), cour: libelleExercice(annee, calendrier) }
   return (
     <>
-      <p className="bandeau ok">
-        <span>{libelleCumul(annee, d.mois_fin ?? mois, calendrier)}</span>
-        <span>Moyenne mensuelle : <strong className="val">{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
-        {d.marge_ytd !== undefined && <span>Marge cumulée : <strong className="val">{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge ?? 0)} mois saisis)</span>}
-      </p>
       <SnapSections
         sections={[
           {
@@ -31,6 +25,7 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
             panneaux: [
               [
                 { titre: '1. Reporting global', contenu: <TypesCharge d={d} lib={lib} /> },
+                { titre: 'Charges exclues du total', contenu: <TypesExclus d={d} lib={lib} /> },
               ],
             ],
           },
@@ -88,13 +83,6 @@ export default function Annuel() {
       {premier && !gab && f.filtres && (
         <RapportSquelette
           lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: libelleExercice(f.filtres.annee, f.filtres.calendrier) }}
-          bandeau={
-            <>
-              <span>{libelleCumul(f.filtres.annee, f.filtres.mois, f.filtres.calendrier)}</span>
-              <span>Moyenne mensuelle : <strong className="val">—</strong></span>
-              <span>Marge cumulée : <strong className="val">—</strong></span>
-            </>
-          }
         />
       )}
       {q.error && !premier && <Etat type={etatErreur(q.error)} />}

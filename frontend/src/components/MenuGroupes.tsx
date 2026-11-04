@@ -47,7 +47,7 @@ export default function MenuGroupes({ groupes, vue, defaut, onVue, onPersonnalis
                   <span className="menu-groupes-coche" aria-hidden="true">{actif && <Check size={14} />}</span>
                   <span className="menu-groupes-texte">
                     <strong>{g.nom}</strong>
-                    {g.id === defaut && <em className="menu-groupes-defaut"> par défaut</em>}
+                    {g.id === defaut && <em className="menu-groupes-defaut">par défaut</em>}
                     <small>{descGroupe(g)}</small>
                   </span>
                 </button>
@@ -65,7 +65,7 @@ export default function MenuGroupes({ groupes, vue, defaut, onVue, onPersonnalis
           <span className="menu-groupes-coche" aria-hidden="true">{vue === VUE_TOUT && <Check size={14} />}</span>
           <span className="menu-groupes-texte">
             <strong>{`Tout afficher (${groupes.length} groupe${groupes.length > 1 ? 's' : ''})`}</strong>
-            {defaut === VUE_TOUT && <em className="menu-groupes-defaut"> par défaut</em>}
+            {defaut === VUE_TOUT && <em className="menu-groupes-defaut">par défaut</em>}
           </span>
         </button>
         <button type="button" className="menu-groupes-ligne" onClick={choisir(onPersonnaliser)}>

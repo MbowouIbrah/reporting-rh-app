@@ -19,6 +19,7 @@ export function Panneau({ titre, className, id, sansTitre, children }: { titre: 
   )
 }
 
+/** Bulle d'aide de la colonne : écart rapporté au budget, signé. */
 const LIB_BUDGET = ['Budget', 'Écart', '% Budget']
 const LIB_OBJECTIF = ['Objectif', 'Écart', 'Écart %']
 
@@ -91,6 +92,22 @@ function Bourrage({ n, tete }: { n: number; tete?: boolean }) {
   return tete ? <th className="bourrage" colSpan={n} aria-hidden="true" /> : <td className="bourrage" colSpan={n} aria-hidden="true" />
 }
 
+/** 1 bis. Charges exclues du total général : tableau distinct, rubriques non comptées dans le reporting global. */
+export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
+  const exclus = d.a_type_charge.filter((r) => r.rubrique !== 'TOTAL CHARGES' && r.exclu)
+  if (exclus.length === 0) return null
+  return (
+    <table className="dense tab-global aligne">
+      <Tete premiere="Charge exclue" lib={lib} budget />
+      <tbody>
+        {exclus.map((r) => (
+          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} className="exclu" />
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 export const LIB_FAMILLE: Record<Famille, string> = {
   salaire: 'Salaire',
   primes: 'Primes',
@@ -98,8 +115,8 @@ export const LIB_FAMILLE: Record<Famille, string> = {
   charges: 'Charges',
 }
 
-/** 1. Reporting global : types de charge regroupés par famille (titre, rubriques, sous-total ; les rubriques hors total
- *  restent dans leur famille, marquées et non comptées), TOTAL GÉNÉRAL, « dont Frais de mission » (déjà dans le total),
+/** 1. Reporting global : types de charge regroupés par famille (titre puis rubriques comptées ; les rubriques hors total
+ *  sont dans `TypesExclus`), TOTAL GÉNÉRAL,
  *  puis CA et marge (hors total, avec objectif). Sans `a_familles` : liste simple des rubriques comptées. */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
@@ -114,23 +131,19 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
                 <tr className="famille">
                   <th scope="rowgroup" colSpan={COLONNES + 1}>{LIB_FAMILLE[f.famille]}</th>
                 </tr>
-                {rubriques.filter((r) => r.famille === f.famille).map((r) => (
-                  <Ligne
-                    key={r.rubrique}
-                    label={r.exclu ? <>{r.rubrique} <span className="mention-hors-total">(hors total)</span></> : r.rubrique}
-                    cell={r}
-                    budget={r}
-                    className={r.exclu ? 'exclu' : undefined}
-                  />
+                {rubriques.filter((r) => r.famille === f.famille && !r.exclu).map((r) => (
+                  <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
                 ))}
-                <Ligne label={`Sous-total ${LIB_FAMILLE[f.famille]}`} cell={f} budget={f} className="sous-total" />
               </Fragment>
             ))
           : rubriques.filter((r) => !r.exclu).map((r) => (
               <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
             ))}
+      </tbody>
+      <tbody className="pied">
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}
-        {d.frais_mission && <Ligne label="dont Frais de mission" cell={d.frais_mission} budget={d.frais_mission} className="dont" />}
+      </tbody>
+      <tbody>
         {d.lignes_ca_marge && (
           <>
             <Ligne label="Chiffre d'affaires" cell={d.lignes_ca_marge.ca} budget={d.lignes_ca_marge.ca} sens="resultat" className="hors-total" />
@@ -175,11 +188,11 @@ export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libell
 
 /** Premier chargement : cadre réel de la section 1 (bandeau, titre, en-têtes, TOTAL GÉNÉRAL) à sa taille ;
  *  seules les valeurs issues des données (types de charge, chiffres) sont en squelette. */
-export function RapportSquelette({ lib, bandeau }: { lib: Libelles; bandeau: ReactNode }) {
+export function RapportSquelette({ lib, bandeau }: { lib: Libelles; bandeau?: ReactNode }) {
   const chiffres = Array.from({ length: COLONNES }, (_, j) => <td key={j} className="num" />)
   return (
     <div aria-busy="true">
-      <p className="bandeau ok">{bandeau}</p>
+      {bandeau && <p className="bandeau ok">{bandeau}</p>}
       <Panneau titre="1. Reporting global">
         <table className="dense tab-global aligne">
           <Tete premiere="Type de charge" lib={lib} budget />
@@ -249,6 +262,8 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
             basculer={() => setOuvert(ouvert === b.service ? null : b.service)}
           />
         ))}
+      </tbody>
+      <tbody className="pied">
         {total && (
           <tr className="total">
             <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
@@ -256,6 +271,8 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
             <Budgets b={total} />
           </tr>
         )}
+      </tbody>
+      <tbody>
         <tr className="total staff">
           <th scope="row" colSpan={2}>Effectif global</th>
           <Valeurs c={d.d_contrat.total} />
@@ -350,6 +367,8 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
             basculer={() => setOuvert(ouvert === r.site ? null : r.site)}
           />
         ))}
+      </tbody>
+      <tbody className="pied">
         {d.c_site_total && (
           <>
             <tr className="total">
@@ -487,12 +506,16 @@ export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
         {contrats.map((c, n) => (
           <ContratBloc key={c} contrat={c} lignes={d.d_contrat.ventilation.filter((v) => v.contrat === c)} bande={n % 2 === 1} />
         ))}
+      </tbody>
+      <tbody className="pied">
         {total && (
           <tr className="total">
             <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
             <Valeurs c={total} />
           </tr>
         )}
+      </tbody>
+      <tbody>
         <tr className="total staff">
           <th scope="row" colSpan={2}>Effectif global</th>
           <Valeurs c={d.d_contrat.total} />

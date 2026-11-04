@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
@@ -162,14 +162,15 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
 })
 
-test('Annuel : affiche la moyenne mensuelle', async () => {
+test('Annuel : pas de bandeau de cumul au-dessus des tableaux', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
-  expect(await screen.findByText(/Moyenne mensuelle/)).toBeInTheDocument()
+  await screen.findByText('1. Reporting global')
+  expect(screen.queryByText(/Moyenne mensuelle/)).toBeNull()
 })
 
 test('Annuel : bloc Activité masqué sans donnée, affiché avec la mention « partiel »', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
-  await screen.findByText(/Moyenne mensuelle/)
+  await screen.findByText('1. Reporting global')
   expect(screen.queryByText('6. Activité')).toBeNull()
   activiteAnnuel = [
     { cle: 'ventes', libelle: 'Ventes', ...cell('12'), partiel: true },
@@ -233,7 +234,8 @@ test('Graphes : CA et marge par mois absents sans données de marge, affichés a
   try {
     rendu(<Graphes />, '/graphes', ['report:read', 'marge:read'], true)
     expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Ventes, marge et commissions/ }))
+    // la vue « tous » choisie plus haut est gardée : le bouton du menu est visé
+    fireEvent.click(within(screen.getByRole('group', { name: 'Groupes de graphiques' })).getByRole('button', { name: /Ventes, marge et commissions/ }))
     await waitFor(() => expect(legende('CA par mois (FCFA)')).toBe(true))
     expect(legende('Marge par mois (FCFA)')).toBe(true)
     // un groupe à la fois : la vue d'ensemble n'est plus à l'écran

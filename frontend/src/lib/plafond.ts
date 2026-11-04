@@ -17,8 +17,10 @@ export function plafonner(panneau: HTMLElement) {
   const lignes = [...table.querySelectorAll('tbody tr')].map((r) => r.getBoundingClientRect().height)
   const tete = table.querySelector('thead')?.getBoundingClientRect().height ?? 0
   const pied = table.querySelector('tfoot')?.getBoundingClientRect().height ?? 0
+  // Ligne de référence prise hors lignes de total figées (plus hautes), sinon le tableau s'étire moins
+  const courantes = [...table.querySelectorAll('tbody:not(.pied) tr')].map((r) => r.getBoundingClientRect().height)
   table.style.height = ''
-  const haute = Math.max(...lignes)
+  const haute = Math.max(...(courantes.length ? courantes : lignes))
   if (!lignes.length || !haute) return
 
   const h3 = panneau.querySelector('h3')?.getBoundingClientRect().height ?? 0

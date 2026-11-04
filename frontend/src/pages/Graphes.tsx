@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Fragment, type ReactNode, useState } from 'react'
+import { Fragment, type ReactNode, useDeferredValue, useState } from 'react'
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -238,7 +238,12 @@ export default function Graphes() {
   const affiches = groupesAffiches(config, dispo, noms)
   // Vue choisie par l'utilisateur ; sans choix (ou si le groupe n'est plus affiché), celle du réglage d'ouverture
   const vueActive = vue !== null && (vue === VUE_TOUT || affiches.some((g) => g.id === vue)) ? vue : vueInitiale(config, affiches)
-  const groupeActif = affiches.find((g) => g.id === vueActive)
+  // Vue rendue en arrière-plan : au changement de vue, le squelette de la vue demandée s'affiche
+  // tout de suite et les graphes (lourds en « tout afficher ») arrivent sans figer la page.
+  const vueRendue = useDeferredValue(vueActive)
+  const enBascule = vueRendue !== vueActive
+  const groupeActif = affiches.find((g) => g.id === vueRendue)
+  const groupeCible = affiches.find((g) => g.id === vueActive) ?? affiches[0]
   // Squelette : les quatre cartes du groupe d'ouverture, avant même de savoir quelles données existent
   const tousLesIds = new Set(GRAPHES.map((g) => g.id))
   const groupesSquelette = groupesAffiches(config, tousLesIds, noms)
@@ -358,8 +363,8 @@ export default function Graphes() {
     credit: () => <GrapheMois {...commun} titre={T.credit} lecture={`Crédit téléphonique payé chaque mois en ${serieN}`} cle="credit" couleur={C_CHARGE} />,
     carburant: () => <GrapheMois {...commun} titre={T.carburant} lecture={`Carburant payé chaque mois en ${serieN}`} cle="carburant" couleur={C_CHARGE} />,
   }
-  const grille = (g: Groupe) => (
-    <div className={`graphes n${g.graphes.length}`}>
+  const grille = (g: Groupe, arrivee = false) => (
+    <div key={arrivee ? g.id : undefined} className={`graphes n${g.graphes.length}${arrivee ? ' graphes-arrivee' : ''}`}>
       {g.graphes.map((id) => <Fragment key={id}>{rendu[id]?.()}</Fragment>)}
     </div>
   )
@@ -371,17 +376,22 @@ export default function Graphes() {
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
-    <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}`}>
+    <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && vueRendue === VUE_TOUT ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
-      {serie && !rapport && affiches.length > 0 && (
+      {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture. */}
+      {!rapport && (serie ? affiches.length > 0 : premier && groupesSquelette.length > 0) && (
         <MenuGroupes
-          groupes={affiches}
-          vue={vueActive}
+          groupes={serie ? affiches : groupesSquelette}
+          vue={serie ? vueActive : vueSquelette}
           defaut={config.defaut}
-          onVue={setVue}
+          onVue={(v) => {
+            setVue(v)
+            // le dernier choix du menu devient la vue d'ouverture de l'utilisateur
+            if (v !== config.defaut) setConfig({ ...config, defaut: v })
+          }}
           onPersonnaliser={() => setPersonnalise(true)}
         />
       )}
@@ -404,7 +414,17 @@ export default function Graphes() {
           ))}
         </div>
       )}
-      {serie && affiches.length > 0 && (rapport || vueActive === VUE_TOUT || !groupeActif ? (
+      {serie && enBascule && groupeCible && (
+        <div className={`graphes n${groupeCible.graphes.length}`} aria-busy="true">
+          {groupeCible.graphes.map((id) => (
+            <figure key={id} className="graphe">
+              <figcaption>{T[id]}</figcaption>
+              <div className="graphe-zone" />
+            </figure>
+          ))}
+        </div>
+      )}
+      {serie && !enBascule && affiches.length > 0 && (rapport || vueRendue === VUE_TOUT || !groupeActif ? (
         // Tous les groupes (et toujours le rapport PDF) : un écran par groupe
         <SnapSections
           libelle="Groupes de graphiques"
@@ -420,7 +440,7 @@ export default function Graphes() {
           }))}
         />
       ) : (
-        grille(groupeActif)
+        grille(groupeActif, true)
       ))}
       {personnalise && !rapport && (
         <PersonnaliserGroupes

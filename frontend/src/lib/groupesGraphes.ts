@@ -3,6 +3,8 @@
 export interface InfoGraphe {
   id: string
   titre: string
+  /** Nom court, pour la description d'un groupe en une ligne. */
+  court: string
   /** Graphique proposé seulement si la série mensuelle a une valeur pour cette clé. */
   cle?: string
 }
@@ -10,26 +12,26 @@ export interface InfoGraphe {
 /** Catalogue des graphiques, dans l'ordre d'affichage. Identifiants stables : les groupes
  *  de l'utilisateur y font référence. */
 export const GRAPHES: InfoGraphe[] = [
-  { id: 'ms', titre: 'Masse salariale mensuelle (FCFA)' },
-  { id: 'effectif', titre: 'Effectif' },
-  { id: 'frais', titre: 'Frais de mission (FCFA)' },
-  { id: 'remu', titre: 'Rémunération globale (FCFA)' },
-  { id: 'salaire', titre: 'Salaire par mois (FCFA)', cle: 'sal' },
-  { id: 'primes', titre: 'Primes par mois (FCFA)', cle: 'prim' },
-  { id: 'ventes', titre: 'Ventes par mois', cle: 'ventes' },
-  { id: 'clients', titre: 'Clients par mois', cle: 'clients' },
-  { id: 'or', titre: 'OR par productif et par mois', cle: 'orProd' },
-  { id: 'ca', titre: 'CA par mois (FCFA)', cle: 'ca' },
-  { id: 'marge', titre: 'Marge par mois (FCFA)', cle: 'marge' },
-  { id: 'commissions', titre: 'Commissions par mois (FCFA)', cle: 'comm' },
-  { id: 'productivite', titre: 'Productivité par mois', cle: 'prod' },
-  { id: 'factures', titre: 'Factures par mois', cle: 'fact' },
-  { id: 'absences', titre: 'Absences par mois (jours)', cle: 'absences' },
-  { id: 'assurance', titre: 'Assurance par mois (FCFA)', cle: 'assurance' },
-  { id: 'formation', titre: 'Formation par mois (FCFA)', cle: 'formation' },
-  { id: 'logement', titre: 'Logement site déporté par mois (FCFA)', cle: 'logement' },
-  { id: 'credit', titre: 'Crédit téléphonique par mois (FCFA)', cle: 'credit' },
-  { id: 'carburant', titre: 'Carburant par mois (FCFA)', cle: 'carburant' },
+  { id: 'ms', titre: 'Masse salariale mensuelle (FCFA)', court: 'Masse salariale' },
+  { id: 'effectif', titre: 'Effectif', court: 'Effectif' },
+  { id: 'frais', titre: 'Frais de mission (FCFA)', court: 'Frais de mission' },
+  { id: 'remu', titre: 'Rémunération globale (FCFA)', court: 'Rémunération' },
+  { id: 'salaire', titre: 'Salaire par mois (FCFA)', court: 'Salaire', cle: 'sal' },
+  { id: 'primes', titre: 'Primes par mois (FCFA)', court: 'Primes', cle: 'prim' },
+  { id: 'ventes', titre: 'Ventes par mois', court: 'Ventes', cle: 'ventes' },
+  { id: 'clients', titre: 'Clients par mois', court: 'Clients', cle: 'clients' },
+  { id: 'or', titre: 'OR par productif et par mois', court: 'OR par productif', cle: 'orProd' },
+  { id: 'ca', titre: 'CA par mois (FCFA)', court: 'CA', cle: 'ca' },
+  { id: 'marge', titre: 'Marge par mois (FCFA)', court: 'Marge', cle: 'marge' },
+  { id: 'commissions', titre: 'Commissions par mois (FCFA)', court: 'Commissions', cle: 'comm' },
+  { id: 'productivite', titre: 'Productivité par mois', court: 'Productivité', cle: 'prod' },
+  { id: 'factures', titre: 'Factures par mois', court: 'Factures', cle: 'fact' },
+  { id: 'absences', titre: 'Absences par mois (jours)', court: 'Absences', cle: 'absences' },
+  { id: 'assurance', titre: 'Assurance par mois (FCFA)', court: 'Assurance', cle: 'assurance' },
+  { id: 'formation', titre: 'Formation par mois (FCFA)', court: 'Formation', cle: 'formation' },
+  { id: 'logement', titre: 'Logement site déporté par mois (FCFA)', court: 'Logement', cle: 'logement' },
+  { id: 'credit', titre: 'Crédit téléphonique par mois (FCFA)', court: 'Téléphone', cle: 'credit' },
+  { id: 'carburant', titre: 'Carburant par mois (FCFA)', court: 'Carburant', cle: 'carburant' },
 ]
 
 export interface Groupe {
@@ -133,9 +135,9 @@ export function vueInitiale(config: ConfigGroupes, affiches: Groupe[]): string {
   return affiches[0]?.id ?? VUE_TOUT
 }
 
-const titreCourt = (id: string) => GRAPHES.find((g) => g.id === id)?.titre.replace(/\s*\(FCFA\)/, '')
+const titreCourt = (id: string) => GRAPHES.find((g) => g.id === id)?.court
 
-/** Contenu d'un groupe en une ligne : les titres des graphiques, sans l'unité. */
+/** Contenu d'un groupe en une ligne : le nom court de chaque graphique. */
 export function descGroupe(g: Pick<Groupe, 'graphes'>): string {
   return g.graphes.map(titreCourt).filter(Boolean).join(', ')
 }

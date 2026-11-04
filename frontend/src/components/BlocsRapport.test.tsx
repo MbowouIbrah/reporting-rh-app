@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import type { Cell } from '../api/types'
-import { Activite, type Blocs, ServicesActivites, Sites, TypesCharge } from './BlocsRapport'
+import { Activite, type Blocs, ServicesActivites, Sites, TypesCharge, TypesExclus } from './BlocsRapport'
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
@@ -119,18 +119,14 @@ test('écart d’un résultat (CA, marge) : dépasser l’objectif est bon, rest
   expect(marge.slice(-2).map((c) => c.className)).toEqual(['num neg', 'num neg'])
 })
 
-test('reporting global : « dont Frais de mission » juste sous le TOTAL GÉNÉRAL, avec son budget', () => {
+test('reporting global : pas de ligne « dont Frais de mission » sous le TOTAL GÉNÉRAL', () => {
   const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...cell, budget: '20', ecart: '8', ecart_pct: '0.4' }
   const frais = { ...cell, budget: '9', ecart: '3', ecart_pct: '0.33' }
   const blocs = { a_type_charge: [total], frais_mission: frais, lignes_ca_marge: { ca: cell, marge: cell } } as unknown as Blocs
   render(<TypesCharge d={blocs} lib={lib} />)
   const lignes = screen.getAllByRole('row').map((r) => r.querySelector('th')?.textContent)
-  expect(lignes.slice(-4)).toEqual(['TOTAL GÉNÉRAL', 'dont Frais de mission', "Chiffre d'affaires", 'Marge'])
-  const ligne = screen.getByText('dont Frais de mission').closest('tr')!
-  expect(ligne).toHaveClass('dont')
-  expect(ligne).toHaveTextContent(/10.*12.*9.*3/)
-  render(<TypesCharge d={{ a_type_charge: [total] } as unknown as Blocs} lib={lib} />)
-  expect(screen.getAllByText('dont Frais de mission')).toHaveLength(1)
+  expect(lignes.slice(-3)).toEqual(['TOTAL GÉNÉRAL', "Chiffre d'affaires", 'Marge'])
+  expect(screen.queryByText('dont Frais de mission')).toBeNull()
 })
 
 test('reporting global : mention « partiel » sur un budget de CA incomplet', () => {
@@ -160,7 +156,7 @@ test('Activité : colonnes Objectif, Écart et Écart % sur les lignes qui ont u
   expect(devis.slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
 })
 
-test('TypesCharge groupe les rubriques par famille, avec sous-total et rubrique hors total marquée', () => {
+test('TypesCharge groupe les rubriques comptées par famille, sans sous-total ; les hors total vont dans TypesExclus', () => {
   const r = (rubrique: string, famille: string, exclu = false) => ({ rubrique, famille, exclu, ...cell })
   const blocs = {
     a_type_charge: [
@@ -176,10 +172,9 @@ test('TypesCharge groupe les rubriques par famille, avec sous-total et rubrique 
   } as unknown as Blocs
   const { container } = render(<TypesCharge d={blocs} lib={lib} />)
   const lignes = [...container.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th')?.textContent)
-  expect(lignes.slice(0, 7)).toEqual([
-    'Salaire', 'Salaire brut garantie', 'Sous-total Salaire',
-    'Primes', 'Bonus (hors total)', 'Prime sur ventes', 'Sous-total Primes',
-  ])
-  expect(container.querySelector('tr.exclu th')?.textContent).toBe('Bonus (hors total)')
-  expect(container.querySelectorAll('tr.sous-total')).toHaveLength(2)
+  expect(lignes.slice(0, 4)).toEqual(['Salaire', 'Salaire brut garantie', 'Primes', 'Prime sur ventes'])
+  expect(container.querySelector('tr.exclu')).toBeNull()
+  expect(container.querySelector('tr.sous-total')).toBeNull()
+  const exclus = render(<TypesExclus d={blocs} lib={lib} />).container
+  expect([...exclus.querySelectorAll('tbody tr.exclu th')].map((th) => th.textContent)).toEqual(['Bonus'])
 })

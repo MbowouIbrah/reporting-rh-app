@@ -13,7 +13,7 @@ function menu(vue = 'ensemble') {
 test('menu des groupes : le groupe courant est annoncé, chaque groupe a sa description et « par défaut » est signalé', () => {
   menu()
   expect(screen.getByText('Groupe : Effectif et masse salariale', { selector: 'summary' })).toBeInTheDocument()
-  expect(screen.getByText('Masse salariale mensuelle, Rémunération globale, Effectif, Absences par mois (jours)')).toBeInTheDocument()
+  expect(screen.getByText('Masse salariale, Rémunération, Effectif, Absences')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Effectif et masse salariale/ })).toHaveAttribute('aria-current', 'true')
   expect(screen.getByRole('button', { name: /Frais et avantages/ })).not.toHaveAttribute('aria-current')
   expect(screen.getAllByText('par défaut')).toHaveLength(1)
