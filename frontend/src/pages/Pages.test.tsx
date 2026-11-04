@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
@@ -83,8 +83,15 @@ function rendu(ui: ReactNode, chemin: string, perms: string[], avecMarge = false
 
 afterEach(() => vi.restoreAllMocks())
 
+/** Le squelette a la structure de la page : attendre la fin du chargement avant de lire les valeurs. */
+async function chargee() {
+  await waitFor(() => expect(document.querySelector('.page-ecran[aria-busy="true"]')).not.toBeNull())
+  await waitFor(() => expect(document.querySelector('.page-ecran[aria-busy="true"]')).toBeNull())
+}
+
 test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
+  await chargee()
   const tuile = (await screen.findByText('Marge', { selector: '.micro' })).closest('.tuile')!
   expect(tuile).toHaveTextContent('—')
   expect(tuile).not.toHaveTextContent('0')
@@ -96,6 +103,7 @@ test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
 
 test('Résumé : effectif global de fin, évolution et répartition par contrat en bulle', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
   const tuile = (await screen.findByText('Évolution par rapport à Fév 2025')).closest('.tuile')!
   expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Fév 2025/)
   expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
@@ -106,6 +114,7 @@ test('Résumé : effectif global de fin, évolution et répartition par contrat 
 
 test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salariale par contrat', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
   const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
   expect(tuile).toHaveTextContent(/MAD globaux2Pourcentage MAD sites déportés1 · 50\s%/)
   expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
@@ -117,6 +126,7 @@ test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salari
 
 test('Résumé : tableau avec frais de mission, logement et ligne de total', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
   await screen.findByText('TOTAL')
   const entetes = [...document.querySelectorAll('.suivi thead th')].map((t) => t.textContent)
   expect(entetes).toEqual(['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.', 'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ'])
@@ -125,6 +135,7 @@ test('Résumé : tableau avec frais de mission, logement et ligne de total', asy
 
 test('Résumé : avec un filtre, tuiles CA et marge gardées avec « — »', async () => {
   rendu(<Resume />, '/resume?type_site=agence', ['report:read', 'marge:read'], true)
+  await chargee()
   for (const titre of ['Chiffre d’affaires', 'Marge', 'CA par salarié']) {
     const tuile = (await screen.findByText(titre, { selector: '.micro' })).closest('.tuile')!
     expect(tuile).toHaveTextContent(`${titre}—Non disponible pour ces filtres`)
@@ -134,6 +145,7 @@ test('Résumé : avec un filtre, tuiles CA et marge gardées avec « — »', as
 
 test('Résumé : tuiles marge absentes sans la permission', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
   await screen.findByText('Masse salariale', { selector: '.micro' })
   expect(screen.queryByText('Marge', { selector: '.micro' })).toBeNull()
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
@@ -233,4 +245,19 @@ test('Graphes : salaire et primes par mois, choix des graphiques mémorisé dans
   expect(screen.getByText('Graphiques (6/6)')).toBeInTheDocument()
   expect(localStorage.getItem('reporting-rh.graphes.1.evolution')).toBeNull()
   localStorage.clear()
+})
+
+test('Résumé : au tout premier chargement, le squelette a les cases, les mois et la ligne TOTAL de la page', async () => {
+  sessionStorage.clear()
+  rendu(<Resume />, '/resume', ['report:read', 'marge:read'])
+  const zone = await waitFor(() => {
+    const z = document.querySelector('.resume-excel[aria-busy="true"]')
+    expect(z).not.toBeNull()
+    return z!
+  })
+  expect(zone.querySelectorAll('.cases')).toHaveLength(2)
+  expect(zone.querySelectorAll('.cases .case')).toHaveLength(8)
+  expect(zone.querySelectorAll('.cases .case .second-libelle')).toHaveLength(8)
+  expect(zone.querySelectorAll('.suivi tbody tr')).toHaveLength(12)
+  expect(zone.querySelector('.suivi tfoot')).toHaveTextContent('TOTAL')
 })

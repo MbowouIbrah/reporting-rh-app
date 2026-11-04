@@ -2,7 +2,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { getAnnuel } from '../api/rapports'
-import type { Cell, Val } from '../api/types'
+import type { Annuel, Cell, Val } from '../api/types'
+import { usePeut } from '../auth/AuthContext'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
@@ -10,7 +11,7 @@ import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
-import { libelleExercice } from '../lib/exercice'
+import { libelleExercice, ordreMois, type Calendrier } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -84,6 +85,19 @@ function Case({
   )
 }
 
+/** Réponse sans valeurs, dessinée par le rendu normal au tout premier chargement (pas encore de gabarit) :
+ *  mêmes cases, libellés, mois et ligne TOTAL que la page chargée. CA et marge selon le droit « marge:read ». */
+function reponseVide(avecCa: boolean, calendrier: Calendrier | undefined): Annuel {
+  const cell = { m: null, m1: null, var: null, var_pct: null }
+  const ca = avecCa ? { ca_ytd: null, marge_ytd: null, taux_marge_ytd: null, ca_cumul: cell, ca_par_effectif: cell } : {}
+  return {
+    ...ca,
+    serie_n: ordreMois(calendrier).map((mois) => ({ mois, ...(avecCa ? { ca: null, marge: null, taux_marge: null } : {}) })),
+    commissions_cumul: cell, primes_cumul: cell, cumul_ytd: cell, effectif_fin: cell, effectif_moyen: cell,
+    mad_fin: cell, mad_deportes_fin: { ...cell, part: null }, ms_contrat: {}, effectif_fin_contrat: {},
+  } as unknown as Annuel
+}
+
 export default function Resume() {
   const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
   // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi. Poste et employé ne s'appliquent pas ici.
@@ -112,15 +126,17 @@ export default function Resume() {
   const an = f.filtres ? libelleExercice(f.filtres.annee, f.filtres.calendrier) : ''
   const n1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const erreur = premier ? null : ann.error
-  // Premier chargement : la page à la forme de la dernière réponse, valeurs en squelette.
-  const a = premier ? gab : ann.data
+  const peutCa = usePeut('marge:read')
+  // Premier chargement : la page à la forme de la dernière réponse (sinon d'une réponse vide), valeurs en squelette.
+  const a = premier ? (gab ?? (f.filtres ? reponseVide(peutCa, f.filtres.calendrier) : undefined)) : ann.data
   // Clés absentes de la réponse sans le droit « marge » ; présentes mais null quand le filtre n'a pas de CA.
   const droitCa = a !== undefined && 'ca_ytd' in a
-  const aCa = droitCa && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && (!filtre || a.ca_ytd != null || a.serie_n.some((m) => m.ca != null))
-  // Tuile indisponible : sous filtre seulement, quand la valeur est null.
-  const sansCa = droitCa && filtre && a.ca_ytd == null
-  const sansMarge = droitCa && filtre && a.marge_ytd == null
-  const sansCaEff = droitCa && filtre && a.ca_par_effectif?.m == null
+  const aCa = droitCa && a.serie_n.length > 0 && 'ca' in a.serie_n[0] && (!filtre || premier || a.ca_ytd != null || a.serie_n.some((m) => m.ca != null))
+  // Tuile indisponible : sous filtre seulement, quand la valeur est null (inconnu pendant le premier chargement).
+  const indef = droitCa && filtre && !premier
+  const sansCa = indef && a.ca_ytd == null
+  const sansMarge = indef && a.marge_ytd == null
+  const sansCaEff = indef && a.ca_par_effectif?.m == null
   const indispo = (titre: string) => (
     <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
   )
@@ -137,40 +153,12 @@ export default function Resume() {
   ]
 
   return (
-    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
+    <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {premier && !gab && (
-        // Premier chargement : cases et tableau à leur taille définitive, seules les valeurs en squelette.
-        <>
-          {[['Commissions', 'Masse salariale', 'MAD globaux'], ['Primes de productivité', 'Effectif global']].map((ligne) => (
-            <div key={ligne[0]} className="cases">
-              {ligne.map((t) => (
-                <Case key={t} titre={t} valeur="—" devise={false} />
-              ))}
-            </div>
-          ))}
-          <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
-          <div className="table-scroll">
-            <table className="dense suivi">
-              <thead>
-                <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
-              </thead>
-              <tbody aria-hidden="true">
-                {MOIS.map((m) => (
-                  <tr key={m}>
-                    <th scope="row">{m}</th>
-                    {colonnes.slice(1).map((c) => <td key={c} className="num" />)}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
       {erreur && <Etat type={etatErreur(erreur)} />}
       {a && (
         <>
