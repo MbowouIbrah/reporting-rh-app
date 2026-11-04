@@ -12,6 +12,7 @@ from app.api.parcours import router as parcours_router
 from app.api.periodes import router as periodes_router
 from app.api.pilotage import router as pilotage_router
 from app.api.rapports import router as rapports_router
+from app.api.reglages import router as reglages_router
 from app.api.salaries import router as salaries_router
 from app.core.config import settings
 
@@ -40,3 +41,4 @@ app.include_router(rapports_router, prefix=settings.API_PREFIX)
 app.include_router(salaries_router, prefix=settings.API_PREFIX)
 app.include_router(parcours_router, prefix=settings.API_PREFIX)
 app.include_router(donnees_router, prefix=settings.API_PREFIX)
+app.include_router(reglages_router, prefix=settings.API_PREFIX)

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { CONFIG_ORIGINE, GRAPHES } from '../lib/groupesGraphes'
 import PersonnaliserGroupes from './PersonnaliserGroupes'
@@ -23,17 +23,17 @@ test('personnaliser : sans changement, le réglage d’origine est rendu tel que
 
 test('personnaliser : masquer un groupe, en monter un, choisir celui qui s’ouvre en premier', () => {
   const f = fenetre()
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Afficher Avantages' }))
-  // ordre affiché : ensemble, salaire, ventes, ateliers ; « Ventes et marge » monte d’un cran
-  fireEvent.click(screen.getByRole('button', { name: 'Monter Ventes et marge' }))
-  fireEvent.click(screen.getByRole('radio', { name: 'Ouvrir sur Ventes et marge' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Afficher Frais et avantages' }))
+  // ordre affiché : ensemble, salaire, ventes, ateliers ; « Ventes, marge et commissions » monte d’un cran
+  fireEvent.click(screen.getByRole('button', { name: 'Monter Ventes, marge et commissions' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Ouvrir sur Ventes, marge et commissions' }))
   enregistrer()
   expect(sortie(f)).toEqual({ perso: [], ordre: ['ensemble', 'ventes', 'salaire', 'ateliers'], defaut: 'ventes' })
 })
 
 test('personnaliser : masquer le groupe d’ouverture le fait passer au premier groupe affiché', () => {
   const f = fenetre()
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Afficher Vue d’ensemble' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Afficher Effectif et masse salariale' }))
   enregistrer()
   expect(sortie(f).defaut).toBe('salaire')
   expect(sortie(f).ordre).toEqual(['salaire', 'avantages', 'ventes', 'ateliers'])
@@ -73,7 +73,7 @@ test('personnaliser : « N’afficher que mes groupes », « Rétablir » et Ann
   const config = { perso: [{ id: 'p-1', nom: 'Mes ventes', graphes: ['ca'] }], ordre: ['ensemble', 'p-1'], defaut: 'p-1' }
   const f = fenetre(config)
   fireEvent.click(screen.getByRole('button', { name: 'N’afficher que mes groupes' }))
-  expect(screen.getByRole('checkbox', { name: 'Afficher Vue d’ensemble' })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'Afficher Effectif et masse salariale' })).not.toBeChecked()
   fireEvent.click(screen.getByRole('button', { name: 'Rétablir les groupes d’origine' }))
   enregistrer()
   expect(sortie(f)).toEqual({ perso: config.perso, ordre: CONFIG_ORIGINE.ordre, defaut: 'ensemble' })
@@ -93,4 +93,52 @@ test('personnaliser : « N’afficher que mes groupes » affiche aussi les group
   fireEvent.click(screen.getByRole('button', { name: 'N’afficher que mes groupes' }))
   enregistrer()
   expect(sortie(f)).toEqual({ perso, ordre: ['p-1', 'p-2'], defaut: 'p-1' })
+})
+
+function fenetreNoms(onNoms: (n: Record<string, string>) => Promise<void>, noms: Record<string, string> = {}) {
+  const onEnregistrer = vi.fn()
+  render(<PersonnaliserGroupes config={CONFIG_ORIGINE} dispo={tous} noms={noms} onNoms={onNoms} onEnregistrer={onEnregistrer} onAnnuler={vi.fn()} />)
+  return onEnregistrer
+}
+
+test('noms : section absente sans onNoms', () => {
+  fenetre()
+  expect(screen.queryByText('Noms des groupes (vus par tous)')).toBeNull()
+})
+
+test('noms : renommer un groupe puis enregistrer envoie le nom et applique le libellé', async () => {
+  const onNoms = vi.fn().mockResolvedValue(undefined)
+  const onEnregistrer = fenetreNoms(onNoms)
+  expect(screen.getByText('Noms des groupes (vus par tous)')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Ventes, marge et commissions'), { target: { value: '  Nouveau nom ' } })
+  expect(screen.getByRole('checkbox', { name: 'Afficher Nouveau nom' })).toBeInTheDocument()
+  enregistrer()
+  await waitFor(() => expect(onEnregistrer).toHaveBeenCalled())
+  expect(onNoms).toHaveBeenCalledWith({ ventes: 'Nouveau nom' })
+})
+
+test('noms : champ vidé, la clé est retirée ; sans changement, rien n’est envoyé', async () => {
+  const onNoms = vi.fn().mockResolvedValue(undefined)
+  const onEnregistrer = fenetreNoms(onNoms, { ventes: 'Chiffre', salaire: 'Paie' })
+  fireEvent.change(screen.getByLabelText('Ventes, marge et commissions'), { target: { value: '' } })
+  enregistrer()
+  await waitFor(() => expect(onEnregistrer).toHaveBeenCalled())
+  expect(onNoms).toHaveBeenCalledWith({ salaire: 'Paie' })
+})
+
+test('noms : sans changement, onNoms n’est pas appelé', async () => {
+  const onNoms = vi.fn().mockResolvedValue(undefined)
+  const onEnregistrer = fenetreNoms(onNoms, { ventes: 'Chiffre' })
+  enregistrer()
+  await waitFor(() => expect(onEnregistrer).toHaveBeenCalled())
+  expect(onNoms).not.toHaveBeenCalled()
+})
+
+test('noms : échec de l’envoi, message d’erreur et la fenêtre reste ouverte', async () => {
+  const onNoms = vi.fn().mockRejectedValue(new Error('403'))
+  const onEnregistrer = fenetreNoms(onNoms)
+  fireEvent.change(screen.getByLabelText('Ventes, marge et commissions'), { target: { value: 'X' } })
+  enregistrer()
+  expect(await screen.findByRole('alert')).toHaveTextContent('Les noms des groupes n’ont pas pu être enregistrés')
+  expect(onEnregistrer).not.toHaveBeenCalled()
 })

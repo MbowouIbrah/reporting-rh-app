@@ -24,11 +24,11 @@
 ## Groupes d'origine (4 graphiques chacun, d'après les familles du calcul)
 | Groupe | Graphiques |
 |---|---|
-| Vue d'ensemble | Masse salariale, Rémunération globale, Effectif, Absences |
-| Salaire, primes et charges | Salaire, Primes, Assurance, Formation |
-| Avantages | Frais de mission, Logement site déporté, Crédit téléphonique, Carburant |
-| Ventes et marge | CA, Marge, Commissions, Ventes |
-| Ateliers et clients | Clients, Factures, Productivité, OR par productif |
+| Effectif et masse salariale | Masse salariale, Rémunération globale, Effectif, Absences |
+| Salaires, primes et charges | Salaire, Primes, Assurance, Formation |
+| Frais et avantages | Frais de mission, Logement site déporté, Crédit téléphonique, Carburant |
+| Ventes, marge et commissions | CA, Marge, Commissions, Ventes |
+| Atelier et productivité | Clients, Factures, Productivité, OR par productif |
 
 Un graphique sans donnée (droit marge absent, activité non importée) est retiré de son groupe ; un groupe vide n'est pas proposé.
 
@@ -37,6 +37,7 @@ Un graphique sans donnée (droit marge absent, activité non importée) est reti
 - Le groupe choisi dans le menu vaut pour la visite ; à l'ouverture, la page montre le réglage « par défaut ».
 - Personnaliser : fenêtre avec copie de travail (Enregistrer / Annuler), « Rétablir les groupes d'origine ».
 - Export PDF : tous les groupes affichés, dans l'ordre choisi, un groupe par page.
+- Noms des groupes d'origine : un administrateur (droit `referentiel:write`) peut les renommer dans « Personnaliser » ; le nom choisi est gardé sur le serveur (`/reglages/noms_groupes`) et vu par tous. Champ vide = nom par défaut. Les groupes personnels gardent leur nom.
 - Ancien choix « graphiques masqués » (clé `graphes.evolution`) : n'est plus lu ; la route serveur reste.
 
 ## Impacts / risques

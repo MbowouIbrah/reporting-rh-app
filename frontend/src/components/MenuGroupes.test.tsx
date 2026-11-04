@@ -12,17 +12,17 @@ function menu(vue = 'ensemble') {
 
 test('menu des groupes : le groupe courant est annoncé, chaque groupe a sa description et « par défaut » est signalé', () => {
   menu()
-  expect(screen.getByText('Groupe : Vue d’ensemble', { selector: 'summary' })).toBeInTheDocument()
+  expect(screen.getByText('Groupe : Effectif et masse salariale', { selector: 'summary' })).toBeInTheDocument()
   expect(screen.getByText('Masse salariale mensuelle, Rémunération globale, Effectif, Absences par mois (jours)')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /Vue d’ensemble/ })).toHaveAttribute('aria-current', 'true')
-  expect(screen.getByRole('button', { name: /Avantages/ })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: /Effectif et masse salariale/ })).toHaveAttribute('aria-current', 'true')
+  expect(screen.getByRole('button', { name: /Frais et avantages/ })).not.toHaveAttribute('aria-current')
   expect(screen.getAllByText('par défaut')).toHaveLength(1)
 })
 
 test('menu des groupes : choisir un groupe change la vue et ferme le menu', () => {
   const { onVue, details } = menu()
   details.open = true
-  fireEvent.click(screen.getByRole('button', { name: /Avantages/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Frais et avantages/ }))
   expect(onVue).toHaveBeenCalledWith('avantages')
   expect(details.open).toBe(false)
 })
@@ -46,7 +46,7 @@ test('menu des groupes : fermé par Échap (focus rendu) et par un clic à côt�
   expect(details.open).toBe(false)
   expect(document.activeElement).toBe(details.querySelector('summary'))
   details.open = true
-  fireEvent.mouseDown(screen.getByRole('button', { name: /Avantages/ }))
+  fireEvent.mouseDown(screen.getByRole('button', { name: /Frais et avantages/ }))
   expect(details.open).toBe(true)
   fireEvent.mouseDown(document.body)
   expect(details.open).toBe(false)

@@ -103,3 +103,13 @@ class PreferenceUtilisateur(Base):
     utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
     cle: Mapped[str] = mapped_column(String(60))
     valeur: Mapped[list | dict] = mapped_column(JsonType)
+
+
+class ReglageGlobal(Base):
+    """Réglage commun à tous (ex. noms des groupes de graphiques), modifié par un administrateur."""
+
+    __tablename__ = "reglage_global"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cle: Mapped[str] = mapped_column(String(60), unique=True)
+    valeur: Mapped[list | dict] = mapped_column(JsonType)

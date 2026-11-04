@@ -24,7 +24,7 @@ test('groupes de graphiques : quatre cartes au plus, tous les groupes, groupe pe
   expect(await page.locator('figure.graphe').count()).toBeLessThanOrEqual(4)
 
   // Un autre groupe remplace le premier
-  await choisir(page, /Salaire, primes et charges/)
+  await choisir(page, /Salaires, primes et charges/)
   await expect(graphe(page, TITRE)).toHaveCount(1)
   await expect(graphe(page, 'Masse salariale mensuelle')).toHaveCount(0)
   expect(await page.locator('figure.graphe').count()).toBeLessThanOrEqual(4)
@@ -82,4 +82,41 @@ test('groupes de graphiques : quatre cartes au plus, tous les groupes, groupe pe
   await f2.getByRole('button', { name: 'Supprimer' }).click()
   await f2.getByRole('button', { name: 'Enregistrer' }).click()
   await expect(f2).toHaveCount(0)
+})
+
+test('groupes de graphiques : un administrateur renomme un groupe d’origine, le nom apparaît dans le menu', async ({ page }) => {
+  const DEFAUT = 'Ventes, marge et commissions'
+  const NOUVEAU = 'Recette ventes renommées'
+  await connecter(page, ADMIN)
+  await page.goto('graphes')
+  await expect(menu(page)).toBeVisible()
+
+  const ouvrir = async () => {
+    await menu(page).locator('summary').click()
+    await menu(page).getByRole('button', { name: 'Personnaliser…' }).click()
+    const f = page.locator('dialog.perso-groupes')
+    await expect(f).toBeVisible()
+    return f
+  }
+
+  try {
+    const f = await ouvrir()
+    await expect(f.getByText('Noms des groupes (vus par tous)')).toBeVisible()
+    await f.getByLabel(DEFAUT, { exact: true }).fill(NOUVEAU)
+    await f.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(f).toHaveCount(0)
+
+    await page.reload()
+    await menu(page).locator('summary').click()
+    await expect(menu(page).getByRole('button', { name: new RegExp(NOUVEAU) })).toBeVisible({ timeout: 20_000 })
+    await expect(menu(page).getByRole('button', { name: new RegExp(DEFAUT) })).toHaveCount(0)
+  } finally {
+    // Nettoyage : retour au nom par défaut
+    await page.goto('graphes')
+    await expect(menu(page)).toBeVisible()
+    const f = await ouvrir()
+    await f.getByLabel(DEFAUT, { exact: true }).fill('')
+    await f.getByRole('button', { name: 'Enregistrer' }).click()
+    await expect(f).toHaveCount(0)
+  }
 })

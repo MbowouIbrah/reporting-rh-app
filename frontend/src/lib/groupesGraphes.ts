@@ -40,11 +40,11 @@ export interface Groupe {
 
 /** Groupes d'origine (4 graphiques chacun, d'après les familles du calcul). Identifiants stables. */
 export const GROUPES_ORIGINE: Groupe[] = [
-  { id: 'ensemble', nom: 'Vue d’ensemble', graphes: ['ms', 'remu', 'effectif', 'absences'] },
-  { id: 'salaire', nom: 'Salaire, primes et charges', graphes: ['salaire', 'primes', 'assurance', 'formation'] },
-  { id: 'avantages', nom: 'Avantages', graphes: ['frais', 'logement', 'credit', 'carburant'] },
-  { id: 'ventes', nom: 'Ventes et marge', graphes: ['ca', 'marge', 'commissions', 'ventes'] },
-  { id: 'ateliers', nom: 'Ateliers et clients', graphes: ['clients', 'factures', 'productivite', 'or'] },
+  { id: 'ensemble', nom: 'Effectif et masse salariale', graphes: ['ms', 'remu', 'effectif', 'absences'] },
+  { id: 'salaire', nom: 'Salaires, primes et charges', graphes: ['salaire', 'primes', 'assurance', 'formation'] },
+  { id: 'avantages', nom: 'Frais et avantages', graphes: ['frais', 'logement', 'credit', 'carburant'] },
+  { id: 'ventes', nom: 'Ventes, marge et commissions', graphes: ['ca', 'marge', 'commissions', 'ventes'] },
+  { id: 'ateliers', nom: 'Atelier et productivité', graphes: ['clients', 'factures', 'productivite', 'or'] },
 ]
 
 /** Réglage de l'utilisateur : ses groupes, l'ordre des groupes affichés (un groupe d'origine
@@ -90,16 +90,28 @@ export function lireConfig(v: unknown): ConfigGroupes | null {
   return { perso: groupes, ordre: ordre as string[], defaut }
 }
 
-/** Tous les groupes connus (ceux d'origine, puis ceux de l'utilisateur), affichés ou non. */
-export function tousLesGroupes(config: ConfigGroupes): Groupe[] {
-  return [...GROUPES_ORIGINE, ...config.perso]
+/** Noms choisis par l'administration pour les groupes d'origine (identifiant -> nom) ; null si la forme
+ *  n'est pas la bonne. Les entrées invalides sont ignorées. */
+export function lireNoms(v: unknown): Record<string, string> | null {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null
+  const res: Record<string, string> = {}
+  for (const [id, nom] of Object.entries(v)) {
+    if (typeof nom === 'string' && texte(nom.trim(), MAX_NOM)) res[id] = nom.trim()
+  }
+  return res
+}
+
+/** Tous les groupes connus (ceux d'origine, puis ceux de l'utilisateur), affichés ou non.
+ *  `noms` renomme les groupes d'origine seulement ; les groupes personnels gardent leur nom. */
+export function tousLesGroupes(config: ConfigGroupes, noms: Record<string, string> = {}): Groupe[] {
+  return [...GROUPES_ORIGINE.map((g) => ({ ...g, nom: noms[g.id] ?? g.nom })), ...config.perso]
 }
 
 /** Groupes à montrer, dans l'ordre choisi. Un identifiant inconnu est ignoré, un graphique sans donnée
  *  est retiré de son groupe, un groupe devenu vide n'est pas proposé. */
-export function groupesAffiches(config: ConfigGroupes, dispo: Set<string>): Groupe[] {
+export function groupesAffiches(config: ConfigGroupes, dispo: Set<string>, noms: Record<string, string> = {}): Groupe[] {
   const connus = new Set(GRAPHES.map((g) => g.id))
-  const parId = new Map(tousLesGroupes(config).map((g) => [g.id, g]))
+  const parId = new Map(tousLesGroupes(config, noms).map((g) => [g.id, g]))
   const vus = new Set<string>()
   const res: Groupe[] = []
   for (const id of config.ordre) {

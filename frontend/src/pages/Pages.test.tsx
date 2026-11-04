@@ -227,13 +227,13 @@ test('Graphes : CA et marge par mois absents sans données de marge, affichés a
   expect(legende('Salaire par mois (FCFA)')).toBe(true)
   expect(legende('CA par mois (FCFA)')).toBe(false)
   expect(legende('Marge par mois (FCFA)')).toBe(false)
-  expect(screen.queryByRole('button', { name: /Ventes et marge/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /Ventes, marge et commissions/ })).toBeNull()
   unmount()
   serieCa = true
   try {
     rendu(<Graphes />, '/graphes', ['report:read', 'marge:read'], true)
     expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Ventes et marge/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Ventes, marge et commissions/ }))
     await waitFor(() => expect(legende('CA par mois (FCFA)')).toBe(true))
     expect(legende('Marge par mois (FCFA)')).toBe(true)
     // un groupe à la fois : la vue d'ensemble n'est plus à l'écran
@@ -247,13 +247,13 @@ test('Graphes : un groupe à la fois, groupe personnel gardé dans le navigateur
   localStorage.clear()
   const legende = (t: string) => [...document.querySelectorAll('figcaption')].some((f) => f.textContent === t)
   const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
-  // Ouverture sur « Vue d'ensemble » : ses graphiques seulement
+  // Ouverture sur « Effectif et masse salariale » : ses graphiques seulement
   expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
-  expect(screen.getByText('Groupe : Vue d’ensemble', { selector: 'summary' })).toBeInTheDocument()
+  expect(screen.getByText('Groupe : Effectif et masse salariale', { selector: 'summary' })).toBeInTheDocument()
   expect(legende('Masse salariale mensuelle (FCFA)')).toBe(true)
   expect(legende('Salaire par mois (FCFA)')).toBe(false)
   // Autre groupe
-  fireEvent.click(screen.getByRole('button', { name: /Salaire, primes et charges/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Salaires, primes et charges/ }))
   expect(legende('Salaire par mois (FCFA)')).toBe(true)
   expect(legende('Primes par mois (FCFA)')).toBe(true)
   expect(legende('Masse salariale mensuelle (FCFA)')).toBe(false)

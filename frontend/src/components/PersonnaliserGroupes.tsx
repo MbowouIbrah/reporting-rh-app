@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import {
-  type ConfigGroupes, descGroupe, GRAPHES, type Groupe, MAX_NOM, MAX_PAR_GROUPE, nouvelId, retablirOrigine, tousLesGroupes, VUE_TOUT,
+  type ConfigGroupes, descGroupe, GRAPHES, type Groupe, GROUPES_ORIGINE, MAX_NOM, MAX_PAR_GROUPE, nouvelId, retablirOrigine, tousLesGroupes, VUE_TOUT,
 } from '../lib/groupesGraphes'
 
 /** Le groupe d'ouverture doit être affiché : sinon il passe au premier groupe affiché. */
@@ -21,9 +21,13 @@ interface Edition {
  * Fenêtre « Personnaliser » : on travaille sur une copie du réglage, appliquée seulement par « Enregistrer ».
  * Affichée dès qu'elle est montée ; `dispo` : identifiants des graphiques qui ont des données.
  */
-export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onAnnuler }: {
+export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms, onEnregistrer, onAnnuler }: {
   config: ConfigGroupes
   dispo: Set<string>
+  /** Noms choisis par l'administration pour les groupes d'origine (identifiant -> nom). */
+  noms?: Record<string, string>
+  /** Fourni seulement à qui peut renommer les groupes (vus par tous) : enregistre les nouveaux noms sur le serveur. */
+  onNoms?: (n: Record<string, string>) => Promise<void>
   onEnregistrer: (c: ConfigGroupes) => void
   onAnnuler: () => void
 }) {
@@ -31,6 +35,9 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
   const idTitre = useId()
   const [travail, setTravail] = useState<ConfigGroupes>(config)
   const [edition, setEdition] = useState<Edition | null>(null)
+  const [brouillon, setBrouillon] = useState<Record<string, string>>(noms)
+  const [erreur, setErreur] = useState('')
+  const [envoi, setEnvoi] = useState(false)
   useEffect(() => {
     const d = ref.current
     if (!d || d.open) return
@@ -38,9 +45,17 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
     else d.setAttribute('open', '')
   }, [])
 
-  const parId = new Map(tousLesGroupes(travail).map((g) => [g.id, g]))
+  // Noms des groupes d'origine : seuls les champs non vides comptent, un champ vide = nom par défaut
+  const nomsSaisis: Record<string, string> = {}
+  for (const g of GROUPES_ORIGINE) {
+    const n = (brouillon[g.id] ?? '').trim()
+    if (n) nomsSaisis[g.id] = n
+  }
+  const nomsActuels = onNoms ? nomsSaisis : noms
+  const tous = tousLesGroupes(travail, nomsActuels)
+  const parId = new Map(tous.map((g) => [g.id, g]))
   const affiches = [...new Set(travail.ordre)].filter((id) => parId.has(id))
-  const masques = tousLesGroupes(travail).filter((g) => !affiches.includes(g.id))
+  const masques = tous.filter((g) => !affiches.includes(g.id))
   const lignes: Groupe[] = [...affiches.map((id) => parId.get(id)!), ...masques]
   const maj = (c: ConfigGroupes) => setTravail(normaliser(c))
 
@@ -58,6 +73,27 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
     maj({ ...travail, perso: travail.perso.filter((g) => g.id !== id), ordre: affiches.filter((x) => x !== id) })
   const seulementMesGroupes = () => maj({ ...travail, ordre: travail.perso.map((g) => g.id) })
   const retablir = () => maj(retablirOrigine(travail))
+
+  const nomsChanges = () => {
+    const avant = GROUPES_ORIGINE.filter((g) => noms[g.id]).map((g) => [g.id, noms[g.id]])
+    return JSON.stringify(avant) !== JSON.stringify(Object.entries(nomsSaisis))
+  }
+  const enregistrer = async () => {
+    const c = normaliser({ ...travail, ordre: affiches })
+    if (onNoms && nomsChanges()) {
+      setErreur('')
+      setEnvoi(true)
+      try {
+        await onNoms(nomsSaisis)
+      } catch {
+        setErreur('Les noms des groupes n’ont pas pu être enregistrés. Réessayez.')
+        setEnvoi(false)
+        return
+      }
+      setEnvoi(false)
+    }
+    onEnregistrer(c)
+  }
 
   const valider = (e: FormEvent) => {
     e.preventDefault()
@@ -81,67 +117,16 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
 
   return (
     <dialog ref={ref} className="perso-groupes" aria-labelledby={idTitre} onCancel={onAnnuler}>
-      <h3 id={idTitre}>Personnaliser les groupes</h3>
-      <p className="perso-aide">Choisissez les groupes affichés, leur ordre et celui qui s’ouvre en premier.</p>
-      <ul className="perso-liste">
-        {lignes.map((g) => {
-          const affiche = affiches.includes(g.id)
-          const i = affiches.indexOf(g.id)
-          const perso = travail.perso.some((p) => p.id === g.id)
-          return (
-            <li key={g.id} className={affiche ? undefined : 'masque'}>
-              <input type="checkbox" checked={affiche} aria-label={`Afficher ${g.nom}`} onChange={() => basculer(g.id)} />
-              <span className="perso-texte">
-                <strong>{g.nom}</strong>
-                <small>{descGroupe(g)}</small>
-              </span>
-              <span className="perso-actions">
-                <button type="button" className="perso-icone" aria-label={`Monter ${g.nom}`} disabled={!affiche || i === 0} onClick={() => deplacer(g.id, -1)}>
-                  <ArrowUp aria-hidden="true" size={16} />
-                </button>
-                <button type="button" className="perso-icone" aria-label={`Descendre ${g.nom}`} disabled={!affiche || i === affiches.length - 1} onClick={() => deplacer(g.id, 1)}>
-                  <ArrowDown aria-hidden="true" size={16} />
-                </button>
-                <label className="perso-defaut">
-                  <input
-                    type="radio"
-                    name="defaut"
-                    aria-label={`Ouvrir sur ${g.nom}`}
-                    checked={travail.defaut === g.id}
-                    disabled={!affiche}
-                    onChange={() => maj({ ...travail, defaut: g.id })}
-                  />
-                  par défaut
-                </label>
-                {perso && (
-                  <>
-                    <button type="button" className="bouton bouton-lien" onClick={() => setEdition({ id: g.id, nom: g.nom, graphes: [...g.graphes] })}>
-                      Modifier
-                    </button>
-                    <button type="button" className="bouton bouton-lien" onClick={() => supprimer(g.id)}>
-                      Supprimer
-                    </button>
-                  </>
-                )}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      <label className="perso-defaut perso-tout">
-        <input type="radio" name="defaut" checked={travail.defaut === VUE_TOUT} onChange={() => maj({ ...travail, defaut: VUE_TOUT })} />
-        Ouvrir sur : tous les groupes
-      </label>
-
       {edition ? (
-        <form className="perso-formulaire" onSubmit={valider}>
-          <h4>{edition.id ? 'Modifier le groupe' : 'Nouveau groupe'}</h4>
+        <form className="perso-edition" onSubmit={valider}>
+          <h3 id={idTitre}>{edition.id ? 'Modifier le groupe' : 'Nouveau groupe'}</h3>
+          <p className="perso-aide">Donnez un nom au groupe et cochez jusqu’à {MAX_PAR_GROUPE} graphiques.</p>
           <label className="perso-nom">
             Nom du groupe
             <input type="text" value={edition.nom} maxLength={MAX_NOM} required onChange={(e) => setEdition({ ...edition, nom: e.target.value })} />
           </label>
           <fieldset>
-            <legend>Graphiques ({edition.graphes.length}/{MAX_PAR_GROUPE}) — {MAX_PAR_GROUPE} graphiques au plus</legend>
+            <legend>Graphiques ({edition.graphes.length}/{MAX_PAR_GROUPE})</legend>
             <ul>
               {choixGraphes.map((g) => (
                 <li key={g.id}>
@@ -158,7 +143,7 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
               ))}
             </ul>
           </fieldset>
-          <div className="perso-actions-bas">
+          <div className="perso-actions-bas perso-pied">
             <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition(null)}>
               Annuler
             </button>
@@ -168,29 +153,102 @@ export default function PersonnaliserGroupes({ config, dispo, onEnregistrer, onA
           </div>
         </form>
       ) : (
-        <div className="perso-outils">
-          <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition({ id: null, nom: '', graphes: [] })} disabled={travail.perso.length >= 20}>
-            Nouveau groupe
-          </button>
-          {travail.perso.length > 0 && (
-            <button type="button" className="bouton bouton-secondaire" onClick={seulementMesGroupes}>
-              N’afficher que mes groupes
-            </button>
-          )}
-          <button type="button" className="bouton bouton-secondaire" onClick={retablir}>
-            Rétablir les groupes d’origine
-          </button>
-        </div>
-      )}
+        <>
+          <h3 id={idTitre}>Personnaliser les groupes</h3>
+          <p className="perso-aide">Choisissez les groupes affichés, leur ordre et celui qui s’ouvre en premier.</p>
+          <ul className="perso-liste">
+            {lignes.map((g) => {
+              const affiche = affiches.includes(g.id)
+              const i = affiches.indexOf(g.id)
+              const perso = travail.perso.some((p) => p.id === g.id)
+              return (
+                <li key={g.id} className={affiche ? undefined : 'masque'}>
+                  <input type="checkbox" checked={affiche} aria-label={`Afficher ${g.nom}`} onChange={() => basculer(g.id)} />
+                  <span className="perso-texte">
+                    <strong>{g.nom}</strong>
+                    <small>{descGroupe(g)}</small>
+                  </span>
+                  <span className="perso-actions">
+                    <button type="button" className="perso-icone" aria-label={`Monter ${g.nom}`} disabled={!affiche || i === 0} onClick={() => deplacer(g.id, -1)}>
+                      <ArrowUp aria-hidden="true" size={16} />
+                    </button>
+                    <button type="button" className="perso-icone" aria-label={`Descendre ${g.nom}`} disabled={!affiche || i === affiches.length - 1} onClick={() => deplacer(g.id, 1)}>
+                      <ArrowDown aria-hidden="true" size={16} />
+                    </button>
+                    <label className="perso-defaut">
+                      <input
+                        type="radio"
+                        name="defaut"
+                        aria-label={`Ouvrir sur ${g.nom}`}
+                        checked={travail.defaut === g.id}
+                        disabled={!affiche}
+                        onChange={() => maj({ ...travail, defaut: g.id })}
+                      />
+                      par défaut
+                    </label>
+                    {perso && (
+                      <>
+                        <button type="button" className="bouton bouton-lien" onClick={() => setEdition({ id: g.id, nom: g.nom, graphes: [...g.graphes] })}>
+                          Modifier
+                        </button>
+                        <button type="button" className="bouton bouton-lien" onClick={() => supprimer(g.id)}>
+                          Supprimer
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          <label className="perso-defaut perso-tout">
+            <input type="radio" name="defaut" checked={travail.defaut === VUE_TOUT} onChange={() => maj({ ...travail, defaut: VUE_TOUT })} />
+            Ouvrir sur : tous les groupes
+          </label>
 
-      <div className="perso-actions-bas">
-        <button type="button" className="bouton bouton-secondaire" onClick={onAnnuler}>
-          Annuler
-        </button>
-        <button type="button" className="bouton bouton-primaire" disabled={affiches.length === 0} onClick={() => onEnregistrer(normaliser({ ...travail, ordre: affiches }))}>
-          Enregistrer
-        </button>
-      </div>
+          {onNoms && (
+            <section className="perso-formulaire perso-noms" aria-label="Noms des groupes">
+              <h4>Noms des groupes (vus par tous)</h4>
+              {GROUPES_ORIGINE.map((g) => (
+                <label key={g.id} className="perso-nom">
+                  {g.nom}
+                  <input
+                    type="text"
+                    value={brouillon[g.id] ?? ''}
+                    placeholder={g.nom}
+                    maxLength={MAX_NOM}
+                    onChange={(e) => setBrouillon({ ...brouillon, [g.id]: e.target.value })}
+                  />
+                </label>
+              ))}
+            </section>
+          )}
+
+            <div className="perso-outils">
+              <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition({ id: null, nom: '', graphes: [] })} disabled={travail.perso.length >= 20}>
+                Nouveau groupe
+              </button>
+              {travail.perso.length > 0 && (
+                <button type="button" className="bouton bouton-secondaire" onClick={seulementMesGroupes}>
+                  N’afficher que mes groupes
+                </button>
+              )}
+              <button type="button" className="bouton bouton-secondaire" onClick={retablir}>
+                Rétablir les groupes d’origine
+              </button>
+            </div>
+
+          {erreur && <p className="perso-erreur" role="alert">{erreur}</p>}
+          <div className="perso-actions-bas perso-pied">
+            <button type="button" className="bouton bouton-secondaire" onClick={onAnnuler}>
+              Annuler
+            </button>
+            <button type="button" className="bouton bouton-primaire" disabled={affiches.length === 0 || envoi} onClick={enregistrer}>
+              Enregistrer
+            </button>
+          </div>
+        </>
+      )}
     </dialog>
   )
 }

@@ -14,12 +14,14 @@ import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
 import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
+import { usePeut } from '../auth/AuthContext'
 import MenuGroupes from '../components/MenuGroupes'
 import PersonnaliserGroupes from '../components/PersonnaliserGroupes'
 import SnapSections from '../components/SnapSections'
 import {
   CONFIG_ORIGINE, GRAPHES, type Groupe, groupesAffiches, lireConfig, retablirOrigine, VUE_TOUT, vueInitiale,
 } from '../lib/groupesGraphes'
+import { useNomsGroupes } from '../lib/nomsGroupes'
 import { usePreference } from '../lib/preference'
 
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
@@ -129,6 +131,8 @@ export default function Graphes() {
   const rapport = useLocation().pathname.startsWith('/rapport')
   const ANIM = rapport ? { isAnimationActive: false } : ANIMATION
   const [config, setConfig] = usePreference('groupes.evolution', lireConfig, CONFIG_ORIGINE)
+  const [noms, enregistrerNoms] = useNomsGroupes()
+  const peutRenommer = usePeut('referentiel:write')
   const [vue, setVue] = useState<string | null>(null)
   const [personnalise, setPersonnalise] = useState(false)
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
@@ -231,13 +235,13 @@ export default function Graphes() {
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
   // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
   const dispo = new Set(GRAPHES.filter((g) => !g.cle || commun.serie.some((m) => m[g.cle!] != null)).map((g) => g.id))
-  const affiches = groupesAffiches(config, dispo)
+  const affiches = groupesAffiches(config, dispo, noms)
   // Vue choisie par l'utilisateur ; sans choix (ou si le groupe n'est plus affiché), celle du réglage d'ouverture
   const vueActive = vue !== null && (vue === VUE_TOUT || affiches.some((g) => g.id === vue)) ? vue : vueInitiale(config, affiches)
   const groupeActif = affiches.find((g) => g.id === vueActive)
   // Squelette : les quatre cartes du groupe d'ouverture, avant même de savoir quelles données existent
   const tousLesIds = new Set(GRAPHES.map((g) => g.id))
-  const groupesSquelette = groupesAffiches(config, tousLesIds)
+  const groupesSquelette = groupesAffiches(config, tousLesIds, noms)
   const vueSquelette = vueInitiale(config, groupesSquelette)
   const titresSquelette = (groupesSquelette.find((g) => g.id === vueSquelette) ?? groupesSquelette[0])?.graphes.map((id) => T[id]) ?? []
 
@@ -422,6 +426,8 @@ export default function Graphes() {
         <PersonnaliserGroupes
           config={config}
           dispo={dispo}
+          noms={noms}
+          onNoms={peutRenommer ? enregistrerNoms : undefined}
           onEnregistrer={(c) => {
             setConfig(c)
             setPersonnalise(false)

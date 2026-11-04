@@ -3,6 +3,7 @@ from app.models.auth import (  # noqa: F401
     Perimetre,
     PerimetreRegle,
     PreferenceUtilisateur,
+    ReglageGlobal,
     Utilisateur,
     UtilisateurPermission,
     UtilisateurPortee,

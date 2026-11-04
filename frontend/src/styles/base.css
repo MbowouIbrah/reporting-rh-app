@@ -490,8 +490,23 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .perso-formulaire label { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
 .perso-nom { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
 .perso-nom input { padding: 6px 10px; border: 1px solid var(--rule-strong); border-radius: 0; font: inherit; }
+.perso-noms { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--sp-2) var(--sp-4); }
+.perso-noms h4 { grid-column: 1 / -1; margin: 0; }
+.perso-erreur { margin: 0 0 var(--sp-2); padding: var(--sp-2); border: 1px solid var(--error); background: var(--error-soft); color: var(--error); font-size: var(--fs-sm); }
 .perso-outils { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
 .perso-actions-bas { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+/* Barre d'actions collée au bas de la fenêtre, séparée du contenu */
+.perso-pied { position: sticky; bottom: calc(-1 * var(--sp-4)); margin: var(--sp-3) calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--rule); background: var(--surface); }
+/* Création / modification : le formulaire seul, nom puis graphiques sur deux colonnes */
+.perso-edition { display: grid; gap: var(--sp-3); }
+.perso-edition h3 { margin: 0; }
+.perso-edition .perso-aide { margin: 0; }
+.perso-edition fieldset { border: 0; border-top: 1px solid var(--rule); margin: 0; padding: var(--sp-3) 0 0; }
+.perso-edition legend { padding: 0 var(--sp-2) 0 0; font-size: var(--fs-sm); font-weight: 700; color: var(--navy); }
+.perso-edition ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-4); }
+.perso-edition label { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.perso-edition label:has(input:disabled) { color: var(--muted); }
+@media (max-width: 560px) { .perso-edition ul { grid-template-columns: minmax(0, 1fr); } }
 /* Un groupe : titre sobre au-dessus de sa grille (tous les groupes, rapport PDF) */
 .graphes-groupe { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .graphes-groupe .graphes { flex: 1; min-height: 0; }

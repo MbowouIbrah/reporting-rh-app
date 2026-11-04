@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import {
-  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, lireConfig, nouvelId, retablirOrigine, tousLesGroupes, vueInitiale,
+  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, lireConfig, lireNoms, nouvelId, retablirOrigine, tousLesGroupes, vueInitiale,
 } from './groupesGraphes'
 
 const tous = new Set(GRAPHES.map((g) => g.id))
@@ -72,4 +72,20 @@ test('nouvelId : préfixe p- et valeurs différentes', () => {
 test('retablirOrigine : groupes et ouverture d’origine, groupes perso gardés', () => {
   const perso = [{ id: 'p-1', nom: 'Mes ventes', graphes: ['ca'] }]
   expect(retablirOrigine({ perso, ordre: ['p-1'], defaut: 'p-1' })).toEqual({ ...CONFIG_ORIGINE, perso })
+})
+
+test('lireNoms : objet de noms valides, entrées invalides ignorées, autre forme refusée', () => {
+  expect(lireNoms({ ventes: '  Mes ventes ', ensemble: '', salaire: 3, avantages: 'x'.repeat(61) })).toEqual({ ventes: 'Mes ventes' })
+  expect(lireNoms({})).toEqual({})
+  expect(lireNoms(null)).toBeNull()
+  expect(lireNoms(['a'])).toBeNull()
+  expect(lireNoms('texte')).toBeNull()
+})
+
+test('noms choisis : appliqués aux groupes d’origine seulement', () => {
+  const config = { ...CONFIG_ORIGINE, perso: [{ id: 'ventes2', nom: 'Mes ventes', graphes: ['ca'] }], ordre: ['ventes', 'ventes2'] }
+  const noms = { ventes: 'Chiffre', ventes2: 'Ignoré' }
+  expect(tousLesGroupes(config, noms).map((g) => g.nom)).toContain('Chiffre')
+  expect(tousLesGroupes(config).find((g) => g.id === 'ventes')?.nom).toBe('Ventes, marge et commissions')
+  expect(groupesAffiches(config, tous, noms).map((g) => g.nom)).toEqual(['Chiffre', 'Mes ventes'])
 })
