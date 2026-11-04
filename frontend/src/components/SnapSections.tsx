@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { plafonner } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
@@ -25,45 +25,47 @@ export interface SectionSnap {
  */
 export default function SnapSections({ sections, libelle = 'Tableaux du rapport' }: { sections: SectionSnap[]; libelle?: string }) {
   const zone = useRef<HTMLDivElement>(null)
-  const [actif, setActif] = useState(sections[0]?.id)
   const cles = sections.map((x) => x.id).join('|')
-
-  useEffect(() => {
-    const racine = zone.current
-    if (!racine || typeof IntersectionObserver === 'undefined') return
-    const obs = new IntersectionObserver(
-      (entrees) => {
-        const visible = entrees.find((e) => e.isIntersecting)
-        if (visible) setActif(visible.target.id)
-      },
-      { root: racine, threshold: 0.55 },
-    )
-    racine.querySelectorAll('.snap-section').forEach((el) => obs.observe(el))
-    return () => obs.disconnect()
-  }, [cles])
 
   // Molette : un geste = une section (l'accrochage seul ramène au départ sur un petit cran),
   // sauf si le tableau survolé peut encore défiler dans ce sens
   useEffect(() => {
     const racine = zone.current
     if (!racine) return
-    let verrou = 0
+    // Verrou levé à l'arrivée (scrollend) et non après un délai fixe ; les crans d'un même geste
+    // (inertie du pavé tactile) restent ignorés tant qu'ils se suivent de près.
+    let enMouvement = false
+    let dernier = 0
+    let secours = 0
+    const liberer = () => {
+      enMouvement = false
+      window.clearTimeout(secours)
+    }
     const surMolette = (e: WheelEvent) => {
       if (Math.abs(e.deltaY) < 4 || racine.scrollHeight <= racine.clientHeight) return
       const bas = e.deltaY > 0
       const corps = (e.target as HTMLElement).closest('.panneau-corps')
       if (corps && (bas ? corps.scrollTop + corps.clientHeight < corps.scrollHeight - 1 : corps.scrollTop > 0)) return
       e.preventDefault()
-      if (Date.now() < verrou) return
+      const t = performance.now()
+      const memeGeste = t - dernier < 160
+      dernier = t
+      if (enMouvement || memeGeste) return
       const liste = [...racine.querySelectorAll<HTMLElement>('.snap-section')]
       const courant = liste.reduce((m, s, i) => (Math.abs(s.offsetTop - racine.scrollTop) < Math.abs(liste[m].offsetTop - racine.scrollTop) ? i : m), 0)
       const cible = liste[courant + (bas ? 1 : -1)]
       if (!cible) return
-      verrou = Date.now() + 700
+      enMouvement = true
+      secours = window.setTimeout(liberer, 900) // navigateur sans scrollend
       aller(cible.id)
     }
     racine.addEventListener('wheel', surMolette, { passive: false })
-    return () => racine.removeEventListener('wheel', surMolette)
+    racine.addEventListener('scrollend', liberer)
+    return () => {
+      racine.removeEventListener('wheel', surMolette)
+      racine.removeEventListener('scrollend', liberer)
+      window.clearTimeout(secours)
+    }
   }, [])
 
   // Tableaux empilés : chacun grandit au prorata de ses lignes, pour une hauteur de ligne commune,
@@ -74,23 +76,33 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
         p.style.flexGrow = String(p.querySelectorAll('tbody tr').length || 1)
         plafonner(p)
       })
+    // Recalage regroupé en une fois par image, jamais pendant le rendu d'un changement de section
+    let image = 0
+    const planifier = () => {
+      if (!image) image = requestAnimationFrame(() => {
+        image = 0
+        poser()
+      })
+    }
     poser()
-    window.addEventListener('resize', poser)
+    window.addEventListener('resize', planifier)
 
     const racine = zone.current
     let mo: MutationObserver | null = null
     if (racine && typeof MutationObserver !== 'undefined') {
-      mo = new MutationObserver(() => {
-        poser()
+      // les dessins des graphiques (svg) ne changent pas la hauteur des tableaux
+      mo = new MutationObserver((l) => {
+        if (l.some((m) => !(m.target as Element).closest?.('svg'))) planifier()
       })
       mo.observe(racine, { childList: true, subtree: true })
     }
 
     return () => {
-      window.removeEventListener('resize', poser)
+      cancelAnimationFrame(image)
+      window.removeEventListener('resize', planifier)
       mo?.disconnect()
     }
-  })
+  }, [cles])
 
   function aller(id: string) {
     const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -133,21 +145,47 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
           </div>
         ))}
       </div>
-      <nav className="rail" aria-label="Sections du rapport">
-        {sections.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={s.id === actif ? 'rail-point actif' : 'rail-point'}
-            aria-label={s.titre}
-            aria-current={s.id === actif ? 'true' : undefined}
-            onClick={() => aller(s.id)}
-          >
-            <span className="rail-bulle">{s.titre}</span>
-            <span className="rail-puce" aria-hidden="true" />
-          </button>
-        ))}
-      </nav>
+      <Rail sections={sections} zone={zone} cles={cles} aller={aller} />
     </div>
+  )
+}
+
+/** Rail à part : le changement de section active ne redessine que lui, pas les tableaux. */
+function Rail({ sections, zone, cles, aller }: {
+  sections: SectionSnap[]
+  zone: RefObject<HTMLDivElement | null>
+  cles: string
+  aller: (id: string) => void
+}) {
+  const [actif, setActif] = useState(sections[0]?.id)
+  useEffect(() => {
+    const racine = zone.current
+    if (!racine || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(
+      (entrees) => {
+        const visible = entrees.find((e) => e.isIntersecting)
+        if (visible) setActif(visible.target.id)
+      },
+      { root: racine, threshold: 0.55 },
+    )
+    racine.querySelectorAll('.snap-section').forEach((el) => obs.observe(el))
+    return () => obs.disconnect()
+  }, [cles, zone])
+  return (
+    <nav className="rail" aria-label="Sections du rapport">
+      {sections.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          className={s.id === actif ? 'rail-point actif' : 'rail-point'}
+          aria-label={s.titre}
+          aria-current={s.id === actif ? 'true' : undefined}
+          onClick={() => aller(s.id)}
+        >
+          <span className="rail-bulle">{s.titre}</span>
+          <span className="rail-puce" aria-hidden="true" />
+        </button>
+      ))}
+    </nav>
   )
 }
