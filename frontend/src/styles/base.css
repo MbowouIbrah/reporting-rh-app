@@ -1073,7 +1073,10 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 
   .resume-excel .regle { margin-bottom: 0; }
   /* Le tableau occupe toute la hauteur restante, les 12 mois se partagent l'espace à parts égales */
-  .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(13 * var(--ligne-max)); }
+  .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(14 * 3rem); }
+  /* Cases plus hautes quand l'écran est haut (24'') : la page se répartit sur toute la hauteur */
+  .resume-excel .cases .case { padding-block: clamp(var(--sp-3), 2.2vh, 28px); }
+  .resume-excel { padding-bottom: var(--v); }
   .resume-excel .suivi { height: 100%; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: var(--ligne-pad); line-height: 1.35; }
 
