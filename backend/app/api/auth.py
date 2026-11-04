@@ -1,15 +1,17 @@
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Path, Response
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import mail
 from app.core.config import settings
 from app.db.session import SessionLocal, get_db
-from app.models.auth import AuditEvent, Utilisateur
+from app.models.auth import AuditEvent, PreferenceUtilisateur, Utilisateur
 from app.security import audit
 from app.security.deps import current_principal, to_principal
 from app.security.passwords import check_password, hash_password, verify_password
@@ -175,3 +177,48 @@ def logout(response: Response) -> dict:
 @router.get("/me")
 def me(principal: Principal = Depends(current_principal)) -> dict:
     return _me(principal)
+
+
+# Réglages d'affichage de l'utilisateur connecté (chacun ne voit que les siens).
+CLE_PREFERENCE = Path(pattern=r"^graphes\.[a-z_]{1,30}$")
+
+
+IdGraphe = Annotated[str, StringConstraints(min_length=1, max_length=50)]
+
+
+class PreferenceIn(BaseModel):
+    valeur: list[IdGraphe] = Field(max_length=50)
+
+
+def _preference(db: Session, uid: int, cle: str) -> PreferenceUtilisateur | None:
+    return db.scalar(select(PreferenceUtilisateur).where(
+        PreferenceUtilisateur.utilisateur_id == uid, PreferenceUtilisateur.cle == cle))
+
+
+@router.get("/preferences/{cle}")
+def lire_preference(cle: str = CLE_PREFERENCE, principal: Principal = Depends(current_principal),
+                    db: Session = Depends(get_db)) -> dict:
+    """`valeur` nulle : rien d'enregistré sur le serveur (réglage par défaut)."""
+    p = _preference(db, principal.user_id, cle)
+    return {"valeur": p.valeur if p else None}
+
+
+@router.put("/preferences/{cle}")
+def ecrire_preference(body: PreferenceIn, cle: str = CLE_PREFERENCE,
+                      principal: Principal = Depends(current_principal),
+                      db: Session = Depends(get_db)) -> dict:
+    """Liste vide gardée (tout affiché) : la distinguer de « jamais enregistré » évite qu'un
+    autre poste renvoie son ancienne copie locale."""
+    valeur = list(dict.fromkeys(body.valeur))
+    p = _preference(db, principal.user_id, cle)
+    if p:
+        p.valeur = valeur
+    else:
+        db.add(PreferenceUtilisateur(utilisateur_id=principal.user_id, cle=cle, valeur=valeur))
+    try:
+        db.commit()
+    except IntegrityError:  # premier envoi simultané : mettre à jour la ligne créée
+        db.rollback()
+        _preference(db, principal.user_id, cle).valeur = valeur
+        db.commit()
+    return {"valeur": valeur}

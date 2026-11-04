@@ -52,7 +52,7 @@ async function requete(path: string, init: RequestInit, retry: boolean): Promise
   if (r.status === 401 && retry && !SANS_REFRESH.includes(path)) {
     if (await refresh()) return requete(path, init, false)
     // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
-    if (!path.startsWith('/auth/')) onUnauthorized()
+    if (path !== '/auth/me') onUnauthorized()
   }
   if (!r.ok) throw new ApiError(r.status, ...(await detail(r)))
   return r

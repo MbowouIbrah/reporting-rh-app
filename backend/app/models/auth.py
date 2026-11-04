@@ -89,3 +89,17 @@ class AuditEvent(Base):
     entite_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     avant: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
     apres: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
+
+
+class PreferenceUtilisateur(Base):
+    """Réglage d'affichage propre à un utilisateur (ex. graphiques masqués), suivi partout."""
+
+    __tablename__ = "preference_utilisateur"
+    __table_args__ = (
+        UniqueConstraint("utilisateur_id", "cle", name="uq_preference_utilisateur"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
+    cle: Mapped[str] = mapped_column(String(60))
+    valeur: Mapped[list] = mapped_column(JsonType)

@@ -2,6 +2,7 @@ from app.models.auth import (  # noqa: F401
     AuditEvent,
     Perimetre,
     PerimetreRegle,
+    PreferenceUtilisateur,
     Utilisateur,
     UtilisateurPermission,
     UtilisateurPortee,

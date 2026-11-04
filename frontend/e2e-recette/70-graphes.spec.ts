@@ -6,7 +6,8 @@ const GARDE = 'Primes par mois (FCFA)'
 
 const graphe = (page: Page, titre: string) => page.locator('figure.graphe figcaption', { hasText: titre })
 
-test('choix des graphiques : masqués après rechargement et absents du PDF', async ({ page }) => {
+test('choix des graphiques : masqués après rechargement, sur un autre poste et absents du PDF', async ({ page, browser }) => {
+  test.setTimeout(60_000)
   await connecter(page, ADMIN)
   await page.goto('graphes')
   const menu = page.locator('details.choix-graphes')
@@ -20,6 +21,16 @@ test('choix des graphiques : masqués après rechargement et absents du PDF', as
   await page.reload()
   await expect(graphe(page, GARDE)).toHaveCount(1)
   for (const t of MASQUES) await expect(graphe(page, t)).toHaveCount(0)
+
+  // Autre poste (navigateur vierge) : le choix gardé sur le serveur suit l'utilisateur
+  const autre = await browser.newContext({ baseURL: test.info().project.use.baseURL })
+  const poste = await autre.newPage()
+  await connecter(poste, ADMIN)
+  await poste.goto('graphes')
+  const figure = (t: string) => poste.getByRole('figure', { name: t, exact: true })
+  await expect(figure(GARDE)).toHaveCount(1, { timeout: 20_000 })
+  for (const t of MASQUES) await expect(figure(t)).toHaveCount(0)
+  await autre.close()
 
   // Le PDF s'ouvre dans le même navigateur : il suit le choix, sans le menu
   await page.goto('rapport?sections=graphes')
