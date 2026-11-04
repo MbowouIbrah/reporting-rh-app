@@ -301,11 +301,13 @@ table.dense td.num { text-align: right; }
 .cases .case .second-libelle { font-size: var(--fs-sm); color: var(--muted); }
 /* Bulle de détail au survol : chiffres exacts, même lecture que les bulles des graphiques. */
 .cases .case { position: relative; }
-.cases .case .bulle { display: none; position: absolute; top: calc(100% + 2px); right: 0; z-index: 20; border-radius: 0; min-width: 240px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); font-size: var(--fs-xs); color: var(--ink); }
-.cases .case:hover .bulle, .cases .case:focus-visible .bulle { display: grid; gap: 2px; }
-.cases .case .bulle > div { display: flex; justify-content: space-between; gap: 16px; white-space: nowrap; }
-.cases .case .bulle > div > span:first-child { color: var(--muted); }
-@media print { .cases .case .bulle { display: none !important; } }
+.bulle-case { position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none; display: grid; gap: 2px; min-width: 240px; padding: 6px 10px; border-radius: 0; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); font-size: var(--fs-xs); color: var(--ink); opacity: 0; visibility: hidden; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), opacity 150ms ease, visibility 0s linear 150ms; }
+.bulle-case.visible { opacity: 1; visibility: visible; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), opacity 150ms ease, visibility 0s; }
+.bulle-case.saut { transition: opacity 150ms ease, visibility 0s; }
+.bulle-case > div { display: flex; justify-content: space-between; gap: 16px; white-space: nowrap; }
+.bulle-case > div > span:first-child { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .bulle-case, .bulle-case.visible { transition: none; } }
+@media print { .bulle-case { display: none !important; } }
 .regle { background: var(--paper-3); color: var(--muted); font-style: italic; font-size: var(--fs-xs); padding: 8px 14px; margin: 0; }
 .suivi thead th { background: var(--gris-etiq); color: var(--muted); font-size: var(--fs-xs); text-align: right; }
 .suivi thead th:first-child { text-align: left; }

@@ -43,7 +43,7 @@
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--mv-dur-sortie); }
 
 /* Éléments qui surgissent : l'animation joue à chaque passage de masqué à affiché. */
-.cases .case .bulle, .info-bulle, .profil-menu, .ligne-fichier, .choix-periode [role='listbox'] { animation: var(--mv-surgir) var(--mv-dur-surgir) var(--mv-courbe-surgir) backwards; }
+.info-bulle, .profil-menu, .ligne-fichier, .choix-periode [role='listbox'] { animation: var(--mv-surgir) var(--mv-dur-surgir) var(--mv-courbe-surgir) backwards; }
 
 /* Fin d'un recalcul : les chiffres remplacent le squelette en fondu (le nom d'animation change quand aria-busy disparaît). */
 .page-ecran :is(tbody td.num, tfoot td.num, tbody .var, .val, .sk-texte, .case > strong, .case > .note, .case > .variation, .case > .second):not([aria-busy='true'] *) {

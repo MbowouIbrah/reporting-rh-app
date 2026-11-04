@@ -83,6 +83,9 @@ function rendu(ui: ReactNode, chemin: string, perms: string[], avecMarge = false
 
 afterEach(() => vi.restoreAllMocks())
 
+/** Bulle unique des cases, affichée. */
+const bulle = () => document.querySelector<HTMLElement>('.bulle-case.visible')!
+
 /** Le squelette a la structure de la page : attendre la fin du chargement avant de lire les valeurs. */
 async function chargee() {
   await waitFor(() => expect(document.querySelector('.page-ecran[aria-busy="true"]')).not.toBeNull())
@@ -106,8 +109,10 @@ test('Résumé : effectif global de fin, évolution et répartition par contrat 
   await chargee()
   const tuile = (await screen.findByText('Évolution par rapport à Fév 2025')).closest('.tuile')!
   expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Fév 2025/)
-  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
-  expect(tuile.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Effectif fin/)
+  fireEvent.mouseEnter(tuile)
+  expect(bulle()).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
+  expect(bulle()).not.toHaveTextContent(/Effectif fin/)
+  expect(tuile).toHaveAttribute('aria-describedby', bulle().id)
   expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
   expect(screen.queryByText('CA par salarié', { selector: '.micro' })).toBeNull()
 })
@@ -117,10 +122,16 @@ test('Résumé : MAD globaux, dont sites déportés avec leur part, masse salari
   await chargee()
   const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
   expect(tuile).toHaveTextContent(/MAD globaux2Pourcentage MAD sites déportés1 · 50\s%/)
-  expect(tuile.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
+  fireEvent.mouseEnter(tuile)
+  expect(bulle()).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
   const ms = screen.getByText('Masse salariale', { selector: '.micro' }).closest('.tuile')!
-  expect(ms.querySelector('[role="tooltip"]')).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)
-  expect(ms.querySelector('[role="tooltip"]')).not.toHaveTextContent(/Écart|Mois saisis/)
+  fireEvent.mouseLeave(tuile)
+  fireEvent.mouseEnter(ms)
+  // Une seule bulle pour toutes les cases : elle passe d'une case à l'autre.
+  expect(document.querySelectorAll('.bulle-case')).toHaveLength(1)
+  expect(bulle()).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)
+  expect(bulle()).not.toHaveTextContent(/Écart|Mois saisis/)
+  expect(tuile).not.toHaveAttribute('aria-describedby')
   expect(screen.queryByText(/MOYENNE MENSUELLE/)).toBeNull()
 })
 

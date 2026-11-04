@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { BulleCases, useBulleCase } from '../components/BulleCases'
 import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
@@ -59,8 +60,9 @@ function Case({
   partiel?: boolean
   children?: ReactNode
 }) {
+  const bulle = useBulleCase(titre, detail)
   return (
-    <div className="tuile case" tabIndex={detail ? 0 : undefined}>
+    <div className="tuile case" tabIndex={detail ? 0 : undefined} {...bulle}>
       <span className="micro">
         {titre}
         {partiel && <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>}
@@ -71,16 +73,6 @@ function Case({
       </strong>
       {libelle2 && <span className="second-libelle">{libelle2}</span>}
       {children}
-      {detail && (
-        <div className="bulle" role="tooltip">
-          {detail.map(([k, v]) => (
-            <div key={k}>
-              <span>{k}</span>
-              <span className="num">{v}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -154,6 +146,7 @@ export default function Resume() {
 
   return (
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
+      <BulleCases>
       <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
@@ -295,6 +288,7 @@ export default function Resume() {
           </div>
         </>
       )}
+      </BulleCases>
     </section>
   )
 }
