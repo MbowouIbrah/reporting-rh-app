@@ -156,23 +156,19 @@ test('Activité : colonnes Objectif, Écart et Écart % sur les lignes qui ont u
   expect(devis.slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
 })
 
-test('TypesCharge groupe les rubriques comptées par famille, sans sous-total ; les hors total vont dans TypesExclus', () => {
-  const r = (rubrique: string, famille: string, exclu = false) => ({ rubrique, famille, exclu, ...cell })
+test('TypesCharge liste les rubriques comptées sans groupe ; les hors total vont dans TypesExclus', () => {
+  const r = (rubrique: string, exclu = false) => ({ rubrique, exclu, ...cell })
   const blocs = {
     a_type_charge: [
-      r('Salaire brut garantie', 'salaire'),
-      r('Bonus', 'primes', true),
-      r('Prime sur ventes', 'primes'),
-      { rubrique: 'TOTAL CHARGES', famille: null, exclu: false, ...cell },
-    ],
-    a_familles: [
-      { famille: 'salaire', hors_total: null, hors_total_m1: null, ...cell },
-      { famille: 'primes', hors_total: '12', hors_total_m1: '10', ...cell },
+      r('Salaire brut garantie'),
+      r('Bonus', true),
+      r('Prime sur ventes'),
+      { rubrique: 'TOTAL CHARGES', exclu: false, ...cell },
     ],
   } as unknown as Blocs
   const { container } = render(<TypesCharge d={blocs} lib={lib} />)
   const lignes = [...container.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('th')?.textContent)
-  expect(lignes.slice(0, 4)).toEqual(['Salaire', 'Salaire brut garantie', 'Primes', 'Prime sur ventes'])
+  expect(lignes.slice(0, 2)).toEqual(['Salaire brut garantie', 'Prime sur ventes'])
   expect(container.querySelector('tr.exclu')).toBeNull()
   expect(container.querySelector('tr.sous-total')).toBeNull()
   const exclus = render(<TypesExclus d={blocs} lib={lib} />).container

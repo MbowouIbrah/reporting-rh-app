@@ -1,9 +1,9 @@
 import { Fragment, type ReactNode, useState } from 'react'
-import type { Budget, Cell, CellPartiel, Famille, LigneActivite, Mensuel } from '../api/types'
+import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
 import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
-export type Blocs = Pick<Mensuel, 'a_type_charge' | 'a_familles' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
+export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
 export interface Libelles {
   prec: string
   cour: string
@@ -108,16 +108,8 @@ export function TypesExclus({ d, lib }: { d: Blocs; lib: Libelles }) {
   )
 }
 
-export const LIB_FAMILLE: Record<Famille, string> = {
-  salaire: 'Salaire',
-  primes: 'Primes',
-  avantages: 'Avantages et frais',
-  charges: 'Charges',
-}
-
-/** 1. Reporting global : types de charge regroupés par famille (titre puis rubriques comptées ; les rubriques hors total
- *  sont dans `TypesExclus`), TOTAL GÉNÉRAL,
- *  puis CA et marge (hors total, avec objectif). Sans `a_familles` : liste simple des rubriques comptées. */
+/** 1. Reporting global : rubriques comptées (les hors total sont dans `TypesExclus`), TOTAL GÉNÉRAL,
+ *  puis CA et marge (hors total, avec objectif). */
 export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const rubriques = d.a_type_charge.filter((r) => r !== total)
@@ -125,20 +117,9 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
     <table className="dense tab-global aligne">
       <Tete premiere="Type de charge" lib={lib} budget />
       <tbody>
-        {d.a_familles
-          ? d.a_familles.map((f) => (
-              <Fragment key={f.famille}>
-                <tr className="famille">
-                  <th scope="rowgroup" colSpan={COLONNES + 1}>{LIB_FAMILLE[f.famille]}</th>
-                </tr>
-                {rubriques.filter((r) => r.famille === f.famille && !r.exclu).map((r) => (
-                  <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
-                ))}
-              </Fragment>
-            ))
-          : rubriques.filter((r) => !r.exclu).map((r) => (
-              <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
-            ))}
+        {rubriques.filter((r) => !r.exclu).map((r) => (
+          <Ligne key={r.rubrique} label={r.rubrique} cell={r} budget={r} />
+        ))}
       </tbody>
       <tbody className="pied">
         {total && <Ligne label="TOTAL GÉNÉRAL" cell={total} budget={total} className="total" />}

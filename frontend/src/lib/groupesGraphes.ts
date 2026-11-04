@@ -40,7 +40,7 @@ export interface Groupe {
   graphes: string[]
 }
 
-/** Groupes d'origine (4 graphiques chacun, d'après les familles du calcul). Identifiants stables. */
+/** Groupes d'origine (4 graphiques chacun). Identifiants stables. */
 export const GROUPES_ORIGINE: Groupe[] = [
   { id: 'ensemble', nom: 'Effectif et masse salariale', graphes: ['ms', 'remu', 'effectif', 'absences'] },
   { id: 'salaire', nom: 'Salaires, primes et charges', graphes: ['salaire', 'primes', 'assurance', 'formation'] },

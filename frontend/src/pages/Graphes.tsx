@@ -70,6 +70,8 @@ const LEGENDE = {
   formatter: (v: string) => <span style={{ color: 'var(--muted)' }}>{v}</span>,
 } as const
 const BULLE_FCFA = (v: unknown) => compact(Number(v))
+// Bulle : une valeur absente (mois sans données, pas d'objectif) reste affichée en « — », jamais retirée ni mise à 0.
+const tiret = (f: (v: unknown) => string) => (v: unknown) => (v == null || v === '' ? '—' : f(v))
 // Transition courte d'une valeur à l'autre (1,5 s par défaut pour une courbe : trop lent au changement de filtre).
 const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as const
 
@@ -114,7 +116,7 @@ function GrapheMois({ serie, titre, lecture, cle, objectif, couleur, unite = 'fc
         <CartesianGrid stroke={GRILLE} vertical={false} />
         <XAxis {...AXE_X} />
         {axe}
-        <Tooltip formatter={bulle} />
+        <Tooltip filterNull={false} formatter={tiret(bulle)} />
         <Legend {...LEGENDE} />
         {courbe
           ? <Line dataKey={cle} name={serieN} stroke={couleur} strokeWidth={2.5} dot={{ r: 3.5, fill: couleur }} connectNulls={false} {...anim} />
@@ -258,7 +260,7 @@ export default function Graphes() {
         <CartesianGrid stroke={GRILLE} vertical={false} />
         <XAxis {...AXE_X} />
         <YAxis {...AXE_FCFA} />
-        <Tooltip formatter={BULLE_FCFA} />
+        <Tooltip filterNull={false} formatter={tiret(BULLE_FCFA)} />
         <Legend {...LEGENDE} />
         <Area dataKey="ms" name={serieN} stroke={C_MS} strokeWidth={2.5} fill={C_MS} fillOpacity={0.15} dot={{ r: 3, fill: C_MS }} connectNulls={false} {...ANIM} />
         {avecN1 && <Area dataKey="ms1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
@@ -271,7 +273,7 @@ export default function Graphes() {
         <CartesianGrid stroke={GRILLE} vertical={false} />
         <XAxis {...AXE_X} />
         <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-        <Tooltip formatter={(v) => `${entier(Number(v))} salariés`} />
+        <Tooltip filterNull={false} formatter={tiret((v) => `${entier(Number(v))} salariés`)} />
         <Legend {...LEGENDE} />
         {contrats.map((c, i) => {
           const coul = COULEURS_CONTRAT[i % COULEURS_CONTRAT.length]
@@ -288,7 +290,7 @@ export default function Graphes() {
         <CartesianGrid stroke={GRILLE} vertical={false} />
         <XAxis {...AXE_X} />
         <YAxis {...AXE_FCFA} />
-        <Tooltip formatter={BULLE_FCFA} />
+        <Tooltip filterNull={false} formatter={tiret(BULLE_FCFA)} />
         <Legend {...LEGENDE} />
         <Bar dataKey="frais" name={serieN} fill={C_FRAIS} radius={[3, 3, 0, 0]} {...ANIM} />
         {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
@@ -300,7 +302,7 @@ export default function Graphes() {
         <CartesianGrid stroke={GRILLE} vertical={false} />
         <XAxis {...AXE_X} />
         <YAxis {...AXE_FCFA} />
-        <Tooltip formatter={BULLE_FCFA} />
+        <Tooltip filterNull={false} formatter={tiret(BULLE_FCFA)} />
         <Legend {...LEGENDE} />
         <Area dataKey="remu" name={serieN} stroke={C_REMU} strokeWidth={2.5} fill={C_REMU} fillOpacity={0.15} dot={{ r: 3, fill: C_REMU }} connectNulls={false} {...ANIM} />
         {avecN1 && <Area dataKey="remu1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
@@ -315,7 +317,7 @@ export default function Graphes() {
           <CartesianGrid stroke={GRILLE} vertical={false} />
           <XAxis {...AXE_X} />
           <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-          <Tooltip formatter={(v) => `${entier(Number(v))} ventes`} />
+          <Tooltip filterNull={false} formatter={tiret((v) => `${entier(Number(v))} ventes`)} />
           <Legend {...LEGENDE} />
           <Bar dataKey="ventes" name={serieN} fill={C_VENTES} radius={[3, 3, 0, 0]} {...ANIM} />
           {ventesN1 && <Line dataKey="ventes1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
@@ -329,7 +331,7 @@ export default function Graphes() {
           <CartesianGrid stroke={GRILLE} vertical={false} />
           <XAxis {...AXE_X} />
           <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-          <Tooltip formatter={(v) => `${entier(Number(v))} clients`} />
+          <Tooltip filterNull={false} formatter={tiret((v) => `${entier(Number(v))} clients`)} />
           <Legend {...LEGENDE} />
           <Line dataKey="clients" name={serieN} stroke={C_CLIENTS} strokeWidth={2.5} dot={{ r: 3.5, fill: C_CLIENTS }} connectNulls={false} {...ANIM} />
           {clientsN1 && <Line dataKey="clients1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...ANIM} />}
@@ -343,7 +345,7 @@ export default function Graphes() {
           <CartesianGrid stroke={GRILLE} vertical={false} />
           <XAxis {...AXE_X} />
           <YAxis width={44} tickCount={5} tickFormatter={(v) => decimal2(String(v))} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-          <Tooltip formatter={(v) => decimal2(String(v))} />
+          <Tooltip filterNull={false} formatter={tiret((v) => decimal2(String(v)))} />
           <Legend {...LEGENDE} />
           <Area dataKey="orProd" name={serieN} stroke={C_OR} strokeWidth={2.5} fill={C_OR} fillOpacity={0.15} dot={{ r: 3, fill: C_OR }} connectNulls={false} {...ANIM} />
           {orN1 && <Area dataKey="orProd1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}

@@ -88,6 +88,8 @@ export default function Individuel() {
   const sansObjet = (r: string, m?: Mois) =>
     r === LOGEMENT && (m ? m.present && !m.deporte : !(d?.mois ?? []).some((x) => x.deporte))
   const val = (v: Val | undefined) => v ?? '0'
+  // Mois sans données (pas encore importé ou hors périmètre) : « - », jamais 0 ; 0 reste un vrai zéro.
+  const aucun = !(d?.mois ?? []).some((m) => m.present)
   const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
   const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
 
@@ -197,17 +199,17 @@ export default function Individuel() {
                   <tr className="groupe">
                     <th scope="row" className="fige-g">{MOIS[m.mois - 1]}</th>
                     {rubriques.map((r) => (
-                      <td className={(sansObjet(r, m) ? 'num' : cls(val(m.montants?.[r]))) + classe(r)} key={r}>
-                        {sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
+                      <td className={(!m.present || sansObjet(r, m) ? 'num' : cls(val(m.montants?.[r]))) + classe(r)} key={r}>
+                        {!m.present || sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
                       </td>
                     ))}
-                    <td className="num fige-d1">{fcfa(totalMois(m))}</td>
+                    <td className="num fige-d1">{m.present ? fcfa(totalMois(m)) : '-'}</td>
                   </tr>
                   <tr className="sous">
                     <th scope="row" className="fige-g">Staff</th>
                     {rubriques.map((r) => (
                       <td className={'num' + classe(r)} key={r}>
-                        {sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
+                        {!m.present || sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
                       </td>
                     ))}
                     <td className="fige-d1" />
@@ -218,16 +220,16 @@ export default function Individuel() {
                 <th scope="row" className="fige-g">Total MS</th>
                 {rubriques.map((r) => (
                   <td className={'num' + classe(r)} key={r}>
-                    {sansObjet(r) ? '-' : fcfa(totalRub(r))}
+                    {aucun || sansObjet(r) ? '-' : fcfa(totalRub(r))}
                   </td>
                 ))}
-                <td className="num fige-d1">{fcfa(somme(d.mois.map(totalMois)) ?? '0')}</td>
+                <td className="num fige-d1">{aucun ? '-' : fcfa(somme(d.mois.filter((m) => m.present).map(totalMois)) ?? '0')}</td>
               </tr>
               <tr className="total staff">
                 <th scope="row" className="fige-g">Total Staff</th>
                 {rubriques.map((r) => (
                   <td className={'num' + classe(r)} key={r}>
-                    {sansObjet(r) ? '-' : totalStaff(r)}
+                    {aucun || sansObjet(r) ? '-' : totalStaff(r)}
                   </td>
                 ))}
                 <td className="fige-d1" />

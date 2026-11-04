@@ -369,9 +369,6 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.tab-global tbody tr.dont:nth-child(n) > * { font-style: italic; color: var(--muted); }
 .rapport-excel .panneau table.tab-global tbody tr.dont:nth-child(n) > th { padding-left: calc(12px + var(--sp-4)); }
 .rapport-excel .panneau table.tab-global tbody tr.hors-total:nth-child(n):not(:has(+ tr.hors-total)) > * { border-bottom: 2px solid var(--brun); }
-/* Familles du reporting global : titre de famille, rubriques en retrait ; rubriques hors total discrètes */
-.rapport-excel .panneau table.tab-global tbody tr.famille:nth-child(n) > th { background: var(--rapport-groupe); color: var(--navy); font-weight: var(--fw-bold); text-transform: uppercase; font-size: var(--fs-xs); letter-spacing: .04em; border-top: 1px solid var(--rule-strong); }
-.rapport-excel .panneau table.tab-global tbody:has(tr.famille) > tr:not(.famille) > th { padding-left: calc(12px + var(--sp-3)); }
 .rapport-excel .panneau table.tab-global tbody tr.exclu:nth-child(n) > * { color: var(--muted); font-style: italic; }
 .mention-hors-total { font-size: var(--fs-xs); }
 /* Lignes de total en pied figé : restent visibles en bas quand le tableau défile. */

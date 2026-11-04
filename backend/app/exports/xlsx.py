@@ -63,11 +63,6 @@ def _sortie(wb: Workbook) -> bytes:
     return buf.getvalue()
 
 
-# Libellés des familles de rubriques (kpi/moteur.py FAMILLES).
-FAMILLES = {"salaire": "Salaire", "primes": "Primes", "avantages": "Avantages et frais",
-            "charges": "Charges"}
-
-
 def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
     """Blocs 1 à 5 communs aux écrans Mensuel et Annuel (components/BlocsRapport.tsx)."""
     var = ["Variation", "Var. %"]
@@ -84,8 +79,8 @@ def _blocs(wb: Workbook, r: dict, prec: str, cour: str) -> None:
                 for k, lib in (("ca", "Chiffre d'affaires"), ("marge", "Marge"))] if cm else []
 
     inclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and not x.get("exclu")]
-    _feuille(wb, "1 Reporting global", ["Type de charge", prec, cour, *var, *bud, "Famille"],
-             [[x["rubrique"], *_cell(x, True), FAMILLES.get(x.get("famille"))] for x in inclus]
+    _feuille(wb, "1 Reporting global", ["Type de charge", prec, cour, *var, *bud],
+             [[x["rubrique"], *_cell(x, True)] for x in inclus]
              + ligne_total + frais + ca_marge)
     exclus = [x for x in r["a_type_charge"] if x["rubrique"] != TOTAL and x.get("exclu")]
     if exclus:

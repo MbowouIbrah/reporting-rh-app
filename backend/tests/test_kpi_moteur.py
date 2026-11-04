@@ -11,7 +11,6 @@ from app.kpi.moteur import (
     PeriodeData,
     Refs,
     annuel,
-    famille,
     individuel,
     mensuel,
 )
@@ -132,7 +131,7 @@ def test_blocs_service_site_contrat():
     mad = next(x for x in r["d_contrat"]["ventilation"]
                if (x["contrat"], x["activite"]) == ("MAD", "Back Office"))
     assert mad["effectif"]["m"] == 1 and mad["ms"]["m"] == 40
-    assert r["a_type_charge"][-1] == {"rubrique": "TOTAL CHARGES", "exclu": False, "famille": None,
+    assert r["a_type_charge"][-1] == {"rubrique": "TOTAL CHARGES", "exclu": False,
                                       "m1": None,
                                       "m": 140, "var": None, "var_pct": None,
                                       "budget": 1_200_000, "ecart": 140 - 1_200_000,
@@ -374,7 +373,7 @@ def test_stage_affiche_seulement_avec_des_lignes():
     assert "Stage" in an2["effectif_fin_contrat"]
 
 
-# ---------- familles de rubriques (demande 8) ----------
+# ---------- salaire, primes et exclusions changeantes ----------
 REFS_F = Refs(
     services=("SAV PL",), activites=("Front office",), sites=("Douala",), contrats=("CDI",),
     rubriques=("Absences (nb)", "Brut Réel", "Salaire brut garantie", "Bonus", "Commission",
@@ -386,46 +385,30 @@ def pdf(*lignes):
     return PeriodeData(tuple(lignes), EXCL_F)
 
 
-def test_famille_par_rubrique_et_inconnue_dans_charges():
-    assert famille("Brut Réel") == famille("Salaire brut garantie") == "salaire"
-    assert {famille(r) for r in ("Bonus", "Primes exceptionnelles", "Primes sur ventes",
-                                 "Primes sur résultats", "Productivité Ateliers",
-                                 "Commission")} == {"primes"}
-    assert famille("Crédit téléphonique") == famille("Frais de mission") == "avantages"
-    assert famille("Charges Patronales") == famille("Rubrique neuve") == "charges"
-
-
 def _lignes_f():
     return L(1, Brut_Réel=1000, Salaire_brut_garantie=700, Bonus=50, Commission=30,
              Primes_sur_ventes=20, Frais_de_mission=40, Charges_Patronales=200,
              Rubrique_neuve=5, Absences_nb=2)
 
 
-def test_mensuel_sous_totaux_familles_valent_total_charges():
+def test_mensuel_total_charges_et_salaire_primes():
     cur = pdf(_lignes_f())
     prev = pdf(L(1, Brut_Réel=900, Bonus=10))
     r = mensuel(cur, prev, REFS_F, Params(), Budgets(rubrique={"Bonus": D(60)}))
     lignes = {x["rubrique"]: x for x in r["a_type_charge"]}
-    assert lignes["Bonus"]["famille"] == "primes" and lignes["TOTAL CHARGES"]["famille"] is None
-    fam = {x["famille"]: x for x in r["a_familles"]}
-    assert list(fam) == ["salaire", "primes", "avantages", "charges"]
-    assert fam["salaire"]["m"] == 1000 and fam["salaire"]["hors_total"] == 700
-    assert fam["primes"]["m"] == 50 and fam["primes"]["hors_total"] == 50  # 30 + 20
-    assert fam["primes"]["m1"] == 10 and fam["primes"]["budget"] == 60
-    assert fam["avantages"]["hors_total"] is None and fam["charges"]["m"] == 205
-    assert sum(x["m"] for x in r["a_familles"]) == lignes["TOTAL CHARGES"]["m"] == cur.ms
-    assert sum(x["m1"] for x in r["a_familles"]) == lignes["TOTAL CHARGES"]["m1"]
+    assert "a_familles" not in r and "famille" not in lignes["Bonus"]
+    assert lignes["TOTAL CHARGES"]["m"] == cur.ms == 1295  # 1000 + 50 + 40 + 200 + 5
+    assert lignes["TOTAL CHARGES"]["m1"] == 910
     s = r["synthese"]
     assert s["salaire"]["m"] == 700 and s["salaire"]["m1"] == 0
     assert s["primes_toutes"]["m"] == 100 and s["primes_toutes"]["m1"] == 10
 
 
-def test_annuel_familles_serie_et_cumuls_salaire_primes():
+def test_annuel_serie_et_cumuls_salaire_primes():
     n = {1: pdf(_lignes_f()), 2: pdf(L(1, Brut_Réel=500, Salaire_brut_garantie=300))}
     r = annuel(n, {}, 2, REFS_F, Params())
     total = next(x for x in r["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
-    assert sum(x["m"] for x in r["a_familles"]) == total["m"]
-    assert all(x["m1"] is None for x in r["a_familles"])  # pas de N-1
+    assert "a_familles" not in r and total["m1"] is None  # pas de N-1
     s = r["serie_n"]
     assert (s[0]["salaire"], s[0]["primes_toutes"]) == (700, 100)
     assert (s[1]["salaire"], s[1]["primes_toutes"]) == (300, 0)
@@ -434,7 +417,7 @@ def test_annuel_familles_serie_et_cumuls_salaire_primes():
     assert r["primes_toutes_cumul"]["m"] == 100
 
 
-def test_familles_exclusion_changeant_en_cours_d_annee_et_budget_partiel():
+def test_exclusion_changeant_en_cours_d_annee():
     sans = frozenset()  # janvier : Primes sur ventes comptée ; février : exclue
     def p(excl, **m):
         return PeriodeData((L(1, **m),), excl)
@@ -442,21 +425,8 @@ def test_familles_exclusion_changeant_en_cours_d_annee_et_budget_partiel():
     n1 = {1: p(sans, Brut_Réel=1000, Primes_sur_ventes=30), 2: p(sans, Brut_Réel=1000, Primes_sur_ventes=30)}
     r = annuel(n, n1, 2, REFS_F, Params())
     total = next(x for x in r["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
-    assert sum(x["m"] for x in r["a_familles"]) == total["m"] == 2030
-    assert sum(x["m1"] for x in r["a_familles"]) == total["m1"] == 2060
-    prim = next(x for x in r["a_familles"] if x["famille"] == "primes")
-    assert prim["hors_total"] == 30 and prim["hors_total_m1"] is None
+    assert total["m"] == 2030 and total["m1"] == 2060
     m = mensuel(n[2], n[1], REFS_F, Params(),
                 Budgets(rubrique={"Charges Patronales": D(10)}))
     t = next(x for x in m["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
     assert t["m1"] == m["synthese"]["ms"]["m1"] == 1030  # N-1 avec ses propres exclusions
-    assert sum(x["m1"] for x in m["a_familles"]) == 1030
-    m = mensuel(pdf(L(1, Charges_Patronales=50, Rubrique_neuve=5)), None, REFS_F, Params(),
-                Budgets(rubrique={"Charges Patronales": D(60)}))
-    ch = next(x for x in m["a_familles"] if x["famille"] == "charges")
-    assert ch["budget"] is None and ch["ecart"] is None  # rubrique neuve sans budget : partiel
-    # annuel : Primes sur ventes sans budget, comptée en janvier puis exclue : budget primes partiel
-    nb = {k: p(v.exclues, Bonus=20, Primes_sur_ventes=30) for k, v in n.items()}
-    r = annuel(nb, {}, 2, REFS_F, Params(), budgets={k: Budgets(rubrique={"Bonus": D(25)}) for k in (1, 2)})
-    prim = next(x for x in r["a_familles"] if x["famille"] == "primes")
-    assert prim["m"] == 70 and prim["budget"] is None and prim["ecart"] is None

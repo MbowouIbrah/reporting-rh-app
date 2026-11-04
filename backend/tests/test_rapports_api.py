@@ -357,19 +357,3 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
     db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "deporte"
     db.commit()
     assert get(c, "individuel/tous", annee=2025).json()["mois"][0]["deporte"] is True
-
-
-def test_familles_exposees_et_filtrees_par_perimetre(charge, make_client):
-    for client, ms in ((charge, D("3700")), (make_client(VN), None)):
-        for route, q in (("mensuel", {"mois": 2}), ("annuel", {"mois": 2})):
-            r = get(client, route, annee=2026, **q).json()
-            total = next(x for x in r["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
-            fam = r["a_familles"]
-            assert fam and {x["famille"] for x in fam} <= {"salaire", "primes", "avantages", "charges"}
-            assert sum(D(x["m"]) for x in fam) == D(total["m"])
-            if route == "mensuel" and ms is not None:
-                assert D(total["m"]) == ms
-            assert all(isinstance(x["m"], str) for x in fam)  # décimaux exacts en chaînes
-    vn = get(make_client(VN), "mensuel", annee=2026, mois=2).json()
-    glob = get(charge, "mensuel", annee=2026, mois=2).json()
-    assert sum(D(x["m"]) for x in vn["a_familles"]) < sum(D(x["m"]) for x in glob["a_familles"])
