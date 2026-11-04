@@ -1,30 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EFFET_PAR_DEFAUT, installerMouvement, transitionPage } from './mouvement'
-
-const URL_BASE = 'http://localhost/reporting-rh/resume'
-
-afterEach(() => {
-  localStorage.clear()
-  delete document.documentElement.dataset.mouvement
-})
-
-describe('installerMouvement', () => {
-  it("pose l'effet par défaut", () => {
-    expect(installerMouvement(document, URL_BASE)).toBe(EFFET_PAR_DEFAUT)
-    expect(document.documentElement.dataset.mouvement).toBe(EFFET_PAR_DEFAUT)
-  })
-
-  it("mémorise l'effet demandé dans l'adresse, puis revient au défaut", () => {
-    installerMouvement(document, `${URL_BASE}?mouvement=zoom`)
-    expect(installerMouvement(document, URL_BASE)).toBe('zoom')
-    expect(installerMouvement(document, `${URL_BASE}?mouvement=defaut`)).toBe(EFFET_PAR_DEFAUT)
-    expect(installerMouvement(document, URL_BASE)).toBe(EFFET_PAR_DEFAUT)
-  })
-
-  it('ignore un effet inconnu', () => {
-    expect(installerMouvement(document, `${URL_BASE}?mouvement=toupie`)).toBe(EFFET_PAR_DEFAUT)
-  })
-})
+import { describe, expect, it, vi } from 'vitest'
+import { transitionPage } from './mouvement'
 
 describe('transitionPage', () => {
   it('navigue directement sans View Transitions', () => {
@@ -41,10 +16,14 @@ describe('transitionPage', () => {
     expect(naviguer).toHaveBeenCalledOnce()
   })
 
-  it("navigue directement avec l'effet « aucun »", () => {
-    document.documentElement.dataset.mouvement = 'aucun'
+  it('navigue directement quand le mouvement est réduit', () => {
+    const avant = window.matchMedia
+    window.matchMedia = vi.fn(() => ({ matches: true }) as MediaQueryList)
     const start = vi.fn()
-    transitionPage(vi.fn(), { startViewTransition: start, documentElement: document.documentElement } as unknown as Document)
+    const naviguer = vi.fn()
+    transitionPage(naviguer, { startViewTransition: start, documentElement: document.documentElement } as unknown as Document)
     expect(start).not.toHaveBeenCalled()
+    expect(naviguer).toHaveBeenCalledOnce()
+    window.matchMedia = avant
   })
 })

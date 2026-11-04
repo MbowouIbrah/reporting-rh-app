@@ -54,11 +54,9 @@ Conclusion : l'impression « aucune animation » ne correspond pas au code ; l'i
 - **Mensuel / Annuel** : rien à changer, la ligne Total est déjà en gras sur une seule teinte ; le zébrage reste (tableaux larges et denses).
 
 ### Mouvement centralisé
-- `frontend/src/styles/mouvement.css` : seul fichier des animations d'apparition. Réglages en tête (`--mv-dur-page`, `--mv-decalage`, `--mv-distance`, courbes), puis un préréglage par effet.
-- Effets : `monte` (défaut : glisse de 14 px vers le haut, blocs de la page décalés de 55 ms), `fondu`, `glisse` (latéral), `zoom`, `aucun`.
-- Essayer un effet : ajouter `?mouvement=zoom` à l'adresse (mémorisé dans ce navigateur), `?mouvement=defaut` pour revenir. Changer pour tout le monde : `EFFET_PAR_DEFAUT` dans `frontend/src/lib/mouvement.ts`.
-- Ajouter un effet : une paire de `@keyframes`, une ligne `[data-mouvement]`, le nom dans `EFFETS`.
-- Sortie de page : `LienPage.tsx` (barre du haut) appelle `transitionPage` → View Transitions, la page quittée s'efface en 180 ms. Navigateur sans l'API, mouvement réduit ou effet `aucun` : navigation directe.
+- `frontend/src/styles/mouvement.css` : seul fichier des animations d'apparition. Réglages en tête (`--mv-dur-page`, `--mv-decalage`, courbes).
+- Effet unique : fondu (décidé le 2026-11-04). Le réglage d'essai `?mouvement=` et les autres effets (`monte`, `glisse`, `zoom`, `aucun`) ont été retirés.
+- Sortie de page : `LienPage.tsx` (barre du haut) appelle `transitionPage` → View Transitions, la page quittée s'efface en 180 ms. Navigateur sans l'API, ou mouvement réduit : navigation directe.
 - Surgissent avec l'effet : bulle des cases, info-bulle, menu profil, ligne de fichier de l'import. Les chiffres reviennent en fondu à la fin d'un squelette.
 - Un bloc qui contient le rail fixe n'est animé qu'en fondu (un transform décalerait le rail pendant l'animation).
 - `prefers-reduced-motion` : tout est coupé.
