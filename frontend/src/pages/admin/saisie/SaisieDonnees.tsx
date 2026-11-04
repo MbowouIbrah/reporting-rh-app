@@ -50,12 +50,12 @@ const COLONNES: Record<string, string> = {
   obj_factures: 'Objectif de factures',
   obj_productivite: 'Objectif de productivité',
 }
-const COURT: Record<string, string> = {
+export const COURT: Record<string, string> = {
   ca: 'CA', marge: 'Marge', or: 'OR', devis: 'Devis', factures: 'Factures',
   obj_ca: 'Objectif CA', obj_marge: 'Objectif marge', obj_ventes: 'Objectif ventes', obj_clients: 'Objectif clients',
   obj_factures: 'Objectif factures', obj_productivite: 'Objectif productivité',
 }
-const MONTANTS = new Set(['ca', 'marge', 'obj_ca', 'obj_marge'])
+export const MONTANTS = new Set(['ca', 'marge', 'obj_ca', 'obj_marge'])
 const SIGNES = new Set(['marge', 'obj_marge'])
 const MOYENNES = new Set(['obj_productivite'])
 // Comptés à l'unité : un objectif de ventes, de clients ou de factures est entier (comme le serveur).
@@ -590,10 +590,12 @@ interface Props {
   onModifs?: (sale: boolean) => void
   /** Exécute une action qui quitte la grille, après confirmation s'il y a des modifications. */
   garde?: (action: () => void) => void
+  /** Onglet ouvert à l'arrivée (carte cliquée sur la page de départ). */
+  ongletInitial?: Groupe
 }
 
 /** Données du mois : CA et marge, OR / devis / factures et leurs objectifs, saisis à plusieurs niveaux. */
-export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = (a) => a() }: Props) {
+export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = (a) => a(), ongletInitial }: Props) {
   const avecMarge = usePeut('marge:read')
   const avecLecture = usePeut('import:read')
   const onglets: { id: Onglet; libelle: string }[] = [
@@ -604,7 +606,7 @@ export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = 
   ]
   // L'onglet de départ est retenu dès qu'un onglet de saisie existe : un droit qui arrive ensuite (marge) ne change pas d'onglet sous les doigts.
   const [choix, setChoix] = useState<Onglet | null>(null)
-  if (choix === null && onglets.length > 0) setChoix(onglets[0].id)
+  if (choix === null && onglets.length > 0) setChoix(onglets.some((o) => o.id === ongletInitial) ? ongletInitial! : onglets[0].id)
   const actif: Onglet | undefined = choix !== null && onglets.some((o) => o.id === choix) ? choix : onglets[0]?.id
   const id = useId()
   const signaler = useCallback((sale: boolean) => onModifs?.(sale), [onModifs])

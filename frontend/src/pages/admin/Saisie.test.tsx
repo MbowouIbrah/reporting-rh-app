@@ -119,7 +119,7 @@ function rendu(perms = ['import:read', 'marge:read']) {
   )
   return qc
 }
-const ouvrirDonnees = async () => fireEvent.click(await screen.findByRole('button', { name: 'Saisir les données de Février 2026 →' }))
+const ouvrirDonnees = async () => fireEvent.click(await screen.findByRole('button', { name: 'Saisir le CA et la marge de Février 2026 →' }))
 const saisirLeMois = async () => fireEvent.click(await screen.findByRole('button', { name: 'Étape 1 : choisir les employés de Février 2026 →' }))
 afterEach(() => {
   vi.restoreAllMocks()
@@ -237,7 +237,7 @@ test('données du mois : CA et marge saisis à plat, case vide calculée depuis 
   expect(screen.queryByRole('tab', { name: 'Budgets' })).toBeNull()
   // Budgets : carte sur la page de départ, nombre saisi et total par axe.
   fireEvent.click(screen.getByRole('button', { name: 'Retour : Choix du mois' }))
-  const services = (await screen.findByText('Services')).closest('li')!
+  const services = (await screen.findByText('Services')).closest('div')!
   expect(services).toHaveTextContent(/1 sur 1/)
   expect(services).toHaveTextContent(/300\sFCFA/)
   expect(screen.getByRole('button', { name: 'Saisir les budgets de Février 2026 →' })).toBeInTheDocument()
@@ -296,7 +296,9 @@ test('OR, devis, factures : total partiel, part non répartie, erreur du serveur
 
 test('sans le droit marge : pas d’onglet CA et marge, on arrive sur l’activité', async () => {
   rendu(['import:read'])
-  await ouvrirDonnees()
+  expect(await screen.findByRole('heading', { name: 'OR, devis, factures' })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'CA et marge' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Saisir les OR, devis et factures de Février 2026 →' }))
   await screen.findByRole('tab', { name: 'OR, devis, factures' })
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'OR : Douala' })).toBeInTheDocument())
   expect(screen.queryByRole('tab', { name: 'CA et marge' })).toBeNull()
@@ -306,7 +308,7 @@ test('sans le droit marge : pas d’onglet CA et marge, on arrive sur l’activi
 test('sans le droit de lecture des imports : seule la carte Budgets, aucune grille demandée', async () => {
   rendu([])
   await screen.findByRole('button', { name: 'Saisir les budgets de Février 2026 →' })
-  expect(screen.queryByRole('button', { name: 'Saisir les données de Février 2026 →' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Saisir le CA et la marge de Février 2026 →' })).toBeNull()
   expect(appels.some((a) => a.url.includes('/pilotage/saisies'))).toBe(false)
 })
 
@@ -509,9 +511,8 @@ test('plusieurs mois : modèle vide sans date, saisie dans l’application rése
   expect(screen.queryByRole('button', { name: /Étape 1/ })).toBeNull()
   expect(screen.getByText('Choisissez un mois précis pour saisir dans l’application.')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'DONNÉES DU MOIS' })).toBeInTheDocument()
-  expect(screen.getByText('Choisissez un mois précis pour saisir ces chiffres.')).toBeInTheDocument()
-  expect(screen.getByText('Choisissez un mois précis pour saisir les budgets.')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: /Enregistrer|Saisir les budgets/ })).toBeNull()
+  expect(screen.getByText(/Choisissez un mois précis pour saisir le CA, la marge/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Enregistrer|Saisir les budgets|Saisir le CA/ })).toBeNull()
 })
 
 test('nouvel employé : ajouté depuis le choix des employés, matricule unique, repris dans la grille', async () => {

@@ -1272,6 +1272,21 @@ table.tableau-squelette td { height: 2.1em; }
 /* Départ : cartes de même hauteur, actions alignées en bas */
 .saisie-cartes-depart .carte > .saisie-deux-temps { flex: 1 1 auto; align-content: start; }
 .saisie-cartes-depart .saisie-carte-action { margin-top: auto; padding-top: var(--sp-3); border-top: 1px solid var(--rule); }
+/* Départ : petites cartes du mois sur toute la largeur, toute la carte est cliquable */
+.saisie-tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); }
+.saisie-tuile { position: relative; display: flex; flex-direction: column; background: var(--verre); border: 1px solid var(--rule); border-top: 3px solid var(--navy); border-radius: 0; box-shadow: var(--shadow-1); padding: var(--sp-3); transition: border-color .15s, background .15s; }
+.saisie-tuile:hover, .saisie-tuile:focus-within { border-color: var(--rule-strong); border-top-color: var(--red); background: var(--surface-hover); }
+.saisie-tuile h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: .04em; color: var(--navy); }
+.saisie-tuile-corps { flex: 1 1 auto; }
+.saisie-tuile-corps > .note { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); }
+.saisie-tuile dl { margin: 0; display: grid; gap: 2px; }
+.saisie-tuile dl > div { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-sm); padding: 2px 0; border-bottom: 1px solid var(--rule); }
+.saisie-tuile dt { color: var(--muted); white-space: nowrap; }
+.saisie-tuile dd { margin: 0; text-align: right; font-weight: var(--fw-medium); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.saisie-tuile-action { margin-top: var(--sp-2); padding: 0; border: 0; background: none; color: var(--red); font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-bold); text-align: left; cursor: pointer; }
+.saisie-tuile-action::after { content: ''; position: absolute; inset: 0; }
+.saisie-tuile-action:focus-visible { outline: none; }
+.saisie-tuile:has(.saisie-tuile-action:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* Choix des employés : consigne, fiche « Nouvel employé », modèle téléchargé à importer */
 .saisie-consigne { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
 .saisie-nouvel { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-2) var(--sp-3); align-items: end; margin: 0 0 var(--sp-3); padding: var(--sp-3); border: 1px solid var(--rule-strong); background: var(--surface); }
