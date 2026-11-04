@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Path, Response
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -180,14 +180,34 @@ def me(principal: Principal = Depends(current_principal)) -> dict:
 
 
 # Réglages d'affichage de l'utilisateur connecté (chacun ne voit que les siens).
-CLE_PREFERENCE = Path(pattern=r"^graphes\.[a-z_]{1,30}$")
+CLE_PREFERENCE = Path(pattern=r"^(graphes|groupes)\.[a-z_]{1,30}$")
 
 
 IdGraphe = Annotated[str, StringConstraints(min_length=1, max_length=50)]
+NomGroupe = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class GroupePerso(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: IdGraphe
+    nom: NomGroupe
+    graphes: list[IdGraphe] = Field(min_length=1, max_length=4)
+
+
+class ConfigGroupes(BaseModel):
+    """Groupes de graphiques : groupes créés par l'utilisateur, ordre des groupes affichés
+    (un groupe d'origine absent de `ordre` est masqué) et vue d'ouverture (`tout` ou un groupe)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    perso: list[GroupePerso] = Field(max_length=20)
+    ordre: list[IdGraphe] = Field(max_length=40)
+    defaut: IdGraphe
 
 
 class PreferenceIn(BaseModel):
-    valeur: list[IdGraphe] = Field(max_length=50)
+    valeur: Annotated[list[IdGraphe], Field(max_length=50)] | ConfigGroupes
 
 
 def _preference(db: Session, uid: int, cle: str) -> PreferenceUtilisateur | None:
@@ -209,7 +229,14 @@ def ecrire_preference(body: PreferenceIn, cle: str = CLE_PREFERENCE,
                       db: Session = Depends(get_db)) -> dict:
     """Liste vide gardée (tout affiché) : la distinguer de « jamais enregistré » évite qu'un
     autre poste renvoie son ancienne copie locale."""
-    valeur = list(dict.fromkeys(body.valeur))
+    if cle.startswith("groupes."):
+        if not isinstance(body.valeur, ConfigGroupes):
+            raise HTTPException(422, "Réglage des groupes : objet attendu")
+        valeur = body.valeur.model_dump()
+    else:
+        if isinstance(body.valeur, ConfigGroupes):
+            raise HTTPException(422, "Graphiques masqués : liste attendue")
+        valeur = list(dict.fromkeys(body.valeur))
     p = _preference(db, principal.user_id, cle)
     if p:
         p.valeur = valeur

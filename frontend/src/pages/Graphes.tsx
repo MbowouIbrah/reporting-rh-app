@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode, useState } from 'react'
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -14,8 +14,13 @@ import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
 import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
-import ChoixGraphes from '../components/ChoixGraphes'
-import { useChoixGraphes } from '../lib/choixGraphes'
+import MenuGroupes from '../components/MenuGroupes'
+import PersonnaliserGroupes from '../components/PersonnaliserGroupes'
+import SnapSections from '../components/SnapSections'
+import {
+  CONFIG_ORIGINE, GRAPHES, type Groupe, groupesAffiches, lireConfig, retablirOrigine, VUE_TOUT, vueInitiale,
+} from '../lib/groupesGraphes'
+import { usePreference } from '../lib/preference'
 
 // Couleurs issues des tokens (styles/tokens.css) : recharts les passe en attributs SVG, qui acceptent var().
 // Une teinte par graphe pour qu'on les distingue d'un coup d'œil.
@@ -42,35 +47,6 @@ const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'va
 // Année N-1 : série de comparaison, en retrait
 const N1 = 'var(--muted-2)'
 const GRILLE = 'var(--rule)'
-// Ordre et titres d'origine ; seuls les deux derniers graphes changent de sujet.
-const TITRES = ['Masse salariale mensuelle (FCFA)', 'Effectif', 'Frais de mission (FCFA)', 'Rémunération globale (FCFA)']
-// Graphes d'activité : affichés seulement si le serveur a des chiffres d'activité sur l'année.
-const TITRES_ACTIVITE = ['Ventes par mois', 'Clients par mois', 'OR par productif et par mois']
-
-/** Catalogue des graphiques, dans l'ordre d'affichage. Identifiants stables : le choix de l'utilisateur
- *  (graphiques masqués) y est enregistré. `cle` : graphique proposé seulement si la série a une valeur. */
-const GRAPHES: { id: string; titre: string; cle?: string }[] = [
-  { id: 'ms', titre: TITRES[0] },
-  { id: 'effectif', titre: TITRES[1] },
-  { id: 'frais', titre: TITRES[2] },
-  { id: 'remu', titre: TITRES[3] },
-  { id: 'salaire', titre: 'Salaire par mois (FCFA)', cle: 'sal' },
-  { id: 'primes', titre: 'Primes par mois (FCFA)', cle: 'prim' },
-  { id: 'ventes', titre: TITRES_ACTIVITE[0], cle: 'ventes' },
-  { id: 'clients', titre: TITRES_ACTIVITE[1], cle: 'clients' },
-  { id: 'or', titre: TITRES_ACTIVITE[2], cle: 'orProd' },
-  { id: 'ca', titre: 'CA par mois (FCFA)', cle: 'ca' },
-  { id: 'marge', titre: 'Marge par mois (FCFA)', cle: 'marge' },
-  { id: 'commissions', titre: 'Commissions par mois (FCFA)', cle: 'comm' },
-  { id: 'productivite', titre: 'Productivité par mois', cle: 'prod' },
-  { id: 'factures', titre: 'Factures par mois', cle: 'fact' },
-  { id: 'absences', titre: 'Absences par mois (jours)', cle: 'absences' },
-  { id: 'assurance', titre: 'Assurance par mois (FCFA)', cle: 'assurance' },
-  { id: 'formation', titre: 'Formation par mois (FCFA)', cle: 'formation' },
-  { id: 'logement', titre: 'Logement site déporté par mois (FCFA)', cle: 'logement' },
-  { id: 'credit', titre: 'Crédit téléphonique par mois (FCFA)', cle: 'credit' },
-  { id: 'carburant', titre: 'Carburant par mois (FCFA)', cle: 'carburant' },
-]
 const T = Object.fromEntries(GRAPHES.map((g) => [g.id, g.titre]))
 const AXE ={ tickLine: false, axisLine: false, tick: { fill: 'var(--muted)', fontSize: 12 } }
 const AXE_X = { dataKey: 'mois', interval: 'preserveStartEnd', minTickGap: 4, padding: { left: 12, right: 16 }, ...AXE } as const
@@ -152,9 +128,9 @@ export default function Graphes() {
   // Rapport PDF : sans animation, sinon l'impression relance le tracé et fige des courbes à moitié dessinées
   const rapport = useLocation().pathname.startsWith('/rapport')
   const ANIM = rapport ? { isAnimationActive: false } : ANIMATION
-  // Graphiques masqués par l'utilisateur (ce navigateur) ; le PDF suit le même choix
-  const choix = useChoixGraphes()
-  const v = choix.visible
+  const [config, setConfig] = usePreference('groupes.evolution', lireConfig, CONFIG_ORIGINE)
+  const [vue, setVue] = useState<string | null>(null)
+  const [personnalise, setPersonnalise] = useState(false)
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
   const salaries = useSalaries(f.filtres?.annee, f.filtres?.calendrier)
@@ -253,8 +229,140 @@ export default function Graphes() {
   const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
-  const dispo = GRAPHES.filter((g) => !g.cle || commun.serie.some((m) => m[g.cle!] != null))
-  const aucun = !!serie && dispo.every((g) => !v(g.id))
+  // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
+  const dispo = new Set(GRAPHES.filter((g) => !g.cle || commun.serie.some((m) => m[g.cle!] != null)).map((g) => g.id))
+  const affiches = groupesAffiches(config, dispo)
+  // Vue choisie par l'utilisateur ; sans choix (ou si le groupe n'est plus affiché), celle du réglage d'ouverture
+  const vueActive = vue !== null && (vue === VUE_TOUT || affiches.some((g) => g.id === vue)) ? vue : vueInitiale(config, affiches)
+  const groupeActif = affiches.find((g) => g.id === vueActive)
+  // Squelette : les quatre cartes du groupe d'ouverture, avant même de savoir quelles données existent
+  const tousLesIds = new Set(GRAPHES.map((g) => g.id))
+  const groupesSquelette = groupesAffiches(config, tousLesIds)
+  const vueSquelette = vueInitiale(config, groupesSquelette)
+  const titresSquelette = (groupesSquelette.find((g) => g.id === vueSquelette) ?? groupesSquelette[0])?.graphes.map((id) => T[id]) ?? []
+
+  // Retour du 16/10 : même présentation que la rémunération globale (aire N, pointillés N-1) ;
+  // l'effectif a son propre graphe.
+  const rendu: Record<string, () => ReactNode> = {
+    ms: () => <Carte titre={T.ms} lecture={`Masse salariale de chaque mois en ${serieN}${comparaison}${lectObj('objMs')}.`}>
+      <AreaChart data={serie}>
+        <CartesianGrid stroke={GRILLE} vertical={false} />
+        <XAxis {...AXE_X} />
+        <YAxis {...AXE_FCFA} />
+        <Tooltip formatter={BULLE_FCFA} />
+        <Legend {...LEGENDE} />
+        <Area dataKey="ms" name={serieN} stroke={C_MS} strokeWidth={2.5} fill={C_MS} fillOpacity={0.15} dot={{ r: 3, fill: C_MS }} connectNulls={false} {...ANIM} />
+        {avecN1 && <Area dataKey="ms1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+        {aObj('objMs') && <Area dataKey="objMs" fill="none" {...OBJECTIF} {...ANIM} />}
+      </AreaChart>
+    </Carte>,
+    // Une courbe par type de contrat, valeur inscrite sur chaque point. 
+    effectif: () => <Carte titre={T.effectif} lecture="Nombre de salariés par mois, une courbe par type de contrat.">
+      <LineChart data={serie}>
+        <CartesianGrid stroke={GRILLE} vertical={false} />
+        <XAxis {...AXE_X} />
+        <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+        <Tooltip formatter={(v) => `${entier(Number(v))} salariés`} />
+        <Legend {...LEGENDE} />
+        {contrats.map((c, i) => {
+          const coul = COULEURS_CONTRAT[i % COULEURS_CONTRAT.length]
+          return (
+            <Line key={c} dataKey={c} name={c} stroke={coul} strokeWidth={2.5} dot={{ r: 3.5, fill: coul }} connectNulls={false} {...ANIM}>
+              <LabelList dataKey={c} content={etiquette(c)} />
+            </Line>
+          )
+        })}
+      </LineChart>
+    </Carte>,
+    frais: () => <Carte titre={T.frais} lecture={`Frais de mission payés chaque mois en ${serieN}${comparaison}${lectObj('objFrais')}.`}>
+      <ComposedChart data={serie}>
+        <CartesianGrid stroke={GRILLE} vertical={false} />
+        <XAxis {...AXE_X} />
+        <YAxis {...AXE_FCFA} />
+        <Tooltip formatter={BULLE_FCFA} />
+        <Legend {...LEGENDE} />
+        <Bar dataKey="frais" name={serieN} fill={C_FRAIS} radius={[3, 3, 0, 0]} {...ANIM} />
+        {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
+        {aObj('objFrais') && <Line dataKey="objFrais" {...OBJECTIF} {...ANIM} />}
+      </ComposedChart>
+    </Carte>,
+    remu: () => <Carte titre={T.remu} lecture={`Salaire, prime, rémunération et charges : total de chaque mois en ${serieN}${comparaison}${lectObj('objRemu')}.`} note="L’objectif de rémunération globale n’apparaît pas quand un filtre (service, site, poste…) est appliqué.">
+      <AreaChart data={serie}>
+        <CartesianGrid stroke={GRILLE} vertical={false} />
+        <XAxis {...AXE_X} />
+        <YAxis {...AXE_FCFA} />
+        <Tooltip formatter={BULLE_FCFA} />
+        <Legend {...LEGENDE} />
+        <Area dataKey="remu" name={serieN} stroke={C_REMU} strokeWidth={2.5} fill={C_REMU} fillOpacity={0.15} dot={{ r: 3, fill: C_REMU }} connectNulls={false} {...ANIM} />
+        {avecN1 && <Area dataKey="remu1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+        {aObj('objRemu') && <Area dataKey="objRemu" fill="none" {...OBJECTIF} {...ANIM} />}
+      </AreaChart>
+    </Carte>,
+    salaire: () => <GrapheMois {...commun} titre={T.salaire} lecture={`Salaire brut garantie de chaque mois en ${serieN}`} cle="sal" couleur={C_SALAIRE} />,
+    primes: () => <GrapheMois {...commun} titre={T.primes} lecture={`Bonus, primes exceptionnelles, primes sur ventes, sur résultats, productivité ateliers et commissions de chaque mois en ${serieN}, y compris celles hors total`} cle="prim" couleur={C_PRIMES} />,
+    ventes: () => (
+      <Carte titre={T.ventes} lecture={`Nombre de ventes de chaque mois en ${serieN}${ventesN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objVentes')}.`}>
+        <ComposedChart data={serie}>
+          <CartesianGrid stroke={GRILLE} vertical={false} />
+          <XAxis {...AXE_X} />
+          <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+          <Tooltip formatter={(v) => `${entier(Number(v))} ventes`} />
+          <Legend {...LEGENDE} />
+          <Bar dataKey="ventes" name={serieN} fill={C_VENTES} radius={[3, 3, 0, 0]} {...ANIM} />
+          {ventesN1 && <Line dataKey="ventes1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
+          {aObj('objVentes') && <Line dataKey="objVentes" {...OBJECTIF} {...ANIM} />}
+        </ComposedChart>
+      </Carte>
+    ),
+    clients: () => (
+      <Carte titre={T.clients} lecture={`Nombre de clients de chaque mois en ${serieN}${clientsN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objClients')}.`}>
+        <LineChart data={serie}>
+          <CartesianGrid stroke={GRILLE} vertical={false} />
+          <XAxis {...AXE_X} />
+          <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+          <Tooltip formatter={(v) => `${entier(Number(v))} clients`} />
+          <Legend {...LEGENDE} />
+          <Line dataKey="clients" name={serieN} stroke={C_CLIENTS} strokeWidth={2.5} dot={{ r: 3.5, fill: C_CLIENTS }} connectNulls={false} {...ANIM} />
+          {clientsN1 && <Line dataKey="clients1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...ANIM} />}
+          {aObj('objClients') && <Line dataKey="objClients" {...OBJECTIF} {...ANIM} />}
+        </LineChart>
+      </Carte>
+    ),
+    or: () => (
+      <Carte titre={T.or} lecture={`OR de chaque mois divisé par le nombre de productifs en ${serieN}${orN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
+        <AreaChart data={serie}>
+          <CartesianGrid stroke={GRILLE} vertical={false} />
+          <XAxis {...AXE_X} />
+          <YAxis width={44} tickCount={5} tickFormatter={(v) => decimal2(String(v))} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
+          <Tooltip formatter={(v) => decimal2(String(v))} />
+          <Legend {...LEGENDE} />
+          <Area dataKey="orProd" name={serieN} stroke={C_OR} strokeWidth={2.5} fill={C_OR} fillOpacity={0.15} dot={{ r: 3, fill: C_OR }} connectNulls={false} {...ANIM} />
+          {orN1 && <Area dataKey="orProd1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
+        </AreaChart>
+      </Carte>
+    ),
+    // CA et marge : présents dans la série seulement avec le droit marge ; sinon aucun graphe. 
+    ca: () => <GrapheMois {...commun} titre={T.ca} lecture={`Chiffre d’affaires de chaque mois en ${serieN}`} cle="ca" objectif="objCa" couleur={C_CA} />,
+    marge: () => <GrapheMois {...commun} titre={T.marge} lecture={`Marge de chaque mois en ${serieN}`} cle="marge" objectif="objMarge" couleur={C_MARGE} />,
+    commissions: () => <GrapheMois {...commun} titre={T.commissions} lecture={`Commissions de chaque mois en ${serieN}`} cle="comm" objectif="objComm" couleur={C_COMMISSIONS} />,
+    productivite: () => <GrapheMois {...commun} titre={T.productivite} lecture={`Indice de productivité de chaque mois en ${serieN}`} cle="prod" objectif="objProd" couleur={C_PRODUCTIVITE} unite="decimal" courbe />,
+    factures: () => <GrapheMois {...commun} titre={T.factures} lecture={`Nombre de factures de chaque mois en ${serieN}`} cle="fact" objectif="objFact" couleur={C_FACTURES} unite="entier" suffixe=" factures" />,
+    absences: () => <GrapheMois {...commun} titre={T.absences} lecture={`Jours d’absence de chaque mois en ${serieN}`} cle="absences" couleur={C_ABSENCES} unite="decimal" suffixe=" j" />,
+    assurance: () => <GrapheMois {...commun} titre={T.assurance} lecture={`Assurance payée chaque mois en ${serieN}`} cle="assurance" couleur={C_CHARGE} />,
+    formation: () => <GrapheMois {...commun} titre={T.formation} lecture={`Formation payée chaque mois en ${serieN}`} cle="formation" couleur={C_CHARGE} />,
+    logement: () => <GrapheMois {...commun} titre={T.logement} lecture={`Logement des sites déportés payé chaque mois en ${serieN}`} cle="logement" couleur={C_CHARGE} />,
+    credit: () => <GrapheMois {...commun} titre={T.credit} lecture={`Crédit téléphonique payé chaque mois en ${serieN}`} cle="credit" couleur={C_CHARGE} />,
+    carburant: () => <GrapheMois {...commun} titre={T.carburant} lecture={`Carburant payé chaque mois en ${serieN}`} cle="carburant" couleur={C_CHARGE} />,
+  }
+  const grille = (g: Groupe) => (
+    <div className={`graphes n${g.graphes.length}`}>
+      {g.graphes.map((id) => <Fragment key={id}>{rendu[id]?.()}</Fragment>)}
+    </div>
+  )
+  const retablir = () => {
+    setConfig(retablirOrigine(config))
+    setVue(null)
+  }
 
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
@@ -264,140 +372,63 @@ export default function Graphes() {
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
-      {serie && !rapport && <ChoixGraphes graphes={dispo} choix={choix} />}
+      {serie && !rapport && affiches.length > 0 && (
+        <MenuGroupes
+          groupes={affiches}
+          vue={vueActive}
+          defaut={config.defaut}
+          onVue={setVue}
+          onPersonnaliser={() => setPersonnalise(true)}
+        />
+      )}
       {f.vide && <Etat type="vide" />}
-      {aucun && (
+      {serie && affiches.length === 0 && (
         <p className="graphes-aucun">
-          Aucun graphique choisi.
-          {!rapport && <> <button type="button" className="bouton bouton-lien" onClick={choix.toutAfficher}>Tout afficher</button></>}
+          Aucun groupe à afficher.
+          {!rapport && <> <button type="button" className="bouton bouton-lien" onClick={retablir}>Rétablir les groupes d’origine</button> <button type="button" className="bouton bouton-lien" onClick={() => setPersonnalise(true)}>Personnaliser…</button></>}
         </p>
       )}
       {erreur && <Etat type={etatErreur(erreur)} />}
-      {/* Un seul conteneur : au premier chargement les quatre cartes ont déjà leur taille définitive. */}
-      <div className="graphes" aria-busy={premier || undefined}>
-        {premier &&
-          TITRES.map((t) => (
+      {/* Au premier chargement les quatre cartes ont déjà leur taille définitive. */}
+      {premier && (
+        <div className={`graphes n${Math.max(1, titresSquelette.length)}`} aria-busy="true">
+          {titresSquelette.map((t) => (
             <figure key={t} className="graphe">
               <figcaption>{t}</figcaption>
               <div className="graphe-zone" />
             </figure>
           ))}
-        {serie && (
-          <>
-            {/* Retour du 16/10 : même présentation que la rémunération globale (aire N, pointillés N-1) ;
-                l'effectif a son propre graphe. */}
-            {v('ms') && <Carte titre={TITRES[0]} lecture={`Masse salariale de chaque mois en ${serieN}${comparaison}${lectObj('objMs')}.`}>
-              <AreaChart data={serie}>
-                <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis {...AXE_X} />
-                <YAxis {...AXE_FCFA} />
-                <Tooltip formatter={BULLE_FCFA} />
-                <Legend {...LEGENDE} />
-                <Area dataKey="ms" name={serieN} stroke={C_MS} strokeWidth={2.5} fill={C_MS} fillOpacity={0.15} dot={{ r: 3, fill: C_MS }} connectNulls={false} {...ANIM} />
-                {avecN1 && <Area dataKey="ms1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
-                {aObj('objMs') && <Area dataKey="objMs" fill="none" {...OBJECTIF} {...ANIM} />}
-              </AreaChart>
-            </Carte>}
-            {/* Une courbe par type de contrat, valeur inscrite sur chaque point. */}
-            {v('effectif') && <Carte titre={TITRES[1]} lecture="Nombre de salariés par mois, une courbe par type de contrat.">
-              <LineChart data={serie}>
-                <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis {...AXE_X} />
-                <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-                <Tooltip formatter={(v) => `${entier(Number(v))} salariés`} />
-                <Legend {...LEGENDE} />
-                {contrats.map((c, i) => {
-                  const coul = COULEURS_CONTRAT[i % COULEURS_CONTRAT.length]
-                  return (
-                    <Line key={c} dataKey={c} name={c} stroke={coul} strokeWidth={2.5} dot={{ r: 3.5, fill: coul }} connectNulls={false} {...ANIM}>
-                      <LabelList dataKey={c} content={etiquette(c)} />
-                    </Line>
-                  )
-                })}
-              </LineChart>
-            </Carte>}
-            {v('frais') && <Carte titre={TITRES[2]} lecture={`Frais de mission payés chaque mois en ${serieN}${comparaison}${lectObj('objFrais')}.`}>
-              <ComposedChart data={serie}>
-                <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis {...AXE_X} />
-                <YAxis {...AXE_FCFA} />
-                <Tooltip formatter={BULLE_FCFA} />
-                <Legend {...LEGENDE} />
-                <Bar dataKey="frais" name={serieN} fill={C_FRAIS} radius={[3, 3, 0, 0]} {...ANIM} />
-                {avecN1 && <Line dataKey="frais1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
-                {aObj('objFrais') && <Line dataKey="objFrais" {...OBJECTIF} {...ANIM} />}
-              </ComposedChart>
-            </Carte>}
-            {v('remu') && <Carte titre={TITRES[3]} lecture={`Salaire, prime, rémunération et charges : total de chaque mois en ${serieN}${comparaison}${lectObj('objRemu')}.`} note="L’objectif de rémunération globale n’apparaît pas quand un filtre (service, site, poste…) est appliqué.">
-              <AreaChart data={serie}>
-                <CartesianGrid stroke={GRILLE} vertical={false} />
-                <XAxis {...AXE_X} />
-                <YAxis {...AXE_FCFA} />
-                <Tooltip formatter={BULLE_FCFA} />
-                <Legend {...LEGENDE} />
-                <Area dataKey="remu" name={serieN} stroke={C_REMU} strokeWidth={2.5} fill={C_REMU} fillOpacity={0.15} dot={{ r: 3, fill: C_REMU }} connectNulls={false} {...ANIM} />
-                {avecN1 && <Area dataKey="remu1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
-                {aObj('objRemu') && <Area dataKey="objRemu" fill="none" {...OBJECTIF} {...ANIM} />}
-              </AreaChart>
-            </Carte>}
-            {v('salaire') && <GrapheMois {...commun} titre={T.salaire} lecture={`Salaire brut garantie de chaque mois en ${serieN}`} cle="sal" couleur={C_SALAIRE} />}
-            {v('primes') && <GrapheMois {...commun} titre={T.primes} lecture={`Bonus, primes exceptionnelles, primes sur ventes, sur résultats, productivité ateliers et commissions de chaque mois en ${serieN}, y compris celles hors total`} cle="prim" couleur={C_PRIMES} />}
-            {aVentes && v('ventes') && (
-              <Carte titre={TITRES_ACTIVITE[0]} lecture={`Nombre de ventes de chaque mois en ${serieN}${ventesN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objVentes')}.`}>
-                <ComposedChart data={serie}>
-                  <CartesianGrid stroke={GRILLE} vertical={false} />
-                  <XAxis {...AXE_X} />
-                  <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-                  <Tooltip formatter={(v) => `${entier(Number(v))} ventes`} />
-                  <Legend {...LEGENDE} />
-                  <Bar dataKey="ventes" name={serieN} fill={C_VENTES} radius={[3, 3, 0, 0]} {...ANIM} />
-                  {ventesN1 && <Line dataKey="ventes1" name={serieN1} stroke={N1} strokeWidth={2} dot={{ r: 3, fill: N1 }} connectNulls={false} {...ANIM} />}
-                  {aObj('objVentes') && <Line dataKey="objVentes" {...OBJECTIF} {...ANIM} />}
-                </ComposedChart>
-              </Carte>
-            )}
-            {aClients && v('clients') && (
-              <Carte titre={TITRES_ACTIVITE[1]} lecture={`Nombre de clients de chaque mois en ${serieN}${clientsN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}${lectObj('objClients')}.`}>
-                <LineChart data={serie}>
-                  <CartesianGrid stroke={GRILLE} vertical={false} />
-                  <XAxis {...AXE_X} />
-                  <YAxis allowDecimals={false} width={36} tickCount={5} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-                  <Tooltip formatter={(v) => `${entier(Number(v))} clients`} />
-                  <Legend {...LEGENDE} />
-                  <Line dataKey="clients" name={serieN} stroke={C_CLIENTS} strokeWidth={2.5} dot={{ r: 3.5, fill: C_CLIENTS }} connectNulls={false} {...ANIM} />
-                  {clientsN1 && <Line dataKey="clients1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls={false} {...ANIM} />}
-                  {aObj('objClients') && <Line dataKey="objClients" {...OBJECTIF} {...ANIM} />}
-                </LineChart>
-              </Carte>
-            )}
-            {aOr && v('or') && (
-              <Carte titre={TITRES_ACTIVITE[2]} lecture={`OR de chaque mois divisé par le nombre de productifs en ${serieN}${orN1 ? ` ; en gris, ${serieN1} pour comparer` : ''}.`}>
-                <AreaChart data={serie}>
-                  <CartesianGrid stroke={GRILLE} vertical={false} />
-                  <XAxis {...AXE_X} />
-                  <YAxis width={44} tickCount={5} tickFormatter={(v) => decimal2(String(v))} domain={[0, (max: number) => (max > 0 ? haut4(max * 1.15) : 4)]} {...AXE} />
-                  <Tooltip formatter={(v) => decimal2(String(v))} />
-                  <Legend {...LEGENDE} />
-                  <Area dataKey="orProd" name={serieN} stroke={C_OR} strokeWidth={2.5} fill={C_OR} fillOpacity={0.15} dot={{ r: 3, fill: C_OR }} connectNulls={false} {...ANIM} />
-                  {orN1 && <Area dataKey="orProd1" name={serieN1} stroke={N1} strokeWidth={2} strokeDasharray="5 4" fill="none" dot={false} connectNulls={false} {...ANIM} />}
-                </AreaChart>
-              </Carte>
-            )}
-            {/* CA et marge : présents dans la série seulement avec le droit marge ; sinon aucun graphe. */}
-            {v('ca') && <GrapheMois {...commun} titre={T.ca} lecture={`Chiffre d’affaires de chaque mois en ${serieN}`} cle="ca" objectif="objCa" couleur={C_CA} />}
-            {v('marge') && <GrapheMois {...commun} titre={T.marge} lecture={`Marge de chaque mois en ${serieN}`} cle="marge" objectif="objMarge" couleur={C_MARGE} />}
-            {v('commissions') && <GrapheMois {...commun} titre={T.commissions} lecture={`Commissions de chaque mois en ${serieN}`} cle="comm" objectif="objComm" couleur={C_COMMISSIONS} />}
-            {v('productivite') && <GrapheMois {...commun} titre={T.productivite} lecture={`Indice de productivité de chaque mois en ${serieN}`} cle="prod" objectif="objProd" couleur={C_PRODUCTIVITE} unite="decimal" courbe />}
-            {v('factures') && <GrapheMois {...commun} titre={T.factures} lecture={`Nombre de factures de chaque mois en ${serieN}`} cle="fact" objectif="objFact" couleur={C_FACTURES} unite="entier" suffixe=" factures" />}
-            {v('absences') && <GrapheMois {...commun} titre={T.absences} lecture={`Jours d’absence de chaque mois en ${serieN}`} cle="absences" couleur={C_ABSENCES} unite="decimal" suffixe=" j" />}
-            {v('assurance') && <GrapheMois {...commun} titre={T.assurance} lecture={`Assurance payée chaque mois en ${serieN}`} cle="assurance" couleur={C_CHARGE} />}
-            {v('formation') && <GrapheMois {...commun} titre={T.formation} lecture={`Formation payée chaque mois en ${serieN}`} cle="formation" couleur={C_CHARGE} />}
-            {v('logement') && <GrapheMois {...commun} titre={T.logement} lecture={`Logement des sites déportés payé chaque mois en ${serieN}`} cle="logement" couleur={C_CHARGE} />}
-            {v('credit') && <GrapheMois {...commun} titre={T.credit} lecture={`Crédit téléphonique payé chaque mois en ${serieN}`} cle="credit" couleur={C_CHARGE} />}
-            {v('carburant') && <GrapheMois {...commun} titre={T.carburant} lecture={`Carburant payé chaque mois en ${serieN}`} cle="carburant" couleur={C_CHARGE} />}
-          </>
-        )}
-      </div>
+        </div>
+      )}
+      {serie && affiches.length > 0 && (rapport || vueActive === VUE_TOUT || !groupeActif ? (
+        // Tous les groupes (et toujours le rapport PDF) : un écran par groupe
+        <SnapSections
+          libelle="Groupes de graphiques"
+          sections={affiches.map((g) => ({
+            id: `groupe-${g.id}`,
+            titre: g.nom,
+            contenu: (
+              <div className="graphes-groupe">
+                <h2 className="graphes-groupe-titre">{g.nom}</h2>
+                {grille(g)}
+              </div>
+            ),
+          }))}
+        />
+      ) : (
+        grille(groupeActif)
+      ))}
+      {personnalise && !rapport && (
+        <PersonnaliserGroupes
+          config={config}
+          dispo={dispo}
+          onEnregistrer={(c) => {
+            setConfig(c)
+            setPersonnalise(false)
+          }}
+          onAnnuler={() => setPersonnalise(false)}
+        />
+      )}
       {serie && (
         <details className="section details-donnees">
           <summary>

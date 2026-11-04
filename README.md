@@ -3,7 +3,7 @@
 Application web de reporting RH (remplace le classeur Excel REPORTING_RH_V5).
 Backend FastAPI + PostgreSQL, frontend React + TypeScript, habillage cfaoacademy.
 
-- Plan : [docs/PLAN_APPLICATION.md](docs/PLAN_APPLICATION.md) · Cadrage (KPI, rôles) : [docs/P0_CADRAGE.md](docs/P0_CADRAGE.md) · Backlog : [backlog.md](backlog.md) · Étude page Utilisateurs : [docs/etude-page-utilisateurs.md](docs/etude-page-utilisateurs.md) · Étude droits : [docs/etude-droits.md](docs/etude-droits.md) · Étude navigation admin : [docs/etude-navigation-admin.md](docs/etude-navigation-admin.md)amp; · Étude connexion : [docs/etude-connexion.md](docs/etude-connexion.md) · Étude 3e présentation (lot 1) : [docs/etude-presentation-3-lot1.md](docs/etude-presentation-3-lot1.md)
+- Plan : [docs/PLAN_APPLICATION.md](docs/PLAN_APPLICATION.md) · Cadrage (KPI, rôles) : [docs/P0_CADRAGE.md](docs/P0_CADRAGE.md) · Backlog : [backlog.md](backlog.md) · Étude page Utilisateurs : [docs/etude-page-utilisateurs.md](docs/etude-page-utilisateurs.md) · Étude droits : [docs/etude-droits.md](docs/etude-droits.md) · Étude navigation admin : [docs/etude-navigation-admin.md](docs/etude-navigation-admin.md)amp; · Étude connexion : [docs/etude-connexion.md](docs/etude-connexion.md) · Étude 3e présentation (lot 1) : [docs/etude-presentation-3-lot1.md](docs/etude-presentation-3-lot1.md) · Étude graphiques par groupes : [docs/etude-graphes-groupes.md](docs/etude-graphes-groupes.md)
 - Template d'import : `templates/TEMPLATE_IMPORT_DONNEES_v1.xlsx` · Contrôle : `python tools/valider_import.py FICHIER.xlsx`
 
 ## Développement

@@ -38,3 +38,35 @@ def test_preference_refusee(make_client):
     assert c.put(f"{API}/graphes.evolution", json={"valeur": ["x" * 51]}).status_code == 422
     assert c.put(f"{API}/graphes.evolution", json={"valeur": [""]}).status_code == 422
     assert c.put(f"{API}/graphes.evolution", json={"valeur": [3]}).status_code == 422
+
+
+CONFIG = {
+    "perso": [{"id": "p-1", "nom": "  Mes ventes ", "graphes": ["ca", "marge"]}],
+    "ordre": ["ensemble", "p-1"],
+    "defaut": "tout",
+}
+
+
+def test_groupes_lus_ecrits(make_client):
+    c = make_client(ADMIN)
+    assert c.get(f"{API}/groupes.evolution").json() == {"valeur": None}
+    r = c.put(f"{API}/groupes.evolution", json={"valeur": CONFIG})
+    attendu = {**CONFIG, "perso": [{"id": "p-1", "nom": "Mes ventes", "graphes": ["ca", "marge"]}]}
+    assert r.status_code == 200 and r.json() == {"valeur": attendu}
+    assert c.get(f"{API}/groupes.evolution").json() == {"valeur": attendu}
+    assert c.get(f"{API}/graphes.evolution").json() == {"valeur": None}
+
+
+def test_groupes_refuses(make_client):
+    c = make_client(ADMIN)
+    cinq = {**CONFIG, "perso": [{"id": "p-1", "nom": "X", "graphes": ["a", "b", "c", "d", "e"]}]}
+    assert c.put(f"{API}/groupes.evolution", json={"valeur": cinq}).status_code == 422
+    vide = {**CONFIG, "perso": [{"id": "p-1", "nom": "X", "graphes": []}]}
+    assert c.put(f"{API}/groupes.evolution", json={"valeur": vide}).status_code == 422
+    sans_nom = {**CONFIG, "perso": [{"id": "p-1", "nom": "   ", "graphes": ["ca"]}]}
+    assert c.put(f"{API}/groupes.evolution", json={"valeur": sans_nom}).status_code == 422
+    en_trop = {**CONFIG, "autre": 1}
+    assert c.put(f"{API}/groupes.evolution", json={"valeur": en_trop}).status_code == 422
+    assert c.put(f"{API}/groupes.evolution", json={"valeur": ["ca"]}).status_code == 422
+    assert c.put(f"{API}/graphes.evolution", json={"valeur": CONFIG}).status_code == 422
+    assert c.get(f"{API}/groupes.evolution").json() == {"valeur": None}

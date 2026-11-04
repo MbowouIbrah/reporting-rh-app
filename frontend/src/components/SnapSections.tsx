@@ -14,16 +14,19 @@ export interface SectionSnap {
   titre: string
   colonnes?: string
   /** Un tableau seul, ou une liste de tableaux empilés dans une même colonne. */
-  panneaux: (PanneauSnap | PanneauSnap[])[]
+  panneaux?: (PanneauSnap | PanneauSnap[])[]
+  /** Contenu libre, rendu à la place des panneaux (ex. une grille de graphiques). */
+  contenu?: ReactNode
 }
 
 /**
  * Sections plein écran avec accrochage (scroll-snap) et rail de navigation à droite,
  * sur le modèle du portail Academy Assist. Sous 1100 px : simple empilement.
  */
-export default function SnapSections({ sections }: { sections: SectionSnap[] }) {
+export default function SnapSections({ sections, libelle = 'Tableaux du rapport' }: { sections: SectionSnap[]; libelle?: string }) {
   const zone = useRef<HTMLDivElement>(null)
   const [actif, setActif] = useState(sections[0]?.id)
+  const cles = sections.map((x) => x.id).join('|')
 
   useEffect(() => {
     const racine = zone.current
@@ -37,7 +40,7 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
     )
     racine.querySelectorAll('.snap-section').forEach((el) => obs.observe(el))
     return () => obs.disconnect()
-  }, [sections.length])
+  }, [cles])
 
   // Molette : un geste = une section (l'accrochage seul ramène au départ sur un petit cran),
   // sauf si le tableau survolé peut encore défiler dans ce sens
@@ -96,10 +99,10 @@ export default function SnapSections({ sections }: { sections: SectionSnap[] }) 
 
   return (
     <div className="snap-zone">
-      <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label="Tableaux du rapport">
+      <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label={libelle}>
         {sections.map((s, i) => (
           <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
-            {s.panneaux.map((pn) =>
+            {s.contenu ?? s.panneaux?.map((pn) =>
               Array.isArray(pn) ? (
                 <div key={pn[0].titre} className="snap-colonne">
                   {pn.map((x) => (

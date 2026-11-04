@@ -218,43 +218,64 @@ test('Individuel sans nominatif:read : renvoyé au Résumé, la page n’est pas
 })
 
 test('Graphes : CA et marge par mois absents sans données de marge, affichés avec', async () => {
+  localStorage.clear()
+  const legende = (t: string) => [...document.querySelectorAll('figcaption')].some((f) => f.textContent === t)
   const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
   // La note n'existe qu'une fois les données chargées (le squelette n'a que les titres).
   expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
-  expect(screen.queryByText('CA par mois (FCFA)')).toBeNull()
-  expect(screen.queryByText('Marge par mois (FCFA)')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /Tout afficher/ }))
+  expect(legende('Salaire par mois (FCFA)')).toBe(true)
+  expect(legende('CA par mois (FCFA)')).toBe(false)
+  expect(legende('Marge par mois (FCFA)')).toBe(false)
+  expect(screen.queryByRole('button', { name: /Ventes et marge/ })).toBeNull()
   unmount()
   serieCa = true
   try {
     rendu(<Graphes />, '/graphes', ['report:read', 'marge:read'], true)
-    expect(await screen.findByRole('checkbox', { name: 'CA par mois (FCFA)' })).toBeInTheDocument()
-    expect(screen.getAllByText('Marge par mois (FCFA)')).toHaveLength(2)
+    expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Ventes et marge/ }))
+    await waitFor(() => expect(legende('CA par mois (FCFA)')).toBe(true))
+    expect(legende('Marge par mois (FCFA)')).toBe(true)
+    // un groupe à la fois : la vue d'ensemble n'est plus à l'écran
+    expect(legende('Effectif')).toBe(false)
   } finally {
     serieCa = false
   }
 })
 
-test('Graphes : salaire et primes par mois, choix des graphiques mémorisé dans le navigateur', async () => {
+test('Graphes : un groupe à la fois, groupe personnel gardé dans le navigateur et retrouvé au rechargement', async () => {
   localStorage.clear()
   const legende = (t: string) => [...document.querySelectorAll('figcaption')].some((f) => f.textContent === t)
   const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
-  expect(await screen.findByText('Graphiques (6/6)')).toBeInTheDocument()
+  // Ouverture sur « Vue d'ensemble » : ses graphiques seulement
+  expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
+  expect(screen.getByText('Groupe : Vue d’ensemble', { selector: 'summary' })).toBeInTheDocument()
+  expect(legende('Masse salariale mensuelle (FCFA)')).toBe(true)
+  expect(legende('Salaire par mois (FCFA)')).toBe(false)
+  // Autre groupe
+  fireEvent.click(screen.getByRole('button', { name: /Salaire, primes et charges/ }))
   expect(legende('Salaire par mois (FCFA)')).toBe(true)
   expect(legende('Primes par mois (FCFA)')).toBe(true)
+  expect(legende('Masse salariale mensuelle (FCFA)')).toBe(false)
+  // Nouveau groupe personnel
+  fireEvent.click(screen.getByRole('button', { name: 'Personnaliser…' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Nouveau groupe' }))
+  fireEvent.change(screen.getByLabelText('Nom du groupe'), { target: { value: 'Mes salaires' } })
   fireEvent.click(screen.getByRole('checkbox', { name: 'Salaire par mois (FCFA)' }))
-  expect(legende('Salaire par mois (FCFA)')).toBe(false)
-  expect(screen.getByText('Graphiques (5/6)')).toBeInTheDocument()
-  expect(JSON.parse(localStorage.getItem('reporting-rh.graphes.1.evolution')!)).toEqual(['salaire'])
+  fireEvent.click(screen.getByRole('button', { name: 'Valider' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+  expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
+  const gardé = JSON.parse(localStorage.getItem('reporting-rh.pref.1.groupes.evolution')!)
+  expect(gardé.perso).toEqual([{ id: expect.stringMatching(/^p-/), nom: 'Mes salaires', graphes: ['salaire'] }])
+  expect(gardé.ordre).toEqual(['ensemble', 'salaire', 'avantages', 'ventes', 'ateliers', gardé.perso[0].id])
   unmount()
-  // Rechargé : le choix est relu ; tout masquer affiche le message, « Tout afficher » rétablit tout.
+  // Rechargé : le groupe personnel est proposé
   rendu(<Graphes />, '/graphes', ['report:read'])
-  expect(await screen.findByText('Graphiques (5/6)')).toBeInTheDocument()
-  expect(legende('Salaire par mois (FCFA)')).toBe(false)
-  for (const c of screen.getAllByRole('checkbox')) if ((c as HTMLInputElement).checked) fireEvent.click(c)
-  expect(screen.getByText('Aucun graphique choisi.')).toBeInTheDocument()
-  fireEvent.click(screen.getAllByRole('button', { name: 'Tout afficher' })[0])
-  expect(screen.getByText('Graphiques (6/6)')).toBeInTheDocument()
-  expect(localStorage.getItem('reporting-rh.graphes.1.evolution')).toBeNull()
+  expect(await screen.findByRole('button', { name: /Mes salaires/ })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Mes salaires/ }))
+  expect(screen.getByText('Groupe : Mes salaires', { selector: 'summary' })).toBeInTheDocument()
+  expect(legende('Salaire par mois (FCFA)')).toBe(true)
+  expect(legende('Primes par mois (FCFA)')).toBe(false)
   localStorage.clear()
 })
 

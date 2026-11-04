@@ -174,7 +174,7 @@ table.dense td.num { text-align: right; }
 .champ input, .champ select, .champ textarea { padding: 8px 10px; border: 1px solid var(--rule-strong); border-radius: var(--radius); font: inherit; }
 .champ input[aria-invalid='true'] { border-color: var(--error); }
 .champ-erreur { color: var(--error); font-size: var(--fs-sm); margin: 0; }
-.confirmer { border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); max-width: 28rem; }
+.confirmer { margin: auto; border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: var(--sp-4); max-width: 28rem; }
 .confirmer::backdrop { background: rgba(0, 0, 0, 0.4); }
 .confirmer-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-3); }
 
@@ -451,20 +451,57 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-excel .graphe figcaption { background: var(--gris-section); color: var(--paper); font: 700 var(--fs-md)/1.2 var(--font-body); text-transform: uppercase; letter-spacing: .02em; padding: 7px 16px; margin: 0; }
 .graphes-excel .graphe-zone { padding: 8px; height: 240px; }
 .graphes-excel .details-donnees { margin-top: var(--sp-3); }
-/* Choix des graphiques : menu déroulant sous les filtres, posé au-dessus des graphiques */
-.choix-graphes { position: relative; align-self: flex-start; margin: 0 0 var(--sp-2); z-index: 5; }
-.choix-graphes > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--navy); font-size: var(--fs-sm); font-weight: 600; }
-.choix-graphes > summary::-webkit-details-marker { display: none; }
-.choix-graphes > summary::after { content: '▾'; color: var(--muted-2); font-size: 11px; }
-.choix-graphes[open] > summary::after { content: '▴'; color: var(--red); }
-.choix-graphes-corps { position: absolute; top: calc(100% + 4px); left: 0; width: min(92vw, 560px); max-height: 60vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 6px 18px rgb(0 0 0 / .12); padding: var(--sp-3); }
-.choix-graphes-corps ul { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px var(--sp-4); }
-.choix-graphes-corps label { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); cursor: pointer; }
+/* Groupes de graphiques : menu « Groupe : … » sous les filtres, au-dessus des graphiques */
+.menu-groupes { position: relative; align-self: flex-start; margin: 0 0 var(--sp-2); z-index: 5; }
+.menu-groupes > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-2); padding: 6px 12px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--navy); font-size: var(--fs-sm); font-weight: 600; }
+.menu-groupes > summary::-webkit-details-marker { display: none; }
+.menu-groupes > summary::after { content: '▾'; color: var(--muted-2); font-size: 11px; }
+.menu-groupes[open] > summary::after { content: '▴'; color: var(--red); }
+.menu-groupes-corps { position: absolute; top: calc(100% + 4px); left: 0; width: min(92vw, 420px); max-height: 70vh; overflow: auto; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0; box-shadow: 0 6px 18px rgb(0 0 0 / .12); padding: var(--sp-2); }
+.menu-groupes-corps ul { list-style: none; margin: 0; padding: 0; }
+.menu-groupes-corps hr { border: 0; border-top: 1px solid var(--rule); margin: var(--sp-2) 0; }
+.menu-groupes-ligne { display: flex; align-items: flex-start; gap: var(--sp-2); width: 100%; padding: 6px var(--sp-2); border: 0; border-radius: 0; background: none; color: var(--ink); font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.menu-groupes-ligne:hover, .menu-groupes-ligne:focus-visible { background: var(--rule); }
+.menu-groupes-ligne[aria-current='true'] strong { color: var(--navy); }
+.menu-groupes-coche { flex: none; width: 14px; height: 18px; display: inline-flex; align-items: center; color: var(--red); }
+.menu-groupes-texte { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 2px; min-width: 0; }
+.menu-groupes-texte small { flex-basis: 100%; color: var(--muted); font-size: var(--fs-xs); line-height: 1.3; }
+.menu-groupes-defaut { color: var(--muted); font-size: var(--fs-xs); font-style: normal; }
+/* Fenêtre « Personnaliser les groupes » */
+.perso-groupes { margin: auto; border: 1px solid var(--rule-strong); border-radius: 0; padding: var(--sp-4); box-shadow: var(--shadow-3); width: min(92vw, 640px); max-height: 88vh; overflow: auto; background: var(--surface); color: var(--ink); }
+.perso-groupes::backdrop { background: rgba(0, 0, 0, 0.4); }
+.perso-groupes h3 { margin: 0 0 var(--sp-1); color: var(--navy); }
+.perso-groupes h4 { margin: 0 0 var(--sp-2); color: var(--navy); font-size: var(--fs-md); }
+.perso-aide { margin: 0 0 var(--sp-3); color: var(--muted); font-size: var(--fs-sm); }
+.perso-liste { list-style: none; margin: 0 0 var(--sp-2); padding: 0; border-top: 1px solid var(--rule); }
+.perso-liste li { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.perso-liste li.masque .perso-texte { opacity: .55; }
+.perso-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.perso-texte small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.3; }
+.perso-actions { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+.perso-icone { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule-strong); border-radius: 0; background: var(--surface); color: var(--navy); cursor: pointer; }
+.perso-icone:disabled { opacity: .35; cursor: default; }
+.perso-defaut { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--muted); cursor: pointer; }
+.perso-tout { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); }
+.perso-formulaire { border: 1px solid var(--rule); padding: var(--sp-3); margin: 0 0 var(--sp-3); display: grid; gap: var(--sp-2); }
+.perso-formulaire fieldset { border: 0; margin: 0; padding: 0; }
+.perso-formulaire legend { padding: 0; margin-bottom: var(--sp-1); font-size: var(--fs-sm); color: var(--muted); }
+.perso-formulaire ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px var(--sp-4); }
+.perso-formulaire label { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.perso-nom { flex-direction: column; align-items: stretch !important; gap: 4px !important; }
+.perso-nom input { padding: 6px 10px; border: 1px solid var(--rule-strong); border-radius: 0; font: inherit; }
+.perso-outils { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
+.perso-actions-bas { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+/* Un groupe : titre sobre au-dessus de sa grille (tous les groupes, rapport PDF) */
+.graphes-groupe { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.graphes-groupe .graphes { flex: 1; min-height: 0; }
+.page .graphes-groupe-titre { margin: 0 0 var(--sp-2); font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--navy); }
 .graphes-excel .graphes-aucun { margin: var(--sp-4) 0; color: var(--muted); }
 .graphes-excel .graphe-lecture { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.35; }
 .graphes-excel .graphe-note { padding: 0 16px 8px; font-style: italic; }
 @media (min-width: 1360px) {
   .graphes-excel .graphes { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--v, 8px); margin: 0 0 var(--v, 8px); }
+  .graphes-excel .graphes.n1, .graphes-excel .graphes.n2 { grid-template-rows: 1fr; }
   .graphes-excel .graphe-zone { flex: 1; min-height: 0; height: auto; }
   .graphes-excel .details-donnees { display: none; }
   .page-ecran.rapport-excel:not(.graphes-excel) .panneau { min-height: 0; display: flex; flex-direction: column; }

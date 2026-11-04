@@ -102,4 +102,4 @@ class PreferenceUtilisateur(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
     cle: Mapped[str] = mapped_column(String(60))
-    valeur: Mapped[list] = mapped_column(JsonType)
+    valeur: Mapped[list | dict] = mapped_column(JsonType)
