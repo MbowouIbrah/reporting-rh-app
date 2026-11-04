@@ -89,3 +89,12 @@ test('noms choisis : appliqués aux groupes d’origine seulement', () => {
   expect(tousLesGroupes(config).find((g) => g.id === 'ventes')?.nom).toBe('Ventes, marge et commissions')
   expect(groupesAffiches(config, tous, noms).map((g) => g.nom)).toEqual(['Chiffre', 'Mes ventes'])
 })
+
+test('noms personnels : lus depuis le réglage et prioritaires sur les noms communs', () => {
+  const c = lireConfig({ ...CONFIG_ORIGINE, noms: { ventes: ' A moi ', bad: 3 } })
+  expect(c?.noms).toEqual({ ventes: 'A moi' })
+  const g = tousLesGroupes(c!, { ventes: 'Commun', salaire: 'Paie' })
+  expect(g.find((x) => x.id === 'ventes')?.nom).toBe('A moi')
+  expect(g.find((x) => x.id === 'salaire')?.nom).toBe('Paie')
+  expect(lireConfig(CONFIG_ORIGINE)).toEqual(CONFIG_ORIGINE)
+})

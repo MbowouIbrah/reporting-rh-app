@@ -57,6 +57,14 @@ def test_groupes_lus_ecrits(make_client):
     assert c.get(f"{API}/graphes.evolution").json() == {"valeur": None}
 
 
+def test_groupes_noms_personnels(make_client):
+    c = make_client(ADMIN)
+    r = c.put(f"{API}/groupes.evolution", json={"valeur": {**CONFIG, "noms": {"ventes": "  Mes chiffres "}}})
+    assert r.status_code == 200 and r.json()["valeur"]["noms"] == {"ventes": "Mes chiffres"}
+    for noms in ({"Ventes": "X"}, {"ventes": "  "}, {f"g_{chr(97 + i)}": "X" for i in range(21)}):
+        assert c.put(f"{API}/groupes.evolution", json={"valeur": {**CONFIG, "noms": noms}}).status_code == 422
+
+
 def test_groupes_refuses(make_client):
     c = make_client(ADMIN)
     cinq = {**CONFIG, "perso": [{"id": "p-1", "nom": "X", "graphes": ["a", "b", "c", "d", "e"]}]}

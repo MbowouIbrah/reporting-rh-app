@@ -101,9 +101,23 @@ function fenetreNoms(onNoms: (n: Record<string, string>) => Promise<void>, noms:
   return onEnregistrer
 }
 
-test('noms : section absente sans onNoms', () => {
-  fenetre()
+test('noms : sans onNoms, les noms saisis sont personnels et gardés dans le réglage', () => {
+  const onEnregistrer = vi.fn()
+  render(<PersonnaliserGroupes config={CONFIG_ORIGINE} dispo={tous} noms={{ ventes: 'Commun' }} onEnregistrer={onEnregistrer} onAnnuler={vi.fn()} />)
   expect(screen.queryByText('Noms des groupes (vus par tous)')).toBeNull()
+  expect(screen.getByText('Noms des groupes (vus par vous seul)')).toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Afficher Commun' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Ventes, marge et commissions'), { target: { value: ' A moi ' } })
+  expect(screen.getByRole('checkbox', { name: 'Afficher A moi' })).toBeInTheDocument()
+  enregistrer()
+  expect(onEnregistrer.mock.calls[0][0]).toEqual({ ...CONFIG_ORIGINE, noms: { ventes: 'A moi' } })
+})
+
+test('noms : un nom personnel vidé est retiré du réglage', () => {
+  const f = fenetre({ ...CONFIG_ORIGINE, noms: { ventes: 'A moi' } })
+  fireEvent.change(screen.getByLabelText('Ventes, marge et commissions'), { target: { value: '' } })
+  enregistrer()
+  expect(sortie(f)).toEqual(CONFIG_ORIGINE)
 })
 
 test('noms : renommer un groupe puis enregistrer envoie le nom et applique le libellé', async () => {

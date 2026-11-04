@@ -26,7 +26,8 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
   dispo: Set<string>
   /** Noms choisis par l'administration pour les groupes d'origine (identifiant -> nom). */
   noms?: Record<string, string>
-  /** Fourni seulement à qui peut renommer les groupes (vus par tous) : enregistre les nouveaux noms sur le serveur. */
+  /** Fourni seulement à qui peut renommer les groupes pour tous : enregistre les noms communs sur le serveur.
+   *  Sans lui, les noms saisis sont personnels (gardés dans le réglage de l'utilisateur). */
   onNoms?: (n: Record<string, string>) => Promise<void>
   onEnregistrer: (c: ConfigGroupes) => void
   onAnnuler: () => void
@@ -35,7 +36,7 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
   const idTitre = useId()
   const [travail, setTravail] = useState<ConfigGroupes>(config)
   const [edition, setEdition] = useState<Edition | null>(null)
-  const [brouillon, setBrouillon] = useState<Record<string, string>>(noms)
+  const [brouillon, setBrouillon] = useState<Record<string, string>>(onNoms ? noms : (config.noms ?? {}))
   const [erreur, setErreur] = useState('')
   const [envoi, setEnvoi] = useState(false)
   useEffect(() => {
@@ -51,8 +52,14 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     const n = (brouillon[g.id] ?? '').trim()
     if (n) nomsSaisis[g.id] = n
   }
-  const nomsActuels = onNoms ? nomsSaisis : noms
-  const tous = tousLesGroupes(travail, nomsActuels)
+  const sansNomsPerso = (c: ConfigGroupes): ConfigGroupes => {
+    const { noms: _n, ...reste } = c
+    return reste
+  }
+  // admin : aperçu des noms communs saisis ; autres : noms personnels saisis, sinon noms communs
+  const tous = onNoms
+    ? tousLesGroupes(sansNomsPerso(travail), nomsSaisis)
+    : tousLesGroupes({ ...travail, noms: nomsSaisis }, noms)
   const parId = new Map(tous.map((g) => [g.id, g]))
   const affiches = [...new Set(travail.ordre)].filter((id) => parId.has(id))
   const masques = tous.filter((g) => !affiches.includes(g.id))
@@ -79,7 +86,8 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     return JSON.stringify(avant) !== JSON.stringify(Object.entries(nomsSaisis))
   }
   const enregistrer = async () => {
-    const c = normaliser({ ...travail, ordre: affiches })
+    const base = { ...travail, ordre: affiches }
+    const c = normaliser(onNoms ? base : Object.keys(nomsSaisis).length ? { ...base, noms: nomsSaisis } : sansNomsPerso(base))
     if (onNoms && nomsChanges()) {
       setErreur('')
       setEnvoi(true)
@@ -206,23 +214,21 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
             Ouvrir sur : tous les groupes
           </label>
 
-          {onNoms && (
             <section className="perso-formulaire perso-noms" aria-label="Noms des groupes">
-              <h4>Noms des groupes (vus par tous)</h4>
+              <h4>{onNoms ? 'Noms des groupes (vus par tous)' : 'Noms des groupes (vus par vous seul)'}</h4>
               {GROUPES_ORIGINE.map((g) => (
                 <label key={g.id} className="perso-nom">
                   {g.nom}
                   <input
                     type="text"
                     value={brouillon[g.id] ?? ''}
-                    placeholder={g.nom}
+                    placeholder={onNoms ? g.nom : (noms[g.id] ?? g.nom)}
                     maxLength={MAX_NOM}
                     onChange={(e) => setBrouillon({ ...brouillon, [g.id]: e.target.value })}
                   />
                 </label>
               ))}
             </section>
-          )}
 
             <div className="perso-outils">
               <button type="button" className="bouton bouton-secondaire" onClick={() => setEdition({ id: null, nom: '', graphes: [] })} disabled={travail.perso.length >= 20}>

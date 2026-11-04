@@ -38,6 +38,7 @@ Un graphique sans donnée (droit marge absent, activité non importée) est reti
 - Personnaliser : fenêtre avec copie de travail (Enregistrer / Annuler), « Rétablir les groupes d'origine ».
 - Export PDF : tous les groupes affichés, dans l'ordre choisi, un groupe par page.
 - Noms des groupes d'origine : un administrateur (droit `referentiel:write`) peut les renommer dans « Personnaliser » ; le nom choisi est gardé sur le serveur (`/reglages/noms_groupes`) et vu par tous. Champ vide = nom par défaut. Les groupes personnels gardent leur nom.
+- Les autres utilisateurs peuvent aussi les renommer, pour eux seuls : noms personnels dans leur réglage `groupes.<page>` (champ `noms`), prioritaires sur les noms communs. Le serveur refuse toujours le `PUT /reglages/noms_groupes` sans `referentiel:write`.
 - Ancien choix « graphiques masqués » (clé `graphes.evolution`) : n'est plus lu ; la route serveur reste.
 
 ## Impacts / risques

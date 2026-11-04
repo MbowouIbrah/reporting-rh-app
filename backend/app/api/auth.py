@@ -185,6 +185,7 @@ CLE_PREFERENCE = Path(pattern=r"^(graphes|groupes)\.[a-z_]{1,30}$")
 
 IdGraphe = Annotated[str, StringConstraints(min_length=1, max_length=50)]
 NomGroupe = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+CleGroupe = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,30}$")]
 
 
 class GroupePerso(BaseModel):
@@ -197,13 +198,16 @@ class GroupePerso(BaseModel):
 
 class ConfigGroupes(BaseModel):
     """Groupes de graphiques : groupes créés par l'utilisateur, ordre des groupes affichés
-    (un groupe d'origine absent de `ordre` est masqué) et vue d'ouverture (`tout` ou un groupe)."""
+    (un groupe d'origine absent de `ordre` est masqué), vue d'ouverture (`tout` ou un groupe)
+    et noms personnels des groupes d'origine, vus par l'utilisateur seul
+    (priment sur les noms communs)."""
 
     model_config = ConfigDict(extra="forbid")
 
     perso: list[GroupePerso] = Field(max_length=20)
     ordre: list[IdGraphe] = Field(max_length=40)
     defaut: IdGraphe
+    noms: Annotated[dict[CleGroupe, NomGroupe], Field(max_length=20)] | None = None
 
 
 class PreferenceIn(BaseModel):
@@ -232,7 +236,7 @@ def ecrire_preference(body: PreferenceIn, cle: str = CLE_PREFERENCE,
     if cle.startswith("groupes."):
         if not isinstance(body.valeur, ConfigGroupes):
             raise HTTPException(422, "Réglage des groupes : objet attendu")
-        valeur = body.valeur.model_dump()
+        valeur = body.valeur.model_dump(exclude_none=True)
     else:
         if isinstance(body.valeur, ConfigGroupes):
             raise HTTPException(422, "Graphiques masqués : liste attendue")
