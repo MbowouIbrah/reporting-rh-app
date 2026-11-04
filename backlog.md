@@ -22,7 +22,7 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 | B-016 | 2026-10-19 | 11 | Historique des enregistrements : liste des imports et saisies passés, annulation d'un enregistrement précis (pas seulement le dernier), voire suivi des modifications ligne par ligne façon versions | 2 | À faire |
 | B-017 | 2026-10-19 | 11 | Contrôles d'import manquants (test août) : ANNÉE/MOIS différent du mois choisi, montant ×10 ou saisi en milliers vs M-1, Brut Réel ≠ somme des composantes, « 45.000 » lu 45 sans alerte claire, formule sans valeur calculée perdue, ligne sans aucun montant | 2 | Fait (G5, G4, G12) |
 | B-018 | 2026-10-30 | 12 | Export xlsx : la feuille « 6 Activité » ne montre pas encore les objectifs (l'écran et le PDF les montrent) ; à faire quand l'xlsx sera proposé à l'écran | 3 | À faire |
-| B-019 | 2026-10-30 | 12 | Migration 0018 (objectifs) à rejouer sur PostgreSQL 16 avant la mise en service (testée sur SQLite seulement) | 2 | À faire |
+| B-019 | 2026-10-30 | 12 | Migration 0018 (objectifs) à rejouer sur PostgreSQL 16 avant la mise en service (testée sur SQLite seulement) | 2 | Fait (2026-11-04) : PostgreSQL 16.15 (Docker), montée complète jusqu'à 0018, descente/remontée de 0018, descente complète puis remontée : OK |
 | B-020 | 2026-11-02 | 12 | Famille des rubriques de charge modifiable par l'administrateur (aujourd'hui codée dans kpi/moteur.py, défaut « Charges ») | 3 | À faire |
 | B-021 | 2026-11-02 | 12 | Choix des graphiques gardé côté serveur (suivre l'utilisateur sur tous ses postes) au lieu du navigateur | 3 | À faire |
 | B-022 | 2026-11-02 | 12 | Excel des rapports : sous-totaux par famille (salaire, primes, avantages, charges) et feuille « Charges exclues » | 3 | À faire |
