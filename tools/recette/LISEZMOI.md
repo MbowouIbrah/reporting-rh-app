@@ -17,7 +17,7 @@ Mot de passe : début de l'adresse + `<suffixe-retire>` (`admin@exemple.invalid`
 |---|---|
 | `comptes.csv` | Un compte par profil : fonction (libellé affiché), modèle de droits (`admin`, `global`, `perimetre`), périmètre, nominatif. Remplacer les adresses `@exemple.invalid` par les vraies au fur et à mesure. |
 | `ca_marge.csv` | CA et marge de janvier 2025 à juin 2026 (marge négative, CA sans marge, mois non saisi, décimales). |
-| `budgets.csv` | Budgets de mai (services) et juin 2026 (services, sites, rubriques), au-dessus et en dessous du réel. |
+| `budgets.csv` | Budgets de mai (services) et juin 2026 (services, sites, toutes les rubriques payées en juin : budgets par famille salaire / primes / avantages / charges affichés), au-dessus et en dessous du réel. |
 
 L'historique vient de `Reporting RH/REPORTING_RH_V4.xlsx` (18 mois), enrichi par le script ; la liste des cas s'affiche à la fin.
 Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUILLET-SEPTEMBRE_2026.xlsx` en direct.

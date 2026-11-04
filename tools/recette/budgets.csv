@@ -18,3 +18,16 @@ annee;mois;axe;cible;valeur;cas couvert
 2026;6;site;Dehane;6000000;proche du budget
 2026;6;rubrique;Primes exceptionnelles;2000000;au-dessus du budget
 2026;6;rubrique;Formation;150000;sous le budget
+2026;6;rubrique;Salaire brut garantie;31000000;au-dessus du budget (famille salaire)
+2026;6;rubrique;Brut Réel;33000000;sous le budget (famille salaire)
+2026;6;rubrique;Primes sur ventes;1000000;sous le budget (famille primes)
+2026;6;rubrique;Bonus;250000;au-dessus du budget (famille primes)
+2026;6;rubrique;Productivité Ateliers;300000;sous le budget (famille primes)
+2026;6;rubrique;Commission;1300000;au-dessus du budget (famille primes)
+2026;6;rubrique;Frais de mission;1200000;au-dessus du budget (famille avantages)
+2026;6;rubrique;Logement site déporté;840000;égal au budget (famille avantages)
+2026;6;rubrique;Carburant véhicule service;500000;sous le budget (famille avantages)
+2026;6;rubrique;Crédit téléphonique;900000;proche du budget (famille avantages)
+2026;6;rubrique;Charges Patronales;5400000;proche du budget (famille charges)
+2026;6;rubrique;Assurance Maladie;1000000;au-dessus du budget (famille charges)
+2026;6;rubrique;TVA & Marge MAD;1900000;sous le budget (famille charges)
