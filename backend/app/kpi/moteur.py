@@ -314,10 +314,12 @@ def _part(pd: PeriodeData | None, r: str, compte: bool) -> Decimal | None:
     return pd.rubrique(r) if (r in pd.exclues) != compte else ZERO
 
 
-def _familles(a_type: list[dict], parts: dict[str, tuple]) -> list[dict]:
+def _familles(a_type: list[dict], parts: dict[str, tuple],
+              budget_compte: dict[str, Decimal | None]) -> list[dict]:
     """Sous-totaux par famille présente. `parts[r]` = (compté N, compté N-1, hors total N,
     hors total N-1), chaque mois avec ses propres exclusions : la somme des sous-totaux vaut
-    le TOTAL CHARGES. Budget seulement si chaque rubrique comptée non vide en a un."""
+    le TOTAL CHARGES. `budget_compte[r]` = budget des seuls mois où la rubrique est comptée
+    (None si aucun). Budget seulement si chaque rubrique comptée non vide en a un."""
     def tot(lignes, i):
         vals = [parts[x["rubrique"]][i] for x in lignes]
         vals = [v for v in vals if v is not None]
@@ -334,8 +336,8 @@ def _familles(a_type: list[dict], parts: dict[str, tuple]) -> list[dict]:
             continue
         # rubrique comptée sans budget ni montant : sans effet ; avec montant compté (un mois au
         # moins, selon les exclusions de chaque mois) : budget partiel
-        budgets = [x.get("budget") for x in lignes
-                   if parts[x["rubrique"]][0] or (not x["exclu"] and x.get("budget") is not None)]
+        budgets = [budget_compte[x["rubrique"]] for x in lignes
+                   if parts[x["rubrique"]][0] or budget_compte[x["rubrique"]] is not None]
         budget = sum(budgets, ZERO) if budgets and all(b is not None for b in budgets) else None
         m = tot(lignes, 0)
         out.append({"famille": fam, **cell(m, tot(lignes, 1)), **_bud(m, budget),
@@ -546,7 +548,9 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, "famille": None, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
-        "a_familles": _familles(a_type, parts),
+        "a_familles": _familles(a_type, parts, {
+            x["rubrique"]: None if x["exclu"] else budgets.rubrique.get(x["rubrique"])
+            for x in a_type}),
         "b_service_activite": b_service,
         "c_site": c_site,
         "c_site_total": c_site_total,
@@ -605,7 +609,14 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
     parts = {x["rubrique"]: tuple(cum(pds, mois, lambda pd, r=x["rubrique"], c=c: _part(pd, r, c))
                                   for c in (True, False) for pds, mois in ((n, ok), (n1, ok1)))
              for x in a_type}
-    familles = _familles(a_type, parts)
+    budget_compte = {}
+    for x in a_type:
+        r = x["rubrique"]
+        vals = [budgets[m].rubrique.get(r) for m in ok
+                if m in budgets and r not in n[m].exclues]
+        vals = [v for v in vals if v is not None]
+        budget_compte[r] = sum(vals, ZERO) if vals else None
+    familles = _familles(a_type, parts, budget_compte)
     a_type.append({"rubrique": "TOTAL CHARGES", "exclu": False, "famille": None,
                    **cell(ms_n, ms_n1),
                    **bud("rubrique", "TOTAL CHARGES", ms_n)})
@@ -703,25 +714,31 @@ def annuel(
     def par_contrat(pd: PeriodeData) -> dict[str, int]:
         return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
 
+    def paie(pd: PeriodeData) -> dict:
+        # séries tirées de la paie, toutes vides ensemble sur un mois sans données
+        return {
+            "ms": pd.ms,
+            "effectif": len(pd.ids),
+            "absences": pd.rubrique(ABSENCES),
+            "commissions": pd.rubrique(COMMISSION),
+            "primes": sum((pd.rubrique(r) for r in PRIMES), ZERO),
+            "salaire": pd.rubrique(SALAIRE),
+            "primes_toutes": sum((pd.rubrique(r) for r in PRIMES_TOUTES), ZERO),
+            "frais_mission": pd.rubrique(FRAIS_MISSION),
+            "logement": pd.rubrique(LOGEMENT),
+            "assurance": pd.rubrique(ASSURANCE),
+            "formation": pd.rubrique(FORMATION),
+            "carburant": pd.rubrique(CARBURANT),
+            "credit_telephonique": pd.rubrique(CREDIT_TEL),
+            "remuneration": remuneration(pd),
+            "effectif_contrat": par_contrat(pd),
+        }
+
+    cles_paie = tuple(paie(PeriodeData(())))
+
     def serie(pds, objectifs=None):
         return [{"mois": m,
-                 "ms": pds[m].ms if _ok(pds.get(m)) else None,
-                 "effectif": len(pds[m].ids) if _ok(pds.get(m)) else None,
-                 "absences": pds[m].rubrique(ABSENCES) if _ok(pds.get(m)) else None,
-                 "commissions": pds[m].rubrique(COMMISSION) if _ok(pds.get(m)) else None,
-                 "primes": sum((pds[m].rubrique(r) for r in PRIMES), ZERO)
-                 if _ok(pds.get(m)) else None,
-                 "salaire": pds[m].rubrique(SALAIRE) if _ok(pds.get(m)) else None,
-                 "primes_toutes": sum((pds[m].rubrique(r) for r in PRIMES_TOUTES), ZERO)
-                 if _ok(pds.get(m)) else None,
-                 "frais_mission": pds[m].rubrique(FRAIS_MISSION) if _ok(pds.get(m)) else None,
-                 "logement": pds[m].rubrique(LOGEMENT) if _ok(pds.get(m)) else None,
-                 "assurance": pds[m].rubrique(ASSURANCE) if _ok(pds.get(m)) else None,
-                 "formation": pds[m].rubrique(FORMATION) if _ok(pds.get(m)) else None,
-                 "carburant": pds[m].rubrique(CARBURANT) if _ok(pds.get(m)) else None,
-                 "credit_telephonique": pds[m].rubrique(CREDIT_TEL) if _ok(pds.get(m)) else None,
-                 "remuneration": remuneration(pds[m]) if _ok(pds.get(m)) else None,
-                 "effectif_contrat": par_contrat(pds[m]) if _ok(pds.get(m)) else None,
+                 **(paie(pd) if (pd := _ok(pds.get(m))) else dict.fromkeys(cles_paie)),
                  # saisies indépendantes de la paie : un mois peut avoir un CA sans lignes
                  **_ca_marge(pds.get(m)),
                  "activite": _activite(pds.get(m)),

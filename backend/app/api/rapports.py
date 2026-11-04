@@ -169,6 +169,15 @@ def _salarie_id(db: Session, p: Principal, matricule: str | None) -> int | None:
     return sal.id
 
 
+def _params(db, crit: dict, annee: int, mois: int):
+    """Paramètres du mois ; pas de budget employé pour un poste, un type de contrat ou une
+    personne (seulement pour un effectif d'ensemble), en mensuel comme en annuel."""
+    params = ch.charger_params(db, annee, mois)
+    if crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None:
+        params = replace(params, budget_employe=None)
+    return params
+
+
 def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
              type_site=None, poste=None, matricule=None, activite=None, type_contrat=None) -> dict:
     authorize(p, "report:read")
@@ -180,11 +189,7 @@ def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
         raise HTTPException(404, "Aucune donnée pour cette période")
     ref = _reference(annee, mois, ref_annee, ref_mois)
     prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site, **crit)
-    params = ch.charger_params(db, annee, mois)
-    if poste or type_contrat or crit["salarie_id"] is not None:
-        # pas de budget pour un poste, un type de contrat ou une personne :
-        # seulement pour un effectif d'ensemble
-        params = replace(params, budget_employe=None)
+    params = _params(db, crit, annee, mois)
     res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site, scope), params,
                          ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
     return _sortie(p, res)
@@ -267,12 +272,10 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     # budgets et paramètres des 12 mois : la série des objectifs couvre toute l'année ; les blocs
     # du cumul ne retiennent que les mois qui ont des données
     budgets = {r: ch.charger_budgets(db, scope, *reels[r - 1], service, site, **crit) for r in n}
-    sans_budget_employe = crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None
-    params_mois = {r: (replace(pm, budget_employe=None) if sans_budget_employe else pm)
-                   for r, pm in ((r, ch.charger_params(db, *reels[r - 1])) for r in n)}
+    params_mois = {r: _params(db, crit, *reels[r - 1]) for r in n}
+    params_fin = params_mois.get(fin) or _params(db, crit, *reels[fin - 1])
     refs = ch.charger_refs(db, type_site, scope)
-    res = moteur.annuel(n, annee_pds(ref), fin, refs,
-                        ch.charger_params(db, *reels[fin - 1]), budgets, params_mois)
+    res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois)
     return _sortie(p, ex.en_mois_reels(res, annee, ref, calendrier))
 
 
@@ -321,7 +324,8 @@ def annuel_export(
                   "type_contrat": type_contrat, "calendrier": calendrier})
     db.commit()
     suffixe = "-fiscal" if calendrier == "fiscal" else ""
-    return _xlsx(xlsx.annuel(res, annee, mois_fin, ref_annee, calendrier),
+    # libellé du cumul : dernier mois réellement cumulé, comme à l'écran
+    return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier),
                  f"reporting-annuel-{annee}{suffixe}.xlsx")
 
 

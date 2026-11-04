@@ -19,7 +19,7 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
   return (
     <>
       <p className="bandeau ok">
-        <span>{libelleCumul(annee, mois, calendrier)}</span>
+        <span>{libelleCumul(annee, d.mois_fin ?? mois, calendrier)}</span>
         <span>Moyenne mensuelle : <strong className="val">{fcfa(d.moyenne_mensuelle.m)}</strong> ({entier(d.cumul_ytd.nb_mois)} mois)</span>
         {d.marge_ytd !== undefined && <span>Marge cumulée : <strong className="val">{fcfa(d.marge_ytd)}</strong> ({entier(d.nb_mois_marge ?? 0)} mois saisis)</span>}
       </p>

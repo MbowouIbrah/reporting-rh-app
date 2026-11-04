@@ -256,6 +256,13 @@ class SaisiesIn(Mois):
     cases: list[CaseIn] = Field(max_length=5000)
 
 
+OBJ_MARGE_SANS_CA = ("Un objectif de marge ne peut pas être saisi sans objectif de chiffre "
+                     "d'affaires")
+# groupe -> (indicateur CA, indicateur marge, message si marge sans CA)
+_CA_MARGE = {"ca_marge": ("ca", "marge", MARGE_SANS_CA),
+             "obj_ca_marge": ("obj_ca", "obj_marge", OBJ_MARGE_SANS_CA)}
+
+
 def _valider_saisies(ctx: saisies.Contexte, body: SaisiesIn) -> dict[nv.Cle, dict]:
     """Contrôle toutes les cases avant toute écriture : clé de case -> {indicateur: valeur ou
     None si effacée}."""
@@ -280,14 +287,17 @@ def _valider_saisies(ctx: saisies.Contexte, body: SaisiesIn) -> dict[nv.Cle, dic
                 for i, v in c.valeurs.items()}
         if any(i in _NOMBRES and not _entier(v) for i, v in vals.items()):
             raise HTTPException(422, OBJECTIF_ENTIER)
-        marge = vals["marge"] if "marge" in vals else ctx.lignes.get(("marge", *cle))
-        if body.groupe == "ca_marge" and marge is not None:
-            # CA de la même case : celui envoyé, sinon celui déjà saisi, sinon celui des employés
-            ca = vals["ca"] if "ca" in vals else ctx.lignes.get(("ca", *cle))
-            if ca is None and cle in existant:
-                ca = existant[cle].valeurs["ca"].employes
-            if ca is None:
-                raise HTTPException(422, MARGE_SANS_CA)
+        if body.groupe in _CA_MARGE:
+            i_ca, i_marge, message = _CA_MARGE[body.groupe]
+            marge = vals[i_marge] if i_marge in vals else ctx.lignes.get((i_marge, *cle))
+            if marge is not None:
+                # CA de la même case : celui envoyé, sinon celui déjà saisi, sinon celui des
+                # employés (réel seulement)
+                ca = vals[i_ca] if i_ca in vals else ctx.lignes.get((i_ca, *cle))
+                if ca is None and cle in existant:
+                    ca = getattr(existant[cle].valeurs[i_ca], "employes", None)
+                if ca is None:
+                    raise HTTPException(422, message)
         out[cle] = vals
     return out
 
@@ -382,10 +392,13 @@ def repartir_objectif_annuel(
         cle = (c.site_id, c.service_id)
         if c.indicateur in totaux.get(cle, {}):
             raise HTTPException(422, "Case en double")
-        if t is not None:  # total vide = rien à répartir pour cette case
-            totaux.setdefault(cle, {})[c.indicateur] = t
+        totaux.setdefault(cle, {})[c.indicateur] = t  # total vide = objectif effacé
+    if not totaux:
+        return {"annee": body.annee, "calendrier": body.calendrier, "groupe": body.groupe,
+                "niveau": body.niveau, "mois": [], "ecrases": []}
     scope = scope_for(db, p)
-    mensuels = {cle: {i: repartir_annee(t, i in nv.MOYENNE) for i, t in vals.items()}
+    mensuels = {cle: {i: [None] * 12 if t is None else repartir_annee(t, i in nv.MOYENNE)
+                      for i, t in vals.items()}
                 for cle, vals in totaux.items()}
     contextes, ecrases = {}, []
     for rg, (an, m) in enumerate(mois_exercice(body.annee, body.calendrier)):
@@ -393,10 +406,13 @@ def repartir_objectif_annuel(
         ctx = saisies.contexte(db, saisies.periode_id(db, an, m))
         corps = SaisiesIn(annee=an, mois=m, groupe=body.groupe, niveau=body.niveau, cases=[
             CaseIn(site_id=cle[0], service_id=cle[1],
-                   valeurs={i: format(v[rg], "f") for i, v in vals.items()})
+                   valeurs={i: _txt_opt(v[rg]) for i, v in vals.items()})
             for cle, vals in mensuels.items()])
         valides = _valider_saisies(ctx, corps)
         _verifier_perimetre(ctx, scope, body.groupe, body.niveau, valides)
+        if ctx.periode_id is None and all(v is None for vals in valides.values()
+                                          for v in vals.values()):
+            continue  # rien à effacer dans un mois jamais ouvert
         contextes[(an, m)] = (ctx, valides)
         autre_niveau = nv.niveau_des_lignes(
             [(si, se) for (i, si, se) in ctx.lignes if i in nv.GROUPES[body.groupe]])
@@ -404,9 +420,6 @@ def repartir_objectif_annuel(
                 ctx.lignes.get((i, *cle)) is not None for cle, vals in valides.items()
                 for i in vals):
             ecrases.append(m)  # cases remplacées, ou lignes d'un autre niveau effacées
-    if not mensuels:
-        return {"annee": body.annee, "calendrier": body.calendrier, "groupe": body.groupe,
-                "niveau": body.niveau, "mois": [], "ecrases": []}
     if any(ctx.periode_id is None for ctx, _v in contextes.values()):
         authorize(p, "periode:write")  # même droit que l'ouverture d'un mois
     ecrits = []

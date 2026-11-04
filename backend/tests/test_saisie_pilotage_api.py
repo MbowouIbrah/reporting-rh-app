@@ -559,7 +559,7 @@ def test_objectifs_d_activite_par_site_et_total_de_productivite_en_moyenne(make_
 
 def test_objectifs_signes(make_client):
     c = make_client(ADMIN)
-    assert saisir(c, "obj_ca_marge", "global", [case(obj_marge="-3")]).status_code == 200
+    assert saisir(c, "obj_ca_marge", "global", [case(obj_ca="10", obj_marge="-3")]).status_code == 200
     assert saisir(c, "obj_ca_marge", "global", [case(obj_ca="-3")]).status_code == 422
     assert saisir(c, "obj_activite", "global", [case(obj_ventes="-3")]).status_code == 422
     r = saisir(c, "obj_activite", "global", [case(obj_factures="2.5")])  # un nombre est entier
@@ -646,7 +646,7 @@ def test_repartition_annuelle_decimales_exactes_negatif_et_productivite(make_cli
     assert D(valeurs_du_mois(c, "obj_activite", "obj_productivite", 7)[0]) == D("85.5")
 
 
-def test_repartition_annuelle_par_site_audit_par_mois_et_rien_si_vide(make_client, db):
+def test_repartition_annuelle_par_site_audit_par_mois_vide_efface_sans_ouvrir_de_mois(make_client, db):
     c = make_client(ADMIN)
     sites, _ = ids(db)
     r = repartir(c, "obj_activite", "site", [
@@ -655,7 +655,7 @@ def test_repartition_annuelle_par_site_audit_par_mois_et_rien_si_vide(make_clien
     assert r.status_code == 200, r.text
     m1 = r.json()["mois"][0]["cases"]
     assert {x["site_id"]: x["valeurs"] for x in m1} == {
-        sites["Douala"]: {"obj_ventes": "2"}, sites["Yaoundé"]: {"obj_ventes": "3"}}
+        sites["Douala"]: {"obj_ventes": "2", "obj_clients": None}, sites["Yaoundé"]: {"obj_ventes": "3"}}
     assert nb_lignes(db, "obj_ventes") == 24 and nb_lignes(db, "obj_clients") == 0
     ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "saisie_pilotage")).all()
     assert len(ev) == 12  # une trace par mois
@@ -758,3 +758,31 @@ def test_journal_masque_la_marge_sans_droit_marge(make_client, db):
     adm = {e["apres"]["groupe"]: e["apres"] for e in c.get(f"{API}/audit").json()
            if e["action"] == "saisie_pilotage"}
     assert adm["obj_ca_marge"]["valeurs"]["obj_marge//"] == "10.000"
+
+
+def test_objectif_de_marge_refuse_sans_objectif_de_ca(make_client, db):
+    c = make_client(ADMIN)
+    r = saisir(c, "obj_ca_marge", "global", [case(obj_marge="5")])
+    assert r.status_code == 422 and r.json()["detail"] == pilotage.OBJ_MARGE_SANS_CA
+    r = repartir(c, "obj_ca_marge", "global", [total("obj_marge", "120")])
+    assert r.status_code == 422 and nb_lignes(db) == 0 and nb_periodes(db) == 0
+    # objectif de CA déjà saisi sur le mois : la marge seule passe
+    assert saisir(c, "obj_ca_marge", "global", [case(obj_ca="100")]).status_code == 200
+    assert saisir(c, "obj_ca_marge", "global", [case(obj_marge="5")]).status_code == 200
+
+
+def test_repartition_d_un_total_vide_efface_les_objectifs_des_12_mois(make_client, db):
+    c = make_client(ADMIN)
+    assert repartir(c, "obj_activite", "global", [total("obj_ventes", "120")]).status_code == 200
+    assert nb_lignes(db, "obj_ventes") == 12
+    r = repartir(c, "obj_activite", "global", [total("obj_ventes", None)])
+    assert r.status_code == 200, r.text
+    assert nb_lignes(db, "obj_ventes") == 0 and len(r.json()["ecrases"]) == 12
+
+
+def test_repartition_vide_n_ouvre_aucun_mois(make_client, db):
+    c = make_client(ADMIN)
+    for cases in ([], [total("obj_ventes", "")]):
+        r = repartir(c, "obj_activite", "global", cases)
+        assert r.status_code == 200 and r.json()["mois"] == []
+    assert nb_periodes(db) == 0
