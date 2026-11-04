@@ -127,33 +127,33 @@ export default function Individuel() {
       {f.filtres && (
         <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
           <TitreFiltres />
-          <ChoixEmploye salaries={salaries ?? []} valeur={matricule} onChange={setMatricule} />
-          {f.typesSite.length > 0 && (
-            <ChoixTypeSite valeur={typeSite ?? ''} types={f.typesSite} tous="(Tous)" onChange={(v) => f.set({ type_site: v })} />
-          )}
-          <label>
-            Site
-            <select value={site ?? ''} onChange={(e) => f.set({ site: e.target.value })}>
-              <option value="">(Tous)</option>
-              {f.sites.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
-          <label>
+          <ChoixCalendrier filtres={f.filtres} onChange={f.set} />
+          <ChoixAnnee filtres={f.filtres} annees={f.annees} onChange={f.set} />
+          <label className="souple">
             Service
             <select value={service ?? ''} onChange={(e) => f.set({ service: e.target.value })}>
-              <option value="">(Tous)</option>
+              <option value="">Tous</option>
               {f.services.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
           </label>
-          {f.postes.length > 0 && (
-            <ChoixPoste valeur={poste ?? ''} postes={f.postes} tous="(Tous)" onChange={(v) => f.set({ poste: v })} />
+          {f.typesSite.length > 0 && (
+            <ChoixTypeSite valeur={typeSite ?? ''} types={f.typesSite} onChange={(v) => f.set({ type_site: v })} />
           )}
-          <ChoixCalendrier filtres={f.filtres} onChange={f.set} />
-          <ChoixAnnee filtres={f.filtres} annees={f.annees} onChange={f.set} />
+          <label className="souple">
+            Site
+            <select value={site ?? ''} onChange={(e) => f.set({ site: e.target.value })}>
+              <option value="">Tous</option>
+              {f.sites.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+          {f.postes.length > 0 && (
+            <ChoixPoste valeur={poste ?? ''} postes={f.postes} onChange={(v) => f.set({ poste: v })} />
+          )}
+          <ChoixEmploye salaries={salaries ?? []} valeur={matricule} onChange={setMatricule} />
           <div className="filtres-actions">
             <BoutonReinitialiser
               actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee', 'calendrier', 'exercice'] as const).some((k) => f.partage[k])}
