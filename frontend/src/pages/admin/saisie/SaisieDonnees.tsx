@@ -8,7 +8,6 @@ import {
   useState,
   type ClipboardEvent,
   type KeyboardEvent,
-  type ReactNode,
 } from 'react'
 import { Link } from 'react-router-dom'
 import { usePeut } from '../../../auth/AuthContext'
@@ -581,21 +580,20 @@ function OngletGroupe({ groupe, annee, mois, periode, onModifs }: { groupe: Grou
   return <Grille vue={q.data} groupe={groupe} periode={periode} demandeNiveau={choix} enAttente={q.isPlaceholderData} onNiveau={setChoix} onModifs={onModifs} />
 }
 
-type Onglet = Groupe | 'budgets'
+type Onglet = Groupe
 
 interface Props {
   annee: number
   mois: number
   periode: string
-  budgets: ReactNode
   /** Signale au parent les modifications non enregistrées de la grille affichée. */
   onModifs?: (sale: boolean) => void
   /** Exécute une action qui quitte la grille, après confirmation s'il y a des modifications. */
   garde?: (action: () => void) => void
 }
 
-/** Données du mois : CA et marge, OR / devis / factures (saisies à plusieurs niveaux) et budgets. */
-export default function SaisieDonnees({ annee, mois, periode, budgets, onModifs, garde = (a) => a() }: Props) {
+/** Données du mois : CA et marge, OR / devis / factures et leurs objectifs, saisis à plusieurs niveaux. */
+export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = (a) => a() }: Props) {
   const avecMarge = usePeut('marge:read')
   const avecLecture = usePeut('import:read')
   const onglets: { id: Onglet; libelle: string }[] = [
@@ -603,12 +601,11 @@ export default function SaisieDonnees({ annee, mois, periode, budgets, onModifs,
     ...(avecLecture ? [{ id: 'activite' as const, libelle: 'OR, devis, factures' }] : []),
     ...(avecLecture && avecMarge ? [{ id: 'obj_ca_marge' as const, libelle: 'Objectifs CA et marge' }] : []),
     ...(avecLecture ? [{ id: 'obj_activite' as const, libelle: 'Objectifs d’activité' }] : []),
-    { id: 'budgets', libelle: 'Budgets' },
   ]
   // L'onglet de départ est retenu dès qu'un onglet de saisie existe : un droit qui arrive ensuite (marge) ne change pas d'onglet sous les doigts.
   const [choix, setChoix] = useState<Onglet | null>(null)
-  if (choix === null && onglets[0].id !== 'budgets') setChoix(onglets[0].id)
-  const actif: Onglet = choix !== null && onglets.some((o) => o.id === choix) ? choix : onglets[0].id
+  if (choix === null && onglets.length > 0) setChoix(onglets[0].id)
+  const actif: Onglet | undefined = choix !== null && onglets.some((o) => o.id === choix) ? choix : onglets[0]?.id
   const id = useId()
   const signaler = useCallback((sale: boolean) => onModifs?.(sale), [onModifs])
 
@@ -631,7 +628,7 @@ export default function SaisieDonnees({ annee, mois, periode, budgets, onModifs,
         ))}
       </div>
       <div role="tabpanel" id={`${id}-panneau`} aria-labelledby={`${id}-${actif}`}>
-        {actif === 'budgets' ? budgets : <OngletGroupe key={`${actif}-${annee}-${mois}`} groupe={actif} annee={annee} mois={mois} periode={periode} onModifs={signaler} />}
+        {actif && <OngletGroupe key={`${actif}-${annee}-${mois}`} groupe={actif} annee={annee} mois={mois} periode={periode} onModifs={signaler} />}
       </div>
     </div>
   )

@@ -119,6 +119,7 @@ function rendu(perms = ['import:read', 'marge:read']) {
   )
   return qc
 }
+const ouvrirDonnees = async () => fireEvent.click(await screen.findByRole('button', { name: 'Saisir les données de Février 2026 →' }))
 const saisirLeMois = async () => fireEvent.click(await screen.findByRole('button', { name: 'Étape 1 : choisir les employés de Février 2026 →' }))
 afterEach(() => {
   vi.restoreAllMocks()
@@ -203,7 +204,8 @@ test('données du mois : CA et marge saisis à plat, case vide calculée depuis 
     taux_marge: '-0.05',
   }))
   rendu()
-  expect(await screen.findByRole('heading', { name: 'DONNÉES DE FÉVRIER 2026' })).toBeInTheDocument()
+  await ouvrirDonnees()
+  expect(await screen.findByRole('heading', { name: 'DONNÉES — FÉVRIER 2026' })).toBeInTheDocument()
   expect(await screen.findByRole('tab', { name: 'CA et marge' })).toHaveAttribute('aria-selected', 'true')
   const ca = await screen.findByRole('textbox', { name: 'CA : Global' })
   const marge = screen.getByRole('textbox', { name: 'Marge : Global' })
@@ -232,8 +234,9 @@ test('données du mois : CA et marge saisis à plat, case vide calculée depuis 
   expect((screen.getByRole('textbox', { name: 'CA : Global' }) as HTMLInputElement).value).toMatch(/^1\s000\s000$/)
   expect(screen.getByText(/non réparti : 200\s000/)).toBeInTheDocument()
   expect(screen.getAllByText(/-5\s%/).length).toBeGreaterThan(0)
-  // Budgets : onglet dédié, nombre saisi et total par axe.
-  fireEvent.click(screen.getByRole('tab', { name: 'Budgets' }))
+  expect(screen.queryByRole('tab', { name: 'Budgets' })).toBeNull()
+  // Budgets : carte sur la page de départ, nombre saisi et total par axe.
+  fireEvent.click(screen.getByRole('button', { name: 'Retour : Choix du mois' }))
   const services = (await screen.findByText('Services')).closest('li')!
   expect(services).toHaveTextContent(/1 sur 1/)
   expect(services).toHaveTextContent(/300\sFCFA/)
@@ -243,6 +246,7 @@ test('données du mois : CA et marge saisis à plat, case vide calculée depuis 
 test('changement de niveau : confirmation avant d’effacer les chiffres saisis, puis une ligne par site', async () => {
   reponsePut = (corps) => new Response(JSON.stringify({ ...SAISIES_CA, niveau: corps.niveau, niveau_enregistre: corps.niveau }))
   rendu()
+  await ouvrirDonnees()
   const ca = await screen.findByRole('textbox', { name: 'CA : Global' })
   fireEvent.change(ca, { target: { value: '900000' } })
   fireEvent.click(screen.getByRole('radio', { name: 'Par site' }))
@@ -277,6 +281,7 @@ test('changement de niveau : confirmation avant d’effacer les chiffres saisis,
 test('OR, devis, factures : total partiel, part non répartie, erreur du serveur affichée', async () => {
   reponsePut = () => new Response(JSON.stringify({ detail: 'Mois clos : saisie impossible.' }), { status: 409 })
   rendu()
+  await ouvrirDonnees()
   fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
   expect(await screen.findByRole('textbox', { name: 'OR : Douala' })).toHaveValue('500')
   expect(screen.getByRole('radio', { name: 'Par site' })).toBeChecked()
@@ -291,17 +296,17 @@ test('OR, devis, factures : total partiel, part non répartie, erreur du serveur
 
 test('sans le droit marge : pas d’onglet CA et marge, on arrive sur l’activité', async () => {
   rendu(['import:read'])
+  await ouvrirDonnees()
   await screen.findByRole('tab', { name: 'OR, devis, factures' })
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'OR : Douala' })).toBeInTheDocument())
   expect(screen.queryByRole('tab', { name: 'CA et marge' })).toBeNull()
   expect(screen.getByRole('tab', { name: 'OR, devis, factures' })).toHaveAttribute('aria-selected', 'true')
 })
 
-test('sans le droit de lecture des imports : seul l’onglet Budgets, aucune grille demandée', async () => {
+test('sans le droit de lecture des imports : seule la carte Budgets, aucune grille demandée', async () => {
   rendu([])
-  await screen.findByRole('tab', { name: 'Budgets' })
-  expect(screen.getAllByRole('tab')).toHaveLength(1)
-  expect(screen.queryByRole('tab', { name: 'OR, devis, factures' })).toBeNull()
+  await screen.findByRole('button', { name: 'Saisir les budgets de Février 2026 →' })
+  expect(screen.queryByRole('button', { name: 'Saisir les données de Février 2026 →' })).toBeNull()
   expect(appels.some((a) => a.url.includes('/pilotage/saisies'))).toBe(false)
 })
 
@@ -316,6 +321,7 @@ test('changement de niveau : la grille est pré-remplie par la proposition du se
     }
   }
   rendu()
+  await ouvrirDonnees()
   await screen.findByRole('textbox', { name: 'CA : Global' })
   fireEvent.click(screen.getByRole('radio', { name: 'Par site' })) // rien de tapé : pas de confirmation
   const douala = await screen.findByRole('textbox', { name: 'CA : Douala' })
@@ -328,6 +334,7 @@ test('changement de niveau : la grille est pré-remplie par la proposition du se
 
 test('collage d’un bloc Excel, Entrée vers la case du dessous', async () => {
   rendu()
+  await ouvrirDonnees()
   fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
   const orDouala = await screen.findByRole('textbox', { name: 'OR : Douala' })
   orDouala.focus()
@@ -346,6 +353,7 @@ test('collage d’un bloc Excel, Entrée vers la case du dessous', async () => {
 
 test('validation identique au serveur : 12 décimales au plus, erreur visible sur la case', async () => {
   rendu()
+  await ouvrirDonnees()
   fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
   const or = await screen.findByRole('textbox', { name: 'OR : Yaoundé' })
   fireEvent.change(or, { target: { value: '1,123456789012' } })
@@ -367,6 +375,7 @@ test('saisie en cours gardée au rechargement, alerte en quittant, confirmation 
     cases: [{ ...SAISIES_ACTIVITE.cases[0], valeurs: { ...SAISIES_ACTIVITE.cases[0].valeurs, or: { ...vierge, saisi: serveur, valeur: serveur, origine: 'saisi' } } }, SAISIES_ACTIVITE.cases[1]],
   })
   const qc = rendu()
+  await ouvrirDonnees()
   fireEvent.click(await screen.findByRole('tab', { name: 'OR, devis, factures' }))
   const yaounde = await screen.findByRole('textbox', { name: 'OR : Yaoundé' })
   const alerte = () => {
@@ -382,11 +391,11 @@ test('saisie en cours gardée au rechargement, alerte en quittant, confirmation 
   await act(async () => { await qc.invalidateQueries({ queryKey: ['saisies'] }) })
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'OR : Douala' })).toHaveValue('900'))
   expect(screen.getByRole('textbox', { name: 'OR : Yaoundé' })).toHaveValue('70')
-  // Changer de mois : confirmation, annuler garde la saisie.
-  fireEvent.change(screen.getByLabelText('Mois'), { target: { value: '3' } })
+  // Revenir au choix du mois : confirmation, annuler garde la saisie.
+  fireEvent.click(screen.getByRole('button', { name: 'Retour : Choix du mois' }))
   const dialogue = screen.getByRole('dialog', { name: 'Quitter sans enregistrer ?' })
   fireEvent.click(within(dialogue).getByRole('button', { name: 'Annuler' }))
-  expect(screen.getByLabelText('Mois')).toHaveValue('2')
+  expect(screen.getByRole('heading', { name: 'DONNÉES — FÉVRIER 2026' })).toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: 'OR : Yaoundé' })).toHaveValue('70')
   // Ctrl+S enregistre.
   fireEvent.keyDown(window, { key: 's', ctrlKey: true })

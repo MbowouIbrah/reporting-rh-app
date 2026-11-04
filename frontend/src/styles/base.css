@@ -707,8 +707,13 @@ html, body { overscroll-behavior: none; }
 .saisie-donnees thead th { text-align: left; }
 .saisie-donnees thead th.num { text-align: right; }
 .saisie-donnees tbody th { white-space: normal; font-weight: 600; color: var(--navy); }
-.saisie-donnees td:has(> input) { padding: 0; }
-.saisie-donnees td input { display: block; width: 100%; min-width: 120px; border: 0; background: transparent; font: inherit; color: inherit; text-align: right; padding: 6px 12px; border-radius: 0; font-variant-numeric: tabular-nums; }
+/* Grille de saisie façon tableur : chaque case est le champ lui-même, bord à bord, séparée de ses voisines par un trait. */
+.rapport-excel .panneau table.dense.saisie-donnees th, .rapport-excel .panneau table.dense.saisie-donnees td,
+.panneau table.dense.saisie-donnees th, .panneau table.dense.saisie-donnees td { border-right: 1px solid var(--rule); }
+.rapport-excel .panneau table.dense.saisie-donnees th:last-child, .rapport-excel .panneau table.dense.saisie-donnees td:last-child,
+.panneau table.dense.saisie-donnees th:last-child, .panneau table.dense.saisie-donnees td:last-child { border-right: 0; }
+.rapport-excel .panneau table.dense.saisie-donnees td:has(> input), .panneau table.dense.saisie-donnees td:has(> input) { padding: 0; vertical-align: top; }
+.saisie-donnees td input { display: block; box-sizing: border-box; width: 100%; min-width: 120px; min-height: 40px; margin: 0; border: 0; background: transparent; font: inherit; color: inherit; text-align: right; padding: 8px 12px; border-radius: 0; font-variant-numeric: tabular-nums; }
 .saisie-donnees td input:focus { outline: 2px solid var(--navy-3); outline-offset: -2px; background: var(--paper); }
 .saisie-donnees td.calcule input { background: var(--surface-sunken); }
 .saisie-donnees td.calcule input::placeholder { color: var(--muted); opacity: 1; }

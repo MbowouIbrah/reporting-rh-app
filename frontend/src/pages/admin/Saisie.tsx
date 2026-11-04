@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePilotage } from '../../api/pilotage'
+import { usePeut } from '../../auth/AuthContext'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Carte, ChoixFichier, Confirmer } from '../../components/Kit'
@@ -26,6 +27,7 @@ type Etape =
   | { e: 'fichier'; fichier: File }
   | { e: 'apercu'; lot: Lot; depuis: 'grille' | 'fichier' }
   | { e: 'budgets' }
+  | { e: 'donnees' }
 
 const suivant = (a: number, m: number) => (m === 12 ? [a + 1, 1] : [a, m + 1])
 
@@ -47,6 +49,8 @@ export default function Saisie() {
   const [sale, setSale] = useState(false)
   const [enAttente, setEnAttente] = useState<{ action: () => void } | null>(null)
   const garde = (action: () => void) => (sale ? setEnAttente({ action }) : action())
+  const avecLecture = usePeut('import:read')
+  const avecMarge = usePeut('marge:read')
 
   const prepa = usePreparation(annee, mois, etape.e === 'choix' || etape.e === 'grille')
   // Mois 0 : plusieurs mois dans un même fichier, chaque ligne porte son année et son mois.
@@ -131,36 +135,46 @@ export default function Saisie() {
           </Carte>
         </div>
         <h3 className="saisie-sous-bandeau">{plusieurs ? 'DONNÉES DU MOIS' : `DONNÉES DE ${periode.toUpperCase()}`}</h3>
-        {plusieurs ? (
-          /* CA, marge, activité et budgets se rattachent à un seul mois : cartes visibles, action remplacée par la raison. */
-          <div className="saisie-cartes saisie-cartes-depart">
+        {/* CA, marge, activité et budgets se rattachent à un seul mois : chacun s'ouvre sur sa page ; plusieurs mois, l'action est remplacée par la raison. */}
+        <div className="saisie-cartes saisie-cartes-depart">
+          {avecLecture && (
             <Carte titre="Chiffre d’affaires, marge et activité">
-              <p className="note">CA et marge en FCFA ; nombre d’OR, de devis et de factures. Saisis mois par mois.</p>
-              <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir ces chiffres.</p></div>
+              <p className="note">
+                {avecMarge ? 'CA et marge en FCFA, nombre d’OR, de devis et de factures, et leurs objectifs' : 'Nombre d’OR, de devis et de factures, et leurs objectifs'}
+                {' '}: saisis mois par mois, au niveau global, par site, par service ou par site et service.
+              </p>
+              <div className="saisie-carte-action">
+                {plusieurs ? (
+                  <p className="note">Choisissez un mois précis pour saisir ces chiffres.</p>
+                ) : (
+                  <Bouton onClick={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'donnees' }) }}>Saisir les données de {periode} →</Bouton>
+                )}
+              </div>
             </Carte>
+          )}
+          {plusieurs ? (
             <Carte titre="Budgets du mois">
               <p className="note">Budgets par axe du MENSUEL, saisis mois par mois.</p>
               <div className="saisie-carte-action"><p className="note">Choisissez un mois précis pour saisir les budgets.</p></div>
             </Carte>
-          </div>
-        ) : (
-          <SaisieDonnees
-            annee={annee}
-            mois={mois}
-            periode={periode}
-            onModifs={setSale}
-            garde={garde}
-            budgets={
-              pilotage.data ? (
-                <div className="saisie-cartes">
-                  <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => garde(() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) })} />
-                </div>
-              ) : (
-                <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
-              )
-            }
-          />
-        )}
+          ) : pilotage.data ? (
+            <CarteBudgets vue={pilotage.data} periode={periode} onSaisir={() => { setChoixPeriode([annee, mois]); setEtape({ e: 'budgets' }) }} />
+          ) : (
+            <Carte titre="Budgets du mois">
+              <Etat type={pilotage.isError ? etatErreur(pilotage.error) : 'chargement'} onRetry={() => pilotage.refetch()} />
+            </Carte>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  if (etape.e === 'donnees') {
+    return (
+      <section className="page-ecran rapport-excel saisie-donnees-page">
+        <BarreParcours libelle="Choix du mois" onRetour={() => garde(() => { setSale(false); setEtape({ e: 'depart' }) })} />
+        <h2 className="bandeau-titre">DONNÉES — {periode.toUpperCase()}</h2>
+        <SaisieDonnees key={periode} annee={annee} mois={mois} periode={periode} onModifs={setSale} garde={garde} />
         <Confirmer
           ouvert={enAttente !== null}
           titre="Quitter sans enregistrer ?"

@@ -32,7 +32,14 @@ async function ouvrirMois(page: Page, mois: string) {
   await expect(page.getByRole('heading', { name: 'RENSEIGNER DES DONNÉES' })).toBeVisible()
   await page.getByRole('combobox', { name: 'Année', exact: true }).selectOption('2026')
   await page.getByRole('combobox', { name: 'Mois', exact: true }).selectOption({ label: mois })
-  await expect(page.getByRole('heading', { level: 3, name: `DONNÉES DE ${mois.toUpperCase()} 2026` })).toBeVisible()
+  await expect(page.getByRole('button', { name: `Saisir les budgets de ${mois} 2026 →` })).toBeVisible()
+}
+
+// Page dédiée aux données du mois (CA et marge, activité, objectifs), ouverte depuis la page de départ.
+async function ouvrirDonnees(page: Page, mois: string) {
+  await ouvrirMois(page, mois)
+  await page.getByRole('button', { name: `Saisir les données de ${mois} 2026 →` }).click()
+  await expect(page.getByRole('heading', { level: 2, name: `DONNÉES — ${mois.toUpperCase()} 2026` })).toBeVisible()
 }
 
 // Grille « CA et marge » au niveau global : une seule ligne, deux cases, un bouton Enregistrer.
@@ -44,7 +51,6 @@ const invalide = (page: Page) => page.locator('.erreur-case', { hasText: 'Valeur
 
 async function ouvrirBudgets(page: Page, mois: string) {
   await ouvrirMois(page, mois)
-  await page.getByRole('tab', { name: 'Budgets' }).click()
 }
 
 async function saisirCaMarge(page: Page, ca: string, marge: string) {
@@ -77,7 +83,7 @@ test.describe.serial('saisies de pilotage', () => {
     expect(avant.ca).toBeNull()
     expect(avant.marge).toBeNull()
 
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirDonnees(page, 'Juillet')
     await expect(champCa(page)).toHaveValue('')
     await expect(enregistrerCa(page)).toBeDisabled()
     await saisirCaMarge(page, '2100000000', '315000000')
@@ -101,7 +107,7 @@ test.describe.serial('saisies de pilotage', () => {
   })
 
   test('CA et marge : décimales gardées, marge négative acceptée', async ({ page }) => {
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirDonnees(page, 'Juillet')
     await expect(champCa(page)).toHaveValue(groupe('2100000000'))
     await saisirCaMarge(page, '2100000000,5', '315000000,25')
     let v = await pilotage(page.request)
@@ -126,7 +132,7 @@ test.describe.serial('saisies de pilotage', () => {
 
   test('CA et marge : erreurs de saisie, rien n’est enregistré', async ({ page }) => {
     const avant = await pilotage(page.request)
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirDonnees(page, 'Juillet')
     await expect(champCa(page)).toHaveValue(groupe('2100000000'))
 
     // Marge sans CA : refusée par le serveur à l'enregistrement, le message s'affiche sous la grille
@@ -269,7 +275,7 @@ test.describe.serial('saisies de pilotage', () => {
   })
 
   test('objectifs d’activité : objectif annuel réparti sur les 12 mois', async ({ page }) => {
-    await ouvrirMois(page, 'Juillet')
+    await ouvrirDonnees(page, 'Juillet')
     await page.getByRole('tab', { name: 'Objectifs d’activité' }).click()
     // La base de recette a déjà 1 200 ventes sur 2026 (100 par mois)
     const ventes = page.getByRole('textbox', { name: 'Objectif ventes : Global' })
