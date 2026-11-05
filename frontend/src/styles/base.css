@@ -1411,6 +1411,12 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-trio > :nth-child(2) { grid-area: service; }
 .admin-trio > .ref-contrats { grid-area: contrat; align-self: start; }
 .ref-contrats .note { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
+/* Colonnes (rubriques) : pleine largeur sous les référentiels */
+.admin-excel .ref-colonnes { margin-top: var(--sp-4); margin-bottom: 0; }
+.ref-colonnes-tete { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); padding: var(--sp-2) 12px; border-bottom: 1px solid var(--rule); }
+.ref-colonnes-tete .note { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.ref-colonnes td .badge { margin-left: var(--sp-2); }
+.ref-colonnes td.actions .note { color: var(--muted); font-size: var(--fs-xs); cursor: help; }
 @media (max-width: 899px) { .admin-duo { grid-template-columns: minmax(0, 1fr); } .admin-trio { grid-template-areas: "site" "service" "contrat"; } }
 /* Utilisateurs : liste à gauche, fiche du compte éditée en place à droite */
 .comptes-duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-4); align-items: start; min-height: 0; }
@@ -1427,6 +1433,10 @@ table.tableau-squelette td { height: 2.1em; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
   .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
+  /* Référentiels et Colonnes se partagent la hauteur ; chaque cadre défile seul */
+  .admin-excel .ref-colonnes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .admin-excel .ref-colonnes .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
+  .admin-excel .ref-colonnes table.dense thead th { position: sticky; top: 0; z-index: 1; }
   /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
   .admin-excel :is(.admin-duo, .comptes-duo) .fiche-barre { bottom: 0; }
 }

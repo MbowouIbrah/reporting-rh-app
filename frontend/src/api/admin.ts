@@ -18,6 +18,34 @@ export const useEnregistrerColonnes = () =>
     api('/parametrage/colonnes', json('PUT', { colonnes })),
   )
 
+// ---- colonnes (rubriques) : remplissage, ajout, activation ----
+export interface ColonneRemplie {
+  id: number
+  libelle: string
+  nature: 'paie' | 'activite'
+  unite: 'FCFA' | 'jours' | 'nombre'
+  actif: boolean
+  /** Rubrique lue par le calcul des KPI : ne se désactive pas. */
+  moteur: boolean
+  valeurs: number
+  dernier_mois: number | null
+}
+export interface Remplissage {
+  annee: number
+  annees: number[]
+  colonnes: ColonneRemplie[]
+}
+export const useRemplissage = (annee: number | null) =>
+  useQuery({
+    queryKey: ['admin', 'colonnes', annee],
+    queryFn: () => api<Remplissage>(`/parametrage/colonnes/remplissage${annee ? `?annee=${annee}` : ''}`),
+    retry: queryRetry,
+  })
+export const useCreerColonne = () =>
+  useEcriture((b: { libelle: string; nature: string; unite: string }) => api('/parametrage/rubriques', json('POST', b)))
+export const useActiverColonne = () =>
+  useEcriture(({ id, actif }: { id: number; actif: boolean }) => api(`/parametrage/rubriques/${id}`, json('PUT', { actif })))
+
 // ---- référentiels (sites et services) ----
 export type DimensionRef = 'site' | 'service'
 export interface ValeurRef {

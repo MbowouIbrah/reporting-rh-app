@@ -13,13 +13,15 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.kpi.chargement import rubriques_exclues
-from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
+from app.kpi.moteur import ABSENCES, CA_INDIVIDUEL, COMMISSION, MARGE_INDIVIDUELLE, PRIMES
 from app.models.pilotage import Parametre
 from app.models.referentiel import Rubrique, RubriqueRegle
 from app.referentiels_init import DEBUT
+from app.repos.remplissage import annees_remplies, remplissage
+from app.repos.scope import scope_for
 from app.security import audit
 from app.security.deps import current_principal
-from app.security.policy import Principal, authorize
+from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(tags=["parametrage"])
 
@@ -88,9 +90,36 @@ def creer_rubrique(
                  nature=body.nature)
     db.add(r)
     db.flush()
+    if r.nature == "paie":
+        # Hors total tant qu'on ne la glisse pas dans le total (DONNEES) : la paie reste juste.
+        db.add(RubriqueRegle(rubrique_id=r.id, regle="exclu_total_ligne", date_debut=DEBUT))
     audit.record(db, p.user_id, "create", "rubrique", r.id, None, _rubrique(r))
     db.commit()
     return _rubrique(r)
+
+
+@router.get("/parametrage/colonnes/remplissage")
+def lire_remplissage(
+    annee: int | None = None,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Colonnes et leur remplissage sur l'année, dans le périmètre du compte (Référentiels)."""
+    authorize(p, "referentiel:write")
+    scope = scope_for(db, p)
+    annees = annees_remplies(db, scope)
+    if annee is None:
+        annee = annees[0] if annees else date.today().year
+    rempli = remplissage(db, scope, annee)
+    marge = is_allowed(p, "marge:read")
+    rubriques = [r for r in db.scalars(select(Rubrique).order_by(Rubrique.nature, Rubrique.ordre))
+                 if marge or r.libelle not in (CA_INDIVIDUEL, MARGE_INDIVIDUELLE)]
+    return {
+        "annee": annee,
+        "annees": annees,
+        "colonnes": [{**_rubrique(r), "valeurs": rempli.get(r.id, (0, None))[0],
+                      "dernier_mois": rempli.get(r.id, (0, None))[1]} for r in rubriques],
+    }
 
 
 class RubriquePatch(BaseModel):

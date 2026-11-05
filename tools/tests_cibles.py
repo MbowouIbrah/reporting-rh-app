@@ -79,9 +79,13 @@ RECETTE = {
     "backend/app/api/comptes": ["40-utilisateurs"],
     "backend/app/api/auth": ["40-utilisateurs", "profils"],
     "backend/app/api/donnees": ["50-donnees"],
+    "backend/app/api/parametrage": ["50-donnees"],
+    "backend/app/repos/remplissage": ["50-donnees"],
     "backend/app/kpi/": ["10-import", "20-saisies", "60-lecteurs", "70-graphes"],
     "frontend/e2e-recette/outils.ts": "*",
 }
+# Une spec qui lit les données importées par une autre : on lance aussi celle-ci, avant.
+PREALABLES = {"50-donnees": ["10-import"]}
 
 
 def git(*args: str) -> list[str]:
@@ -157,6 +161,8 @@ def plan_recette(fichiers: list[str]) -> list[str] | None:
                 if cible == "*":
                     return None
                 specs.update(cible)
+    for s in list(specs):
+        specs.update(PREALABLES.get(s, []))
     return sorted(specs)
 
 

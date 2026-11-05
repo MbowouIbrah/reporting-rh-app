@@ -15,6 +15,7 @@ const PERMS = ['referentiel:write', 'saisie:write']
 const servir = (a: Appel) => {
   if (a.method === 'PUT' && a.url.includes('apercu=true')) return { perimetres_maj: 2, comptes_maj: 1 }
   if (a.method !== 'GET') return {}
+  if (a.url.includes('/colonnes/remplissage')) return { annee: 2026, annees: [2026], colonnes: [{ id: 1, libelle: 'Brut Réel', nature: 'paie', unite: 'FCFA', actif: true, moteur: true, valeurs: 6, dernier_mois: 2 }] }
   return { valeurs: a.url.endsWith('/site') ? SITES : SERVICES, alias: [] }
 }
 const page = <Referentiels />

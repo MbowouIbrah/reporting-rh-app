@@ -13,6 +13,7 @@ import { Panneau } from '../../components/BlocsRapport'
 import Etat, { etatErreur } from '../../components/Etat'
 import { LIBELLE_TYPE_SITE } from '../../components/FiltresPeriode'
 import { Bouton, Champ } from '../../components/Kit'
+import Colonnes from './Colonnes'
 
 interface Renommage {
   id: number
@@ -229,6 +230,7 @@ export default function Referentiels() {
         <Bloc dim="service" titre="Services" singulier="service" />
         <TypesContrat />
       </div>
+      <Colonnes />
     </section>
   )
 }

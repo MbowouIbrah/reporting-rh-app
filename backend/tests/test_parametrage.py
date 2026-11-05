@@ -117,3 +117,50 @@ def test_colonne_sortie_de_la_zone_hachuree_recalcule_tout(charge):
     _colonnes(charge, (PV, True))
     ms = charge.get(f"{API}/rapports/mensuel", params={"annee": 2026, "mois": 2}).json()
     assert ms["synthese"]["ms"]["m"] in ("3700", "3700.000")
+
+
+# ---- remplissage des colonnes (Référentiels) ----
+def _col(d, libelle):
+    return next(x for x in d["colonnes"] if x["libelle"] == libelle)
+
+
+def test_remplissage_compte_et_dernier_mois(charge, make_client):
+    r = charge.get(f"{P}/colonnes/remplissage", params={"annee": 2026})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["annee"] == 2026 and d["annees"] == [2026]
+    assert (_col(d, "Brut Réel")["valeurs"], _col(d, "Brut Réel")["dernier_mois"]) == (6, 2)
+    assert (_col(d, PV)["valeurs"], _col(d, PV)["dernier_mois"]) == (1, 2)
+    assert _col(d, "Absences (nb)")["moteur"] is True
+    # année sans données : tout est vide ; sans année, la plus récente remplie
+    vide = charge.get(f"{P}/colonnes/remplissage", params={"annee": 2025}).json()
+    assert all(x["valeurs"] == 0 and x["dernier_mois"] is None for x in vide["colonnes"])
+    assert charge.get(f"{P}/colonnes/remplissage").json()["annee"] == 2026
+    assert make_client(DRH).get(f"{P}/colonnes/remplissage").status_code == 403
+
+
+def test_remplissage_perimetre(charge, db):
+    from app.repos.remplissage import remplissage
+    from app.repos.scope import Scope
+    brut = _rub(charge, "Brut Réel")
+    vn = remplissage(db, Scope(False, {"service": frozenset({"Commerce VN"})}), 2026)
+    assert vn[brut] == (2, 2)
+    assert remplissage(db, Scope(False, {"service": frozenset()}), 2026) == {}
+
+
+def test_remplissage_masque_ca_marge_sans_droit(charge, monkeypatch):
+    from app.api import parametrage
+    assert {"CA individuel", "Marge individuelle"} <= {
+        x["libelle"] for x in charge.get(f"{P}/colonnes/remplissage").json()["colonnes"]}
+    monkeypatch.setattr(parametrage, "is_allowed", lambda p, perm: perm != "marge:read")
+    libelles = {x["libelle"] for x in charge.get(f"{P}/colonnes/remplissage").json()["colonnes"]}
+    assert not {"CA individuel", "Marge individuelle"} & libelles
+
+
+def test_rubrique_paie_creee_hors_total(charge):
+    rid = charge.post(f"{P}/rubriques", json={"libelle": "Prime Z", "unite": "FCFA"}).json()["id"]
+    act = charge.post(f"{P}/rubriques", json={"libelle": "Visites", "unite": "nombre",
+                                              "nature": "activite"}).json()["id"]
+    regles = charge.get(P).json()["regles"]
+    assert any(r["rubrique_id"] == rid and r["regle"] == "exclu_total_ligne" for r in regles)
+    assert not any(r["rubrique_id"] == act for r in regles)
