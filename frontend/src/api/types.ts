@@ -227,6 +227,8 @@ export interface Annuel {
   annee_fin?: number | null
   effectif_fin: Cell
   effectif_fin_contrat: Record<string, Cell & { part: Val }>
+  effectif_moyen_mad: Cell
+  part_mad: { m: Val; m1: Val }
   mad_fin: Cell
   mad_deportes_fin: Cell & { part: Val }
   ms_contrat: Record<string, Cell & { part: Val }>

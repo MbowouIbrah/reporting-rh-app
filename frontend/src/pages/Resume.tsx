@@ -86,7 +86,7 @@ function reponseVide(avecCa: boolean, calendrier: Calendrier | undefined): Annue
     ...ca,
     serie_n: ordreMois(calendrier).map((mois) => ({ mois, ...(avecCa ? { ca: null, marge: null, taux_marge: null } : {}) })),
     commissions_cumul: cell, primes_cumul: cell, cumul_ytd: cell, effectif_fin: cell, effectif_moyen: cell,
-    mad_fin: cell, mad_deportes_fin: { ...cell, part: null }, ms_contrat: {}, effectif_fin_contrat: {},
+    effectif_moyen_mad: cell, part_mad: { m: null, m1: null }, mad_fin: cell, mad_deportes_fin: { ...cell, part: null }, ms_contrat: {}, effectif_fin_contrat: {},
   } as unknown as Annuel
 }
 
@@ -175,9 +175,12 @@ export default function Resume() {
             >
               <Variation v={a.cumul_ytd.var_pct} vs="" />
             </Case>
-            <Case titre="MAD globaux" valeur={montrer(a.mad_fin.m)} devise={false}
+            <Case titre="Part des MAD" valeur={vide(a.part_mad.m) ? '—' : taux(a.part_mad.m)} devise={false}
               libelle2="Pourcentage MAD sites déportés"
               detail={[
+                ['Effectif moyen MAD', dec(a.effectif_moyen_mad.m)],
+                ['Effectif moyen total', dec(a.effectif_moyen.m)],
+                [`Part des MAD ${n1}`, taux(a.part_mad.m1)],
                 [`MAD globaux ${moisFin} ${finAn}`, dec(a.mad_fin.m)],
                 [`MAD globaux ${moisFin} ${finN1}`, dec(a.mad_fin.m1)],
                 ['MAD sites déportés', dec(a.mad_deportes_fin.m)],

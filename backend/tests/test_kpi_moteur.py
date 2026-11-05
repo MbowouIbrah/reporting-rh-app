@@ -225,6 +225,17 @@ def test_annuel_mad_sites_deportes_effectif_de_fin():
     assert annuel({}, {}, 2, REFS, Params())["mad_deportes_fin"]["part"] is None
 
 
+def test_annuel_part_des_mad_sur_les_effectifs_moyens():
+    # Janvier : 1 MAD sur 2. Février : 2 MAD sur 4. Moyennes : 1,5 MAD sur 3 salariés.
+    n = {1: pd(L(1, ctr="MAD"), L(2)), 2: pd(L(1, ctr="MAD"), L(2, ctr="MAD"), L(3), L(4))}
+    r = annuel(n, {2: pd(L(1, ctr="MAD"), L(2), L(3), L(4))}, 2, REFS, Params())
+    assert r["effectif_moyen_mad"]["m"] == D("1.5")
+    assert r["part_mad"]["m"] == D("0.5") and r["part_mad"]["m1"] == D("0.25")
+    # Effectif sans MAD : la part vaut zéro ; aucune paie : elle n'est pas calculable.
+    assert annuel({1: pd(L(1))}, {}, 1, REFS, Params())["part_mad"]["m"] == 0
+    assert annuel({}, {}, 2, REFS, Params())["part_mad"]["m"] is None
+
+
 def test_annuel_masse_par_contrat_frais_et_logement():
     n = {1: pd(L(1, Brut_Réel=300, Frais_de_mission=20), L(2, ctr="CDD", Brut_Réel=100)),
          2: pd(L(1, Brut_Réel=300, **{"Logement site déporté": 5}))}

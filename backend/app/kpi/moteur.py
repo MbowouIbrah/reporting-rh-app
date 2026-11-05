@@ -765,6 +765,8 @@ def annuel(
 
     eff_fin_total = eff_fin(lambda L: True)
     mad_fin = eff_fin(lambda L: L.contrat == "MAD")
+    mad_moyen = next((c for c in blocs["d_contrat"]["effectifs"] if c["contrat"] == "MAD"),
+                     {"m": ZERO, "m1": ZERO})
     ms_total = {"m": c if nb else None}
 
     def ms_contrat(pds, mois_ok, contrat) -> Decimal | None:
@@ -819,6 +821,9 @@ def annuel(
         "effectif_fin": eff_fin_total,
         "effectif_fin_contrat": {ct: avec_part(eff_fin(lambda L, ct=ct: L.contrat == ct),
                                                eff_fin_total) for ct in refs.contrats},
+        # Part des MAD dans l'effectif : moyennes sur les mois de paie saisis (QUESTIONS_CLIENT C1)
+        "effectif_moyen_mad": mad_moyen,
+        "part_mad": {"m": ratio(mad_moyen["m"], eff["m"]), "m1": ratio(mad_moyen["m1"], eff["m1"])},
         # MAD affectés aux sites déportés, part des MAD globaux (effectif de fin)
         "mad_fin": mad_fin,
         "mad_deportes_fin": avec_part(
