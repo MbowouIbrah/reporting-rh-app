@@ -49,3 +49,19 @@ Le 500 réel avec base coupée ; lecture la plus lente à 1,8 s ; imports face �
 | 14 | corrigé / rejeté en partie | `--bandeau-h` retirée des écrans pleine hauteur, ajoutée sous le corps et aux pieds collés (fiche, saisie). Inerte sous un `<dialog>` : rejeté, la sonde automatique toutes les 5 s rend le bouton facultatif. |
 | 15 | corrigé | `LimiteErreur` autour de Graphes et Rapport : `Etat` réseau, Réessayer recharge la page. |
 | 16 | corrigé | Minuteurs manuels (`AbortController` + `setTimeout`). |
+
+## Contre-revue (passe 2)
+
+| N° | Fichier | Classe | Correction | Statut |
+|---|---|---|---|---|
+| C1 | `GrilleSaisie.tsx` (effet de vérification) | résultat périmé affiché comme valide | en panne : résultat vidé, « Vérification en attente du réseau. », pas de Réessayer inutile | corrigé |
+| C2 | `base.css` (`.rapport-excel … tbody.pied`) | hauteur sans `--bandeau-h` | `calc(100dvh - 160px - var(--bandeau-h, 0px))` | corrigé |
+| C3 | `base.css` (`.fiche-barre` ≥ 1360 px) | décalage compté deux fois | `bottom: 0` dans le cadre qui défile seul | corrigé |
+| C4 | `LimiteErreur.tsx` | `<main>` en double sous Layout | `<main>` seulement avec `page` (Rapport) | corrigé |
+| C5 | `LimiteErreur.tsx` | erreur mal classée | message réseau seulement si le code n'a pas chargé, sinon « Page non affichée » | corrigé |
+| C6 | `MenuProfil.tsx` | remplissage vide | message affiché seulement en cas d'échec, effacé à la fermeture | corrigé |
+| C7 | `client.ts` (`appel`) | statuts sans corps incomplets | `r.body === null` au lieu de la liste 204/205 | corrigé |
+| C8 | `RequireAuth.tsx`, `Etat.tsx` | clic sans retour visible | `enCours` : `aria-busy` et « Vérification… » | corrigé |
+| C9 | `client.test.ts` | tests manquants | 204 et sonde après 8 s ajoutés | corrigé ; chemin panne de la grille : différé (pas de test de composant pour la grille, couvert par la relecture) |
+| C10 | point 14 (`<dialog>` modal) | annonce inerte sous un dialogue | rejeté : dialogues courts (formulaires), le bandeau visible et l'annonce reprennent à la fermeture | rejeté |
+| C11 | sonde après 8 s pendant un import lourd | fausse panne possible si `/auth/me` dépasse 5 s | rejeté : lecture la plus lente mesurée 1,8 s ; la panne se lève à la réponse suivante | rejeté |

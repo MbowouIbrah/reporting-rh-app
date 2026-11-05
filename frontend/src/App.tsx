@@ -30,7 +30,7 @@ export default function App() {
         path="/rapport"
         element={
           <RequireAuth>
-            <LimiteErreur>
+            <LimiteErreur page>
               <Suspense fallback={null}>
                 <Rapport />
               </Suspense>

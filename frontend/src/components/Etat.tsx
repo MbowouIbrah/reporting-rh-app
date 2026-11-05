@@ -27,6 +27,8 @@ interface Props {
   type: TypeEtat
   /** Action proposée dans l'état d'erreur (ex. relancer la requête). */
   onRetry?: () => void
+  /** Nouvel essai en cours : le bouton l'indique et ignore les clics. */
+  enCours?: boolean
   /** Texte propre à la page, à la place du texte générique de l'état. */
   titre?: string
   aide?: string
@@ -57,7 +59,7 @@ export function TableauSquelette({ colonnes, lignes = 8 }: { colonnes: (string |
 
 const AIDE_PANNE = 'La page se chargera dès le retour du réseau.'
 
-export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: Props) {
+export default function Etat({ type, onRetry, enCours, titre, aide, colonnes, lignes }: Props) {
   const perdue = useSyncExternalStore(abonnerConnexion, connexionPerdue)
   if (type === 'chargement') {
     return (
@@ -72,8 +74,8 @@ export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: P
       <strong>{titre ?? TEXTE[type]}</strong>
       {(aide ?? AIDE[type]) && <span className="note">{aide ?? (type === 'reseau' && perdue ? AIDE_PANNE : AIDE[type])}</span>}
       {(type === 'erreur' || type === 'reseau' || type === 'serveur') && onRetry && (
-        <button type="button" className="bouton bouton-secondaire" onClick={onRetry}>
-          Réessayer
+        <button type="button" className="bouton bouton-secondaire" aria-busy={enCours || undefined} onClick={() => !enCours && onRetry()}>
+          {enCours ? 'Vérification…' : 'Réessayer'}
         </button>
       )}
     </div>

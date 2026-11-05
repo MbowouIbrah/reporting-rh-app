@@ -57,7 +57,7 @@ async function appel(url: string, init: RequestInit, delai?: number): Promise<Re
     const r = await fetch(url, { ...init, signal: ctrl.signal })
     if (PANNE_PASSERELLE.includes(r.status)) throw new ErreurReseau()
     // arrayBuffer plutôt que blob : un corps lu en blob n'est plus lisible par les outils du navigateur.
-    const corps = r.status === 204 || r.status === 205 ? null : await r.arrayBuffer()
+    const corps = r.body === null ? null : await r.arrayBuffer()
     connexionRetablie()
     return new Response(corps, { status: r.status, statusText: r.statusText, headers: r.headers })
   } catch (e) {

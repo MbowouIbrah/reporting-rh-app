@@ -383,7 +383,7 @@ table.dense td.num { text-align: right; }
 @media print { .rapport-excel .panneau table.dense tbody.pied { position: static; } }
 /* Sans accrochage (écran étroit) : le tableau à total défile dans son panneau, sinon le pied figé n'aurait aucun effet. */
 @media screen and (max-width: 1359.98px) {
-  .rapport-excel .panneau-corps:has(table.dense tbody.pied) { max-height: max(320px, calc(100dvh - 160px)); }
+  .rapport-excel .panneau-corps:has(table.dense tbody.pied) { max-height: max(320px, calc(100dvh - 160px - var(--bandeau-h, 0px))); }
   .rapport-excel .panneau-corps:has(table.dense tbody.pied) table.dense thead th { position: sticky; top: 0; z-index: 2; }
 }
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
@@ -1427,6 +1427,8 @@ table.tableau-squelette td { height: 2.1em; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
   .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
+  /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
+  .admin-excel :is(.admin-duo, .comptes-duo) .fiche-barre { bottom: 0; }
 }
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
 .bouton-copier { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--navy); cursor: pointer; }

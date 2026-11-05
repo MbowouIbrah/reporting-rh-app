@@ -6,7 +6,7 @@ import Etat, { etatErreur } from '../components/Etat'
 import { useAuth } from './AuthContext'
 
 export default function RequireAuth({ perm, children }: { perm?: string; children: ReactNode }) {
-  const { me, loading, panne, reessayer, can } = useAuth()
+  const { me, loading, panne, reessayer, verification, can } = useAuth()
   const loc = useLocation()
   // Session inconnue (premier affichage de l'onglet) : rien plutôt qu'une structure qui ne serait pas
   // celle de la page ; au rechargement, le profil gardé (AuthContext) affiche la page sans attendre.
@@ -16,7 +16,7 @@ export default function RequireAuth({ perm, children }: { perm?: string; childre
   if (panne)
     return (
       <main className="page">
-        <Etat type={etatErreur(panne)} titre="Connexion impossible" onRetry={reessayer} />
+        <Etat type={etatErreur(panne)} titre="Connexion impossible" onRetry={reessayer} enCours={verification} />
         <BandeauConnexion />
       </main>
     )

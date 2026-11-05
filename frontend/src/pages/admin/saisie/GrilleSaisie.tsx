@@ -186,7 +186,8 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
   useEffect(() => {
     if (!envoyees.length) { setVerif(null); setEchecVerif(null); setEnCours(false); return }
     // Panne : inutile d'interroger le serveur ; le retour du réseau relance la vérification.
-    if (perdue) { setEnCours(false); return }
+    // Le résultat précédent ne vaut plus pour ce contenu : l'enregistrement attend la vérification.
+    if (perdue) { setVerif(null); setEchecVerif('Vérification en attente du réseau.'); setEnCours(false); return }
     const ctrl = new AbortController()
     setEnCours(true)
     const t = setTimeout(() => {
@@ -483,8 +484,13 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
         )}
         {!enCours && echecVerif && (
           <span>
-            {echecVerif}{' '}
-            <button type="button" className="bouton bouton-lien" onClick={() => setEssaiVerif((n) => n + 1)}>Réessayer</button>
+            {echecVerif}
+            {!perdue && (
+              <>
+                {' '}
+                <button type="button" className="bouton bouton-lien" onClick={() => setEssaiVerif((n) => n + 1)}>Réessayer</button>
+              </>
+            )}
           </span>
         )}
         {envoi && <span>{envoi}</span>}

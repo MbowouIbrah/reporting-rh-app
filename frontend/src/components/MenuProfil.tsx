@@ -13,7 +13,10 @@ export default function MenuProfil() {
   const bouton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (!ouvert) return
+    if (!ouvert) {
+      setEchec(false)
+      return
+    }
     const dehors = (e: PointerEvent) => {
       if (!zone.current?.contains(e.target as Node)) setOuvert(false)
     }
@@ -75,7 +78,7 @@ export default function MenuProfil() {
             <LogOut aria-hidden="true" size={15} />
             Déconnexion
           </button>
-          <p className="champ-erreur" role="status">{echec && 'Déconnexion impossible : le serveur ne répond pas. Réessayez au retour du réseau.'}</p>
+          {echec && <p className="champ-erreur" role="alert">Déconnexion impossible : le serveur ne répond pas. Réessayez au retour du réseau.</p>}
         </div>
       )}
     </div>

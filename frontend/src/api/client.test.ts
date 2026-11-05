@@ -100,3 +100,29 @@ test('annulation par l’appelant : pas une panne', async () => {
   ctrl.abort()
   await expect(p).rejects.not.toBeInstanceOf(ErreurReseau)
 })
+
+test('204 : réponse sans corps rendue telle quelle', async () => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(null, { status: 204 }))
+  expect(await api('/x', { method: 'DELETE' })).toBeUndefined()
+})
+
+test('envoi long sans réponse : la sonde part après 8 s, sans annuler l’envoi', async () => {
+  vi.useFakeTimers()
+  try {
+    const ctrl = new AbortController()
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (_u, init) => new Promise((_, r) => init?.signal?.addEventListener('abort', () => r(new DOMException('abort', 'AbortError')))),
+    )
+    const p = api('/imports', { method: 'POST', body: new FormData(), signal: ctrl.signal })
+    await vi.advanceTimersByTimeAsync(7_999)
+    expect(f).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(String(f.mock.calls[1]?.[0])).toContain('/auth/me')
+    expect((f.mock.calls[0][1]?.signal as AbortSignal).aborted).toBe(false)
+    ctrl.abort()
+    await expect(p).rejects.not.toBeInstanceOf(ErreurReseau)
+    await vi.advanceTimersByTimeAsync(10_000)
+  } finally {
+    vi.useRealTimers()
+  }
+})

@@ -12,6 +12,8 @@ interface Auth {
   /** Erreur de /auth/me quand aucun profil n'est connu : la session ne peut pas être établie. */
   panne: unknown
   reessayer: () => void
+  /** Relecture de la session en cours. */
+  verification: boolean
   can: (perm: string) => boolean
   login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
@@ -193,8 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetch = q.refetch
   const reessayer = useCallback(() => void refetch(), [refetch])
   const value = useMemo<Auth>(
-    () => ({ me, loading: q.isLoading, panne, reessayer, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
-    [me, q.isLoading, panne, reessayer, login, logout, changerMotDePasse],
+    () => ({ me, loading: q.isLoading, panne, reessayer, verification: q.isFetching, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
+    [me, q.isLoading, panne, reessayer, q.isFetching, login, logout, changerMotDePasse],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
