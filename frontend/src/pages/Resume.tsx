@@ -229,24 +229,24 @@ export default function Resume() {
               </Case>
             )}
           </div>
-          {(sansCa || sansMarge) && (
-            <p className="regle">
-              {sansCa && sansMarge ? 'Le CA et la marge ne sont pas disponibles' : sansCa ? 'Le CA n’est pas disponible' : 'La marge n’est pas disponible'}
-              {' '}pour ces filtres : {sansCa && sansMarge ? 'ils n’existent' : 'il n’existe'} que s’{sansCa && sansMarge ? 'ils sont saisis' : 'il est saisi'}
-              {' '}à ce niveau (site, service) ou renseigné{sansCa && sansMarge ? 's' : ''} par employé.
-            </p>
-          )}
         </>
       )}
       {a && (
         <>
           <div className="titre-ligne">
             <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
-            {aCa && (
+            {(aCa || sansCa || sansMarge) && (
               <button type="button" className="info" aria-label="À propos du suivi mensuel" aria-describedby="note-suivi">
                 <Info aria-hidden="true" size={16} strokeWidth={2} />
                 <span id="note-suivi" role="tooltip" className="info-bulle">
-                  CA et marge saisis chaque mois par les RH ; % marge calculé sur les mois où les deux sont saisis.
+                  {aCa && <span className="info-ligne">CA et marge saisis chaque mois par les RH ; % marge calculé sur les mois où les deux sont saisis.</span>}
+                  {(sansCa || sansMarge) && (
+                    <span className="info-ligne">
+                      {sansCa && sansMarge ? 'Le CA et la marge ne sont pas disponibles' : sansCa ? 'Le CA n’est pas disponible' : 'La marge n’est pas disponible'}
+                      {' '}pour ces filtres : {sansCa && sansMarge ? 'ils n’existent' : 'il n’existe'} que s’{sansCa && sansMarge ? 'ils sont saisis' : 'il est saisi'}
+                      {' '}à ce niveau (site, service) ou renseigné{sansCa && sansMarge ? 's' : ''} par employé.
+                    </span>
+                  )}
                 </span>
               </button>
             )}
