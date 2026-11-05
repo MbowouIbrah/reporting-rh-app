@@ -76,6 +76,7 @@ class Principal:
     portee: Portee = field(default_factory=Portee)
     nom: str = ""
     fonction: str = ""
+    doit_changer_mdp: bool = False
 
     @property
     def is_global(self) -> bool:

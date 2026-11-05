@@ -1,4 +1,5 @@
 from app.security.policy import ACCORDABLES
+from tests.conftest import mot_de_passe_choisi
 
 API = "/api/v1"
 ADMIN = "admin@exemple.invalid"
@@ -140,6 +141,7 @@ def test_gestionnaire_de_comptes_liste_services_et_sites(db, make_client):
     r = c.post(f"{API}/users", json={"email": "g@exemple.invalid", "nom": "G", "password": PW,
                                      "permissions": ["comptes"], "portee": {"tout": True}})
     assert r.status_code == 201
+    mot_de_passe_choisi(db, "g@exemple.invalid")
     g = make_client("g@exemple.invalid")
     r = g.get(f"{API}/referentiels/service")
     assert r.status_code == 200 and "alias" not in r.json()
@@ -149,4 +151,5 @@ def test_gestionnaire_de_comptes_liste_services_et_sites(db, make_client):
     lecteur = c.post(f"{API}/users", json={"email": "l@exemple.invalid", "nom": "L", "password": PW,
                                            **GLOBAL_DROITS})
     assert lecteur.status_code == 201
+    mot_de_passe_choisi(db, "l@exemple.invalid")
     assert make_client("l@exemple.invalid").get(f"{API}/referentiels/site").status_code == 403

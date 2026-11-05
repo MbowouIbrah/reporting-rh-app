@@ -5,6 +5,7 @@ import { motDePasseOublie } from '../api/rapports'
 import { useAuth } from '../auth/AuthContext'
 import ChampMotDePasse from '../components/ChampMotDePasse'
 import PageConnexion from '../components/PageConnexion'
+import { cibleSure } from '../lib/connexion'
 
 export default function Login() {
   const { login } = useAuth()
@@ -43,13 +44,14 @@ export default function Login() {
     setBusy(true)
     try {
       await login(email, password, remember)
-      const next = sp.get('next')
-      navigate(next?.startsWith('/') && !next.startsWith('//') ? next : '/resume', { replace: true })
+      navigate(cibleSure(sp.get('next')), { replace: true })
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 401
           ? 'Identifiants invalides.'
-          : 'Connexion impossible pour le moment. Réessayez.',
+          : err instanceof ApiError && err.status === 429
+            ? 'Trop de tentatives. Réessayez dans une minute.'
+            : 'Connexion impossible pour le moment. Réessayez.',
       )
     } finally {
       setBusy(false)
@@ -156,7 +158,7 @@ export default function Login() {
                   ref={champOubli}
                   type="email"
                   autoComplete="email"
-                  placeholder="prenom.nom@exemple.invalid"
+                  placeholder="prénom.nom"
                   value={emailOubli}
                   onChange={(e) => setEmailOubli(e.target.value)}
                   disabled={envoye}

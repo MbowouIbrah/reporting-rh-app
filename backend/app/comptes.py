@@ -1,7 +1,7 @@
 """Comptes et journal en console serveur : python -m app.comptes <commande>.
 
-L'administration n'a plus d'écran Utilisateurs ni Journal (08a) : cet outil les remplace en
-production via `docker compose exec api python -m app.comptes ...`. Mêmes règles que l'API
+Complément de l'écran Administration > Utilisateurs, sur le serveur :
+`docker compose exec api python -m app.comptes ...`. Mêmes règles que l'API
 (droits, 8 caractères, au moins un compte actif qui gère les comptes) ; chaque écriture est
 tracée au journal d'audit avec un utilisateur vide (console).
 
@@ -77,13 +77,18 @@ def _droits(db: Session, args: argparse.Namespace) -> tuple[str, list[str], Port
     return args.fonction or fonction, perms, portee
 
 
-def _modifier(db: Session, u: Utilisateur, *, actif=None, pw=None, droits=None) -> None:
+def _modifier(
+    db: Session, u: Utilisateur, *, actif=None, pw=None, droits=None, exiger=False
+) -> None:
     avant = _user_dict(u)
     etait_admin = _est_admin_actif(u)
     if actif is not None:
         u.actif = actif
     if pw is not None:
         u.password_hash = hash_password(pw)
+        u.doit_changer_mdp = True
+    if exiger:
+        u.doit_changer_mdp = True
     if droits is not None:
         u.fonction, perms, portee = droits
         _poser_droits(u, perms, portee)
@@ -103,7 +108,8 @@ def lister(db: Session, args: argparse.Namespace) -> None:
         ) or "aucune donnée"
         perms = ", ".join(sorted(x.permission for x in u.permissions)) or "lecture"
         etat = "actif" if u.actif else "INACTIF"
-        print(f"{u.email:40} {etat:8} [{donnees}] {perms}  ({u.nom}, {u.fonction or '-'})")
+        prov = "  provisoire" if u.doit_changer_mdp else ""
+        print(f"{u.email:40} {etat:8} [{donnees}] {perms}  ({u.nom}, {u.fonction or '-'}){prov}")
 
 
 def perimetres(db: Session, args: argparse.Namespace) -> None:
@@ -122,6 +128,7 @@ def creer(db: Session, args: argparse.Namespace) -> None:
         nom=args.nom,
         fonction=fonction,
         password_hash=hash_password(_mot_de_passe()),
+        doit_changer_mdp=True,
     )
     _poser_droits(u, perms, portee)
     db.add(u)
@@ -150,6 +157,11 @@ def mot_de_passe(db: Session, args: argparse.Namespace) -> None:
     u = _utilisateur(db, args.email)
     _modifier(db, u, pw=_mot_de_passe())
     print(f"Mot de passe changé : {args.email}")
+
+
+def exiger_changement(db: Session, args: argparse.Namespace) -> None:
+    _modifier(db, _utilisateur(db, args.email), exiger=True)
+    print(f"Changement exigé : {args.email} doit changer son mot de passe avant de continuer")
 
 
 def journal(db: Session, args: argparse.Namespace) -> None:
@@ -193,6 +205,7 @@ def _parser() -> argparse.ArgumentParser:
         ("activer", activer, "réactive un compte"),
         ("desactiver", desactiver, "désactive un compte (départ : ne pas supprimer)"),
         ("mot-de-passe", mot_de_passe, "change le mot de passe (demandé)"),
+        ("exiger-changement", exiger_changement, "impose un changement immédiat"),
     ):
         sp = sub.add_parser(nom, help=aide)
         sp.add_argument("email")

@@ -1,6 +1,15 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -47,6 +56,8 @@ class Utilisateur(Base):
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
     cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     fonction: Mapped[str] = mapped_column(String(200), default="", server_default="")  # sans effet
+    # Mot de passe provisoire : tout est bloqué tant que la personne ne l'a pas changé.
+    doit_changer_mdp: Mapped[bool] = mapped_column(Boolean, default=True, server_default=false())
     permissions: Mapped[list["UtilisateurPermission"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
     )

@@ -4,6 +4,7 @@ import { ApiError } from '../api/client'
 import { reinitialiser } from '../api/rapports'
 import ChampMotDePasse from '../components/ChampMotDePasse'
 import PageConnexion from '../components/PageConnexion'
+import { MDP_MIN } from '../lib/connexion'
 
 export default function Reinitialiser() {
   const { hash } = useLocation()
@@ -24,8 +25,8 @@ export default function Reinitialiser() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.')
+    if (password.length < MDP_MIN) {
+      setError(`Le mot de passe doit contenir au moins ${MDP_MIN} caractères.`)
       return
     }
     if (password !== confirmation) {
@@ -38,6 +39,8 @@ export default function Reinitialiser() {
       setFait(true)
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) setInvalide(true)
+      else if (err instanceof ApiError && err.status === 422) setError(err.message)
+      else if (err instanceof ApiError && err.status === 429) setError('Trop d’essais. Réessayez dans une minute.')
       else setError('Réinitialisation impossible pour le moment. Réessayez.')
     } finally {
       setBusy(false)
@@ -72,7 +75,7 @@ export default function Reinitialiser() {
         </>
       ) : (
         <form onSubmit={onSubmit} noValidate>
-          <p className="login-form-sub">Choisissez un nouveau mot de passe (8 caractères minimum).</p>
+          <p className="login-form-sub">Choisissez un nouveau mot de passe ({MDP_MIN} caractères minimum).</p>
           {error && (
             <div role="alert" className="alert">
               {error}

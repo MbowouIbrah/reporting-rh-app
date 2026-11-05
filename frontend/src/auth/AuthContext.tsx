@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
-import { ApiError, setUnauthorizedHandler } from '../api/client'
-import { getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
+import { ApiError, setMotDePasseAChangerHandler, setUnauthorizedHandler } from '../api/client'
+import { changerMotDePasse as apiChanger, getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
 import type { Me } from '../api/types'
 import { viderCache } from '../lib/cacheSession'
 import { viderPartage } from '../lib/filtresPartages'
@@ -12,6 +12,7 @@ interface Auth {
   can: (perm: string) => boolean
   login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
+  changerMotDePasse: (actuel: string, nouveau: string) => Promise<void>
 }
 
 const Ctx = createContext<Auth | null>(null)
@@ -32,7 +33,9 @@ function lireProfil(): Me | undefined {
 }
 function ecrireProfil(me: Me | null) {
   try {
-    if (me) sessionStorage.setItem(PROFIL, JSON.stringify(me))
+    // Un mot de passe à changer se vérifie toujours au serveur : un profil périmé enverrait sur la page
+    // de changement un compte qui l'a déjà fait dans un autre onglet.
+    if (me && !me.doit_changer_mdp) sessionStorage.setItem(PROFIL, JSON.stringify(me))
     else sessionStorage.removeItem(PROFIL)
   } catch {
     /* stockage indisponible : le rechargement attend /auth/me */
@@ -47,6 +50,8 @@ const CANAL = 'reporting-rh:session'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
   const canal = useRef<BroadcastChannel | null>(null)
+  // Une vérification lancée avant une connexion, une déconnexion ou un changement ne doit pas écraser son résultat.
+  const version = useRef(0)
   const q = useQuery({
     queryKey: ['me'],
     queryFn: () => getMe().catch(sansSession),
@@ -74,13 +79,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Revérifie la session : sur annonce d'un autre onglet, ou quand l'onglet redevient visible.
   useEffect(() => {
     let enCours = false
+    let relancer = false
     const verifier = () => {
       if (enCours) return
       enCours = true
+      const n = ++version.current
       getMe()
         .catch(sansSession)
         .then(
           (m: Me | null) => {
+            if (n !== version.current) return
             const avant = qc.getQueryData<Me | null>(['me'])
             if ((m?.id ?? null) !== (avant?.id ?? null)) {
               ecrireProfil(null)
@@ -92,18 +100,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
         .finally(() => {
           enCours = false
+          if (relancer) {
+            relancer = false
+            verifier()
+          }
         })
+    }
+    // Un message reçu pendant une vérification annonce un état plus récent : on vérifie de nouveau ensuite.
+    const surAnnonce = () => {
+      if (enCours) relancer = true
+      else verifier()
     }
     const visible = () => {
       if (document.visibilityState === 'visible') verifier()
     }
     if (typeof BroadcastChannel !== 'undefined') {
       canal.current = new BroadcastChannel(CANAL)
-      canal.current.onmessage = verifier
+      canal.current.onmessage = surAnnonce
     }
     document.addEventListener('visibilitychange', visible)
     window.addEventListener('focus', visible)
     return () => {
+      relancer = false
       canal.current?.close()
       canal.current = null
       document.removeEventListener('visibilitychange', visible)
@@ -118,16 +136,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       qc.setQueryData(['me'], null)
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
     })
+    // Mot de passe redevenu provisoire pendant la session : le profil périmé doit laisser place à la page de changement.
+    setMotDePasseAChangerHandler(() => {
+      void qc.invalidateQueries({ queryKey: ['me'] })
+    })
   }, [qc])
+
+  // Annuler d'abord : une lecture de ['me'] en vol écraserait sinon le profil posé ici.
+  const poser = useCallback(
+    async (m: Me | null) => {
+      version.current++
+      await qc.cancelQueries({ queryKey: ['me'] })
+      qc.setQueryData(['me'], m)
+    },
+    [qc],
+  )
 
   const login = useCallback(
     async (email: string, password: string, remember = false) => {
       const me = await apiLogin(email, password, remember)
       oublier()
-      qc.setQueryData(['me'], me)
+      await poser(me)
       canal.current?.postMessage('connexion')
     },
-    [qc, oublier],
+    [poser, oublier],
   )
   const logout = useCallback(async () => {
     await apiLogout().catch(() => {})
@@ -135,13 +167,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Pas de qc.clear() : il retirerait ['me'] et l'écran resterait sur le profil précédent.
     ecrireProfil(null)
     oublier()
-    qc.setQueryData(['me'], null)
+    await poser(null)
     canal.current?.postMessage('deconnexion')
-  }, [qc, oublier])
+  }, [poser, oublier])
+
+  const changerMotDePasse = useCallback(
+    async (actuel: string, nouveau: string) => {
+      await poser(await apiChanger(actuel, nouveau))
+      canal.current?.postMessage('connexion')
+    },
+    [poser],
+  )
 
   const value = useMemo<Auth>(
-    () => ({ me, loading: q.isLoading, can: (p) => !!me?.permissions.includes(p), login, logout }),
-    [me, q.isLoading, login, logout],
+    () => ({ me, loading: q.isLoading, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
+    [me, q.isLoading, login, logout, changerMotDePasse],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

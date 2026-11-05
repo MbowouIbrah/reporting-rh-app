@@ -19,13 +19,14 @@ import AdminNav from '../../components/AdminNav'
 import { Panneau } from '../../components/BlocsRapport'
 import BoutonReinitialiser from '../../components/BoutonReinitialiser'
 import Etat, { etatErreur } from '../../components/Etat'
+import { Link } from 'react-router-dom'
 import { Bouton, Champ } from '../../components/Kit'
+import { MDP_MIN } from '../../lib/connexion'
 import { CATALOGUE, GESTION_COMPTES, LECTURE, MODELES, exigeTout } from '../../lib/droits'
 
 const COLONNES = ['Nom', 'Données visibles', 'Statut']
 // Mêmes règles que le serveur (admin.py) : messages immédiats, le serveur reste l'autorité.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-const MDP_MIN = 8
 
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 const trier = <T extends string | number>(l: T[]) => [...l].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
@@ -340,9 +341,20 @@ function FicheCompte({
             <Champ label="Fonction">
               {(p) => <input {...p} placeholder="ex. DRH, Directeur commercial VN" value={fiche.fonction} onChange={(e) => maj('fonction', e.target.value)} />}
             </Champ>
-            <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe'} erreur={erreurs.password}>
-              {(p) => <input {...p} type="password" autoComplete="new-password" placeholder={nouveau ? undefined : 'Laisser vide pour le garder'} value={fiche.password} onChange={(e) => maj('password', e.target.value)} />}
-            </Champ>
+            {soi ? (
+              <div className="field">
+                <Link className="btn-link" to="/changer-mot-de-passe?next=/admin/utilisateurs">Changer mon mot de passe</Link>
+              </div>
+            ) : (
+              <Champ label={nouveau ? 'Mot de passe' : 'Nouveau mot de passe'} erreur={erreurs.password}>
+                {(p) => (
+                  <>
+                    <input {...p} type="password" autoComplete="new-password" value={fiche.password} onChange={(e) => maj('password', e.target.value)} />
+                    <p className="note">{nouveau ? 'Provisoire : à changer par l’utilisateur.' : 'Vide : inchangé. Sinon provisoire : à changer par l’utilisateur.'}</p>
+                  </>
+                )}
+              </Champ>
+            )}
             {!nouveau && (
               <label className="admin-case">
                 <input type="checkbox" checked={fiche.actif} disabled={soi} onChange={(e) => maj('actif', e.target.checked)} />
@@ -527,7 +539,7 @@ export default function Utilisateurs() {
                           {c.fonction && <span className="fonction">{c.fonction}</span>}
                         </th>
                         <td>{resumePortee(c.portee, perimetres.data)}</td>
-                        <td><span className={c.actif ? 'statut statut-ok' : 'statut'}>{c.actif ? 'Actif' : 'Inactif'}</span></td>
+                        <td><span className={c.actif ? 'statut statut-ok' : 'statut'}>{c.actif ? 'Actif' : 'Inactif'}</span>{c.doit_changer_mdp && <>{' '}<span className="statut">Provisoire</span></>}</td>
                       </tr>
                     ))}
                   </tbody>

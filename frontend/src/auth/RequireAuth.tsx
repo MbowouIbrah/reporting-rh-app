@@ -10,6 +10,7 @@ export default function RequireAuth({ perm, children }: { perm?: string; childre
   // celle de la page ; au rechargement, le profil gardé (AuthContext) affiche la page sans attendre.
   if (loading) return null
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
+  if (me.doit_changer_mdp) return <Navigate to={`/changer-mot-de-passe?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   // Page non accordée : on n'en révèle pas l'existence, on mène à une page permise.
   if (perm && !can(perm)) {
     const admin = loc.pathname.startsWith('/admin') ? premierePageAdmin(can) : undefined

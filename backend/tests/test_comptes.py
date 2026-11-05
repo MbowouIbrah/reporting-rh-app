@@ -23,6 +23,7 @@ def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
     assert main(argv, db) == 0
     u = _u(db, "dps.sav@exemple.invalid")
     assert u.actif and verify_password(NOUVEAU, u.password_hash)
+    assert u.doit_changer_mdp is True
     assert u.fonction == "Lecteur de périmètre" and u.permissions == []
     assert [(x.type, x.perimetre_id is not None) for x in u.portees] == [("perimetre", True)]
     e = _dernier_audit(db)
@@ -55,6 +56,7 @@ def test_desactiver_activer_et_mot_de_passe(db, monkeypatch):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
     assert main(["mot-de-passe", "drh@exemple.invalid"], db) == 0
     assert verify_password(NOUVEAU, _u(db, "drh@exemple.invalid").password_hash)
+    assert _u(db, "drh@exemple.invalid").doit_changer_mdp is True
     assert main(["desactiver", "personne@exemple.invalid"], db) == 1
 
 
@@ -77,3 +79,16 @@ def test_droits_remplaces_et_journal(db, capsys):
     assert main(["journal", "--entite", "utilisateur", "--detail", "--limite", "1"], db) == 0
     sortie = capsys.readouterr().out
     assert "console" in sortie and "update" in sortie and "DOP VN" in sortie
+
+
+def test_exiger_changement_et_affichage(db, capsys):
+    u = _u(db, "drh@exemple.invalid")
+    u.doit_changer_mdp = False
+    db.commit()
+    assert main(["exiger-changement", "drh@exemple.invalid"], db) == 0
+    assert _u(db, "drh@exemple.invalid").doit_changer_mdp is True
+    assert main(["exiger-changement", "personne@exemple.invalid"], db) == 1
+    capsys.readouterr()
+    assert main(["lister"], db) == 0
+    ligne = next(x for x in capsys.readouterr().out.splitlines() if x.startswith("drh@exemple.invalid"))
+    assert "provisoire" in ligne

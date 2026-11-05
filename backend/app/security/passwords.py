@@ -16,3 +16,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def check_password(pw: str) -> None:
     if len(pw) < 8:
         raise HTTPException(422, "Mot de passe : 8 caractères minimum")
+    if not pw.strip():
+        raise HTTPException(422, "Mot de passe : ne peut pas être fait seulement d'espaces")
+    if len(pw.encode()) > 72:
+        raise HTTPException(422, "Mot de passe : 72 octets maximum")

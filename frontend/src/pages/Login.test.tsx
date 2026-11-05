@@ -49,6 +49,15 @@ test('identifiants refusés : message dédié', async () => {
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Identifiants invalides'))
 })
 
+test('trop de tentatives : le message le dit au lieu de parler de panne', async () => {
+  repondre('<html>429</html>', 429)
+  rendu()
+  fireEvent.change(connexion().getByLabelText('Adresse e-mail'), { target: { value: 'a@b.c' } })
+  fireEvent.change(connexion().getByLabelText('Mot de passe'), { target: { value: 'x' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Se connecter' }))
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Trop de tentatives'))
+})
+
 test('le choix « Se souvenir de moi » est transmis à la connexion', async () => {
   const spy = repondre('{}', 401)
   rendu()

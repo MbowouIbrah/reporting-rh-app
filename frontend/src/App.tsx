@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
 import Layout from './components/Layout'
 import Annuel from './pages/Annuel'
+import ChangerMotDePasse from './pages/ChangerMotDePasse'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Reinitialiser from './pages/Reinitialiser'
@@ -22,6 +23,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reinitialiser" element={<Reinitialiser />} />
+      <Route path="/changer-mot-de-passe" element={<ChangerMotDePasse />} />
       <Route
         path="/rapport"
         element={

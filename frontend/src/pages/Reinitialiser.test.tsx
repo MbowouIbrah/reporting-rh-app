@@ -53,6 +53,15 @@ test('lien invalide ou expiré (400) : message et lien pour une nouvelle demande
   expect(screen.getByRole('link', { name: 'Demander un nouveau lien' })).toHaveAttribute('href', '/login?oubli=1')
 })
 
+test('mot de passe refusé par le serveur (422) : message du serveur affiché', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({ detail: 'Le mot de passe doit différer de l’actuel' }), { status: 422 }),
+  )
+  rendu()
+  saisir('<mot-de-passe-test-m1>', '<mot-de-passe-test-m1>')
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Le mot de passe doit différer de l’actuel'))
+})
+
 test("sans jeton dans l'adresse : erreur directe", () => {
   rendu('/reinitialiser')
   expect(screen.getByRole('alert')).toHaveTextContent('Ce lien est invalide ou a expiré.')

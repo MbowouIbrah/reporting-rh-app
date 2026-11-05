@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.auth import AuditEvent, PreferenceUtilisateur, Utilisateur
 from app.security import audit
-from app.security.deps import current_principal, to_principal
+from app.security.deps import current_principal, session_principal, to_principal
 from app.security.passwords import check_password, hash_password, verify_password
 from app.security.policy import ACTIONS, Principal, is_allowed
 from app.security.tokens import empreinte, make_token, read_claims
@@ -39,6 +39,11 @@ class OubliIn(BaseModel):
 class ReinitIn(BaseModel):
     jeton: str
     password: str
+
+
+class ChangementIn(BaseModel):
+    actuel: str
+    nouveau: str
 
 
 def _set_cookies(response: Response, user: Utilisateur, remember: bool) -> None:
@@ -67,6 +72,7 @@ def _me(p: Principal) -> dict:
         "nom": p.nom,
         "fonction": p.fonction,
         "permissions": sorted(a for a in ACTIONS if is_allowed(p, a)),
+        "doit_changer_mdp": p.doit_changer_mdp,
     }
 
 
@@ -161,10 +167,44 @@ def reinitialiser(body: ReinitIn, db: Session = Depends(get_db)) -> dict:
     if user is None or not user.actif or claims.get("pwd") != empreinte(user.password_hash):
         raise HTTPException(status_code=400, detail="Lien invalide ou expiré")
     check_password(body.password)
+    if verify_password(body.password, user.password_hash):
+        audit.record(db, user.id, "reinit_mdp_refuse", "utilisateur", user.id)
+        db.commit()
+        raise HTTPException(422, "Le nouveau mot de passe doit être différent de l'actuel")
     user.password_hash = hash_password(body.password)
+    user.doit_changer_mdp = False
     audit.record(db, user.id, "reinit_mdp", "utilisateur", user.id)
     db.commit()
     return {"status": "ok"}
+
+
+@router.post("/changer-mot-de-passe")
+def changer_mot_de_passe(
+    body: ChangementIn,
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    principal: Principal = Depends(session_principal),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Le nouveau hachage ferme les autres sessions ; celle-ci reçoit de nouveaux cookies.
+    Mot de passe actuel faux : 400 et non 401, la session reste valable."""
+    user = db.get(Utilisateur, principal.user_id)
+    if not verify_password(body.actuel, user.password_hash):
+        audit.record(db, user.id, "changement_mdp_echec", "utilisateur", user.id)
+        db.commit()
+        raise HTTPException(400, "Mot de passe actuel incorrect")
+    check_password(body.nouveau)
+    if verify_password(body.nouveau, user.password_hash):
+        audit.record(db, user.id, "changement_mdp_refuse", "utilisateur", user.id)
+        db.commit()
+        raise HTTPException(422, "Le nouveau mot de passe doit être différent de l'actuel")
+    user.password_hash = hash_password(body.nouveau)
+    user.doit_changer_mdp = False
+    audit.record(db, user.id, "changement_mdp", "utilisateur", user.id)
+    db.commit()
+    claims = read_claims(refresh_token, "refresh") if refresh_token else None
+    _set_cookies(response, user, bool(claims and claims.get("rem")))
+    return _me(to_principal(user))
 
 
 @router.post("/logout")
@@ -175,7 +215,7 @@ def logout(response: Response) -> dict:
 
 
 @router.get("/me")
-def me(principal: Principal = Depends(current_principal)) -> dict:
+def me(principal: Principal = Depends(session_principal)) -> dict:
     return _me(principal)
 
 

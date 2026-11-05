@@ -139,6 +139,7 @@ def _user_dict(u: Utilisateur) -> dict:
         "nom": u.nom,
         "fonction": u.fonction,
         "actif": u.actif,
+        "doit_changer_mdp": u.doit_changer_mdp,
         "permissions": sorted(x.permission for x in u.permissions),
         "portee": {
             "tout": portee.tout,
@@ -205,6 +206,7 @@ def create_user(
         nom=body.nom,
         fonction=body.fonction.strip(),
         password_hash=hash_password(body.password),
+        doit_changer_mdp=True,  # provisoire : seule la personne doit connaître son mot de passe
     )
     _poser_droits(u, body.permissions, body.portee)
     db.add(u)
@@ -225,6 +227,8 @@ def update_user(
     u = db.get(Utilisateur, user_id)
     if u is None:
         raise HTTPException(404, "Utilisateur introuvable")
+    if body.password is not None and u.id == p.user_id:
+        raise HTTPException(422, "Pour votre propre compte, utilisez le changement de mot de passe")
     avant = _user_dict(u)
     if body.permissions is not None or body.portee is not None:
         _check_droits(
@@ -245,6 +249,7 @@ def update_user(
     if body.password is not None:
         check_password(body.password)
         u.password_hash = hash_password(body.password)
+        u.doit_changer_mdp = True
     _poser_droits(u, body.permissions, body.portee)
     if etait_admin and not _est_admin_actif(u):
         if u.id == p.user_id:
@@ -370,9 +375,13 @@ def list_audit(
     voit_marge = is_allowed(p, "marge:read")
 
     def lisible(e: AuditEvent, d):
-        """Valeurs d'une saisie de CA, de marge ou de leurs objectifs masquées sans droit marge."""
-        if (voit_marge or e.action != "saisie_pilotage" or not isinstance(d, dict)
-                or d.get("groupe") not in GROUPES_MARGE):
+        """Valeurs d'une saisie de CA, de marge ou de leurs objectifs, et chiffres d'un conflit
+        CA ou marge, masqués sans droit marge."""
+        if voit_marge or not isinstance(d, dict):
+            return d
+        if e.action == "saisie_conflit":
+            return {k: None if k in ("saisie", "employes") else v for k, v in d.items()}
+        if e.action != "saisie_pilotage" or d.get("groupe") not in GROUPES_MARGE:
             return d
         return {**d, "valeurs": None}
 

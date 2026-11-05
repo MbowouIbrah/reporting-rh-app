@@ -6,9 +6,9 @@ import { erreurApi, monter, type Appel } from './testSupport'
 const TOUT = { tout: true, perimetres: [], services: [], sites: [] }
 const ADMIN = ['nominatif', 'marge', 'import', 'saisie', 'referentiel', 'comptes', 'journal']
 const COMPTES = [
-  { id: 1, email: 'admin@exemple.invalid', nom: 'Admin RH', fonction: 'DRH', actif: true, permissions: ADMIN, portee: TOUT },
-  { id: 2, email: 'chef.sav@exemple.invalid', nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
-  { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', fonction: '', actif: false, permissions: ['nominatif', 'marge'], portee: TOUT },
+  { id: 1, email: 'admin@exemple.invalid', nom: 'Admin RH', fonction: 'DRH', actif: true, doit_changer_mdp: false, permissions: ADMIN, portee: TOUT },
+  { id: 2, email: 'chef.sav@exemple.invalid', nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, doit_changer_mdp: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
+  { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', fonction: '', actif: false, doit_changer_mdp: false, permissions: ['nominatif', 'marge'], portee: TOUT },
 ]
 const PERIMETRES = [
   { id: 5, code: 'sav_pl', libelle: 'SAV PL', regles: [{ dimension: 'service', valeur: 'SAV PL' }] },
@@ -53,6 +53,13 @@ test('liste : fonction, résumé des données visibles et statut', async () => {
   expect(within(dg).getByText('Inactif')).toBeInTheDocument()
   expect(within(l.getByRole('row', { name: /Admin RH/ })).getByText('(vous)')).toBeInTheDocument()
   expect(screen.getByText('3 utilisateurs')).toBeInTheDocument()
+})
+
+test('liste : un mot de passe provisoire est signalé', async () => {
+  monter(page, PERMS, servir)
+  const l = await liste()
+  expect(within(await l.findByRole('row', { name: /Chef Sav/ })).getByText('Provisoire')).toBeInTheDocument()
+  expect(within(l.getByRole('row', { name: /Admin RH/ })).queryByText('Provisoire')).toBeNull()
 })
 
 test('recherche sans accents par nom, adresse ou fonction', async () => {
@@ -176,6 +183,7 @@ test('son propre compte : données, gestion des comptes et statut verrouillés, 
   expect(f.getByRole('checkbox', { name: /Consulter le journal/ })).toBeEnabled()
   expect(f.getByRole('checkbox', { name: 'Compte actif' })).toBeDisabled()
   expect(f.queryByRole('button', { name: 'Supprimer ce compte' })).toBeNull()
+  expect(f.getByRole('link', { name: 'Changer mon mot de passe' })).toBeInTheDocument()
 })
 
 test('changement de compte refusé tant que la fiche est modifiée', async () => {

@@ -87,6 +87,7 @@ export interface Compte {
   nom: string
   fonction: string
   actif: boolean
+  doit_changer_mdp: boolean
   permissions: string[]
   portee: Portee
 }

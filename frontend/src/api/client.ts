@@ -16,6 +16,11 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+let onMotDePasseAChanger: () => void = () => {}
+export function setMotDePasseAChangerHandler(fn: () => void) {
+  onMotDePasseAChanger = fn
+}
+
 // /auth/me reste éligible : c'est lui qui restaure la session après expiration du jeton d'accès.
 const SANS_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
 
@@ -54,7 +59,11 @@ async function requete(path: string, init: RequestInit, retry: boolean): Promise
     // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
     if (path !== '/auth/me') onUnauthorized()
   }
-  if (!r.ok) throw new ApiError(r.status, ...(await detail(r)))
+  if (!r.ok) {
+    const [message, info] = await detail(r)
+    if (r.status === 403 && info?.code === 'mot_de_passe_a_changer') onMotDePasseAChanger()
+    throw new ApiError(r.status, message, info)
+  }
   return r
 }
 
