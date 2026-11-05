@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Fragment, useLayoutEffect, useRef } from 'react'
+import { Fragment, memo, useLayoutEffect, useRef } from 'react'
 import { useEnregistrerColonnes } from '../api/admin'
 import { getIndividuelTous } from '../api/rapports'
 import type { IndividuelTous, Val } from '../api/types'
@@ -47,6 +47,70 @@ const MODELE_VIDE: IndividuelTous = {
 }
 const modeleVide = (cal?: Calendrier): IndividuelTous => ({ ...MODELE_VIDE, mois: ordreMois(cal).map((m) => ({ mois: m, present: false })) })
 
+/**
+ * Lignes du tableau : refaites seulement quand les données ou les colonnes changent, jamais au simple
+ * rendu de la page (glisser d'un en-tête, attente, filtres). `cle` résume l'ordre et la zone des colonnes.
+ */
+const CorpsIndividuel = memo(
+  function CorpsIndividuel({ d, rubriques, exclues }: { d: IndividuelTous; rubriques: string[]; exclues: Set<string>; cle: string }) {
+    const classe = (r: string) => (exclues.has(r) ? ' exclu' : '')
+    const val = (v: Val | undefined) => v ?? '0'
+    const totalMois = (m: IndividuelTous['mois'][number]) => m.total ?? '0'
+    // Logement site déporté : sans objet (« - ») quand aucun site déporté ne figure dans le mois.
+    const aDeporte = d.mois.some((x) => x.deporte)
+    const sansObjet = (r: string, m?: IndividuelTous['mois'][number]) => r === LOGEMENT && (m ? m.present && !m.deporte : !aDeporte)
+    // Mois sans données (pas encore importé ou hors périmètre) : « - », jamais 0 ; 0 reste un vrai zéro.
+    const aucun = !d.mois.some((m) => m.present)
+    const totalRub = (r: string) => somme(d.mois.map((m) => m.montants?.[r] ?? null)) ?? '0'
+    const totalStaff = (r: string) => d.mois.reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
+    return (
+      <tbody>
+        {d.mois.map((m) => (
+          <Fragment key={m.mois}>
+            <tr className="groupe">
+              <th scope="row" className="fige-g">{MOIS[m.mois - 1]}</th>
+              {rubriques.map((r) => (
+                <td className={(!m.present || sansObjet(r, m) ? 'num' : cls(val(m.montants?.[r]))) + classe(r)} key={r}>
+                  {!m.present || sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
+                </td>
+              ))}
+              <td className="num fige-d1">{m.present ? fcfa(totalMois(m)) : '-'}</td>
+            </tr>
+            <tr className="sous">
+              <th scope="row" className="fige-g">Staff</th>
+              {rubriques.map((r) => (
+                <td className={'num' + classe(r)} key={r}>
+                  {!m.present || sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
+                </td>
+              ))}
+              <td className="fige-d1" />
+            </tr>
+          </Fragment>
+        ))}
+        <tr className="total">
+          <th scope="row" className="fige-g">Total MS</th>
+          {rubriques.map((r) => (
+            <td className={'num' + classe(r)} key={r}>
+              {aucun || sansObjet(r) ? '-' : fcfa(totalRub(r))}
+            </td>
+          ))}
+          <td className="num fige-d1">{aucun ? '-' : fcfa(somme(d.mois.filter((m) => m.present).map(totalMois)) ?? '0')}</td>
+        </tr>
+        <tr className="total staff">
+          <th scope="row" className="fige-g">Total Staff</th>
+          {rubriques.map((r) => (
+            <td className={'num' + classe(r)} key={r}>
+              {aucun || sansObjet(r) ? '-' : totalStaff(r)}
+            </td>
+          ))}
+          <td className="fige-d1" />
+        </tr>
+      </tbody>
+    )
+  },
+  (a, b) => a.d === b.d && a.cle === b.cle,
+)
+
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
   const f = useFiltres({ avecMois: false, avecCalendrier: true })
@@ -82,16 +146,7 @@ export default function Individuel() {
   })
   const { ordre: rubriques, exclues } = colonnes
   const classe = (r: string) => (exclues.has(r) ? ' exclu' : '')
-  type Mois = NonNullable<typeof d>['mois'][number]
-  const totalMois = (m: Mois) => m.total ?? '0'
-  // Logement site déporté : sans objet (« - ») quand aucun site déporté ne figure dans le mois.
-  const sansObjet = (r: string, m?: Mois) =>
-    r === LOGEMENT && (m ? m.present && !m.deporte : !(d?.mois ?? []).some((x) => x.deporte))
-  const val = (v: Val | undefined) => v ?? '0'
-  // Mois sans données (pas encore importé ou hors périmètre) : « - », jamais 0 ; 0 reste un vrai zéro.
-  const aucun = !(d?.mois ?? []).some((m) => m.present)
-  const totalRub = (r: string) => somme((d?.mois ?? []).map((m) => m.montants?.[r] ?? null)) ?? '0'
-  const totalStaff = (r: string) => (d?.mois ?? []).reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
+  const cleColonnes = [...rubriques, '|', ...exclues].join('\u0000')
 
   // Activité du périmètre : n'apparaît que si au moins un mois porte une valeur ; CA et marge individuels
   // seulement avec le droit marge (clés absentes sinon).
@@ -112,14 +167,15 @@ export default function Individuel() {
       : []),
   ]
 
-  // Le tableau s'étire sur la hauteur restante, sans dépasser la hauteur de ligne plafonnée
+  // Le tableau s'étire sur la hauteur restante, sans dépasser la hauteur de ligne plafonnée.
+  // À refaire si les lignes ou les colonnes changent, ou à la fin de l'attente, pas à chaque rendu.
   const zone = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const poser = () => zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
     poser()
     window.addEventListener('resize', poser)
     return () => window.removeEventListener('resize', poser)
-  })
+  }, [d, cleColonnes, maj])
 
   return (
     <section ref={zone} className={`page-ecran page-etroite rapport-excel individuel-excel${maj ? ' maj' : ''}${relais ? ' relais' : ''}`} aria-busy={maj || undefined}>
@@ -193,48 +249,7 @@ export default function Individuel() {
                 <th scope="col" className="num fige-d1">Total mensuel</th>
               </tr>
             </thead>
-            <tbody>
-              {d.mois.map((m) => (
-                <Fragment key={m.mois}>
-                  <tr className="groupe">
-                    <th scope="row" className="fige-g">{MOIS[m.mois - 1]}</th>
-                    {rubriques.map((r) => (
-                      <td className={(!m.present || sansObjet(r, m) ? 'num' : cls(val(m.montants?.[r]))) + classe(r)} key={r}>
-                        {!m.present || sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
-                      </td>
-                    ))}
-                    <td className="num fige-d1">{m.present ? fcfa(totalMois(m)) : '-'}</td>
-                  </tr>
-                  <tr className="sous">
-                    <th scope="row" className="fige-g">Staff</th>
-                    {rubriques.map((r) => (
-                      <td className={'num' + classe(r)} key={r}>
-                        {!m.present || sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
-                      </td>
-                    ))}
-                    <td className="fige-d1" />
-                  </tr>
-                </Fragment>
-              ))}
-              <tr className="total">
-                <th scope="row" className="fige-g">Total MS</th>
-                {rubriques.map((r) => (
-                  <td className={'num' + classe(r)} key={r}>
-                    {aucun || sansObjet(r) ? '-' : fcfa(totalRub(r))}
-                  </td>
-                ))}
-                <td className="num fige-d1">{aucun ? '-' : fcfa(somme(d.mois.filter((m) => m.present).map(totalMois)) ?? '0')}</td>
-              </tr>
-              <tr className="total staff">
-                <th scope="row" className="fige-g">Total Staff</th>
-                {rubriques.map((r) => (
-                  <td className={'num' + classe(r)} key={r}>
-                    {aucun || sansObjet(r) ? '-' : totalStaff(r)}
-                  </td>
-                ))}
-                <td className="fige-d1" />
-              </tr>
-            </tbody>
+            <CorpsIndividuel d={d} rubriques={rubriques} exclues={exclues} cle={cleColonnes} />
           </table>
         </Panneau>
       )}
