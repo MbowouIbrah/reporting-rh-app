@@ -85,7 +85,7 @@ def feuille_lisez_moi(wb):
         ("Lignes vides", "À éviter entre les données : après 50 lignes vides consécutives, le fichier est refusé tant qu'elles ne sont pas supprimées."),
         ("ANNÉE / MOIS", "ANNÉE : nombre entier (2026). MOIS : nom complet avec accent, issu de la liste (Février, Août, Décembre)."),
         ("MATRICULE", "Texte, sans espace en début ou fin. Conserver les zéros de tête (colonne au format texte)."),
-        ("Référentiels", "Type Contrat, Activité, Site, Service : choisir dans la liste (feuille REFERENTIELS). Une valeur absente de la liste est rejetée à l'import. Toute nouvelle valeur doit d'abord être créée dans l'application."),
+        ("Listes", "Type Contrat, Activité, Site, Service : choisir dans la liste (feuille LISTES). Une valeur absente de la liste est rejetée à l'import. Toute nouvelle valeur doit d'abord être créée dans l'application."),
         ("Montants", "Nombre uniquement : pas de texte, pas d'unité, pas d'espace, pas de formule, pas de #N/A. Séparateur décimal selon le poste Excel. Cellule vide = 0. Les négatifs sont admis (régularisations)."),
         ("Absences (nb)", "Nombre de jours d'absence (pas un montant). Les autres rubriques sont en FCFA."),
         ("TOTAL CHARGES", "Absent du template : calculé par l'application. La feuille DONNEES de l'Excel REPORTING RH peut être importée telle quelle : ses colonnes calculées (TOTAL CHARGES, Total exclusions, colonnes « (norme) ») sont ignorées."),
@@ -132,7 +132,7 @@ def feuille_donnees(wb):
     def liste(formule, col, titre):
         dv = DataValidation(type="list", formula1=formule, allow_blank=True,
                             showErrorMessage=True, errorTitle=titre,
-                            error="Valeur absente de la liste (feuille REFERENTIELS).")
+                            error="Valeur absente de la liste (feuille LISTES).")
         dv.add(f"{col}{debut}:{col}{fin}")
         ws.add_data_validation(dv)
 
@@ -189,7 +189,7 @@ def feuille_exemple(wb):
 
 
 def feuille_referentiels(wb):
-    ws = wb.create_sheet("REFERENTIELS")
+    ws = wb.create_sheet("LISTES")
     blocs = [("MOIS", MOIS, "REF_MOIS"), ("TYPE CONTRAT", CONTRATS, "REF_CONTRATS"),
              ("ACTIVITÉ", ACTIVITES, "REF_ACTIVITES"), ("SITE", SITES, "REF_SITES"),
              ("SERVICE", SERVICES, "REF_SERVICES")]
@@ -200,7 +200,7 @@ def feuille_referentiels(wb):
             ws.cell(i, j, v).border = BORD
         col = get_column_letter(j)
         wb.defined_names[nom] = __import__("openpyxl").workbook.defined_name.DefinedName(
-            nom, attr_text=f"REFERENTIELS!${col}$2:${col}${len(valeurs) + 1}")
+            nom, attr_text=f"LISTES!${col}$2:${col}${len(valeurs) + 1}")
     ws["H1"] = "Les listes sont modifiées dans l'application, pas dans ce fichier."
     ws["H1"].font = Font(italic=True, color=RED)
 

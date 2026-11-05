@@ -29,7 +29,7 @@ const codes = (...liste: string[]) => (a: AnomalieLot) => liste.includes(a.code)
 /** Identifiant du volet des erreurs bloquantes, pour l'ouvrir d'office. */
 export const VOLET_ERREURS = 'erreurs'
 
-/** Chaque point tombe dans le premier groupe qui le retient ; un code inconnu va dans « Montants et référentiels ». */
+/** Chaque point tombe dans le premier groupe qui le retient ; un code inconnu va dans « Montants et listes de valeurs ». */
 const GROUPES: Groupe[] = [
   { id: VOLET_ERREURS, titre: 'Erreurs à corriger', niveau: 'corriger', aide: 'bloquent l’enregistrement',
     retenir: (a) => a.gravite === 'bloquant' },
@@ -44,7 +44,7 @@ const GROUPES: Groupe[] = [
   { id: 'auto', titre: 'Valeurs corrigées automatiquement', niveau: 'auto',
     aide: 'espaces, casse, nombres en texte, arrondis, colonnes ignorées',
     retenir: codes('NORMALISE', 'TEXTE_CONVERTI', 'ENTETE_INCONNU', 'ENTETE_ALIAS') },
-  { id: 'montants', titre: 'Montants et référentiels', niveau: 'confirmer', aide: 'montants inhabituels, Brut Réel, mois différent, postes nouveaux ou vides',
+  { id: 'montants', titre: 'Montants et listes de valeurs', niveau: 'confirmer', aide: 'montants inhabituels, Brut Réel, mois différent, postes nouveaux ou vides',
     retenir: () => true },
 ]
 
@@ -337,7 +337,7 @@ interface DetailProps {
   edition: Edition
 }
 
-/** Liste du référentiel où ajouter une valeur inconnue, selon la colonne. */
+/** Liste de valeurs où ajouter une valeur inconnue, selon la colonne. */
 const LISTES: Record<string, { dimension: string; pluriel: string }> = {
   Site: { dimension: 'site', pluriel: 'sites' },
   Service: { dimension: 'service', pluriel: 'services' },
@@ -348,7 +348,7 @@ const LISTES: Record<string, { dimension: string; pluriel: string }> = {
 
 const TYPES_SITE = [['agence', 'Agence'], ['deporte', 'Site déporté'], ['principal', 'Siège / principal']]
 
-/** Décision possible sur un point : ce qu'elle change dans la ligne, ajoute au référentiel ou retire du lot. */
+/** Décision possible sur un point : ce qu'elle change dans la ligne, ajoute à une liste ou retire du lot. */
 interface Decision {
   libelle: string
   valeurs?: Record<string, string | null>

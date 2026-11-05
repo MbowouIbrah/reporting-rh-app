@@ -119,7 +119,7 @@ def test_colonne_sortie_de_la_zone_hachuree_recalcule_tout(charge):
     assert ms["synthese"]["ms"]["m"] in ("3700", "3700.000")
 
 
-# ---- remplissage des colonnes (Référentiels) ----
+# ---- remplissage des colonnes (Sites, services et colonnes) ----
 def _col(d, libelle):
     return next(x for x in d["colonnes"] if x["libelle"] == libelle)
 

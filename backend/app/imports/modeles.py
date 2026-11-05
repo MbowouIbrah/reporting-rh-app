@@ -26,7 +26,7 @@ def filtre(ws, ligne: int, nb_colonnes: int, derniere: int) -> None:
 
 
 def listes(wb: Workbook, colonnes: dict[str, list[str]]) -> dict[str, str]:
-    """Feuille LISTES masquée : une colonne par référentiel, renvoie les plages pour validation."""
+    """Feuille LISTES masquée : une colonne par liste, renvoie les plages pour validation."""
     ws = wb.create_sheet("LISTES")
     plages = {}
     for i, (nom, valeurs) in enumerate(colonnes.items(), start=1):

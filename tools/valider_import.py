@@ -131,7 +131,7 @@ def valider(chemin):
             if r[1]:
                 rap.add(num, "ANNÉE", "TEXTE_CONVERTI", AVERT, a, "Année saisie en texte, convertie.")
 
-        # --- référentiels (MOIS + 4 listes)
+        # --- listes (MOIS + 4 listes)
         valeurs = {}
         for nom in ("MOIS", "Type Contrat", "Activité", "Site", "Service"):
             v = g(nom)
@@ -141,7 +141,7 @@ def valider(chemin):
                 continue
             canon = REFS[nom].get(norm(t))
             if canon is None:
-                rap.add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, "Valeur absente du référentiel.")
+                rap.add(num, nom, "REFERENTIEL_INCONNU", BLOQUANT, t, "Valeur absente de la liste.")
             else:
                 valeurs[nom] = canon
                 if canon != str(v):

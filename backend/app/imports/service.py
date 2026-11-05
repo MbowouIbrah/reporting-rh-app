@@ -264,7 +264,7 @@ DIM_REFS = {"service": "services", "activite": "activites", "site": "sites", "ty
 
 
 def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Refs:
-    """Référentiels de la base, plus les valeurs que le lot propose d'ajouter (créées à la validation)."""
+    """Listes de valeurs de la base, plus les valeurs que le lot propose d'ajouter (créées à la validation)."""
     refs = charger_refs(db)
     for dim, valeurs in (lot.feuille.get("ajouts", {}) if ajouts is None else ajouts).items():
         idx = getattr(refs, DIM_REFS[dim])
@@ -411,7 +411,7 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
 
 def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, valeur: str,
                         type_site: str | None = None) -> LotImport:
-    """Décide d'ajouter une valeur inconnue au référentiel : gardée dans le lot, créée à la validation."""
+    """Décide d'ajouter une valeur inconnue à sa liste : gardée dans le lot, créée à la validation."""
     if dimension not in DIM_REFS:
         raise HTTPException(422, "Liste inconnue")
     valeur = (valeur or "").strip()
@@ -917,7 +917,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
             db.flush()
             postes[norm(p)] = obj.id
 
-    # valeurs de référentiel ajoutées dans le lot : créées maintenant seulement
+    # valeurs de liste ajoutées dans le lot : créées maintenant seulement
     for dim, valeurs in ((lot.feuille or {}).get("ajouts") or {}).items():
         model = DIM_MODELS[dim]
         connus = {norm(k) for k in _ids(db, model)}

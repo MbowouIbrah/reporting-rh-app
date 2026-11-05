@@ -16,7 +16,7 @@ RUBRIQUE = "Commission"
 
 
 def upgrade() -> None:
-    # Base vierge : la rubrique n'existe pas encore, l'amorçage des référentiels pose la règle.
+    # Base vierge : la rubrique n'existe pas encore, l'amorçage des listes pose la règle.
     op.execute(sa.text(
         "INSERT INTO rubrique_regle (rubrique_id, regle, date_debut) "
         "SELECT r.id, 'exclu_total_ligne', '2000-01-01' FROM rubrique r "

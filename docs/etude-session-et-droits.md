@@ -13,7 +13,7 @@
 | Point | Constat |
 |---|---|
 | 1 | Le cookie de session est commun aux onglets, le profil `['me']` est propre à chaque onglet (`staleTime: Infinity`, copie en sessionStorage). Les captures montrent deux onglets ouverts : l'onglet resté ouvert garde l'ancien profil et reçoit les données du nouveau compte. |
-| 2 | `RequireAuth` affiche `<Etat type="403">` ; l'onglet Administration n'apparaît qu'avec `saisie:write` alors que Sites et services ou Utilisateurs peuvent être accordés seuls. |
+| 2 | `RequireAuth` affiche `<Etat type="403">` ; l'onglet Administration n'apparaît qu'avec `saisie:write` alors que Sites, services et colonnes ou Utilisateurs peuvent être accordés seuls. |
 | 3 | Tableaux et options de `/rapports/filtres` sont déjà filtrés par `scope_for` côté serveur. Seule cascade : Type de site → Site. |
 | 6 | Règle serveur : une dimension vide alors que l'autre est restreinte = aucune restriction sur elle (« service X sur tous les sites »). La fiche l'affichait « 0 sur N » : affichage faux, pas un défaut de droits. |
 

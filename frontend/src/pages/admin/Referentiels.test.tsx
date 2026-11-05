@@ -44,7 +44,7 @@ test('types de contrat : liste fixe en lecture seule, Stage compris', async () =
   expect(bloc.queryByRole('textbox')).toBeNull()
 })
 
-test('sans droit sur les référentiels : renvoyé au premier onglet d’administration permis', async () => {
+test('sans droit sur les sites et services : renvoyé au premier onglet d’administration permis', async () => {
   monter(
     <Routes>
       <Route path="/admin/referentiels" element={<RequireAuth perm="referentiel:write"><Referentiels /></RequireAuth>} />

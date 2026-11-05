@@ -17,7 +17,7 @@ Retour de réunion : l'administration doit permettre de **gérer les colonnes** 
 ## Options
 | Option | Pour | Contre |
 |---|---|---|
-| A. Quatrième panneau « Colonnes » dans Référentiels | Même écran, même composant `Panneau`, même droit `referentiel:write`. Peu de code. | Le panneau est plus large que les autres (plus de colonnes). |
+| A. Quatrième panneau « Colonnes » dans Sites et services | Même écran, même composant `Panneau`, même droit `referentiel:write`. Peu de code. | Le panneau est plus large que les autres (plus de colonnes). |
 | B. Nouvel onglet d'administration « Colonnes » | Place pour le détail par année | Un onglet de plus dans le menu, de la navigation à refaire |
 | C. Tout dans DONNEES (menu sur les en-têtes) | On voit les données à côté | DONNEES est déjà chargé ; une colonne vide n'y apparaît pas forcément |
 
@@ -55,4 +55,4 @@ Retour de réunion : l'administration doit permettre de **gérer les colonnes** 
 - Désactiver une colonne remplie la fait disparaître des tableaux. Parade : on demande une confirmation qui donne le nombre de valeurs concernées.
 
 ## Décidé par défaut (sans retour client)
-Panneau dans Référentiels, ni suppression ni renommage, nouvelle rubrique de paie hachurée au départ, et confirmation avant de désactiver une colonne remplie.
+Panneau dans Sites et services (onglet renommé Sites, services et colonnes), ni suppression ni renommage, nouvelle rubrique de paie hachurée au départ, et confirmation avant de désactiver une colonne remplie.

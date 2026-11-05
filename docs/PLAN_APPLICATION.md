@@ -3,7 +3,7 @@
 ## Décisions
 - Stack : FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL 16 dédié (aucun port publié) / React 19 + TS + Vite + react-query + recharts. Calquée sur Academy (qui est FastAPI, pas Django).
 - Design : tokens et composants de cfaoacademy (DESIGN_SYSTEM.md §1-3, 5, 7, 9-12) réécrits en TSX + extension « tableaux denses » (zébrure, chiffres à droite, fr-FR, négatifs en rouge, total sur --red-soft).
-- Données en format long : situation_mensuelle x rubrique -> montant NUMERIC (décimales gardées telles qu'importées). Nouvelle rubrique ou exclusion = une ligne de référentiel (rubrique_regle datée).
+- Données en format long : situation_mensuelle x rubrique -> montant NUMERIC (décimales gardées telles qu'importées). Nouvelle rubrique ou exclusion = une ligne de paramétrage (rubrique_regle datée).
 - KPI : module Python de fonctions pures sur agrégats SQL, calcul à la volée.
 - Import xlsx : staging -> validation par ligne -> rapport d'anomalies -> validation explicite -> lot annulable, idempotent (sha256 + période/matricule).
 - Pas de clôture de période (retirée en 07e) : un mois reste modifiable ; chaque écriture est tracée au journal d'audit (avant/après).
@@ -23,7 +23,7 @@ periode, salarie, service/activite/site/type_contrat/poste (+ref_alias), situati
 | P0 | Cadrage : dictionnaire KPI, matrice rôles, périmètres, backlog.md | S | Validé par l'admin |
 | P1 | Socle : squelette back/front, CI, compose, nginx | M | Login servi en HTTPS en staging, CI verte, aucun port DB publié |
 | P2 | Auth, RBAC, périmètres, audit | M | Tests rôle x endpoint x périmètre, cas négatifs inclus ; chaque écriture auditée |
-| P3 | Modèle, référentiels, import | L | Import V4 = 1 398 lignes, 0 bloquant ; fichier « pièges » -> 1 anomalie localisée/cas ; idempotent ; annulation OK |
+| P3 | Modèle, listes de valeurs, import | L | Import V4 = 1 398 lignes, 0 bloquant ; fichier « pièges » -> 1 anomalie localisée/cas ; idempotent ; annulation OK |
 | P4 | Moteur KPI + API rapports | L | Parité golden sur 18 périodes, invariants OK, couverture kpi/ >= 90 % |
 | P5 | Front : Résumé, Mensuel, Annuel, Individuel, Graphes | L | Playwright par rôle, filtres indépendants par page, conformité RESULTAT_ATTENDU.md |
 | P5b | Refonte UI (`docs/PLAN_REFONTE_UI.md`) : tokens, kit de composants, pages, accessibilité, captures avant/après | M (~6,5 j) | Présentation seule : valeurs et masquages inchangés, Playwright par rôle inchangé, Lighthouse accessibilité >= 95, validé par l'admin |

@@ -62,7 +62,7 @@ Contraintes qui restent (P0 §2, QUESTIONS_CLIENT D1–D5, Q2–Q3) :
 | Voir le CA et la marge | `marge:read` | Portée *tout* exigée (le CA est global) |
 | Importer la paie | `import:read`, `import:write` | Portée *tout* exigée |
 | Corriger les données, saisir budgets et CA | `saisie:write`, `periode:write`, `report:write` | Portée *tout* exigée (D2) |
-| Gérer les référentiels, règles et périmètres | `referentiel:write`, `perimetre:write` | Portée *tout* exigée |
+| Gérer les listes de valeurs, règles et périmètres | `referentiel:write`, `perimetre:write` | Portée *tout* exigée |
 | Gérer les comptes et les droits | `users:read`, `users:write` | Portée *tout* ; garde-fous du §3 |
 | Consulter le journal | `audit:read` | Portée *tout* exigée (le journal montre CA, budgets, noms et comptes de tous les services) |
 
@@ -90,6 +90,6 @@ Création : bouton « Nouveau compte » qui ouvre une fiche vide dans le même p
 ## 7. Décisions (2026-10-20)
 1. « IO » = lecture / écriture : c'est l'axe des permissions (§5), pas une donnée de plus. Portée sur services, sites et périmètres.
 2. Service + site accordés ensemble : **ET** (seulement ce service sur ce site), OU à l'intérieur d'une même dimension.
-3. Écriture (import, corrections, référentiels, comptes) réservée à une portée *tout*.
+3. Écriture (import, corrections, listes de valeurs, comptes) réservée à une portée *tout*.
 4. « Gérer les comptes et les droits » : les deux administrateurs RH, comme aujourd'hui.
 5. Une barre « Enregistrer / Annuler » par fiche.

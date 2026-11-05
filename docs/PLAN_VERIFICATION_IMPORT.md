@@ -5,13 +5,13 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 ## Principe commun
 - **Trois niveaux** : *À corriger* (bloque l'enregistrement), *À confirmer* (une décision est attendue, une valeur par défaut est proposée), *Corrigé automatiquement* (pour information, refusable).
 - **Ancrage** : chaque erreur porte « Ligne N » cliquable, qui ouvre la ligne du fichier avec la cellule fautive surlignée.
-- **Actions sur place** : chaque erreur propose ses boutons (ajouter au référentiel, reprendre la valeur enregistrée, garder une ligne…). Les décisions sont gardées dans le lot, les contrôles sont relancés, les compteurs se mettent à jour. Rien n'est écrit en base avant « Enregistrer ».
+- **Actions sur place** : chaque erreur propose ses boutons (ajouter à la liste, reprendre la valeur enregistrée, garder une ligne…). Les décisions sont gardées dans le lot, les contrôles sont relancés, les compteurs se mettent à jour. Rien n'est écrit en base avant « Enregistrer ».
 - **Historique protégé** : un changement (contrat, service…) ne touche que les mois importés ; les mois déjà enregistrés gardent leurs valeurs (chaque mois porte déjà ses propres attributs).
 
 ## Groupes, dans l'ordre
 
 **G1. Messages clairs et regroupement** (affichage seul)
-- Détail concis et explicite : type attendu (« nombre », « entier de 0 à 31 »), liste des valeurs admises pour un référentiel (« Sites admis : Bertoua, Dehane… »).
+- Détail concis et explicite : type attendu (« nombre », « entier de 0 à 31 »), liste des valeurs admises pour une liste (« Sites admis : Bertoua, Dehane… »).
 - Doublon sur une seule ligne : « EMP046 en double (août 2026) : lignes 40 et 41 ».
 - Nom de l'employé sur chaque erreur, notamment les changements d'affectation.
 - Niveaux et ancrage vers la ligne ; plus de rubrique « Autres points » (chaque code a son groupe).
@@ -20,7 +20,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 - `#N/A`, `#REF!`… : cellule traitée comme vide, signalée pour information.
 - Formule : la valeur calculée par Excel est déjà lue. Si le fichier n'a pas de valeur calculée (fichier produit par un outil, ou jamais ouvert dans Excel) : *À confirmer*, avec la consigne « ouvrir et enregistrer dans Excel, ou copier puis Collage spécial › Valeurs ».
 - `-`, `/`, `néant`, `n/a`, `x`… dans un montant : plus bloquant, *À confirmer* avec l'action « Ignorer (vide) ».
-- Référentiels : liste déroulante dans le modèle mais collage libre accepté (alerte Excel en simple avertissement) ; casse ignorée, la valeur de référence est reprise telle quelle.
+- Listes de valeurs : liste déroulante dans le modèle mais collage libre accepté (alerte Excel en simple avertissement) ; casse ignorée, la valeur de référence est reprise telle quelle.
 
 **G3. Socle des décisions + erreurs bloquantes** — livré : décisions gardées dans le lot, liste « Choisir une solution… » par point, vérification en direct, point réglé en vert, « Annuler ce choix ». Reste (retours du 19/10) :
 - Doublon : un seul en-tête, les deux lignes dans le même tableau (ordre du fichier) ; options « Garder la ligne 40, supprimer la ligne 41 » et l'inverse.
@@ -45,7 +45,7 @@ Origine : test d'import d'août 2026 (`Downloads/donnees_2026_08.xlsx`, 48 erreu
 **G5. Lecture intelligente des valeurs saisies** — validé (écran de vérification en lecture seule, bouton « Revenir à l'étape précédente » ; les corrections se font sur l'écran de refus) (`regles.py` `interpretations()`, `fr()` ; code `SEPARATEUR_AMBIGU` ; `service.propositions()` renvoie les `corrections` proposées dans la liste ; espaces en double retirés des noms et postes sans alerte ; fichier de test `Downloads/G5 nombres mal ecrits.xlsx`) : intention évidente devinée et proposée (« Corriger en 1 250 000 ») ; toutes les valeurs affichées au même format (espace pour les milliers, virgule pour les décimales).
 - Points comme séparateurs de milliers (« 1.250.000 ») ; cas ambigu (« 45.000 ») : deux solutions, « 45 000 (point = milliers) » ou « 45 (point = décimale) », avec l'explication.
 - Devise ou unité collée (« 25 000 FCFA », « 25000 F », « XAF », « jours ») ou points de milliers (« 1.250.000 ») : lu d'office, point d'attention « l'unité n'est pas gardée ».
-- Espaces en trop au début, à la fin ou en double (texte et référentiels) ; virgule décimale ; casse ou accent différents d'une valeur de la liste.
+- Espaces en trop au début, à la fin ou en double (texte et listes de valeurs) ; virgule décimale ; casse ou accent différents d'une valeur de la liste.
 - Décimales : gardées telles qu'elles viennent, quel que soit leur nombre (« 138 700,4853 » reste 138 700,4853), sans point d'attention.
 
 **G6. Valeurs obligatoires vides** — validé (`service.propositions()` : `PRECEDENT` avec le poste, `_periode_du_fichier()` ; code `LIGNE_TOTAL` dans `regles.py`) : solutions proposées dans la liste.

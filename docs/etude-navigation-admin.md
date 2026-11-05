@@ -3,7 +3,7 @@
 ## Besoin (retours utilisateur du 21/10)
 - Utilisateurs : la liste et la fiche défilent ensemble (c'est le conteneur qui défile). Chacune doit défiler seule et les deux colonnes doivent remplir la hauteur restante.
 - Fiche, bloc Identité : un champ par ligne, bien équilibré.
-- Même traitement pour l'écran « Référentiels », qui doit aussi changer de nom : le mot n'est pas compris.
+- Même traitement pour l'écran des sites et services, qui doit aussi changer de nom : le mot n'est pas compris.
 - Ordre incohérent : le titre est au-dessus des onglets alors que ce sont les onglets qui le changent.
 - Les onglets ont l'air de boutons, ce qui n'aide pas à comprendre qu'ils changent de section.
 
@@ -26,8 +26,8 @@
 
 **Choix : B.** `AdminNav` affiche la barre d'onglets, puis le titre et la description de l'onglet actif ; les pages ne gèrent plus leur titre. Le texte du titre ne change pas, donc les tests e2e restent valables.
 
-## Nom de « Référentiels »
-Le nouveau nom est « **Sites et services** », ce que l'écran contient vraiment. L'adresse `/admin/referentiels` reste la même, pour ne pas casser les liens et les tests.
+## Nom de l'écran
+Le nouveau nom est « **Sites et services** », ce que l'écran contient vraiment. Depuis l'ajout du panneau Colonnes (16-f), il devient « **Sites, services et colonnes** ». L'adresse `/admin/referentiels` reste la même, pour ne pas casser les liens et les tests.
 
 ## Défilement et hauteur
 - Les grilles en deux colonnes prennent la hauteur restante (`flex: 1`), s'étirent (`align-items: stretch`) et ne défilent plus elles-mêmes.

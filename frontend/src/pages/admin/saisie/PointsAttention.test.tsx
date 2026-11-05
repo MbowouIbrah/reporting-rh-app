@@ -10,13 +10,13 @@ function anomalie(code: string, gravite: AnomalieLot['gravite'] = 'avertissement
   return { ligne: 4, colonne, code, gravite, valeur: 'Jhon', message, matricule: 'EMP004', nom: 'John Doe' }
 }
 
-test('repartir : à corriger, à confirmer puis corrigé auto ; code inconnu dans « Montants et référentiels »', () => {
+test('repartir : à corriger, à confirmer puis corrigé auto ; code inconnu dans « Montants et listes de valeurs »', () => {
   const groupes = repartir([anomalie('NORMALISE'), anomalie('POSTE_NOUVEAU'), anomalie('INCONNU'),
     anomalie('NOM_SIMILAIRE'), anomalie('NOM_PROCHE'), anomalie('DOUBLON', 'bloquant')])
   expect(groupes.map((g) => [g.titre, g.lignes.length])).toEqual([
     ['Erreurs à corriger', 1],
     ['Noms et matricules à vérifier', 2],
-    ['Montants et référentiels', 2],
+    ['Montants et listes de valeurs', 2],
     ['Valeurs corrigées automatiquement', 1],
   ])
 })

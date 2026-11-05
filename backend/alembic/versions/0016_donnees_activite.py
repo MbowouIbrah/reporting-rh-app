@@ -32,7 +32,7 @@ def upgrade() -> None:
         b.create_check_constraint("ck_rubrique_unite", "unite IN ('FCFA','jours','nombre')")
         b.create_check_constraint("ck_rubrique_nature", "nature IN ('paie','activite')")
 
-    # Base vierge : l'amorçage des référentiels pose les rubriques, à la suite de celles de paie.
+    # Base vierge : l'amorçage des listes pose les rubriques, à la suite de celles de paie.
     dernier = bind.execute(sa.text("SELECT MAX(ordre) FROM rubrique")).scalar()
     if dernier is not None:
         for i, (lib, unite) in enumerate(RUBRIQUES_ACTIVITE, start=1):

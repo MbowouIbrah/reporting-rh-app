@@ -104,7 +104,7 @@ def lire_remplissage(
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    """Colonnes et leur remplissage sur l'année, dans le périmètre du compte (Référentiels)."""
+    """Colonnes et leur remplissage sur l'année, dans le périmètre du compte."""
     authorize(p, "referentiel:write")
     scope = scope_for(db, p)
     annees = annees_remplies(db, scope)

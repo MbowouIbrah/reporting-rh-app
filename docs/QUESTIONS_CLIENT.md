@@ -45,7 +45,7 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | D4 | Les directeurs à périmètre voient-ils les données nominatives ou seulement des totaux ? | Totaux seulement. |
 | D5 | La marge et le taux de marge sont-ils réservés à l'administrateur RH et aux lecteurs globaux ? | Oui (le CA n'existe pas par périmètre). |
 
-## E. Référentiels (sites, services, employés)
+## E. Listes de valeurs (sites, services, employés)
 
 | # | Question | Appliqué aujourd'hui |
 |---|---|---|

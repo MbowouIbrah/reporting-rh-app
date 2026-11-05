@@ -1,4 +1,4 @@
-"""Référentiels initiaux (mêmes listes que templates/ et tools/generer_template_import.py)."""
+"""Listes de valeurs initiales (mêmes listes que templates/ et tools/generer_template_import.py)."""
 
 from datetime import date
 from decimal import Decimal

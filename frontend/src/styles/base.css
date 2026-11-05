@@ -1395,7 +1395,7 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .admin-contexte { flex-basis: 100%; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .admin-excel .admin-case { display: inline-flex; align-items: center; gap: var(--sp-2); height: 36px; margin-top: calc(var(--fs-xs) * 1.4 + var(--sp-1)); color: var(--navy); font-size: var(--fs-md); font-weight: 700; }
 .admin-excel .admin-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-/* Formulaire d'ajout court (Référentiels) : le bouton Ajouter reste sur la ligne des champs, aligné sur leur bas */
+/* Formulaire d'ajout court (Sites, services et colonnes) : le bouton Ajouter reste sur la ligne des champs, aligné sur leur bas */
 .admin-excel .admin-actions.en-ligne { flex-basis: auto; align-self: flex-end; }
 .admin-excel .admin-erreur { flex-basis: 100%; }
 .admin-excel .admin-erreur-bloc { padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--rule); }
@@ -1404,14 +1404,14 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .renommer p { flex-basis: 100%; margin: 0; white-space: normal; }
 .admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
-/* Référentiels : sites et services, puis la liste fixe des contrats sous les services (écran moyen)
+/* Sites, services et colonnes : sites et services, puis la liste fixe des contrats sous les services (écran moyen)
    ou en troisième colonne plus étroite (grand écran) ; elle garde sa hauteur, jamais étirée */
 .admin-trio { grid-template-areas: "site service" "site contrat"; grid-template-rows: auto 1fr; }
 .admin-trio > :nth-child(1) { grid-area: site; }
 .admin-trio > :nth-child(2) { grid-area: service; }
 .admin-trio > .ref-contrats { grid-area: contrat; align-self: start; }
 .ref-contrats .note { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
-/* Colonnes (rubriques) : pleine largeur sous les référentiels */
+/* Colonnes (rubriques) : pleine largeur sous les sites et services */
 .admin-excel .ref-colonnes { margin-top: var(--sp-4); margin-bottom: 0; }
 .ref-colonnes-tete { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); padding: var(--sp-2) 12px; border-bottom: 1px solid var(--rule); }
 .ref-colonnes-tete .note { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
@@ -1433,7 +1433,7 @@ table.tableau-squelette td { height: 2.1em; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
   .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
   .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
-  /* Référentiels et Colonnes se partagent la hauteur ; chaque cadre défile seul */
+  /* Sites, services et Colonnes se partagent la hauteur ; chaque cadre défile seul */
   .admin-excel .ref-colonnes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .admin-excel .ref-colonnes .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
   .admin-excel .ref-colonnes table.dense thead th { position: sticky; top: 0; z-index: 1; }

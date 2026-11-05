@@ -89,7 +89,7 @@ test.describe.serial('import de fichiers', () => {
       await deplier(page, ligne)
       await page.getByLabel('Mutation ou erreur ?').selectOption({ label: 'Changement à partir de ce mois' })
     }
-    await ouvrirVolet(page, /Montants et référentiels/)
+    await ouvrirVolet(page, /Montants et listes de valeurs/)
     await deplier(page, 22)
     await page.getByLabel('Mois différent du reste du fichier : que faire ?').selectOption({ label: 'Corriger en Juillet, comme les autres lignes' })
     await deplier(page, 28)

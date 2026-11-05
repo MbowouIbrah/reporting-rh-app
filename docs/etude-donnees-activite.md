@@ -33,7 +33,7 @@ Nouvelle table `activite_saisie` (période, site, service, indicateur `or`|`devi
 | Q0.2 | Que contient la référence Annick ? | Un texte libre (200 caractères maximum), affiché dans DONNEES, sans calcul. Libellé « Référence reporting ». |
 | Q0.3 | CA par employé ou CA saisi : lequel fait foi ? | Le **CA saisi** reste celui des lignes CA/Marge des tableaux. Le CA et la marge par employé (« CA individuel », « Marge individuelle ») s'affichent seulement dans DONNEES et Individuel, avec `marge:read`. |
 | Q0.4 | Forme des fiches individuelles | Sans effet ici : les chiffres arrivent par le fichier mensuel. |
-| Q6.1 | Qui est un « productif » ? | Un employé d'un service marqué **productif** (nouveau drapeau `service.productif`, réglable dans Référentiels). SAV PL et SAV Engins sont cochés par défaut. |
+| Q6.1 | Qui est un « productif » ? | Un employé d'un service marqué **productif** (nouveau drapeau `service.productif`, réglable dans Sites, services et colonnes). SAV PL et SAV Engins sont cochés par défaut. |
 | — | Qui voit ventes, clients, OR ? | Tous les lecteurs, dans leur périmètre. Seuls CA et marge individuels demandent `marge:read`. |
 
 ## Restitution
@@ -51,7 +51,7 @@ Nouvelle table `activite_saisie` (période, site, service, indicateur `or`|`devi
 
 ## Risques
 - Une rubrique d'activité qui entrerait dans un total de paie. Parade : séparation dès le chargement, plus un test « total de paie inchangé avec des colonnes d'activité ».
-- Les réponses du client aux questions Q0.1 et Q6.1 peuvent changer l'agrégat ou la règle des productifs. Ces points sont isolés : une formule dans le moteur, un drapeau dans le référentiel.
+- Les réponses du client aux questions Q0.1 et Q6.1 peuvent changer l'agrégat ou la règle des productifs. Ces points sont isolés : une formule dans le moteur, un drapeau dans la liste des services.
 
 ## Points à trancher par le client
 Q0.1 à Q0.3, Q6.1, Q10.1. Les choix provisoires ci-dessus restent valables tant que le client n'a pas répondu.

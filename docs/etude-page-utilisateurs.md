@@ -15,7 +15,7 @@ Un administrateur RH doit pouvoir gérer les comptes de l'application (pas les e
 | Option | Pour | Contre |
 |---|---|---|
 | A. Page dédiée « Utilisateurs », calquée sur Employés (liste + formulaire repliable) | Cohérente avec l'existant, composants réutilisés, aucun changement serveur | — |
-| B. Bloc dans la page Référentiels | Pas de nouvel onglet | Mélange deux sujets, page déjà chargée |
+| B. Bloc dans la page Sites et services | Pas de nouvel onglet | Mélange deux sujets, page déjà chargée |
 | C. Gestion multi-rôles complète (plusieurs affectations par compte) | Couvre tous les cas de l'API | Complexe ; aucun besoin au cadrage (1 compte = 1 rôle) |
 
 ## Choix : A

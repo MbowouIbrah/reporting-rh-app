@@ -195,7 +195,7 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
   )
 }
 
-// Liste fixe : les types de contrat ne se créent pas dans l'application (référentiel initial).
+// Liste fixe : les types de contrat ne se créent pas dans l'application (liste initiale).
 const CONTRATS: [string, string][] = [
   ['CDI', 'Contrat à durée indéterminée'],
   ['CDD', 'Contrat à durée déterminée'],

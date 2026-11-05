@@ -126,7 +126,7 @@ class ReferentielIn(BaseModel):
 @router.post("/{lot_id}/referentiels")
 def ajouter_referentiel(lot_id: int, corps: ReferentielIn,
                         p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    """Ajoute une valeur inconnue au référentiel (gardée dans le lot, créée à la validation)."""
+    """Ajoute une valeur inconnue à sa liste (gardée dans le lot, créée à la validation)."""
     authorize(p, "import:write")
     _lot(db, lot_id)
     return service.lot_dict(service.ajouter_referentiel(

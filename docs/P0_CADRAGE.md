@@ -43,7 +43,7 @@ Annuel : N / N-1, cumul YTD, moyenne mensuelle, nb de mois saisis, ventilation p
 
 | Rôle | Qui | Périmètre | Écriture | Détail nominatif |
 |---|---|---|---|---|
-| `rh_admin` | Administrateurs RH (deux personnes), même niveau | Global | Oui : import, saisie, CA, budgets, référentiels, règles, comptes | Oui |
+| `rh_admin` | Administrateurs RH (deux personnes), même niveau | Global | Oui : import, saisie, CA, budgets, listes de valeurs, règles, comptes | Oui |
 | `lecteur_global` | DRH, DOP | Global | Non | Oui |
 | `lecteur_perimetre` | DPS | `dps` : Commerce Pièces, SAV PL, SAV Engins, Sites Déportés | Non | Non, agrégats seulement |
 | `lecteur_perimetre` | Directeur commercial | `commerce_vn` : Commerce VN | Non | Non |

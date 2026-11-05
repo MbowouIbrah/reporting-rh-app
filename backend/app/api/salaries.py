@@ -42,7 +42,7 @@ class FicheIn(BaseModel):
 
 
 class Index:
-    """Résolution d'un libellé (ou alias) de référentiel vers son id, sans accents ni casse."""
+    """Résolution d'un libellé (ou alias) d'une liste vers son id, sans accents ni casse."""
 
     def __init__(self, db: Session):
         self.par_dim, self.libelles = {}, {}

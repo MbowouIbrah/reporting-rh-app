@@ -46,7 +46,7 @@ export const useCreerColonne = () =>
 export const useActiverColonne = () =>
   useEcriture(({ id, actif }: { id: number; actif: boolean }) => api(`/parametrage/rubriques/${id}`, json('PUT', { actif })))
 
-// ---- référentiels (sites et services) ----
+// ---- listes de valeurs (sites et services) ----
 export type DimensionRef = 'site' | 'service'
 export interface ValeurRef {
   id: number

@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 const ONGLETS = [
   { to: '/admin', label: 'Données', perm: 'saisie:write', titre: 'ADMINISTRATION DES DONNÉES', aide: 'Importer, saisir et corriger les chiffres de chaque mois.' },
   { to: '/admin/employes', label: 'Employés', perm: 'saisie:write', titre: 'ADMINISTRATION DES EMPLOYÉS', aide: 'Fiches des salariés : création, rattachement au service et au site.' },
-  { to: '/admin/referentiels', label: 'Sites et services', perm: 'referentiel:write', titre: 'ADMINISTRATION DES SITES ET SERVICES', aide: 'Sites, services et colonnes des fichiers d’import, utilisés dans les rapports et les droits.' },
+  { to: '/admin/referentiels', label: 'Sites, services et colonnes', perm: 'referentiel:write', titre: 'ADMINISTRATION DES SITES, SERVICES ET COLONNES', aide: 'Sites, services et colonnes des fichiers d’import, utilisés dans les rapports et les droits.' },
   { to: '/admin/utilisateurs', label: 'Utilisateurs', perm: 'users:write', titre: 'ADMINISTRATION DES UTILISATEURS', aide: 'Comptes de connexion : qui accède à l’application et ce que chacun voit.' },
 ]
 

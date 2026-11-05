@@ -41,7 +41,7 @@ def test_fichier_propre(tmp_path):
 def test_pieges(tmp_path):
     rows = [
         ligne(MATRICULE="E1"), ligne(MATRICULE="E1"),                       # doublon
-        ligne(MATRICULE="E2", Service="Inconnu"),                           # référentiel
+        ligne(MATRICULE="E2", Service="Inconnu"),                           # liste
         ligne(MATRICULE="E3", **{"Primes sur ventes": "abc"}),              # texte
         ligne(MATRICULE="E4", **{"Bonus": "#N/A"}),                         # erreur excel
         ligne(MATRICULE="E5", MOIS="  fevrier "),                           # normalisé

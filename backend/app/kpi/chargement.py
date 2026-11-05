@@ -36,7 +36,7 @@ from app.repos.scope import Scope, apply_scope
 
 
 def charger_refs(db: Session, type_site: str | None = None, scope: Scope | None = None) -> Refs:
-    """Référentiels actifs ; un type de site ne garde que les sites de ce type, un périmètre
+    """Listes de valeurs actives ; un type de site ne garde que les sites de ce type, un périmètre
     que ses services et sites (les tableaux n'affichent pas de ligne hors périmètre)."""
     def libs(model):
         q = select(model.libelle).where(model.actif).order_by(model.id)

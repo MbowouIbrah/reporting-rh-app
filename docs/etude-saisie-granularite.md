@@ -109,7 +109,7 @@ Total (partiel)    20 500 000    1 860 000            ← lecture seule
 
 1. Serveur : table, migration, fonction de calcul, API, tests.
 2. Moteur et rapports : CA et marge par site et par service, mention « partiel », périmètre ; exports.
-3. Écran : onglets, choix du niveau, grille, cases calculées ; drapeau « productif » dans Référentiels (Vitest).
+3. Écran : onglets, choix du niveau, grille, cases calculées ; drapeau « productif » dans Sites, services et colonnes (Vitest).
 4. Étape 7 : budgets et objectifs dans la même table.
 
 ## 9. Points à trancher par l'utilisateur

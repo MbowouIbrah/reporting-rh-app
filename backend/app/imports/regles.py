@@ -55,7 +55,7 @@ RE_SOMME = re.compile(r"\b(SUM|SOMME|SUBTOTAL|SOUS\.TOTAL)\s*\(", re.I)
 
 @dataclass
 class Refs:
-    """Référentiels lus en base : libellé canonique indexé par texte normalisé."""
+    """Listes de valeurs lues en base : libellé canonique indexé par texte normalisé."""
 
     services: dict[str, str]
     activites: dict[str, str]

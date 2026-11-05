@@ -26,7 +26,7 @@ Contraintes : montants `Decimal` côté serveur, calculs KPI côté serveur, pé
 |---|---|---|---|
 | 3 K/M | A. Nouveau `compact()` dans `format.ts` | Un seul format, testé | — |
 | | B. Format local par page | — | Doublons, écarts |
-| 5 Stage | A. Référentiel + migration de données 0015 | Bases existantes à jour, moteur inchangé | Une migration |
+| 5 Stage | A. Liste des contrats + migration de données 0015 | Bases existantes à jour, moteur inchangé | Une migration |
 | | B. Seulement `referentiels_init` | Simple | Bases déjà créées sans Stage |
 | 9 CA/Marge | A. Cellules calculées par le serveur (`lignes_ca_marge`) | Règle « KPI côté serveur », masquage par `CLES_MARGE` | Petit ajout au moteur |
 | | B. Calcul front depuis la synthèse | Pas de back | Pas de N-1 en mensuel, contraire à la règle |
@@ -52,7 +52,7 @@ Choix : A partout.
 ## Retour du 27/10 (2e passe)
 - CA et Marge : orange de l'Excel (fond `#FCE4D6`, texte `#833C00`, jetons `--rapport-hors-total*`), sans ligne d'en-tête.
 - Totaux : même cadre partout (fond, traits épais haut et bas) ; le total à deux lignes (masse + staff) est encadré comme un seul bloc.
-- Types de contrat : liste fixe en lecture seule (CDI, CDD, MAD, Stage) dans Administration > Sites et services, sous Services (même colonne, hauteur de la page couverte).
+- Types de contrat : liste fixe en lecture seule (CDI, CDD, MAD, Stage) dans Administration > Sites, services et colonnes, sous Services (même colonne, hauteur de la page couverte).
 - Stagiaires : « Stage » apparaît dans les répartitions par contrat seulement s'il a au moins une ligne sur les périodes affichées (`FACULTATIFS`, `kpi/moteur.py`).
 - Filtre actif : les cases CA, Marge et CA par salarié restent affichées avec « — » et « Non disponible pour ces filtres ». Les colonnes CA/Marge du tableau mensuel restent masquées.
 - Analyse des effectifs : « Effectif fin de période » ferme le tableau, à la couleur des totaux ; l'effectif sous un TOTAL (ligne staff) prend le texte des totaux.

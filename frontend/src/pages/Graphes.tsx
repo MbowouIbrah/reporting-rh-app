@@ -45,7 +45,7 @@ const C_PRIMES = 'var(--data-3)'
 // Objectif : pointillés rouges, distincts des pointillés gris de l'année précédente
 const C_OBJECTIF = 'var(--red)'
 const OBJECTIF = { name: 'Objectif', stroke: C_OBJECTIF, strokeWidth: 2, strokeDasharray: '6 4', dot: false, connectNulls: false } as const
-// Une couleur fixe par type de contrat, dans l'ordre du référentiel : un filtre ne la change pas.
+// Une couleur fixe par type de contrat, dans l'ordre de la liste des contrats : un filtre ne la change pas.
 const COULEURS_CONTRAT = ['var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)']
 // Année N-1 : série de comparaison, en retrait
 const N1 = 'var(--muted-2)'

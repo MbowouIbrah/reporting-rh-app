@@ -143,7 +143,7 @@ def test_blocs_service_site_contrat():
 
 
 def test_controle_bloquant_si_referentiel_incomplet():
-    cur = pd(L(1, ctr="Stagiaire", Brut_Réel=10))  # contrat hors référentiel
+    cur = pd(L(1, ctr="Stagiaire", Brut_Réel=10))  # contrat hors liste
     cs = {c["controle"]: c for c in mensuel(cur, None, REFS, Params())["controles"]}
     assert cs["Total contrats = somme des types"]["bloquant"]
 

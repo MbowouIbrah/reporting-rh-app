@@ -9,11 +9,11 @@ const onglets = () => screen.getAllByRole('link').map((a) => [a.textContent, a.g
 
 test('les trois onglets avec tous les droits, Données actif sur /admin', async () => {
   monter(<AdminNav />, ['saisie:write', 'referentiel:write'], () => ({}))
-  await screen.findByRole('link', { name: 'Sites et services' })
+  await screen.findByRole('link', { name: 'Sites, services et colonnes' })
   expect(onglets()).toEqual([
     ['Données', '/admin'],
     ['Employés', '/admin/employes'],
-    ['Sites et services', '/admin/referentiels'],
+    ['Sites, services et colonnes', '/admin/referentiels'],
   ])
   expect(screen.getByRole('link', { name: 'Données' })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: 'Employés' })).not.toHaveAttribute('aria-current')
@@ -24,5 +24,5 @@ test('un onglet est masqué sans le droit qu’exige son API', async () => {
   monter(<AdminNav />, ['saisie:write'], () => ({}))
   await screen.findByRole('link', { name: 'Employés' })
   expect(onglets().map((o) => o[0])).toEqual(['Données', 'Employés'])
-  expect(screen.queryByRole('link', { name: 'Sites et services' })).toBeNull()
+  expect(screen.queryByRole('link', { name: 'Sites, services et colonnes' })).toBeNull()
 })

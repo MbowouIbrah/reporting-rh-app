@@ -4,7 +4,7 @@ Projet autonome (API, page web, base) ; seule la page web publie un port, la bas
 
 ## 1. Mise en service
 1. `cp .env.example .env` puis renseigner `POSTGRES_PASSWORD`, `SECRET_KEY` (≥ 32 car.), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (≥ 8 car.). Ce mot de passe est provisoire : l'application impose d'en choisir un autre à la première connexion.
-2. `docker compose up -d --build` : les migrations Alembic et le seed (référentiels, périmètres, compte administrateur si aucun compte actif ne gère les comptes) tournent au démarrage, idempotents.
+2. `docker compose up -d --build` : les migrations Alembic et le seed (listes de valeurs, périmètres, compte administrateur si aucun compte actif ne gère les comptes) tournent au démarrage, idempotents.
 3. Mettre un proxy HTTPS devant `127.0.0.1:8080` (`WEB_PORT`) en transmettant `X-Forwarded-Proto` et `X-Forwarded-For`. Un seul proxy devant l'application : il ajoute l'adresse réelle du client en dernier (nginx : `$proxy_add_x_forwarded_for`). Le port web reste lié à 127.0.0.1 (`WEB_BIND`) : seul le proxy doit l'atteindre. Renseigner `APP_URL` avec l'adresse publique. Sans HTTPS, le cookie de session n'est pas accepté hors localhost.
 4. Vérifier : `docker compose ps` (api healthy) et connexion avec le compte administrateur, puis choix d'un nouveau mot de passe (imposé).
 5. Retirer `ADMIN_PASSWORD` de `.env`, puis `docker compose up -d api`.

@@ -111,7 +111,7 @@ def saisir_ca(
     return _periode(per, db)
 
 
-# ---- référentiels et alias ----
+# ---- listes de valeurs et alias ----
 def _modele(dimension: str):
     if dimension == "rubrique":
         return Rubrique
