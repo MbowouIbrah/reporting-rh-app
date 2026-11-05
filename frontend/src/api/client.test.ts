@@ -1,4 +1,4 @@
-import { api, ApiError, setUnauthorizedHandler } from './client'
+import { api, ApiError, ErreurReseau, setUnauthorizedHandler } from './client'
 
 const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status })
 
@@ -27,13 +27,13 @@ test('session restaurée au chargement : /auth/me en 401 passe par le refresh', 
 test('/auth/me sans session valide : 401 rendu à l’appelant, sans vider le cache', async () => {
   const out = vi.fn()
   setUnauthorizedHandler(out)
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401))
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(401))
   await expect(api('/auth/me')).rejects.toMatchObject({ status: 401 })
   expect(out).not.toHaveBeenCalled()
 })
 
 test('identifiants refusés : pas de refresh', async () => {
-  const f = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401))
+  const f = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(401))
   await expect(api('/auth/login', { method: 'POST' })).rejects.toMatchObject({ status: 401 })
   expect(f).toHaveBeenCalledTimes(1)
 })
@@ -60,7 +60,7 @@ test('deux 401 simultanés : un seul refresh', async () => {
 test('refresh refusé : déconnexion déclenchée', async () => {
   const out = vi.fn()
   setUnauthorizedHandler(out)
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(401))
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(401))
   await expect(api('/x')).rejects.toMatchObject({ status: 401 })
   expect(out).toHaveBeenCalled()
 })
@@ -68,7 +68,35 @@ test('refresh refusé : déconnexion déclenchée', async () => {
 test('403 : erreur typée sans déconnexion', async () => {
   const out = vi.fn()
   setUnauthorizedHandler(out)
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(403, { detail: 'Interdit' }))
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => json(403, { detail: 'Interdit' }))
   await expect(api('/x')).rejects.toBeInstanceOf(ApiError)
   expect(out).not.toHaveBeenCalled()
+})
+
+test('refresh en erreur serveur (500) : la session reste ouverte, erreur rendue', async () => {
+  const out = vi.fn()
+  setUnauthorizedHandler(out)
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => (String(url).endsWith('/auth/refresh') ? json(500) : json(401)))
+  await expect(api('/x')).rejects.toMatchObject({ status: 500 })
+  expect(out).not.toHaveBeenCalled()
+})
+
+test('réseau coupé : ErreurReseau, pas de déconnexion', async () => {
+  const out = vi.fn()
+  setUnauthorizedHandler(out)
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+    throw new TypeError('Failed to fetch')
+  })
+  await expect(api('/x')).rejects.toBeInstanceOf(ErreurReseau)
+  expect(out).not.toHaveBeenCalled()
+})
+
+test('annulation par l’appelant : pas une panne', async () => {
+  const ctrl = new AbortController()
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
+    (_u, init) => new Promise((_, r) => init?.signal?.addEventListener('abort', () => r(new DOMException('abort', 'AbortError')))),
+  )
+  const p = api('/x', { signal: ctrl.signal })
+  ctrl.abort()
+  await expect(p).rejects.not.toBeInstanceOf(ErreurReseau)
 })

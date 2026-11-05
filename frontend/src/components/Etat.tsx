@@ -1,4 +1,6 @@
+import { useSyncExternalStore } from 'react'
 import { ApiError, ErreurReseau } from '../api/client'
+import { abonnerConnexion, connexionPerdue } from '../lib/etatConnexion'
 
 export type TypeEtat = 'chargement' | '403' | '404' | 'vide' | 'erreur' | 'reseau' | 'serveur'
 
@@ -16,7 +18,8 @@ const AIDE: Partial<Record<TypeEtat, string>> = {
   '403': 'Votre rôle ne donne pas accès à ce contenu. Contactez la DRH si besoin.',
   '404': 'Choisissez une autre période, ou vérifiez que ses données ont été saisies ou importées.',
   vide: 'Aucune période n’est encore disponible.',
-  reseau: 'La page se chargera dès le retour du réseau.',
+  // Relance automatique seulement quand la sonde a constaté la panne (voir BandeauConnexion).
+  reseau: 'Vérifiez le réseau, puis réessayez.',
   serveur: 'Réessayez dans un instant. Si cela continue, contactez la DRH.',
 }
 
@@ -52,7 +55,10 @@ export function TableauSquelette({ colonnes, lignes = 8 }: { colonnes: (string |
   )
 }
 
+const AIDE_PANNE = 'La page se chargera dès le retour du réseau.'
+
 export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: Props) {
+  const perdue = useSyncExternalStore(abonnerConnexion, connexionPerdue)
   if (type === 'chargement') {
     return (
       // L'annonce « Chargement… » est faite une seule fois par Layout (requête en cours).
@@ -64,7 +70,7 @@ export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: P
   return (
     <div className={`etat etat-${type}`} role="alert">
       <strong>{titre ?? TEXTE[type]}</strong>
-      {(aide ?? AIDE[type]) && <span className="note">{aide ?? AIDE[type]}</span>}
+      {(aide ?? AIDE[type]) && <span className="note">{aide ?? (type === 'reseau' && perdue ? AIDE_PANNE : AIDE[type])}</span>}
       {(type === 'erreur' || type === 'reseau' || type === 'serveur') && onRetry && (
         <button type="button" className="bouton bouton-secondaire" onClick={onRetry}>
           Réessayer

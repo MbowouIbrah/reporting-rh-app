@@ -227,7 +227,7 @@ export default function Individuel() {
             : q.isLoading ? <span className="val">—</span> : 'Aucun employé sélectionné : cumul de tous les employés du périmètre.'}
         </p>
       )}
-      {f.vide && <Etat type="vide" />}
+      {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {q.error &&
         (matricule && etatErreur(q.error) === '404' ? (
           <Etat type="404" titre="Matricule introuvable" aide="Cet employé n’a aucune donnée cette année dans votre périmètre." />

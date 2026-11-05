@@ -8,6 +8,7 @@ export default function MenuProfil() {
   const { me, logout } = useAuth()
   const navigate = useNavigate()
   const [ouvert, setOuvert] = useState(false)
+  const [echec, setEchec] = useState(false)
   const zone = useRef<HTMLDivElement>(null)
   const bouton = useRef<HTMLButtonElement>(null)
 
@@ -61,13 +62,20 @@ export default function MenuProfil() {
             type="button"
             className="btn-link profil-sortie"
             onClick={async () => {
-              await logout()
+              setEchec(false)
+              try {
+                await logout()
+              } catch {
+                setEchec(true)
+                return
+              }
               navigate('/login')
             }}
           >
             <LogOut aria-hidden="true" size={15} />
             Déconnexion
           </button>
+          <p className="champ-erreur" role="status">{echec && 'Déconnexion impossible : le serveur ne répond pas. Réessayez au retour du réseau.'}</p>
         </div>
       )}
     </div>

@@ -151,7 +151,7 @@ export default function Resume() {
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
-      {f.vide && <Etat type="vide" />}
+      {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
       {a && (
         <>

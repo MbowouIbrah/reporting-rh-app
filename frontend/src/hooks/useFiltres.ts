@@ -188,8 +188,10 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     activites: f?.activite ?? options.data?.activites ?? [],
     typesContrat: f?.type_contrat ?? options.data?.types_contrat ?? [],
     pret: !periodes.isLoading,
-    vide: !periodes.isLoading && !derniere,
-    erreur: periodes.error,
+    // Une panne n'est pas une absence de période : sans liste connue, la page affiche l'erreur.
+    vide: periodes.isSuccess && !derniere,
+    erreur: derniere ? null : periodes.error,
+    relancer: () => void periodes.refetch(),
   }
 }
 

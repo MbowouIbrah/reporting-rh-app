@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
 import Layout from './components/Layout'
+import LimiteErreur from './components/LimiteErreur'
 import Annuel from './pages/Annuel'
 import ChangerMotDePasse from './pages/ChangerMotDePasse'
 import Individuel from './pages/Individuel'
@@ -29,9 +30,11 @@ export default function App() {
         path="/rapport"
         element={
           <RequireAuth>
-            <Suspense fallback={null}>
-              <Rapport />
-            </Suspense>
+            <LimiteErreur>
+              <Suspense fallback={null}>
+                <Rapport />
+              </Suspense>
+            </LimiteErreur>
           </RequireAuth>
         }
       />
@@ -49,9 +52,11 @@ export default function App() {
           path="/graphes"
           element={
             // Le temps du chargement du code, un écran vide de même taille (la page ne rétrécit pas) : la page dessine ensuite sa propre structure.
-            <Suspense fallback={<section className="page-ecran page-etroite" />}>
-              <Graphes />
-            </Suspense>
+            <LimiteErreur>
+              <Suspense fallback={<section className="page-ecran page-etroite" />}>
+                <Graphes />
+              </Suspense>
+            </LimiteErreur>
           }
         />
         <Route

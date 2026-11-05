@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, ClipboardEvent, FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import {
   ATTRIBUTS, creerLotSaisie, verifier,
@@ -7,6 +7,7 @@ import {
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import BoutonReinitialiser from '../../../components/BoutonReinitialiser'
 import { Bouton } from '../../../components/Kit'
+import { abonnerConnexion, connexionPerdue } from '../../../lib/etatConnexion'
 import { largeurEntete, matriculeAffiche, MOIS, valeurBrute } from '../../../lib/format'
 import { coller, estMontant, lireTSV, type Ligne } from '../../../lib/grille'
 import BarreParcours from './BarreParcours'
@@ -115,6 +116,9 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
   const [verif, setVerif] = useState<{ ids: string[]; v: Verification } | null>(null)
   const [enCours, setEnCours] = useState(false)
   const [echecVerif, setEchecVerif] = useState<string | null>(null)
+  // Relance de la vérification : bouton Réessayer, ou retour du réseau après une panne.
+  const [essaiVerif, setEssaiVerif] = useState(0)
+  const perdue = useSyncExternalStore(abonnerConnexion, connexionPerdue)
   const [envoiEnCours, setEnvoiEnCours] = useState(false)
   const [envoi, setEnvoi] = useState<string | null>(null)
   const [focus, setFocus] = useState<{ r: number; c: number } | null>(null)
@@ -181,6 +185,8 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
   const envoyees = useMemo(() => lignes.filter(aMontant), [lignes])
   useEffect(() => {
     if (!envoyees.length) { setVerif(null); setEchecVerif(null); setEnCours(false); return }
+    // Panne : inutile d'interroger le serveur ; le retour du réseau relance la vérification.
+    if (perdue) { setEnCours(false); return }
     const ctrl = new AbortController()
     setEnCours(true)
     const t = setTimeout(() => {
@@ -195,7 +201,7 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
         .finally(() => { if (!ctrl.signal.aborted) setEnCours(false) })
     }, 600)
     return () => { clearTimeout(t); ctrl.abort() }
-  }, [annee, mois, envoyees, rubriques])
+  }, [annee, mois, envoyees, rubriques, perdue, essaiVerif])
 
   const { parLigne, totaux, nbBloquants, nbAvert } = useMemo(() => {
     const parLigne = new Map<string, AnosLigne>()
@@ -475,7 +481,12 @@ export default function GrilleSaisie({ prepa, lignesInitiales, brouillonId, onRe
             </span>
           ) : <span>Aucune erreur{nbAvert ? ` · ${nbAvert} avertissement${nbAvert > 1 ? 's' : ''}` : ''}</span>
         )}
-        {!enCours && echecVerif && <span>{echecVerif}</span>}
+        {!enCours && echecVerif && (
+          <span>
+            {echecVerif}{' '}
+            <button type="button" className="bouton bouton-lien" onClick={() => setEssaiVerif((n) => n + 1)}>Réessayer</button>
+          </span>
+        )}
         {envoi && <span>{envoi}</span>}
         {anoFocus && <span className="saisie-message">{anoFocus.message}</span>}
       </p>

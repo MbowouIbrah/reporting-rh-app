@@ -4,8 +4,13 @@
  */
 const DELAI_SONDE = 5_000
 
+/** Réponses d'une passerelle sans serveur derrière : seules ces réponses valent panne. */
+export const PANNE_PASSERELLE = [502, 503, 504]
+
 let perdue = false
 let sonde: Promise<boolean> | null = null
+// Compte les réponses reçues : une sonde partie avant une réponse réussie ne peut plus déclarer la panne.
+let reponses = 0
 const abonnes = new Set<() => void>()
 
 function poser(valeur: boolean) {
@@ -15,7 +20,10 @@ function poser(valeur: boolean) {
 }
 
 export const connexionPerdue = () => perdue
-export const connexionRetablie = () => poser(false)
+export const connexionRetablie = () => {
+  reponses++
+  poser(false)
+}
 
 export function abonnerConnexion(f: () => void) {
   abonnes.add(f)
@@ -26,18 +34,24 @@ export function abonnerConnexion(f: () => void) {
 
 /** Interroge le serveur et met l'état à jour. Sans session, le 401 prouve aussi que le serveur répond. */
 export function verifierConnexion(): Promise<boolean> {
-  sonde ??= fetch(`${import.meta.env.BASE_URL}api/v1/auth/me`, {
+  if (sonde) return sonde
+  const depart = reponses
+  // Minuteur manuel : AbortSignal.timeout manque sur Safari < 16.
+  const ctrl = new AbortController()
+  const minuteur = setTimeout(() => ctrl.abort(), DELAI_SONDE)
+  sonde = fetch(`${import.meta.env.BASE_URL}api/v1/auth/me`, {
     credentials: 'same-origin',
     cache: 'no-store',
-    signal: AbortSignal.timeout(DELAI_SONDE),
+    signal: ctrl.signal,
   })
-    .then((r) => r.status < 500)
+    .then((r) => !PANNE_PASSERELLE.includes(r.status))
     .catch(() => false)
     .then((ok) => {
-      poser(!ok)
-      return ok
+      if (ok || reponses === depart) poser(!ok)
+      return ok || reponses !== depart
     })
     .finally(() => {
+      clearTimeout(minuteur)
       sonde = null
     })
   return sonde

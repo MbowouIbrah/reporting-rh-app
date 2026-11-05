@@ -93,7 +93,7 @@ export default function ChangerMotDePasse() {
       </form>
       <p className="login-retour">
         {impose ? (
-          <button type="button" className="btn-link" onClick={() => void logout()}>
+          <button type="button" className="btn-link" onClick={() => logout().catch(() => setError('Déconnexion impossible : le serveur ne répond pas. Réessayez au retour du réseau.'))}>
             Se déconnecter
           </button>
         ) : (

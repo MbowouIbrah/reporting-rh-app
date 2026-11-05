@@ -401,7 +401,7 @@ export default function Graphes() {
           onPersonnaliser={() => setPersonnalise(true)}
         />
       )}
-      {f.vide && <Etat type="vide" />}
+      {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {serie && menu.length === 0 && (
         <p className="graphes-aucun">
           Aucun groupe à afficher.

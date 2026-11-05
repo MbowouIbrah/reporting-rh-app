@@ -251,7 +251,7 @@ table.dense td.num { text-align: right; }
 }
 @media (max-width: 1099px) { .grille-rapport > .panneau { grid-column: 1 / -1; } }
 @media (min-width: 1360px) {
-  .layout-ecran:has(.page-ecran) { height: 100dvh; display: flex; flex-direction: column; }
+  .layout-ecran:has(.page-ecran) { height: calc(100dvh - var(--bandeau-h, 0px)); display: flex; flex-direction: column; }
   .layout-ecran:has(.page-ecran) > .page { flex: 1; min-height: 0; width: 100%; }
 }
 
@@ -727,7 +727,7 @@ html, body { overscroll-behavior: none; }
 .saisie-donnees small { display: block; padding: 0 12px 4px; font-size: var(--fs-xs); font-weight: 400; font-style: italic; color: var(--muted); text-align: right; }
 .saisie-donnees tfoot td small { padding-inline: 0; }
 .saisie-donnees .non-reparti.negatif { color: var(--warning); font-style: normal; font-weight: var(--fw-bold); }
-.saisie-donnees-groupe .saisie-pied { position: sticky; bottom: 0; z-index: 2; border-top: 1px solid var(--rule); margin-top: 0; padding-block: var(--sp-3); background: var(--surface-sunken); }
+.saisie-donnees-groupe .saisie-pied { position: sticky; bottom: var(--bandeau-h, 0px); z-index: 2; border-top: 1px solid var(--rule); margin-top: 0; padding-block: var(--sp-3); background: var(--surface-sunken); }
 .saisie-donnees .saisie-groupe-titre > * { border-top: 1px solid var(--rule-strong); background: var(--surface-sunken); color: var(--navy); font-weight: var(--fw-bold); }
 .saisie-donnees .saisie-groupe-titre th[scope='rowgroup'] { position: sticky; left: 0; z-index: 1; text-align: left; white-space: normal; }
 .saisie-donnees .saisie-groupe-titre small { display: inline; padding: 0 0 0 var(--sp-2); font-weight: 400; }
@@ -822,7 +822,7 @@ html, body { overscroll-behavior: none; }
 .rapport-excel.saisie-choix .panneau table.saisie-liste tbody tr:not(.saisie-service):not(.cochee) td { color: var(--muted); }
 .saisie-liste label.saisie-nom { cursor: pointer; }
 .saisie-liste .badge { margin: 0 var(--sp-2) 0 0; }
-.saisie-choix .saisie-pied { margin-top: 0; position: sticky; bottom: 0; background: var(--surface-sunken); padding-block: var(--sp-3); }
+.saisie-choix .saisie-pied { margin-top: 0; position: sticky; bottom: var(--bandeau-h, 0px); background: var(--surface-sunken); padding-block: var(--sp-3); }
 .saisie-nom { font-weight: 600; color: var(--navy); }
 /* Grille : même tableau que DONNEES, cellules éditables, colonne de retrait puis MATRICULE et Noms figés */
 .saisie-excel { --f1: 30px; --f2: 104px; --f3: 190px; }
@@ -1479,7 +1479,7 @@ table.tableau-squelette td { height: 2.1em; }
 .fiche-permissions small { color: var(--muted); font-size: var(--fs-xs); }
 .fiche-permissions label:has(input:disabled) { cursor: default; }
 .fiche-erreur { padding: var(--sp-2) var(--sp-4) 0; }
-.fiche-barre { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--rule-strong); background: var(--surface); }
+.fiche-barre { position: sticky; bottom: var(--bandeau-h, 0px); display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--rule-strong); background: var(--surface); }
 .fiche-barre-discrete { position: static; border-top: 0; background: none; }
 @media (max-width: 899px) { .comptes-duo { grid-template-columns: minmax(0, 1fr); } }
 
@@ -1565,7 +1565,7 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 /* Renseigner des données >= 1100 px : espacements proportionnels à la hauteur, tout tient dans l'écran avec une marge en bas
    (la page défile en elle-même seulement si l'écran est vraiment trop bas) */
 @media (min-width: 1100px) {
-  .layout-ecran:has(.saisie-depart) { height: 100dvh; display: flex; flex-direction: column; }
+  .layout-ecran:has(.saisie-depart) { height: calc(100dvh - var(--bandeau-h, 0px)); display: flex; flex-direction: column; }
   .layout-ecran:has(.saisie-depart) > .page { flex: 1; min-height: 0; width: 100%; padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
   .saisie-depart .barre-parcours { margin-bottom: var(--v); padding-bottom: calc(var(--v) * .6); }
   .saisie-depart > .bandeau-titre { margin-bottom: calc(var(--v) * .5); }
@@ -1579,7 +1579,7 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 }
 /* Vérification >= 1100 px : en-tête et pied fixes, seule la liste des volets défile ; le volet déplié occupe presque toute sa hauteur */
 @media (min-width: 1100px) {
-  .layout-ecran:has(.saisie-verif) { height: 100dvh; display: flex; flex-direction: column; }
+  .layout-ecran:has(.saisie-verif) { height: calc(100dvh - var(--bandeau-h, 0px)); display: flex; flex-direction: column; }
   .layout-ecran:has(.saisie-verif) > .page { flex: 1; min-height: 0; width: 100%; padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
   .page-ecran.saisie-verif { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; }
   .page-ecran.saisie-verif .panneau { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -1621,6 +1621,8 @@ input::-ms-clear {
 .recharts-default-tooltip .recharts-tooltip-item-separator { display: none; }
 .recharts-default-tooltip .recharts-tooltip-item-value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-/* Perte de connexion : hors du flux, les pages à hauteur mesurée ne bougent pas. */
+/* Perte de connexion : hors du flux ; sa hauteur (--bandeau-h, posée par le composant) est retirée des
+   écrans pleine hauteur et ajoutée sous les pages longues, pour que rien ne reste caché dessous. */
+body { padding-bottom: var(--bandeau-h, 0px); }
 .bandeau-connexion { position: fixed; inset: auto 0 0; z-index: calc(var(--z-sticky) + 20); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-1) var(--sp-4); padding: var(--sp-2) var(--page-gutter); background: var(--red-soft); color: var(--red-deep); border-top: 1px solid var(--red-deep); font-size: var(--fs-sm); }
 @media print { .bandeau-connexion { display: none; } }

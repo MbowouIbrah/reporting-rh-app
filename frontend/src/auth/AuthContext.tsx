@@ -9,6 +9,9 @@ import { viderPartage } from '../lib/filtresPartages'
 interface Auth {
   me: Me | null
   loading: boolean
+  /** Erreur de /auth/me quand aucun profil n'est connu : la session ne peut pas être établie. */
+  panne: unknown
+  reessayer: () => void
   can: (perm: string) => boolean
   login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
@@ -59,8 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     placeholderData: lireProfil,
   })
-  // Une panne ne dit rien de la session : le profil gardé reste valable jusqu'à la réponse du serveur.
-  const me = q.data ?? (q.error instanceof ErreurReseau ? lireProfil() : undefined) ?? null
+  // Une panne ou une erreur serveur ne dit rien de la session (seul le 401 la ferme, voir sansSession) :
+  // le profil gardé reste valable jusqu'à la réponse du serveur.
+  const me = q.data ?? (q.error ? lireProfil() : undefined) ?? null
+  // Session inconnue faute de serveur (nouvel onglet, mot de passe à changer) : ni page ni redirection.
+  const panne = !me && q.error ? q.error : null
 
   /** Oublie tout ce qui appartient au compte précédent (filtres, caches), sauf le profil lui-même. */
   const oublier = useCallback(() => {
@@ -163,7 +169,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [poser, oublier],
   )
   const logout = useCallback(async () => {
-    await apiLogout().catch(() => {})
+    // Sans réponse du serveur, les cookies restent valides : fermer l'écran seul rouvrirait le compte
+    // au retour du réseau (poste partagé). On refuse, l'appelant affiche le message.
+    await apiLogout().catch((e) => {
+      if (e instanceof ErreurReseau || (e instanceof ApiError && e.status >= 500)) throw e
+    })
     // Le prochain utilisateur de l'onglet ne doit pas hériter du service ou de l'employé choisis.
     // Pas de qc.clear() : il retirerait ['me'] et l'écran resterait sur le profil précédent.
     ecrireProfil(null)
@@ -180,9 +190,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [poser],
   )
 
+  const refetch = q.refetch
+  const reessayer = useCallback(() => void refetch(), [refetch])
   const value = useMemo<Auth>(
-    () => ({ me, loading: q.isLoading, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
-    [me, q.isLoading, login, logout, changerMotDePasse],
+    () => ({ me, loading: q.isLoading, panne, reessayer, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
+    [me, q.isLoading, panne, reessayer, login, logout, changerMotDePasse],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
