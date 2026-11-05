@@ -18,13 +18,14 @@ test('groupes de graphiques : quatre cartes au plus, tous les groupes, groupe pe
   await page.goto('graphes')
   await expect(menu(page)).toBeVisible()
 
-  // Ouverture sur le premier groupe : quatre cartes au plus
-  await expect(menu(page).locator('summary')).toContainText('Groupe : ')
+  // Ouverture : les groupes cochés s'affichent directement, un écran par groupe
+  await expect(menu(page).locator('summary')).toContainText('Tous les groupes')
   await expect(page.locator('figure.graphe').first()).toBeVisible()
-  expect(await page.locator('figure.graphe').count()).toBeLessThanOrEqual(4)
+  await expect.poll(() => page.locator('.snap-section').count()).toBeGreaterThan(1)
 
-  // Un autre groupe remplace le premier
+  // Choisir un groupe l'affiche seul : quatre cartes au plus
   await choisir(page, /Salaires, primes et charges/)
+  await expect(menu(page).locator('summary')).toContainText('Groupe : ')
   await expect(graphe(page, TITRE)).toHaveCount(1)
   await expect(graphe(page, 'Masse salariale mensuelle')).toHaveCount(0)
   expect(await page.locator('figure.graphe').count()).toBeLessThanOrEqual(4)
@@ -32,7 +33,7 @@ test('groupes de graphiques : quatre cartes au plus, tous les groupes, groupe pe
   // Tous les groupes : un écran par groupe, toutes les cartes sont dans la page
   await choisir(page, /Tout afficher/)
   await expect(page.locator('.snap-section').first()).toBeVisible()
-  expect(await page.locator('.snap-section').count()).toBeGreaterThan(1)
+  await expect.poll(() => page.locator('.snap-section').count()).toBeGreaterThan(1)
   await expect(graphe(page, TITRE)).toHaveCount(1)
   await expect(graphe(page, 'Masse salariale mensuelle')).toHaveCount(1)
 
@@ -70,7 +71,7 @@ test('groupes de graphiques : quatre cartes au plus, tous les groupes, groupe pe
   // Le PDF s'ouvre dans le même navigateur : un groupe par page, sans le menu
   await page.goto('rapport?sections=graphes')
   await expect(page.locator('.snap-section').first()).toBeVisible({ timeout: 20_000 })
-  expect(await page.locator('.snap-section').count()).toBeGreaterThan(1)
+  await expect.poll(() => page.locator('.snap-section').count()).toBeGreaterThan(1)
   await expect(page.locator('.graphes-groupe-titre', { hasText: NOM })).toHaveCount(1)
   await expect(page.locator('details.menu-groupes')).toHaveCount(0)
 

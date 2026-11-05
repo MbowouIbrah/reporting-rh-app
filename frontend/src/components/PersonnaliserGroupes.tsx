@@ -83,8 +83,11 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     setRang(o)
     maj({ ...travail, ordre: o.filter((x) => affiches.includes(x)) })
   }
-  const supprimer = (id: string) =>
-    maj({ ...travail, perso: travail.perso.filter((g) => g.id !== id), ordre: affiches.filter((x) => x !== id) })
+  // Supprimer le seul groupe coché réaffiche les autres : sinon rien ne serait coché et « Enregistrer » resterait bloqué
+  const supprimer = (id: string) => {
+    const restants = affiches.filter((x) => x !== id)
+    maj({ ...travail, perso: travail.perso.filter((g) => g.id !== id), ordre: restants.length ? restants : ids.filter((x) => x !== id) })
+  }
   const seulementMesGroupes = () => maj({ ...travail, ordre: travail.perso.map((g) => g.id) })
   const retablir = () => {
     const c = retablirOrigine(travail)

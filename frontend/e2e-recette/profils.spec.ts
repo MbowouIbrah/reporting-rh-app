@@ -44,10 +44,10 @@ for (const p of PROFILS) {
       await expect(page.getByRole('alert')).toHaveCount(0)
     }
     await expect(optionsService(page)).toHaveText(['Tous', ...p.services])
-    await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
     for (const s of p.services) {
       await page.getByRole('combobox', { name: 'Service' }).selectOption({ label: s })
-      await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
+      await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
     }
 
     await page.goto('individuel')

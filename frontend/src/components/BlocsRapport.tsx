@@ -167,13 +167,12 @@ export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libell
   )
 }
 
-/** Premier chargement : cadre réel de la section 1 (bandeau, titre, en-têtes, TOTAL GÉNÉRAL) à sa taille ;
+/** Premier chargement : cadre réel de la section 1 (titre, en-têtes, TOTAL GÉNÉRAL) à sa taille ;
  *  seules les valeurs issues des données (types de charge, chiffres) sont en squelette. */
-export function RapportSquelette({ lib, bandeau }: { lib: Libelles; bandeau?: ReactNode }) {
+export function RapportSquelette({ lib }: { lib: Libelles }) {
   const chiffres = Array.from({ length: COLONNES }, (_, j) => <td key={j} className="num" />)
   return (
     <div aria-busy="true">
-      {bandeau && <p className="bandeau ok">{bandeau}</p>}
       <Panneau titre="1. Reporting global">
         <table className="dense tab-global aligne">
           <Tete premiere="Type de charge" lib={lib} budget />

@@ -114,7 +114,7 @@ test.describe.serial('gestion des utilisateurs', () => {
 
     const { context, page: p } = await session(browser, baseURL, EMAIL.perimetre)
     await voir(p, { onglets: BASE_ONGLETS.slice(0, 4), services: ['Pneumatique'], marge: false })
-    await expect(p.getByText('Contrôles de cohérence : OK')).toBeVisible()
+    await expect(p.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
     await p.goto('individuel')
     // Page non accordée : redirection vers le résumé (pas de 403 affiché)
     await expect(p).toHaveURL(/resume$/)

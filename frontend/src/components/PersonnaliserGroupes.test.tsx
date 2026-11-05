@@ -207,3 +207,12 @@ test('afficher tous les groupes : décochée puis recochée, tous les groupes re
   enregistrer()
   expect(sortie(f)).toEqual(CONFIG_ORIGINE)
 })
+
+test('personnaliser : supprimer le seul groupe coché réaffiche les autres', () => {
+  const config = { perso: [{ id: 'p-1', nom: 'Mes ventes', graphes: ['ca'] }], ordre: ['p-1'], defaut: 'p-1' }
+  const f = fenetre(config)
+  fireEvent.click(screen.getByRole('button', { name: 'Supprimer' }))
+  enregistrer()
+  expect(sortie(f).perso).toEqual([])
+  expect(sortie(f).ordre).toEqual(CONFIG_ORIGINE.ordre)
+})

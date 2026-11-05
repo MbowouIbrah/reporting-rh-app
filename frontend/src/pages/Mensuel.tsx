@@ -9,7 +9,6 @@ import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { entier, pct } from '../lib/format'
 import { TitreRapport } from '../components/ExportPdf'
 
 export default function Mensuel() {
@@ -37,14 +36,6 @@ export default function Mensuel() {
       {premier && !gab && f.filtres && (
         <RapportSquelette
           lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }}
-          bandeau={
-            <>
-              <span>Contrôles de cohérence : <strong className="val">—</strong></span>
-              <span>Effectif fin de mois : <strong className="val">—</strong></span>
-              <span>Taux de rotation : <strong className="val">—</strong></span>
-              <span>Taux d’absentéisme : <strong className="val">—</strong></span>
-            </>
-          }
         />
       )}
       {q.error && !premier && <Etat type={etatErreur(q.error)} />}
@@ -54,20 +45,8 @@ export default function Mensuel() {
 }
 
 function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string } }) {
-  const s = d.synthese
-  const bloquants = d.controles.filter((c) => c.bloquant)
   return (
     <>
-      <p className={bloquants.length ? 'bandeau ko' : 'bandeau ok'} role="status">
-        <span className="sk-texte">
-          {bloquants.length
-            ? `Contrôles de cohérence en écart : ${bloquants.map((c) => c.controle).join(' ; ')}`
-            : 'Contrôles de cohérence : OK'}
-        </span>
-        <span>Effectif fin de mois : <strong className="val">{entier(s.effectif.fin)}</strong></span>
-        <span>Taux de rotation : <strong className="val">{pct(s.taux_rotation)}</strong></span>
-        <span>Taux d’absentéisme : <strong className="val">{pct(s.taux_absenteisme)}</strong></span>
-      </p>
       <SnapSections
         sections={[
           {

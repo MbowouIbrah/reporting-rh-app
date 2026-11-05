@@ -381,6 +381,11 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.dense tbody.pied:last-child > tr:last-child > *, .rapport-excel .panneau table.dense tbody.pied + tbody > tr:last-child > * { box-shadow: inset 0 -2px 0 var(--brun); }
 .rapport-excel .panneau table.dense tbody.pied:last-child > tr:only-child > *, .rapport-excel .panneau table.dense tbody.pied:last-child > tr:first-child > [rowspan] { box-shadow: inset 0 2px 0 var(--brun), inset 0 -2px 0 var(--brun); }
 @media print { .rapport-excel .panneau table.dense tbody.pied { position: static; } }
+/* Sans accrochage (écran étroit) : le tableau à total défile dans son panneau, sinon le pied figé n'aurait aucun effet. */
+@media screen and (max-width: 1359.98px) {
+  .rapport-excel .panneau-corps:has(table.dense tbody.pied) { max-height: max(320px, calc(100dvh - 160px)); }
+  .rapport-excel .panneau-corps:has(table.dense tbody.pied) table.dense thead th { position: sticky; top: 0; z-index: 2; }
+}
 /* Répartition par service : service et budget fusionnés sur les lignes de leurs activités comme dans l'Excel, ligne Staff discrète */
 .rapport-excel .panneau table.services th.service { text-align: left; vertical-align: middle; font-weight: var(--fw-bold); background: var(--rapport-groupe); color: var(--navy); border-right: 1px solid var(--rule); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rapport-excel .panneau table.services th.service.detail { font-weight: var(--fw-regular); background: var(--surface); border-left: 3px solid var(--navy); padding-left: calc(12px + var(--sp-1)); padding-right: 2px; }

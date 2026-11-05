@@ -7,6 +7,7 @@ import RequireAuth from '../auth/RequireAuth'
 import Annuel from './Annuel'
 import Graphes from './Graphes'
 import Individuel from './Individuel'
+import Mensuel from './Mensuel'
 import Resume from './Resume'
 
 // Bloc ACTIVITÉ de l'annuel : null tant qu'aucune donnée d'activité n'existe.
@@ -160,6 +161,14 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
   await screen.findByText('Masse salariale', { selector: '.micro' })
   expect(screen.queryByText('Marge', { selector: '.micro' })).toBeNull()
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
+})
+
+test('Mensuel : pas de ligne de contrôles et d’indicateurs au-dessus des tableaux', async () => {
+  rendu(<Mensuel />, '/mensuel', ['report:read'])
+  await screen.findByText('1. Reporting global')
+  expect(screen.queryByText(/Contrôles de cohérence/)).toBeNull()
+  expect(screen.queryByText(/Effectif fin de mois/)).toBeNull()
+  expect(screen.queryByText(/Taux de rotation/)).toBeNull()
 })
 
 test('Annuel : pas de bandeau de cumul au-dessus des tableaux', async () => {

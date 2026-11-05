@@ -21,7 +21,7 @@ for (const email of ['admin@exemple.invalid', 'drh@exemple.invalid']) {
     )
     await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ }).first()).toBeVisible()
     await page.getByRole('link', { name: 'Mensuel' }).click()
-    await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
     await expect(page.getByText('4. Répartition par nature de contrat')).toBeVisible()
   })
 }
@@ -68,7 +68,7 @@ test('access token supprimé : rattrapé par le refresh', async ({ page, context
   await connecter(page, 'admin@exemple.invalid')
   await context.clearCookies({ name: 'access_token' })
   await page.getByRole('link', { name: 'Mensuel' }).click()
-  await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
 })
 
 test('fiche individuelle puis déconnexion', async ({ page }) => {

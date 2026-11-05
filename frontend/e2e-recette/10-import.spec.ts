@@ -116,8 +116,8 @@ test.describe.serial('import de fichiers', () => {
     await page.goto('mensuel')
     await reinitialiserFiltres(page)
     await choisirPeriode(page, 'Juillet')
-    await expect(page.getByText('Contrôles de cohérence : OK')).toBeVisible()
-    await expect(page.getByText(/Effectif fin de mois :\s*81/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveCount(0)
 
     // Chaque correction retrouvée dans la feuille de données de juillet
     const sites = await lireJson<{ valeurs: { libelle: string; type_site: string }[] }>(page.request, 'referentiels/site')
@@ -164,7 +164,8 @@ test.describe.serial('import de fichiers', () => {
     await page.goto('mensuel')
     await reinitialiserFiltres(page)
     await choisirPeriode(page, 'Août')
-    await expect(page.getByText(new RegExp(`Effectif fin de mois :\\s*${f.manifeste.lignes_aout}`))).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('alert')).toHaveCount(0)
   })
 
   test('août : le même fichier réimporté est refusé, rien ne change', async ({ page }) => {
