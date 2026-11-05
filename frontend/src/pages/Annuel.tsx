@@ -85,7 +85,7 @@ export default function Annuel() {
           lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: libelleExercice(f.filtres.annee, f.filtres.calendrier) }}
         />
       )}
-      {q.error && !premier && <Etat type={etatErreur(q.error)} />}
+      {q.error && !premier && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
       {d && f.filtres && <Contenu d={d} f={f.filtres} />}
     </section>
   )

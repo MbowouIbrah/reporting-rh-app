@@ -133,7 +133,7 @@ export default function Donnees() {
         </div>
       </div>
       <BandeauEnregistre />
-      {q.isError && <Etat type={etatErreur(q.error)} />}
+      {q.isError && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
       {(d || q.isLoading) && (
         <>
           <p className="bandeau">

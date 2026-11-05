@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
-import { ApiError, setMotDePasseAChangerHandler, setUnauthorizedHandler } from '../api/client'
+import { ApiError, ErreurReseau, setMotDePasseAChangerHandler, setUnauthorizedHandler } from '../api/client'
 import { changerMotDePasse as apiChanger, getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
 import type { Me } from '../api/types'
 import { viderCache } from '../lib/cacheSession'
@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     placeholderData: lireProfil,
   })
-  const me = q.data ?? null
+  // Une panne ne dit rien de la session : le profil gardé reste valable jusqu'à la réponse du serveur.
+  const me = q.data ?? (q.error instanceof ErreurReseau ? lireProfil() : undefined) ?? null
 
   /** Oublie tout ce qui appartient au compte précédent (filtres, caches), sauf le profil lui-même. */
   const oublier = useCallback(() => {

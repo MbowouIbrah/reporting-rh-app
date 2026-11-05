@@ -232,7 +232,7 @@ export default function Individuel() {
         (matricule && etatErreur(q.error) === '404' ? (
           <Etat type="404" titre="Matricule introuvable" aide="Cet employé n’a aucune donnée cette année dans votre périmètre." />
         ) : (
-          <Etat type={etatErreur(q.error)} />
+          <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
         ))}
       <ConfirmerColonne {...colonnes} />
       {d && (

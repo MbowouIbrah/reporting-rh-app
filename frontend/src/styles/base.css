@@ -135,7 +135,7 @@ a.bouton:not(.bouton-lien) { text-decoration: none; }
 .section-corps .table-scroll { margin: 0; }
 
 .etat { display: grid; gap: var(--sp-2); justify-items: center; }
-.etat-403, .etat-erreur { color: var(--error); }
+.etat-403, .etat-erreur, .etat-reseau, .etat-serveur { color: var(--error); }
 
 .filtres { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--surface-sunken); padding: var(--sp-2) 0; }
 .filtres-resume { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; }
@@ -1620,3 +1620,7 @@ input::-ms-clear {
 .recharts-default-tooltip .recharts-tooltip-item-name { flex: 1; }
 .recharts-default-tooltip .recharts-tooltip-item-separator { display: none; }
 .recharts-default-tooltip .recharts-tooltip-item-value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Perte de connexion : hors du flux, les pages à hauteur mesurée ne bougent pas. */
+.bandeau-connexion { position: fixed; inset: auto 0 0; z-index: calc(var(--z-sticky) + 20); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-1) var(--sp-4); padding: var(--sp-2) var(--page-gutter); background: var(--red-soft); color: var(--red-deep); border-top: 1px solid var(--red-deep); font-size: var(--fs-sm); }
+@media print { .bandeau-connexion { display: none; } }

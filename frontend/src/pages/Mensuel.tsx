@@ -38,7 +38,7 @@ export default function Mensuel() {
           lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }}
         />
       )}
-      {q.error && !premier && <Etat type={etatErreur(q.error)} />}
+      {q.error && !premier && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}
       {d && f.filtres && <Contenu d={d} lib={{ prec: libelleComparaison(f.filtres, 'periode'), cour: libellePeriode(f.filtres) }} />}
     </section>
   )

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { configure } from '@testing-library/react'
+import { connexionRetablie } from './lib/etatConnexion'
 import { viderPartage } from './lib/filtresPartages'
 
 configure({ asyncUtilTimeout: 4000 })
@@ -8,6 +9,7 @@ configure({ asyncUtilTimeout: 4000 })
 // chaque test repart à vide.
 beforeEach(() => {
   viderPartage()
+  connexionRetablie()
   sessionStorage.clear()
   localStorage.clear()
 })

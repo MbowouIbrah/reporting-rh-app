@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { queryRetry } from './api/client'
 import App from './App'
 import { AuthProvider } from './auth/AuthContext'
+import { connexionPerdue } from './lib/etatConnexion'
 import '@fontsource/dm-sans/latin-300.css'
 import '@fontsource/dm-sans/latin-400.css'
 import '@fontsource/dm-sans/latin-500.css'
@@ -17,7 +18,18 @@ import './styles/mouvement.css'
 
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: queryRetry, staleTime: 5 * 60 * 1000 } },
+  defaultOptions: {
+    queries: {
+      retry: queryRetry,
+      staleTime: 5 * 60 * 1000,
+      // Hors ligne, une requête échoue au lieu de rester en pause sans fin (voir docs/etude-reseau.md).
+      networkMode: 'always',
+      // Pendant une panne, les données déjà affichées restent à l'écran, sans relecture vouée à l'échec.
+      refetchOnWindowFocus: () => !connexionPerdue(),
+      refetchOnMount: () => !connexionPerdue(),
+    },
+    mutations: { networkMode: 'always' },
+  },
 })
 
 createRoot(document.getElementById('root')!).render(

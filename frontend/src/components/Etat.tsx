@@ -1,6 +1,6 @@
-import { ApiError } from '../api/client'
+import { ApiError, ErreurReseau } from '../api/client'
 
-export type TypeEtat = 'chargement' | '403' | '404' | 'vide' | 'erreur'
+export type TypeEtat = 'chargement' | '403' | '404' | 'vide' | 'erreur' | 'reseau' | 'serveur'
 
 const TEXTE: Record<TypeEtat, string> = {
   chargement: 'Chargement…',
@@ -8,12 +8,16 @@ const TEXTE: Record<TypeEtat, string> = {
   '404': 'Aucune donnée pour cette période',
   vide: 'Aucune donnée',
   erreur: 'Une erreur est survenue. Réessayez.',
+  reseau: 'Connexion au serveur impossible',
+  serveur: 'Le serveur a rencontré une erreur',
 }
 
 const AIDE: Partial<Record<TypeEtat, string>> = {
   '403': 'Votre rôle ne donne pas accès à ce contenu. Contactez la DRH si besoin.',
   '404': 'Choisissez une autre période, ou vérifiez que ses données ont été saisies ou importées.',
   vide: 'Aucune période n’est encore disponible.',
+  reseau: 'La page se chargera dès le retour du réseau.',
+  serveur: 'Réessayez dans un instant. Si cela continue, contactez la DRH.',
 }
 
 interface Props {
@@ -61,7 +65,7 @@ export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: P
     <div className={`etat etat-${type}`} role="alert">
       <strong>{titre ?? TEXTE[type]}</strong>
       {(aide ?? AIDE[type]) && <span className="note">{aide ?? AIDE[type]}</span>}
-      {type === 'erreur' && onRetry && (
+      {(type === 'erreur' || type === 'reseau' || type === 'serveur') && onRetry && (
         <button type="button" className="bouton bouton-secondaire" onClick={onRetry}>
           Réessayer
         </button>
@@ -72,7 +76,9 @@ export default function Etat({ type, onRetry, titre, aide, colonnes, lignes }: P
 
 /** Choisit l'état à afficher pour une requête en échec. */
 export function etatErreur(e: unknown): TypeEtat {
+  if (e instanceof ErreurReseau) return 'reseau'
   if (e instanceof ApiError) {
+    if (e.status >= 500) return 'serveur'
     if (e.status === 403) return '403'
     if (e.status === 404) return '404'
   }

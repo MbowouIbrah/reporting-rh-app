@@ -129,5 +129,5 @@ test('désactivation : PUT avec la fiche et actif inversé', async () => {
 
 test('échec de l’API sur la liste : état d’erreur', async () => {
   monter(page, PERMS, () => erreurApi(500, 'boom'))
-  expect(await screen.findByText('Une erreur est survenue. Réessayez.')).toBeInTheDocument()
+  expect(await screen.findByText('Le serveur a rencontré une erreur')).toBeInTheDocument()
 })

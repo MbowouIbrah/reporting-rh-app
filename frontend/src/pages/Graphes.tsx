@@ -408,7 +408,7 @@ export default function Graphes() {
           {!rapport && <> <button type="button" className="bouton bouton-lien" onClick={retablir}>Rétablir les groupes d’origine</button> <button type="button" className="bouton bouton-lien" onClick={() => setPersonnalise(true)}>Personnaliser…</button></>}
         </p>
       )}
-      {erreur && <Etat type={etatErreur(erreur)} />}
+      {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
       {/* Au premier chargement les quatre cartes ont déjà leur taille définitive. */}
       {premier && (
         <div className={`graphes n${Math.max(1, titresSquelette.length)}`} aria-busy="true">

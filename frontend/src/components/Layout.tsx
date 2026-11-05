@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { prechargerGraphes } from '../lib/pagesDifferees'
+import BandeauConnexion from './BandeauConnexion'
 import Fond from './Fond'
 import { premierePageAdmin } from './AdminNav'
 import LienPage from './LienPage'
@@ -63,6 +64,7 @@ export default function Layout() {
       <main className="page">
         <Outlet />
       </main>
+      <BandeauConnexion />
     </div>
   )
 }

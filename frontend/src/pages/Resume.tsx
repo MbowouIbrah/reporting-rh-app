@@ -152,7 +152,7 @@ export default function Resume() {
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}
       {f.vide && <Etat type="vide" />}
-      {erreur && <Etat type={etatErreur(erreur)} />}
+      {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
       {a && (
         <>
           {/* Disposition du 16/10 : CA, commissions, masse salariale, MAD ; puis marge, primes,

@@ -1,3 +1,5 @@
+import { connexionRetablie, verifierConnexion } from '../lib/etatConnexion'
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -9,7 +11,18 @@ export class ApiError extends Error {
   }
 }
 
+/** Le serveur est injoignable : réseau coupé, passerelle sans réponse ou lecture trop longue. */
+export class ErreurReseau extends Error {
+  constructor() {
+    super('Connexion au serveur impossible. Vérifiez le réseau, puis réessayez.')
+  }
+}
+
 export const BASE = `${import.meta.env.BASE_URL}api/v1`
+
+const PANNE_PASSERELLE = [502, 503, 504]
+// Lecture la plus lente mesurée : 1,8 s. Les envois (imports, exports) n'ont pas de limite.
+const DELAI_LECTURE = 30_000
 
 let onUnauthorized: () => void = () => {}
 export function setUnauthorizedHandler(fn: () => void) {
@@ -24,11 +37,31 @@ export function setMotDePasseAChangerHandler(fn: () => void) {
 // /auth/me reste éligible : c'est lui qui restaure la session après expiration du jeton d'accès.
 const SANS_REFRESH = ['/auth/login', '/auth/refresh', '/auth/logout']
 
+/** `fetch` dont toute panne devient une `ErreurReseau` et fait vérifier la connexion. */
+async function appel(url: string, init: RequestInit): Promise<Response> {
+  const lecture = !init.method || init.method === 'GET'
+  const delai = lecture && !init.signal ? new AbortController() : null
+  const minuteur = delai && setTimeout(() => delai.abort(), DELAI_LECTURE)
+  try {
+    const r = await fetch(url, delai ? { ...init, signal: delai.signal } : init)
+    if (PANNE_PASSERELLE.includes(r.status)) throw new ErreurReseau()
+    connexionRetablie()
+    return r
+  } catch (e) {
+    // Annulation demandée par l'appelant : ce n'est pas une panne.
+    if (init.signal?.aborted) throw e
+    void verifierConnexion()
+    throw e instanceof ErreurReseau ? e : new ErreurReseau()
+  } finally {
+    if (minuteur) clearTimeout(minuteur)
+  }
+}
+
 let refreshing: Promise<boolean> | null = null
+/** Une panne pendant le renouvellement rejette : elle ne dit rien de la session, qui reste ouverte. */
 function refresh(): Promise<boolean> {
-  refreshing ??= fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'same-origin' })
+  refreshing ??= appel(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'same-origin' })
     .then((r) => r.ok)
-    .catch(() => false)
     .finally(() => {
       refreshing = null
     })
@@ -53,7 +86,7 @@ async function detail(r: Response): Promise<[string, Record<string, unknown>?]> 
 
 async function requete(path: string, init: RequestInit, retry: boolean): Promise<Response> {
   const headers = init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json', ...init.headers } : init.headers
-  const r = await fetch(`${BASE}${path}`, { credentials: 'same-origin', ...init, headers })
+  const r = await appel(`${BASE}${path}`, { credentials: 'same-origin', ...init, headers })
   if (r.status === 401 && retry && !SANS_REFRESH.includes(path)) {
     if (await refresh()) return requete(path, init, false)
     // Un 401 sur /auth/me est traité par AuthContext ; vider le cache ici bloquerait la requête en cours.
