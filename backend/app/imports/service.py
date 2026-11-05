@@ -48,6 +48,7 @@ from app.models.referentiel import (
     Site,
     TypeContrat,
 )
+from app.repos import saisies
 from app.security import audit
 
 DIM_MODELS = {"service": Service, "activite": Activite, "site": Site,
@@ -942,6 +943,8 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
 
     # archive puis remplacement par clé (période, salarié)
     pids = set(periodes[k] for k in cles_periodes)
+    saisies.verrouiller_periodes(db, pids)
+    sommes_avant = saisies.sommes_employes(db, pids)
     sids = {salaries[r.matricule.casefold()] for r in rows}
     existantes = list(db.scalars(select(SituationMensuelle).where(
         SituationMensuelle.periode_id.in_(pids), SituationMensuelle.salarie_id.in_(sids))))
@@ -992,6 +995,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
             **r.donnees["montants"], **(r.donnees.get("indicateurs") or {})}.items()]
     if montants:
         db.execute(insert(Montant), montants)
+    saisies.noter_employes(db, sommes_avant, pids)
 
     lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
     audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
@@ -1007,7 +1011,14 @@ def annuler_lot(db: Session, user_id: int, lot_id: int) -> LotImport:
     if lot.statut == "annule":
         raise HTTPException(409, "Lot déjà annulé")
     if lot.statut == "valide":
+        pids = (set(db.scalars(select(SituationMensuelle.periode_id)
+                               .where(SituationMensuelle.lot_import_id == lot.id)))
+                | set(db.scalars(select(LotImportPrecedent.periode_id)
+                                 .where(LotImportPrecedent.lot_id == lot.id))))
+        saisies.verrouiller_periodes(db, pids)
+        sommes_avant = saisies.sommes_employes(db, pids)
         _annuler_valide(db, lot)
+        saisies.noter_employes(db, sommes_avant, pids)
     lot.statut, lot.annule_par, lot.annule_le = "annule", user_id, _now()
     audit.record(db, user_id, "import_annule", "lot_import", lot.id, {"statut": avant},
                  {"statut": "annule"})

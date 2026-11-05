@@ -33,6 +33,8 @@ export const motDePasseOublie = (email: string) =>
   api<{ status: string }>('/auth/mot-de-passe-oublie', { method: 'POST', body: JSON.stringify({ email }) })
 export const reinitialiser = (jeton: string, password: string) =>
   api<{ status: string }>('/auth/reinitialiser', { method: 'POST', body: JSON.stringify({ jeton, password }) })
+export const changerMotDePasse = (actuel: string, nouveau: string) =>
+  api<Me>('/auth/changer-mot-de-passe', { method: 'POST', body: JSON.stringify({ actuel, nouveau }) })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 export const getPeriodes = () => api<Periode[]>('/rapports/periodes')
 export const getFiltres = (annee: number, calendrier?: Calendrier) =>

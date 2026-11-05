@@ -1,4 +1,5 @@
 from app.models.auth import AuditEvent
+from tests.conftest import mot_de_passe_choisi
 
 API = "/api/v1/reglages/noms_groupes"
 ADMIN = "admin@exemple.invalid"
@@ -22,6 +23,7 @@ def test_admin_ecrit_et_un_autre_utilisateur_lit(make_client, db):
     attendu = {"valeur": {"ventes": "Nouveau nom", "ensemble": "Autre"}}
     assert r.json() == attendu
     _lecteur(admin)
+    mot_de_passe_choisi(db, "lecteur@exemple.invalid")
     lecteur = make_client("lecteur@exemple.invalid")
     assert lecteur.get(API).json() == attendu
     assert admin.put(API, json={"valeur": {}}).json() == {"valeur": {}}

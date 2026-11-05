@@ -3,12 +3,13 @@ import { AXES, TITRES, usePilotage, useSaisies, type Groupe } from '../../../api
 import { usePeut } from '../../../auth/AuthContext'
 import Etat, { etatErreur } from '../../../components/Etat'
 import { fcfa, MOIS, pct } from '../../../lib/format'
+import ConflitsSaisie from './ConflitsSaisie'
 import { COURT, MONTANTS } from './SaisieDonnees'
 
 const GROUPES: { id: Groupe; titre: string; action: string; marge: boolean }[] = [
-  { id: 'ca_marge', titre: 'CA et marge', action: 'le CA et la marge', marge: true },
-  { id: 'activite', titre: 'OR, devis, factures', action: 'les OR, devis et factures', marge: false },
-  { id: 'obj_ca_marge', titre: 'Objectifs CA et marge', action: 'les objectifs CA et marge', marge: true },
+  { id: 'ca_marge', titre: 'Résultats financiers', action: 'les résultats financiers', marge: true },
+  { id: 'activite', titre: 'Résultats d’activité', action: 'les résultats d’activité', marge: false },
+  { id: 'obj_ca_marge', titre: 'Objectifs financiers', action: 'les objectifs financiers', marge: true },
   { id: 'obj_activite', titre: 'Objectifs d’activité', action: 'les objectifs d’activité', marge: false },
 ]
 
@@ -43,6 +44,7 @@ function TuileGroupe({ g, annee, mois, periode, onClick }: { g: (typeof GROUPES)
   return (
     <Tuile titre={g.titre} action={action} onClick={onClick}>
       {vue.data ? (
+        <>
         <dl>
           {vue.data.indicateurs.map((ind) => {
             const t = vue.data.totaux[ind]
@@ -60,6 +62,8 @@ function TuileGroupe({ g, annee, mois, periode, onClick }: { g: (typeof GROUPES)
             <div><dt>Taux de marge</dt><dd>{pct(vue.data.taux_marge)}</dd></div>
           )}
         </dl>
+        {!vue.isPlaceholderData && <ConflitsSaisie vue={vue.data} max={2} />}
+        </>
       ) : (
         <Etat type={vue.isError ? etatErreur(vue.error) : 'chargement'} onRetry={() => vue.refetch()} />
       )}

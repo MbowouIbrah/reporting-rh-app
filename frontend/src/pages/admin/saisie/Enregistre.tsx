@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { apresImport } from '../../../api/pilotage'
 import { annulerLot } from '../../../api/saisie'
 import { Confirmer } from '../../../components/Kit'
 
@@ -32,8 +33,7 @@ export default function BandeauEnregistre() {
     setEtat('cours')
     try {
       await annulerLot(enr.lot)
-      qc.invalidateQueries({ queryKey: ['donnees'] })
-      qc.invalidateQueries({ queryKey: ['saisie'] })
+      apresImport(qc)
       setEtat('fait')
     } catch {
       setEtat('ouvert')

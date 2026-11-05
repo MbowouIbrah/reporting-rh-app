@@ -1,11 +1,13 @@
 """Résolution des valeurs saisies à un niveau (global, site, service, case site x service).
 
-Fonction pure, sans base de données. Règle R2 : une case saisie fait foi, une case vide se calcule
-depuis les employés (CA et marge seulement) ; les deux ne s'additionnent jamais. L'écart entre
-la saisie et le calcul est le « non réparti ».
+Fonction pure, sans base de données. Une case vide se calcule depuis les employés (CA et marge
+seulement) ; la saisie et le calcul ne s'additionnent jamais. Quand les deux existent et diffèrent,
+la saisie la plus récente est retenue et la case est en conflit, jusqu'au choix de l'utilisateur.
+À égalité, ou si une date manque d'un côté ou de l'autre, la case saisie est retenue.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 ZERO = Decimal(0)
@@ -42,6 +44,7 @@ class ValeurCase:
     valeur: Decimal | None
     origine: str | None  # saisi | calcule | None
     ecart: Decimal | None  # saisi - employes quand les deux existent (le « non réparti »)
+    conflit: bool = False  # les deux existent, diffèrent, et aucun choix ne vaut encore
 
 
 @dataclass(frozen=True)
@@ -157,6 +160,18 @@ def totaliser(cases: tuple[CaseResolue, ...] | list[CaseResolue],
     return totaux
 
 
+def _valeur_case(s: Decimal | None, e: Decimal | None, d_s: datetime | None,
+                 d_e: datetime | None, tranche: datetime | None) -> ValeurCase:
+    if s is None or e is None:
+        origine = "saisi" if s is not None else ("calcule" if e is not None else None)
+        return ValeurCase(s, e, s if s is not None else e, origine, None)
+    employes_gagnent = s != e and d_e is not None and d_s is not None and d_e > d_s
+    regle = tranche is not None and (d_e is None or d_e <= tranche)
+    return ValeurCase(s, e, e if employes_gagnent else s,
+                      "calcule" if employes_gagnent else "saisi",
+                      s - e, s != e and not regle)
+
+
 def resoudre(
     groupe: str,
     niveau: str,
@@ -165,11 +180,17 @@ def resoudre(
     services: list[int],
     saisies: dict[tuple[str, int | None, int | None], Decimal],
     employes: list[Employe],
+    dates_saisies: dict[tuple[str, int | None, int | None], datetime] | None = None,
+    dates_employes: dict[tuple[str, int | None, int | None], datetime] | None = None,
+    tranches: dict[tuple[str, int | None, int | None], datetime] | None = None,
 ) -> Resolution:
     """Cases du groupe au niveau demandé.
 
     `sites` et `services` : ids actifs. `saisies` : lignes du groupe (indicateur, site, service)
     -> valeur ; celles d'un autre niveau sont ignorées. `employes` : tous les employés du mois.
+    `dates_saisies` : dernier changement de chaque saisie ; `dates_employes` : dernier changement
+    de la somme des employés à chaque niveau de case ; `tranches` : date du choix « garder la
+    saisie ».
     """
     indicateurs = GROUPES[groupe]
     saisi: dict[tuple[str, Cle], Decimal] = {}
@@ -200,9 +221,8 @@ def resoudre(
         valeurs = {}
         for ind in indicateurs:
             s, e = saisi.get((ind, k)), calcule.get((ind, k))
-            valeurs[ind] = ValeurCase(
-                s, e, s if s is not None else e,
-                "saisi" if s is not None else ("calcule" if e is not None else None),
-                s - e if s is not None and e is not None else None)
+            valeurs[ind] = _valeur_case(s, e, (dates_saisies or {}).get((ind, *k)),
+                                        (dates_employes or {}).get((ind, *k)),
+                                        (tranches or {}).get((ind, *k)))
         cases.append(CaseResolue(k[0], k[1], valeurs))
     return Resolution(groupe, niveau, tuple(cases), totaliser(cases, indicateurs))

@@ -51,6 +51,8 @@ Le niveau se lit dans les colonnes remplies : aucune = global ; site seul = site
 | R1. Le calcul remplace toujours la saisie du dessus | Simple, une seule vérité | Faux dès que le détail est incomplet. Exemple : seuls les commerciaux ont un CA individuel, mais le CA de l'atelier existe aussi. Le global tomberait au CA des commerciaux |
 | **R2. Une case vide se calcule ; une case saisie fait foi.** L'écart s'affiche en « non réparti » | Jamais bloqué, jamais faux sans le voir | Une ligne de plus à lire, mais seulement dans l'écran de saisie |
 
+> **Remplacé le 04/11 pour le CA et la marge** : quand la case saisie et la somme des employés existent toutes les deux, la plus récente est retenue et le conflit s'affiche (voir `docs/inventaire-donnees-saisies.md`, X1). R2 reste valable pour les autres données.
+
 Exemple R2 : CA global saisi 100, CA du site A saisi 40, autres sites vides → global 100, « non réparti » 60. Si le détail dépasse le total saisi, alerte orange (comme les points d'attention actuels).
 
 ### Site ou service : un seul niveau par mois et par donnée

@@ -25,6 +25,16 @@ export function fcfa(v: Val | number | undefined): string {
   return espacer(NF.format(Number(v)))
 }
 
+/** Montant écrit au chiffre près, là où un écart de quelques francs compte : le texte du serveur
+ *  est découpé, sans Number() ni arrondi ; seuls les zéros de fin sont retirés. */
+export function montantExact(v: Val | undefined): string {
+  if (v === null || v === undefined || v === 'n/a') return '—'
+  const negatif = v.startsWith('-')
+  const [entier, decimales = ''] = (negatif ? v.slice(1) : v).split('.')
+  const fin = decimales.replace(/0+$/, '')
+  return `${negatif ? '-' : ''}${entier.replace(/\B(?=(\d{3})+$)/g, SEP)}${fin ? `,${fin}` : ''}`
+}
+
 /** Indice ou ratio d'activité (productivité, OR par productif) : deux décimales au plus. Number() sert à l'affichage seulement. */
 export function decimal2(v: Val | undefined): string {
   if (v === null || v === undefined || v === 'n/a') return '—'

@@ -215,7 +215,7 @@ def _vue_saisies(db: Session, scope: Scope, groupe: str, annee: int, mois: int,
         "cases": [{"site_id": c.site_id, "service_id": c.service_id,
                    "valeurs": {i: {"saisi": _txt_opt(v.saisi), "employes": _txt_opt(v.employes),
                                    "valeur": _txt_opt(v.valeur), "origine": v.origine,
-                                   "ecart": _txt_opt(v.ecart),
+                                   "ecart": _txt_opt(v.ecart), "conflit": v.conflit,
                                    "propose": _txt_opt(proposes.get(c.cle, {}).get(i))}
                                for i, v in c.valeurs.items()}}
                   for c in cases],
@@ -336,6 +336,43 @@ def saisir_saisies(
     saisies.ecrire(db, p.user_id, per.id, body.groupe, body.niveau, valides)
     db.commit()
     return _vue_saisies(db, scope, body.groupe, body.annee, body.mois)
+
+
+class ConflitIn(Mois):
+    site_id: int | None = None
+    service_id: int | None = None
+    indicateur: Literal["ca", "marge"]
+    choix: Literal["saisie", "employes"]
+    # chiffres que l'utilisateur a sous les yeux : un choix ne vaut que pour eux
+    saisie: Decimal
+    employes: Decimal
+
+
+@router.post("/saisies/conflit")
+def trancher_conflit(
+    body: ConflitIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db),
+):
+    """Règle en un clic un conflit entre une case saisie et la somme des employés."""
+    authorize(p, "saisie:write")
+    authorize(p, "marge:read")
+    scope = scope_for(db, p)
+    pid = saisies.periode_id(db, body.annee, body.mois)
+    # avant de lire : deux clics simultanés ne règlent pas deux fois le même conflit
+    saisies.verrouiller_periodes(db, {pid} if pid else set())
+    ctx = saisies.contexte(db, pid)
+    if not saisies.case_visible(ctx, scope, body.site_id, body.service_id):
+        raise HTTPException(403, "Accès refusé")
+    cle = (body.site_id, body.service_id)
+    niveau = nv.niveau_de(*cle)
+    cases = saisies.resolution(ctx, "ca_marge", niveau).cases
+    case = next((c for c in cases if c.cle == cle), None)
+    v = case.valeurs[body.indicateur] if case else None
+    if (v is None or not v.conflit or v.saisi != body.saisie or v.employes != body.employes
+            or not saisies.trancher(db, p.user_id, ctx.periode_id, body.indicateur, *cle,
+                                    body.choix, v.employes)):
+        raise HTTPException(409, "Ce conflit a changé : vérifiez les chiffres à jour.")
+    db.commit()
+    return _vue_saisies(db, scope, "ca_marge", body.annee, body.mois)
 
 
 # ---- objectif annuel réparti sur les 12 mois ----

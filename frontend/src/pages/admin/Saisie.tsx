@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Download } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePilotage, type Groupe } from '../../api/pilotage'
+import { apresImport, usePilotage, type Groupe } from '../../api/pilotage'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
 import { Bouton, Carte, ChoixFichier, Confirmer } from '../../components/Kit'
@@ -48,6 +48,8 @@ export default function Saisie() {
   const [sale, setSale] = useState(false)
   const [enAttente, setEnAttente] = useState<{ action: () => void } | null>(null)
   const garde = (action: () => void) => (sale ? setEnAttente({ action }) : action())
+  // Valeurs lues avant la confirmation : une liste contrôlée revient à sa valeur tant que le choix n'est pas appliqué.
+  const changerPeriode = (a: number, m: number) => garde(() => setChoixPeriode([a, m]))
 
   const prepa = usePreparation(annee, mois, etape.e === 'choix' || etape.e === 'grille')
   // Mois 0 : plusieurs mois dans un même fichier, chaque ligne porte son année et son mois.
@@ -63,14 +65,14 @@ export default function Saisie() {
   const fini = (lot: Lot, enregistrees: number) => {
     if (etape.e === 'apercu' && etape.depuis === 'grille') effacerBrouillon(cle)
     grille.current = null
-    qc.invalidateQueries({ queryKey: ['donnees'] })
-    qc.invalidateQueries({ queryKey: ['saisie'] })
+    apresImport(qc)
     const enregistrement: Enregistrement = { lot: lot.id, fichier: lot.fichier_nom, lignes: enregistrees }
     navigate('/admin', { state: { enregistrement } })
   }
 
+  const annees = Array.from({ length: 5 }, (_, i) => auj.getFullYear() - 3 + i)
+
   if (etape.e === 'depart') {
-    const annees = Array.from({ length: 5 }, (_, i) => auj.getFullYear() - 3 + i)
     return (
       <section className="page-ecran rapport-excel saisie-depart">
         <BarreParcours libelle="Administration" vers="/admin" />
@@ -78,13 +80,13 @@ export default function Saisie() {
         <div className="filtres saisie-periode" role="group" aria-label="Période à renseigner">
           <label>
             Année
-            <select value={annee} disabled={plusieurs} onChange={(e) => garde(() => setChoixPeriode([Number(e.target.value), mois]))}>
+            <select value={annee} disabled={plusieurs} onChange={(e) => changerPeriode(Number(e.target.value), mois)}>
               {annees.map((a) => <option key={a}>{a}</option>)}
             </select>
           </label>
           <label>
             Mois
-            <select value={mois} onChange={(e) => garde(() => setChoixPeriode([annee, Number(e.target.value)]))}>
+            <select value={mois} onChange={(e) => changerPeriode(annee, Number(e.target.value))}>
               {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               <option value={0}>Plusieurs mois</option>
             </select>
@@ -152,8 +154,30 @@ export default function Saisie() {
     return (
       <section className="page-ecran rapport-excel saisie-donnees-page">
         <BarreParcours libelle="Choix du mois" onRetour={() => garde(() => { setSale(false); setEtape({ e: 'depart' }) })} />
-        <h2 className="bandeau-titre">DONNÉES — {periode.toUpperCase()}</h2>
-        <SaisieDonnees key={periode} annee={annee} mois={mois} periode={periode} onModifs={setSale} garde={garde} ongletInitial={etape.groupe} />
+        <div className="titre-rapport saisie-donnees-titre">
+          <h2 className="bandeau-titre">DONNÉES — {periode.toUpperCase()}</h2>
+          <div className="filtres saisie-periode" role="group" aria-label="Mois affiché">
+            <Bouton variante="secondaire" aria-label="Mois précédent" disabled={annee === annees[0] && mois === 1} onClick={() => garde(() => setChoixPeriode(mois === 1 ? [annee - 1, 12] : [annee, mois - 1]))}>
+              <ChevronLeft size={16} aria-hidden />
+            </Bouton>
+            <label>
+              Année
+              <select value={annee} onChange={(e) => changerPeriode(Number(e.target.value), mois)}>
+                {annees.map((a) => <option key={a}>{a}</option>)}
+              </select>
+            </label>
+            <label>
+              Mois
+              <select value={mois} onChange={(e) => changerPeriode(annee, Number(e.target.value))}>
+                {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </label>
+            <Bouton variante="secondaire" aria-label="Mois suivant" disabled={annee === annees[annees.length - 1] && mois === 12} onClick={() => garde(() => setChoixPeriode(mois === 12 ? [annee + 1, 1] : [annee, mois + 1]))}>
+              <ChevronRight size={16} aria-hidden />
+            </Bouton>
+          </div>
+        </div>
+        <SaisieDonnees annee={annee} mois={mois} periode={periode} onModifs={setSale} garde={garde} ongletInitial={etape.groupe} />
         <Confirmer
           ouvert={enAttente !== null}
           titre="Quitter sans enregistrer ?"

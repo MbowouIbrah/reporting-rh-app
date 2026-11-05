@@ -5,7 +5,8 @@ site, service ou case site x service. La résolution elle-même est pure (`app.k
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -13,8 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.kpi import niveaux as nv
 from app.kpi.moteur import CA_INDIVIDUEL, MARGE_INDIVIDUELLE
+from app.models.auth import _now
 from app.models.donnees import Montant, Periode, SituationMensuelle
-from app.models.pilotage import ValeurSaisie
+from app.models.pilotage import DateEmployes, ValeurSaisie
 from app.models.referentiel import Rubrique, Service, Site
 from app.repos.scope import Scope
 from app.security import audit
@@ -31,6 +33,9 @@ class Contexte:
     services: dict[int, Service]
     lignes: dict[tuple[str, int | None, int | None], Decimal]
     employes: list[nv.Employe]
+    dates_saisies: dict[tuple[str, int | None, int | None], datetime] = field(default_factory=dict)
+    dates_employes: dict[tuple[str, int | None, int | None], datetime] = field(default_factory=dict)
+    tranches: dict[tuple[str, int | None, int | None], datetime] = field(default_factory=dict)
 
 
 def periode_id(db: Session, annee: int, mois: int) -> int | None:
@@ -64,9 +69,69 @@ def contexte(db: Session, pid: int | None) -> Contexte:
     services = {r.id: r for r in db.scalars(select(Service).order_by(Service.id))}
     if pid is None:
         return Contexte(None, sites, services, {}, [])
-    lignes = {(r.indicateur, r.site_id, r.service_id): _dec(r.valeur)
-              for r in db.scalars(select(ValeurSaisie).where(ValeurSaisie.periode_id == pid))}
-    return Contexte(pid, sites, services, lignes, _employes(db, pid))
+    lignes, dates, tranches = {}, {}, {}
+    # colonnes et non entités : toutes les dates relues de la base se comparent entre elles
+    for ind, si, se, v, d, t in db.execute(
+            select(ValeurSaisie.indicateur, ValeurSaisie.site_id, ValeurSaisie.service_id,
+                   ValeurSaisie.valeur, ValeurSaisie.modifie_le, ValeurSaisie.tranche_le)
+            .where(ValeurSaisie.periode_id == pid)):
+        lignes[(ind, si, se)] = _dec(v)
+        dates[(ind, si, se)] = d
+        if t is not None:
+            tranches[(ind, si, se)] = t
+    dates_employes = {(ind, si, se): d for ind, si, se, d in db.execute(
+        select(DateEmployes.indicateur, DateEmployes.site_id, DateEmployes.service_id,
+               DateEmployes.modifie_le).where(DateEmployes.periode_id == pid))}
+    return Contexte(pid, sites, services, lignes, _employes(db, pid),
+                    dates, dates_employes, tranches)
+
+
+CleSomme = tuple[int, str, int | None, int | None]
+
+
+def verrouiller_periodes(db: Session, pids: set[int]) -> None:
+    """Une seule écriture à la fois par mois : deux validations, saisies ou choix simultanés ne
+    se heurtent pas sur les clés uniques. Sans effet sous SQLite. Libéré en fin de transaction."""
+    if pids:
+        db.execute(select(Periode.id).where(Periode.id.in_(pids)).order_by(Periode.id)
+                   .with_for_update(key_share=True))
+
+
+def sommes_employes(db: Session, pids: set[int]) -> dict[CleSomme, Decimal]:
+    """CA et marge des employés par (période, indicateur, site, service) à chaque niveau de case
+    (site ou service vide = tous), à comparer avant et après un import."""
+    if not pids:
+        return {}
+    q = (select(SituationMensuelle.periode_id, SituationMensuelle.site_id,
+                SituationMensuelle.service_id, Rubrique.libelle, Montant.valeur)
+         .join(Montant, Montant.situation_id == SituationMensuelle.id)
+         .join(Rubrique, Rubrique.id == Montant.rubrique_id)
+         .where(SituationMensuelle.periode_id.in_(pids), Rubrique.libelle.in_(tuple(EMPLOYE))))
+    out: dict[CleSomme, Decimal] = {}
+    for pid, si, se, lib, v in db.execute(q):
+        for case in ((si, se), (si, None), (None, se), (None, None)):
+            k = (pid, EMPLOYE[lib], *case)
+            out[k] = out.get(k, Decimal(0)) + _dec(v)
+    return out
+
+
+def noter_employes(db: Session, avant: dict[CleSomme, Decimal], pids: set[int]) -> None:
+    """Date les seules cases dont la somme a vraiment changé : corriger un salaire ne doit pas
+    faire passer le CA des employés devant une saisie. Pas de commit."""
+    apres = sommes_employes(db, pids)
+    changes = [k for k in avant.keys() | apres.keys() if avant.get(k) != apres.get(k)]
+    if not changes:
+        return
+    maintenant = _now()
+    lignes = {(d.periode_id, d.indicateur, d.site_id, d.service_id): d for d in db.scalars(
+        select(DateEmployes).where(DateEmployes.periode_id.in_(pids)))}
+    for k in changes:
+        if k in lignes:
+            lignes[k].modifie_le = maintenant
+        else:
+            pid, ind, si, se = k
+            db.add(DateEmployes(periode_id=pid, indicateur=ind, site_id=si, service_id=se,
+                                modifie_le=maintenant))
 
 
 def niveau_groupe(ctx: Contexte, groupe: str) -> tuple[str, bool]:
@@ -99,7 +164,8 @@ def resolution(ctx: Contexte, groupe: str, niveau: str | None = None) -> nv.Reso
         groupe, niveau,
         sites=[i for i, r in ctx.sites.items() if r.actif],
         services=[i for i, r in ctx.services.items() if r.actif],
-        saisies=ctx.lignes, employes=ctx.employes)
+        saisies=ctx.lignes, employes=ctx.employes, dates_saisies=ctx.dates_saisies,
+        dates_employes=ctx.dates_employes, tranches=ctx.tranches)
 
 
 def dans_perimetre(scope: Scope, site: str | None, service: str | None) -> bool:
@@ -119,7 +185,8 @@ def case_visible(ctx: Contexte, scope: Scope, site_id: int | None, service_id: i
 
 
 def totaux_ca_marge(db: Session, pid: int | None) -> tuple[Decimal | None, Decimal | None]:
-    """CA et marge du mois, totaux résolus du groupe (saisie ou, à défaut, somme des employés)."""
+    """CA et marge du mois, totaux résolus du groupe (la plus récente de la saisie et de la somme
+    des employés)."""
     if pid is None:
         return None, None
     t = resolution(contexte(db, pid), "ca_marge").totaux
@@ -133,11 +200,34 @@ def _instantane(db: Session, pid: int, groupe: str) -> dict[str, Decimal]:
             for r in db.scalars(q)}
 
 
+def trancher(db: Session, user_id: int | None, pid: int, ind: str, site_id: int | None,
+             service_id: int | None, choix: str, employes: Decimal) -> bool:
+    """Règle un conflit. « saisie » : la saisie redevient la plus récente et le conflit est réglé
+    tant que les employés ne changent pas. « employes » : la ligne saisie disparaît, la case suit
+    les employés. False si la ligne n'existe pas. Pas de commit."""
+    ligne = next((r for r in db.scalars(select(ValeurSaisie).where(
+        ValeurSaisie.periode_id == pid, ValeurSaisie.indicateur == ind))
+        if (r.site_id, r.service_id) == (site_id, service_id)), None)
+    if ligne is None:
+        return False
+    avant = {"indicateur": ind, "site_id": site_id, "service_id": service_id,
+             "saisie": format(_dec(ligne.valeur), "f"), "employes": format(employes, "f")}
+    if choix == "saisie":
+        maintenant = _now()
+        ligne.modifie_le, ligne.tranche_le = maintenant, maintenant
+    else:
+        db.delete(ligne)
+    db.flush()
+    audit.record(db, user_id, "saisie_conflit", "periode", pid, avant, {"choix": choix})
+    return True
+
+
 def ecrire(db: Session, user_id: int | None, pid: int, groupe: str, niveau: str,
            valeurs: dict[nv.Cle, dict[str, Decimal | None]]) -> None:
     """Écrit les cases d'un groupe à un niveau (None = case effacée). Les lignes du groupe d'un
     autre niveau sont supprimées (un seul niveau par mois et par groupe). Trace d'audit si
     quelque chose change. Pas de commit."""
+    verrouiller_periodes(db, {pid})
     inds = nv.GROUPES[groupe]
     avant = _instantane(db, pid, groupe)
     existantes = {(r.indicateur, r.site_id, r.service_id): r for r in db.scalars(
@@ -159,6 +249,8 @@ def ecrire(db: Session, user_id: int | None, pid: int, groupe: str, niveau: str,
                 db.add(ValeurSaisie(periode_id=pid, indicateur=ind, site_id=si, service_id=se,
                                     valeur=v))
             else:
+                if _dec(ligne.valeur) != v:  # 7 et 7.000 : même valeur, même date
+                    ligne.modifie_le, ligne.tranche_le = _now(), None
                 ligne.valeur = v
     db.flush()
     apres = _instantane(db, pid, groupe)

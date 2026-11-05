@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from decimal import Decimal as D
 
 from app.kpi.niveaux import (
@@ -146,3 +147,62 @@ def test_projection_d_objectifs_somme_et_moyenne_pour_la_productivite():
     assert p[(1, None)] == {"obj_productivite": D("85"), "obj_ventes": D("12")}
     p = projeter(list(r.cases), "global", ("obj_productivite", "obj_ventes"))
     assert p[(None, None)] == {"obj_productivite": D("85"), "obj_ventes": D("12")}
+
+
+# ---------- conflit entre la saisie et la somme des employés ----------
+
+T1, T2, T3 = (datetime(2026, 1, j, tzinfo=UTC) for j in (1, 2, 3))
+SAISIE = {("ca", 1, 10): D("1000")}
+
+
+def ca_cellule(dates_saisies=None, dates_employes=None, tranches=None, saisies=SAISIE):
+    r = resoudre("ca_marge", "cellule", sites=SITES, services=SERVICES, saisies=saisies,
+                 employes=EMPLOYES, dates_saisies=dates_saisies, dates_employes=dates_employes,
+                 tranches=tranches)
+    return case(r, 1, 10).valeurs["ca"]
+
+
+def test_la_saisie_plus_recente_est_retenue_et_signalee():
+    v = ca_cellule({("ca", 1, 10): T2}, {("ca", 1, 10): T1})
+    assert (v.valeur, v.origine, v.ecart, v.conflit) == (D("1000"), "saisi", D("200"), True)
+
+
+def test_les_employes_plus_recents_sont_retenus_et_signales():
+    v = ca_cellule({("ca", 1, 10): T1}, {("ca", 1, 10): T2})
+    assert (v.valeur, v.origine, v.ecart, v.conflit) == (D("800"), "calcule", D("200"), True)
+
+
+def test_a_egalite_ou_sans_date_la_saisie_est_retenue():
+    assert ca_cellule({("ca", 1, 10): T1}, {("ca", 1, 10): T1}).valeur == D("1000")
+    v = ca_cellule({("ca", 1, 10): T1})
+    assert (v.valeur, v.conflit) == (D("1000"), True)
+
+
+def test_memes_chiffres_pas_de_conflit_quelles_que_soient_les_dates():
+    v = ca_cellule({("ca", 1, 10): T1}, {("ca", 1, 10): T2}, saisies={("ca", 1, 10): D("800")})
+    assert (v.valeur, v.origine, v.conflit) == (D("800"), "saisi", False)
+
+
+def test_choix_garder_regle_le_conflit_jusqu_au_prochain_changement_des_employes():
+    v = ca_cellule({("ca", 1, 10): T2}, {("ca", 1, 10): T1}, {("ca", 1, 10): T2})
+    assert (v.valeur, v.ecart, v.conflit) == (D("1000"), D("200"), False)
+    v = ca_cellule({("ca", 1, 10): T2}, {("ca", 1, 10): T3}, {("ca", 1, 10): T2})
+    assert (v.valeur, v.conflit) == (D("800"), True)
+
+
+def test_chaque_niveau_lit_la_date_de_sa_propre_somme():
+    def global_avec(dates_e):
+        r = resoudre("ca_marge", "global", sites=SITES, services=SERVICES,
+                     saisies={("ca", None, None): D("900")}, employes=EMPLOYES,
+                     dates_saisies={("ca", None, None): T2}, dates_employes=dates_e)
+        return case(r, None, None).valeurs["ca"]
+    v = global_avec({("ca", None, None): T3})
+    assert (v.valeur, v.origine, v.ecart, v.conflit) == (D("1000"), "calcule", D("-100"), True)
+    # une case du dessous a changé mais pas la somme globale : la saisie reste la plus récente
+    v = global_avec({("ca", None, None): T1, ("ca", 1, 10): T3})
+    assert (v.valeur, v.origine, v.conflit) == (D("900"), "saisi", True)
+
+
+def test_saisie_sans_date_jamais_battue():
+    v = ca_cellule(None, {("ca", 1, 10): T3})
+    assert (v.valeur, v.origine, v.conflit) == (D("1000"), "saisi", True)

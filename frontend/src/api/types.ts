@@ -67,6 +67,7 @@ export interface Me {
   nom: string
   fonction: string
   permissions: string[]
+  doit_changer_mdp: boolean
 }
 
 export interface Periode {

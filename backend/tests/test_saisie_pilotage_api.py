@@ -13,10 +13,11 @@ from app.kpi.chargement import charger_periode, filtrer
 from app.kpi.moteur import CA_INDIVIDUEL, MARGE_INDIVIDUELLE, Params, mensuel
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode
-from app.models.pilotage import ValeurSaisie
+from app.models.pilotage import DateEmployes, ValeurSaisie
 from app.models.referentiel import Service, Site
 from app.repos.scope import Scope
-from tests.test_donnees_activite import _sans_marge, charger, lig
+from tests.conftest import mot_de_passe_choisi
+from tests.test_donnees_activite import _sans_marge, charger, envoyer, lig
 from tests.test_donnees_api import ADMIN, API, BR, DRH
 from tests.test_kpi_moteur import REFS
 from tests.test_rapports_api import EQUIP, get
@@ -96,7 +97,7 @@ def test_lecture_ca_individuel_des_employes_par_cellule_par_defaut(make_client, 
     d = par_cle(j)
     v = d[(sites["Douala"], services["SAV PL"])]["ca"]
     assert v == {"saisi": None, "employes": "800.000", "valeur": "800.000", "origine": "calcule",
-                 "ecart": None, "propose": None}
+                 "ecart": None, "propose": None, "conflit": False}
     assert d[(sites["Yaoundé"], services["Commerce VN"])]["marge"]["valeur"] == "20.000"
     assert j["totaux"]["ca"]["valeur"] == "1000.000" and not j["totaux"]["ca"]["partiel"]
     assert D(j["taux_marge"]) == D("0.07")
@@ -751,6 +752,7 @@ def test_journal_masque_la_marge_sans_droit_marge(make_client, db):
                                      "password": "<mot-de-passe-test>",
                                      "permissions": ["journal"], "portee": {"tout": True}})
     assert r.status_code == 201, r.text
+    mot_de_passe_choisi(db, "j@exemple.invalid")
     j = make_client("j@exemple.invalid").get(f"{API}/audit").json()
     ev = {e["apres"]["groupe"]: e["apres"] for e in j if e["action"] == "saisie_pilotage"}
     assert ev["obj_ca_marge"]["valeurs"] is None
@@ -786,3 +788,222 @@ def test_repartition_vide_n_ouvre_aucun_mois(make_client, db):
         r = repartir(c, "obj_activite", "global", cases)
         assert r.status_code == 200 and r.json()["mois"] == []
     assert nb_periodes(db) == 0
+
+
+# ---------- conflit : la saisie la plus récente est retenue, le choix se fait en un clic ----------
+
+
+def lignes_ca(ca_e1=500, br=1000, ca_e3=200):
+    return [
+        lig(**{BR: br, CA_INDIVIDUEL: ca_e1, MARGE_INDIVIDUELLE: 50}),
+        lig(MATRICULE="E2", Noms="Bob", **{BR: 1000, CA_INDIVIDUEL: 300}),
+        lig(MATRICULE="E3", Noms="Cy", Service="Commerce VN", Site="Yaoundé",
+            **{BR: 500, CA_INDIVIDUEL: ca_e3, MARGE_INDIVIDUELLE: 20}),
+    ]
+
+
+def cellule_saisie(c, db, ca="1000"):
+    """Employés importés puis CA saisi (1000 contre 800) sur Douala / SAV PL."""
+    charger(c, lignes_ca())
+    sites, services = ids(db)
+    cell = (sites["Douala"], services["SAV PL"])
+    assert saisir(c, "ca_marge", "cellule", [case(*cell, ca=ca)]).status_code == 200
+    return cell
+
+
+def chiffres(v):
+    return {k: D(x) if k in ("saisi", "employes", "valeur", "ecart") and x is not None else x
+            for k, x in v.items()}
+
+
+def ca_de(c, cell):
+    return chiffres(par_cle(lire(c, niveau="cellule").json())[cell]["ca"])
+
+
+def trancher(c, cell, choix, indicateur="ca", **chiffres_vus):
+    """Envoie les chiffres à l'écran, sauf `saisie` ou `employes` donnés (chiffres périmés)."""
+    r = lire(c, niveau="cellule" if cell[0] else "global")
+    v = par_cle(r.json()).get(cell, {}).get(indicateur, {}) if r.status_code == 200 else {}
+    corps = {"saisie": v.get("saisi") or "0", "employes": v.get("employes") or "0", **chiffres_vus}
+    return c.post(f"{URL}/conflit", json={**P, "site_id": cell[0], "service_id": cell[1],
+                                          "indicateur": indicateur, "choix": choix, **corps})
+
+
+def dates_employes(db):
+    db.expire_all()
+    return {(d.indicateur, d.site_id, d.service_id): d.modifie_le
+            for d in db.scalars(select(DateEmployes))}
+
+
+def test_saisie_apres_les_employes_retenue_avec_conflit(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    v = ca_de(c, cell)
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("1000"), "saisi", True)
+
+
+def test_corriger_un_salaire_ne_date_pas_le_ca_des_employes(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    avant = dates_employes(db)
+    charger(c, lignes_ca(br=2000))
+    assert dates_employes(db) == avant
+    assert ca_de(c, cell)["valeur"] == D("1000")
+
+
+def test_import_qui_change_le_ca_passe_devant_la_saisie_et_le_rapport_suit(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    charger(c, lignes_ca(ca_e1=600))
+    v = ca_de(c, cell)
+    assert (v["saisi"], v["valeur"], v["origine"], v["conflit"]) == (
+        D("1000"), D("900"), "calcule", True)
+    assert charger_periode(db, RESTREINT, 2026, 1).ca == 900
+
+
+def test_annuler_le_lot_date_le_retour_des_employes(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    lot = envoyer(c, lignes_ca(ca_e1=600))
+    assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
+    assert c.post(f"{API}/imports/{lot['id']}/annuler").status_code == 200
+    v = ca_de(c, cell)
+    assert (v["employes"], v["valeur"], v["origine"], v["conflit"]) == (
+        D("800"), D("800"), "calcule", True)
+
+
+def test_reenregistrer_le_meme_chiffre_ne_change_pas_sa_date(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    charger(c, lignes_ca(ca_e1=600))
+    saisir(c, "ca_marge", "cellule", [case(*cell, ca="1000.000")])
+    assert ca_de(c, cell)["valeur"] == D("900")
+    saisir(c, "ca_marge", "cellule", [case(*cell, ca="1100")])
+    v = ca_de(c, cell)
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("1100"), "saisi", True)
+
+
+def test_garder_la_saisie_regle_le_conflit_jusqu_au_prochain_changement(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    charger(c, lignes_ca(ca_e1=600))
+    r = trancher(c, cell, "saisie")
+    assert r.status_code == 200
+    v = chiffres(par_cle(r.json())[cell]["ca"])
+    assert (v["valeur"], v["origine"], v["ecart"], v["conflit"]) == (
+        D("1000"), "saisi", D("100"), False)
+    assert trancher(c, cell, "saisie").status_code == 409
+    charger(c, lignes_ca(ca_e1=800))
+    v = ca_de(c, cell)
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("1100"), "calcule", True)
+
+
+def test_modifier_la_saisie_apres_garder_fait_revenir_le_conflit(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    assert trancher(c, cell, "saisie").status_code == 200
+    assert saisir(c, "ca_marge", "cellule", [case(*cell, ca="1200")]).status_code == 200
+    v = ca_de(c, cell)
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("1200"), "saisi", True)
+
+
+def test_choix_sur_des_chiffres_perimes_refuse(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    assert trancher(c, cell, "saisie", employes="799").status_code == 409
+    assert trancher(c, cell, "employes", saisie="999").status_code == 409
+    assert ca_de(c, cell)["conflit"] is True
+    assert nb_lignes(db, "ca") == 1
+
+
+def test_meme_chiffre_ecrit_autrement_n_est_pas_perime(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    assert trancher(c, cell, "saisie", saisie="1000.000", employes="800.00").status_code == 200
+    assert ca_de(c, cell)["conflit"] is False
+
+
+def test_somme_globale_inchangee_ne_rouvre_pas_le_conflit_mais_date_les_cases(make_client, db):
+    c = make_client(ADMIN)
+    charger(c, lignes_ca())
+    assert saisir(c, "ca_marge", "global", [case(ca="900")]).status_code == 200
+    glob = (None, None)
+    assert trancher(c, glob, "saisie").status_code == 200
+    avant = dates_employes(db)
+    charger(c, lignes_ca(ca_e1=400, ca_e3=300))  # 100 passent d'un site à l'autre, total 1000
+    apres = dates_employes(db)
+    assert apres[("ca", None, None)] == avant[("ca", None, None)]
+    sites, services = ids(db)
+    assert apres[("ca", sites["Douala"], None)] != avant[("ca", sites["Douala"], None)]
+    assert apres[("ca", sites["Yaoundé"], services["Commerce VN"])] != avant[
+        ("ca", sites["Yaoundé"], services["Commerce VN"])]
+    v = chiffres(par_cle(lire(c, niveau="global").json())[glob]["ca"])
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("900"), "saisi", False)
+
+
+def test_donnees_anciennes_sans_date_employes_la_saisie_gagne_et_le_conflit_se_voit(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    for d in db.scalars(select(DateEmployes)):
+        db.delete(d)
+    db.commit()
+    v = ca_de(c, cell)
+    assert (v["valeur"], v["origine"], v["conflit"]) == (D("1000"), "saisi", True)
+
+
+def test_journal_masque_les_chiffres_du_conflit_sans_droit_marge(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    assert trancher(c, cell, "saisie").status_code == 200
+    r = c.post(f"{API}/users", json={"email": "j@exemple.invalid", "nom": "J",
+                                     "password": "<mot-de-passe-test>",
+                                     "permissions": ["journal"], "portee": {"tout": True}})
+    assert r.status_code == 201, r.text
+    mot_de_passe_choisi(db, "j@exemple.invalid")
+    ev = next(e for e in make_client("j@exemple.invalid").get(f"{API}/audit").json()
+              if e["action"] == "saisie_conflit")
+    assert (ev["avant"]["saisie"], ev["avant"]["employes"]) == (None, None)
+    assert ev["avant"]["indicateur"] == "ca"
+    assert ev["apres"] == {"choix": "saisie"}
+    adm = next(e for e in c.get(f"{API}/audit").json() if e["action"] == "saisie_conflit")
+    assert D(adm["avant"]["saisie"]) == D("1000")
+
+
+def test_regler_un_conflit_exige_le_droit_marge(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    r = c.post(f"{API}/users", json={"email": "s@exemple.invalid", "nom": "S",
+                                     "password": "<mot-de-passe-test>",
+                                     "permissions": ["saisie"], "portee": {"tout": True}})
+    assert r.status_code == 201, r.text
+    mot_de_passe_choisi(db, "s@exemple.invalid")
+    assert trancher(make_client("s@exemple.invalid"), cell, "saisie").status_code == 403
+    assert ca_de(c, cell)["conflit"] is True
+
+
+def test_prendre_les_employes_retire_la_saisie_et_trace_le_choix(make_client, db):
+    c = make_client(ADMIN)
+    cell = cellule_saisie(c, db)
+    r = trancher(c, cell, "employes")
+    assert r.status_code == 200
+    v = chiffres(par_cle(r.json())[cell]["ca"])
+    assert (v["saisi"], v["valeur"], v["origine"], v["conflit"]) == (
+        None, D("800"), "calcule", False)
+    assert nb_lignes(db, "ca") == 0
+    ev = db.scalars(select(AuditEvent).where(AuditEvent.action == "saisie_conflit")).one()
+    assert ev.apres == {"choix": "employes"}
+
+
+def test_conflit_sans_conflit_hors_perimetre_et_sans_droit(make_client, db, monkeypatch):
+    c = make_client(ADMIN)
+    charger(c, lignes_ca())
+    sites, services = ids(db)
+    cell = (sites["Douala"], services["SAV PL"])
+    assert trancher(c, cell, "saisie").status_code == 409  # rien de saisi
+    autre = (sites["Yaoundé"], services["Commerce VN"])
+    saisir(c, "ca_marge", "cellule", [case(*cell, ca="1000"), case(*autre, ca="999")])
+    monkeypatch.setattr(pilotage, "scope_for", lambda _db, _p: RESTREINT)
+    assert trancher(c, autre, "saisie").status_code == 403
+    monkeypatch.undo()
+    assert trancher(make_client(EQUIP), cell, "saisie").status_code == 403
+    assert nb_lignes(db, "ca") == 2

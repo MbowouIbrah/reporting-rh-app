@@ -38,6 +38,7 @@ export interface LigneBudget {
 }
 
 const put = (body: unknown): RequestInit => ({ method: 'PUT', body: JSON.stringify(body) })
+const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
 
 export const usePilotage = (annee: number, mois: number, actif: boolean) =>
   useQuery({
@@ -57,11 +58,13 @@ export interface ValeurSaisie {
   saisi: Dec | null
   /** Somme des chiffres des employés rattachés à la case. */
   employes: Dec | null
-  /** Valeur retenue : le chiffre saisi s'il existe, sinon la somme des employés. */
+  /** Valeur retenue : la plus récente quand la saisie et la somme des employés diffèrent. */
   valeur: Dec | null
   origine: 'saisi' | 'calcule' | null
   /** « Non réparti » : part du chiffre saisi que les cases du dessous n'expliquent pas. */
   ecart: Dec | null
+  /** La saisie et les employés diffèrent et aucun choix ne vaut encore. */
+  conflit: boolean
   /** Somme des valeurs de l'ancien niveau, quand on affiche un niveau plus fin que celui en base. */
   propose: Dec | null
 }
@@ -123,6 +126,12 @@ export const useSaisies = (groupe: Groupe, annee: number, mois: number, actif: b
 export const enregistrerSaisies = (groupe: Groupe, annee: number, mois: number, niveau: Niveau, cases: CaseEnvoyee[]) =>
   api<VueSaisies>('/pilotage/saisies', put({ annee, mois, groupe, niveau, cases }))
 
+/** Règle un conflit : garder la saisie, ou la retirer pour suivre la somme des employés. */
+export const reglerConflit = (
+  annee: number, mois: number, site_id: number | null, service_id: number | null,
+  indicateur: string, choix: 'saisie' | 'employes', saisie: Dec | null, employes: Dec | null,
+) => api<VueSaisies>('/pilotage/saisies/conflit', post({ annee, mois, site_id, service_id, indicateur, choix, saisie, employes }))
+
 export interface TotalAnnuel {
   site_id: number | null
   service_id: number | null
@@ -174,6 +183,12 @@ export function apresSaisies(qc: QueryClient, vue: VueSaisies) {
   })
   qc.invalidateQueries({ queryKey: ['saisie', 'derniere-periode'] })
   qc.invalidateQueries({ queryKey: ['pilotage'] })
+  rechargerRapports(qc)
+}
+
+/** Après la validation ou l'annulation d'un lot : la somme des employés a pu changer partout. */
+export function apresImport(qc: QueryClient) {
+  for (const k of ['donnees', 'saisie', 'saisies', 'pilotage']) qc.invalidateQueries({ queryKey: [k] })
   rechargerRapports(qc)
 }
 

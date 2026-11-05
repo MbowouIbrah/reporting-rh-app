@@ -25,7 +25,8 @@ import {
 } from '../../../api/pilotage'
 import Etat, { etatErreur } from '../../../components/Etat'
 import { Bouton, Confirmer } from '../../../components/Kit'
-import { comparer, decimal2, fcfa, montantSigneValide, montantValide, pct, moyenne, sansEspaces, signe, somme, valeurBrute } from '../../../lib/format'
+import ConflitsSaisie from './ConflitsSaisie'
+import { comparer, decimal2, fcfa, montantExact, montantSigneValide, montantValide, pct, moyenne, sansEspaces, signe, somme, valeurBrute } from '../../../lib/format'
 import { exerciceDe, libelleExercice, type Calendrier } from '../../../lib/exercice'
 import { lirePartage } from '../../../lib/filtresPartages'
 import { lireTSV, nettoyer } from '../../../lib/grille'
@@ -63,12 +64,18 @@ const NOMBRES = new Set(['obj_ventes', 'obj_clients', 'obj_factures'])
 
 /** CA et marge (et leurs objectifs) en FCFA entiers ; les autres chiffres : deux décimales au plus. */
 const montrer = (ind: string, v: string | null | undefined) => (MONTANTS.has(ind) ? fcfa(v) : decimal2(v ?? null))
+/** Écarts et conflits : un écart de quelques francs compte, le montant reste au chiffre près. */
+const montrerExact = (ind: string, v: string | null | undefined) => (MONTANTS.has(ind) ? montantExact(v ?? null) : decimal2(v ?? null))
 
 interface Ligne {
   cle: string
   site_id: number | null
   service_id: number | null
+  /** Libellé complet, repris par les lecteurs d'écran et la répartition annuelle. */
   libelle: string
+  /** Niveau site × service : le site qui regroupe la ligne et le seul nom du service. */
+  site?: string
+  service?: string
 }
 type Valeurs = Record<string, string>
 
@@ -81,7 +88,18 @@ function lignesDe(vue: VueSaisies): Ligne[] {
   if (vue.niveau === 'global') return [ligne(null, null, 'Global')]
   if (vue.niveau === 'site') return vue.sites.map((s) => ligne(s.id, null, s.libelle))
   if (vue.niveau === 'service') return vue.services.map((s) => ligne(null, s.id, s.libelle))
-  return vue.sites.flatMap((si) => vue.services.map((se) => ligne(si.id, se.id, `${si.libelle} — ${se.libelle}`)))
+  return vue.sites.flatMap((si) => vue.services.map((se) => ({ ...ligne(si.id, se.id, `${si.libelle} — ${se.libelle}`), site: si.libelle, service: se.libelle })))
+}
+
+/** Lignes rangées par site au niveau site × service ; `debut` garde l'index de ligne continu pour le clavier et le collage. */
+function groupesDe(lignes: Ligne[]) {
+  const groupes: { cle: string; site?: string; debut: number; lignes: Ligne[] }[] = []
+  lignes.forEach((l, r) => {
+    const dernier = groupes[groupes.length - 1]
+    if (dernier && dernier.site === l.site) dernier.lignes.push(l)
+    else groupes.push({ cle: l.site ?? 'tout', site: l.site, debut: r, lignes: [l] })
+  })
+  return groupes
 }
 
 /** Valeurs de départ : le chiffre saisi du serveur, sinon la proposition tirée de l'ancien niveau. */
@@ -146,6 +164,7 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
   const [focus, setFocus] = useState<string | null>(null)
 
   const lignes = useMemo(() => lignesDe(vue), [vue])
+  const groupes = useMemo(() => groupesDe(lignes), [lignes])
   const base = useMemo(() => valeursDe(vue), [vue])
   const inds = vue.indicateurs
   const avecTaux = groupe === 'ca_marge'
@@ -177,14 +196,19 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
   const aEnregistrer = modifie && nbInvalides === 0 && !envoi.cours && !enAttente
 
   // Valeur retenue d'une case pour les totaux et les taux : le chiffre tapé, sinon la somme des employés.
+  // Une saisie non retouchée garde la valeur du serveur : les employés peuvent être plus récents.
   const effective = (l: Ligne, i: string): string | null => {
     const v = texte(l, i)
-    if (v.trim()) return valide(i, v) ? normal(v) : null
-    return caseServeur(l)?.valeurs[i]?.employes ?? null
+    const x = caseServeur(l)?.valeurs[i]
+    if (v.trim()) {
+      if (!valide(i, v)) return null
+      return x?.saisi != null && memeValeur(v, x.saisi) ? (x.valeur ?? normal(v)) : normal(v)
+    }
+    return x?.employes ?? null
   }
 
-  const totalLocal = (i: string) => {
-    const vals = lignes.map((l) => effective(l, i))
+  const totalLocal = (i: string, parmi: Ligne[] = lignes) => {
+    const vals = parmi.map((l) => effective(l, i))
     const presentes = vals.filter((x): x is string => x != null)
     // Productivité : moyenne exacte des cases renseignées, sinon somme.
     const valeur = MOYENNES.has(i) ? moyenne(presentes) : somme(presentes)
@@ -348,22 +372,21 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
       <p className="note" id={idNote}>
         {objectif ? (
           <>
-            Objectifs de {periode}{groupe === 'obj_ca_marge' ? ' en FCFA' : ''}. Une case laissée vide n’a pas d’objectif ; la productivité se moyenne, les autres objectifs s’additionnent.{' '}
-            Entrée passe à la case du dessous ; vous pouvez coller un bloc copié dans Excel.
+            Case vide : pas d’objectif. La productivité se moyenne, les autres objectifs s’additionnent. Entrée descend d’une case ; un bloc copié dans Excel se colle directement.
           </>
         ) : (
           <>
-            {groupe === 'ca_marge' ? `Montants de ${periode} en FCFA.` : `Chiffres de ${periode}.`} Une case laissée vide se calcule à partir des chiffres des employés.{' '}
-            Entrée passe à la case du dessous ; vous pouvez coller un bloc copié dans Excel.{' '}
+            Case vide : somme des employés. Si les deux diffèrent, la saisie la plus récente est retenue. Entrée descend d’une case ; un bloc copié dans Excel se colle directement.{' '}
             <Link to="/admin">Détail par employé</Link>
           </>
         )}
       </p>
       {aRepartir.length > 0 && (
         <p className="saisie-a-repartir" role="status">
-          À répartir : {aRepartir.map(([i, v]) => `${COURT[i] ?? i} ${montrer(i, v)}`).join(' ; ')}. Ces chiffres de l’ancien niveau ne rentrent dans aucune case : tapez-les dans la grille.
+          À répartir : {aRepartir.map(([i, v]) => `${COURT[i] ?? i} ${montrerExact(i, v)}`).join(' ; ')}. Ces chiffres de l’ancien niveau ne rentrent dans aucune case : tapez-les dans la grille.
         </p>
       )}
+      {!enAttente && <ConflitsSaisie vue={vue} bloque={sale} avantChoix={() => onNiveau(niveauAffiche)} />}
       {lignes.length === 0 ? (
         <Etat type="vide" titre="Aucune ligne à renseigner" aide="" />
       ) : (
@@ -373,15 +396,25 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
               <caption className="sr-only">Saisie {periode}, niveau {defNiveau?.libelle.toLowerCase()}</caption>
               <thead>
                 <tr>
-                  <th scope="col">{defNiveau?.colonne}</th>
+                  <th scope="col">{vue.niveau === 'cellule' ? 'Site et service' : defNiveau?.colonne}</th>
                   {inds.map((i) => <th key={i} scope="col" className="num">{COLONNES[i] ?? i}</th>)}
                   {avecTaux && <th scope="col" className="num">Taux de marge</th>}
                 </tr>
               </thead>
-              <tbody>
-                {lignes.map((l, r) => (
+              {groupes.map((g) => (
+              <tbody key={g.cle} className={g.site ? 'saisie-groupe' : undefined}>
+                {g.site && (
+                  <tr className="saisie-groupe-titre">
+                    <th scope="rowgroup">{g.site}<small>total du site</small></th>
+                    {inds.map((i) => <td key={i} className="num">{montrer(i, totalLocal(i, g.lignes).valeur)}</td>)}
+                    {avecTaux && <td className="num">{pct(taux(totalLocal('ca', g.lignes).valeur, totalLocal('marge', g.lignes).valeur) ?? undefined)}</td>}
+                  </tr>
+                )}
+                {g.lignes.map((l, k) => {
+                  const r = g.debut + k
+                  return (
                   <tr key={l.cle}>
-                    <th scope="row">{l.libelle}</th>
+                    <th scope="row">{l.service ?? l.libelle}</th>
                     {inds.map((i, c) => {
                       const k = cleVal(l, i)
                       const v = texte(l, i)
@@ -409,14 +442,18 @@ function Grille({ vue, groupe, periode, demandeNiveau, enAttente, onNiveau, onMo
                             onChange={(e) => changer(k, e.target.value)}
                           />
                           {ko && <small className="erreur-case" id={idErreur}>Valeur invalide</small>}
-                          {nonNul(ecart) && <small className={`non-reparti${signe(ecart!) < 0 ? ' negatif' : ''}`}>non réparti : {montrer(i, ecart)}</small>}
+                          {x?.conflit
+                            ? <small className="non-reparti negatif">conflit, retenu : {montrerExact(i, x.valeur)}</small>
+                            : nonNul(ecart) && <small className={`non-reparti${signe(ecart!) < 0 ? ' negatif' : ''}`}>non réparti : {montrerExact(i, ecart)}</small>}
                         </td>
                       )
                     })}
                     {avecTaux && <td className="num">{pct(tauxLigne(l) ?? undefined)}</td>}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
+              ))}
               <tfoot>
                 <tr className="total">
                   <th scope="row">TOTAL</th>
@@ -572,7 +609,7 @@ function RepartirAnnee({ vue, groupe, lignes, onFerme }: { vue: VueSaisies; grou
 }
 
 function OngletGroupe({ groupe, annee, mois, periode, onModifs }: { groupe: Groupe; annee: number; mois: number; periode: string; onModifs: (sale: boolean) => void }) {
-  // Niveau choisi par l'utilisateur ; sans choix, celui que le serveur propose. Un autre mois repart du niveau du serveur (l'onglet est remonté).
+  // Niveau choisi par l'utilisateur ; sans choix, celui que le serveur propose.
   const [choix, setChoix] = useState<Niveau | undefined>(undefined)
   const q = useSaisies(groupe, annee, mois, true, choix)
   if (q.isLoading) return <Etat type="chargement" />
@@ -599,9 +636,9 @@ export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = 
   const avecMarge = usePeut('marge:read')
   const avecLecture = usePeut('import:read')
   const onglets: { id: Onglet; libelle: string }[] = [
-    ...(avecLecture && avecMarge ? [{ id: 'ca_marge' as const, libelle: 'CA et marge' }] : []),
-    ...(avecLecture ? [{ id: 'activite' as const, libelle: 'OR, devis, factures' }] : []),
-    ...(avecLecture && avecMarge ? [{ id: 'obj_ca_marge' as const, libelle: 'Objectifs CA et marge' }] : []),
+    ...(avecLecture && avecMarge ? [{ id: 'ca_marge' as const, libelle: 'Résultats financiers' }] : []),
+    ...(avecLecture ? [{ id: 'activite' as const, libelle: 'Résultats d’activité' }] : []),
+    ...(avecLecture && avecMarge ? [{ id: 'obj_ca_marge' as const, libelle: 'Objectifs financiers' }] : []),
     ...(avecLecture ? [{ id: 'obj_activite' as const, libelle: 'Objectifs d’activité' }] : []),
   ]
   // L'onglet de départ est retenu dès qu'un onglet de saisie existe : un droit qui arrive ensuite (marge) ne change pas d'onglet sous les doigts.
@@ -630,6 +667,7 @@ export default function SaisieDonnees({ annee, mois, periode, onModifs, garde = 
         ))}
       </div>
       <div role="tabpanel" id={`${id}-panneau`} aria-labelledby={`${id}-${actif}`}>
+        {/* La clé remonte l'onglet à chaque mois : le niveau essayé sur un mois ne suit pas sur le suivant. */}
         {actif && <OngletGroupe key={`${actif}-${annee}-${mois}`} groupe={actif} annee={annee} mois={mois} periode={periode} onModifs={signaler} />}
       </div>
     </div>
