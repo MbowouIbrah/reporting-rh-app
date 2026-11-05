@@ -1,6 +1,6 @@
 #!/bin/sh
 # Restaure une sauvegarde dans une base (par défaut la base de production, après confirmation).
-# Usage : deploy/scripts/restauration.sh FICHIER.dump [BASE_CIBLE]
+# Usage : scripts/restauration.sh FICHIER.dump [BASE_CIBLE]
 # La base cible est vidée puis recréée. Arrêter l'API avant une restauration de production.
 set -eu
 . "$(dirname "$0")/_commun.sh"

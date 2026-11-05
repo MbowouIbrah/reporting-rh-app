@@ -51,9 +51,9 @@ Critères : disposition ci-dessus ; chaque carte garde sa bulle de détail ; les
 
 | Personne / fonction | Rôle | Lecture | Écriture | Périmètre |
 |---|---|---|---|---|
-| Administrateurs RH | Administrateur RH | Tout | Tout | Global |
+| Deux administrateurs RH | Administrateur RH | Tout | Tout | Global |
 | DRH, DOP | Lecteur global | Tout | Non | Global |
-| DPS (Direction pièces et service) | Lecteur à périmètre | Oui | Non | Commerce Pièces, SAV PL, SAV Engins, Sites Déportés |
+| DPS | Lecteur à périmètre | Oui | Non | Commerce Pièces, SAV PL, SAV Engins, Sites Déportés |
 | Directeur commercial | Lecteur à périmètre | Oui | Non | Commerce VN |
 | DC Pneumatique | Lecteur à périmètre | Oui | Non | Pneumatique |
 | Directeur technique | Lecteur à périmètre | Oui | Non | SAV PL |

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prouve qu'une sauvegarde est restaurable : restaure dans une base jetable et compare
 # le nombre de lignes de chaque table avec la base source. Code retour 0 = identique.
-# Usage : deploy/scripts/test-restauration.sh [FICHIER.dump]  (défaut : dernière sauvegarde)
+# Usage : scripts/test-restauration.sh [FICHIER.dump]  (défaut : dernière sauvegarde)
 set -eu
 . "$(dirname "$0")/_commun.sh"
 fichier="${1:-$(ls -t "$BACKUP_DIR"/reporting_rh_*.dump | head -n 1)}"

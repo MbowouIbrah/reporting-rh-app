@@ -1,6 +1,6 @@
 #!/bin/sh
 # Sauvegarde logique (pg_dump format custom) horodatée, avec rotation.
-# Usage : deploy/scripts/sauvegarde.sh   (cron conseillé : 0 2 * * *)
+# Usage : scripts/sauvegarde.sh   (cron conseillé : 0 2 * * *)
 set -eu
 . "$(dirname "$0")/_commun.sh"
 mkdir -p "$BACKUP_DIR"

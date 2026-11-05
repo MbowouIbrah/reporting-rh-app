@@ -1,16 +1,26 @@
 name: reporting-rh
 
+# Limites prévues pour un petit serveur : les ajuster ici si le volume de données grandit.
+x-commun: &commun
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
 services:
   db:
+    <<: *commun
     image: postgres:16-alpine
-    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-reporting_rh}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obligatoire}
       POSTGRES_DB: ${POSTGRES_DB:-reporting_rh}
     volumes:
       - rh_pgdata:/var/lib/postgresql/data
-    networks: [internal]
+    networks: [interne]
     # Aucun port publié : la base n'est joignable que par l'API.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -19,18 +29,21 @@ services:
       retries: 5
 
   api:
-    build: ../backend
-    restart: unless-stopped
+    <<: *commun
+    build: ./backend
+    mem_limit: 768m
+    cpus: 1
     environment:
       ENV: prod
       POSTGRES_SERVER: db
       POSTGRES_USER: ${POSTGRES_USER:-reporting_rh}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-reporting_rh}
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY requis}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY obligatoire}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      APP_URL: ${APP_URL:-http://localhost:5173}
+      APP_URL: ${APP_URL:-http://localhost:8080}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -38,28 +51,40 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_TLS: ${SMTP_TLS:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
-      COOKIE_PATH_PREFIX: /reporting-rh
     depends_on:
       db:
         condition: service_healthy
-    networks: [internal, edge]
+    networks: [interne, public]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
       interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   web:
-    build: ../frontend
-    restart: unless-stopped
-    networks: [edge]
+    <<: *commun
+    build: ./frontend
+    mem_limit: 128m
+    cpus: 0.5
+    # Page web et passage vers l'API. Par défaut seule la machine y accède :
+    # le HTTPS est assuré devant (voir docs/RUNBOOK.md).
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [public]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
 networks:
-  internal:
+  interne:
     internal: true
-  # Réseau partagé avec le nginx d'Academy (créé une fois : docker network create edge)
-  edge:
-    external: true
+  public:
 
 volumes:
   rh_pgdata:

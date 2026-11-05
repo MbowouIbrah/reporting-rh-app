@@ -5,6 +5,13 @@ import { BrowserRouter } from 'react-router-dom'
 import { queryRetry } from './api/client'
 import App from './App'
 import { AuthProvider } from './auth/AuthContext'
+import '@fontsource/dm-sans/latin-300.css'
+import '@fontsource/dm-sans/latin-400.css'
+import '@fontsource/dm-sans/latin-500.css'
+import '@fontsource/dm-sans/latin-600.css'
+import '@fontsource/dm-sans/latin-700.css'
+import '@fontsource/dm-sans/latin-800.css'
+import '@fontsource/jetbrains-mono/latin-500.css'
 import './styles/base.css'
 import './styles/mouvement.css'
 
@@ -17,7 +24,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter basename="/reporting-rh">
+        <BrowserRouter>
           <App />
         </BrowserRouter>
       </AuthProvider>

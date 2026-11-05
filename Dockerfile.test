@@ -1,0 +1,18 @@
+# Image unique des tests (backend, frontend, navigateur). Jamais déployée.
+FROM python:3.12-slim-bookworm
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+WORKDIR /repo
+COPY backend/requirements.txt backend/requirements-dev.txt backend/
+RUN python -m venv backend/.venv \
+ && backend/.venv/bin/pip install --no-cache-dir -q -r backend/requirements-dev.txt
+COPY frontend/package.json frontend/package-lock.json frontend/
+RUN cd frontend && npm ci --no-audit --no-fund \
+ && npx playwright install --with-deps --only-shell chromium \
+ && rm -rf /var/lib/apt/lists/* /root/.npm
+COPY . .
+ENTRYPOINT ["sh", "scripts/tests-conteneur.sh"]
+CMD ["tout"]

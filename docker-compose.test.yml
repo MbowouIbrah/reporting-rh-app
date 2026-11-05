@@ -1,0 +1,34 @@
+name: reporting-rh-test
+
+# Tests dans un conteneur, avec plafonds mémoire et processeur. Rien n'est gardé sur le disque
+# (base en mémoire) ; `make test-clean` retire l'image de test.
+services:
+  db-test:
+    image: postgres:16-alpine
+    mem_limit: 256m
+    cpus: 1
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    tmpfs:
+      - /var/lib/postgresql/data:size=256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: reporting-rh-test
+    mem_limit: 2g
+    cpus: 2
+    environment:
+      TEST_DATABASE_URL: postgresql+psycopg://test:test@db-test:5432/test
+      E2E_BASE: recette-e2e.db
+    depends_on:
+      db-test:
+        condition: service_healthy

@@ -19,7 +19,7 @@ Remplacer le classeur Excel de reporting RH (CFAO) par une application web : mas
 Reprend fidèlement les indicateurs de l'Excel d'origine, avec droits par rôle et périmètre appliqués côté serveur, contrôles de cohérence et traçabilité des lectures nominatives.
 
 ## Operating Context
-Données financières et nominatives sensibles. Import mensuel de la paie. Montants en FCFA, libellés en français. Hébergé derrière le nginx d'Academy, sous `/reporting-rh/`.
+Données financières et nominatives sensibles. Import mensuel de la paie. Montants en FCFA, libellés en français. Application autonome servie à la racine.
 
 ## Capabilities and Constraints
 - Pages: Résumé, Mensuel (blocs A type de charge, B service/activité, C site, D contrat), Annuel, Graphes, Individuel, Connexion ; Administration = feuille DONNEES de l'Excel en lecture seule, filtrable (année, mois, service, site, matricule ou nom).

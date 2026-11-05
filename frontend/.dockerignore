@@ -3,4 +3,6 @@ dist
 *.tsbuildinfo
 test-results
 playwright-report
+captures
+*.png
 .env*

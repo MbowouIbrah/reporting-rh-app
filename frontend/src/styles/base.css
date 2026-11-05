@@ -724,8 +724,20 @@ html, body { overscroll-behavior: none; }
 .saisie-donnees tfoot td small { padding-inline: 0; }
 .saisie-donnees .non-reparti.negatif { color: var(--warning); font-style: normal; font-weight: var(--fw-bold); }
 .saisie-donnees-groupe .saisie-pied { position: sticky; bottom: 0; z-index: 2; border-top: 1px solid var(--rule); margin-top: 0; padding-block: var(--sp-3); background: var(--surface-sunken); }
+.saisie-donnees .saisie-groupe-titre > * { border-top: 1px solid var(--rule-strong); background: var(--surface-sunken); color: var(--navy); font-weight: var(--fw-bold); }
+.saisie-donnees .saisie-groupe-titre th[scope='rowgroup'] { position: sticky; left: 0; z-index: 1; text-align: left; white-space: normal; }
+.saisie-donnees .saisie-groupe-titre small { display: inline; padding: 0 0 0 var(--sp-2); font-weight: 400; }
+.saisie-donnees .saisie-groupe th[scope='row'] { padding-left: var(--sp-5); font-weight: 400; }
+.saisie-donnees-titre .filtres { flex-wrap: nowrap; }
+.saisie-donnees-titre .filtres .bouton { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; }
 .saisie-a-repartir { margin: 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--warning); background: var(--warning-soft); color: var(--warning); font-weight: var(--fw-bold); }
 .saisie-donnees-groupe .saisie-pied .champ-erreur { margin: 0; }
+/* Conflit : au-dessus du bouton qui couvre la carte, pour que ses deux choix restent cliquables */
+.saisie-conflits { position: relative; z-index: 1; display: grid; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--warning); background: var(--warning-soft); font-size: var(--fs-sm); white-space: normal; }
+.saisie-conflits h5 { margin: 0; font-size: inherit; font-weight: var(--fw-bold); color: var(--warning); }
+.saisie-conflits ul { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.saisie-conflits p { margin: 0; }
+.saisie-conflit-choix { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); margin-top: var(--sp-1); }
 .partiel-mention { margin-left: .5em; font-size: var(--fs-xs); font-weight: 400; font-style: italic; color: var(--muted); }
 .saisie-carte-action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 .saisie-carte-action .champ-erreur, .saisie-carte-action .note { margin: 0; }

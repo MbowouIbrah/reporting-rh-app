@@ -3,13 +3,12 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  base: '/reporting-rh/',
+  base: '/',
   plugins: [react()],
   server: {
     proxy: {
-      '/reporting-rh/api': {
+      '/api': {
         target: `http://localhost:${process.env.API_PORT || 8000}`,
-        rewrite: (p) => p.replace('/reporting-rh/api', '/api'),
       },
     },
   },

@@ -1,5 +1,10 @@
 .venv
 __pycache__
 .pytest_cache
+.hypothesis
+.mypy_cache
+.ruff_cache
 .env
 *.db
+*.db.*
+tests
