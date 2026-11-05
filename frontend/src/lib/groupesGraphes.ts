@@ -49,8 +49,8 @@ export const GROUPES_ORIGINE: Groupe[] = [
   { id: 'ateliers', nom: 'Atelier et productivité', graphes: ['clients', 'factures', 'productivite', 'or'] },
 ]
 
-/** Réglage de l'utilisateur : ses groupes, l'ordre des groupes affichés (un groupe d'origine
- *  absent de `ordre` est masqué) et la vue d'ouverture (`tout` ou l'identifiant d'un groupe). */
+/** Réglage de l'utilisateur : ses groupes et, dans `ordre`, les groupes cochés, ceux qui s'affichent
+ *  directement. `defaut` suit les cases : le groupe s'il est seul coché, sinon `tout`. */
 export interface ConfigGroupes {
   perso: Groupe[]
   ordre: string[]
@@ -66,7 +66,7 @@ export const MAX_NOM = 60
 export const CONFIG_ORIGINE: ConfigGroupes = {
   perso: [],
   ordre: GROUPES_ORIGINE.map((g) => g.id),
-  defaut: 'ensemble',
+  defaut: VUE_TOUT,
 }
 
 /** Groupes d'origine affichés dans leur ordre et ouverture d'origine ; les groupes personnels restent (masqués). */
@@ -129,10 +129,23 @@ export function groupesAffiches(config: ConfigGroupes, dispo: Set<string>, noms:
   return res
 }
 
-/** Vue à l'ouverture : le réglage « par défaut » s'il est utilisable, sinon le premier groupe affiché. */
-export function vueInitiale(config: ConfigGroupes, affiches: Groupe[]): string {
-  if (config.defaut === VUE_TOUT || affiches.some((g) => g.id === config.defaut)) return config.defaut
-  return affiches[0]?.id ?? VUE_TOUT
+/** Groupes du menu : les cochés d'abord, dans l'ordre choisi, puis les autres, qui restent accessibles. */
+export function groupesDuMenu(config: ConfigGroupes, dispo: Set<string>, noms: Record<string, string> = {}): Groupe[] {
+  const ordre = [...config.ordre, ...tousLesGroupes(config, noms).map((g) => g.id)]
+  return groupesAffiches({ ...config, ordre }, dispo, noms)
+}
+
+/** Choix dans le menu : « Tout afficher » recoche tous les groupes, un groupe devient le seul coché. */
+export function choisirVue(config: ConfigGroupes, vue: string, noms: Record<string, string> = {}): ConfigGroupes {
+  if (vue !== VUE_TOUT) return { ...config, ordre: [vue], defaut: vue }
+  const ordre = [...new Set([...config.ordre, ...tousLesGroupes(config, noms).map((g) => g.id)])]
+  return { ...config, ordre, defaut: VUE_TOUT }
+}
+
+/** Ligne du menu qui correspond à ce qui est affiché : un groupe seul, « tout », ou aucune pour une sélection. */
+export function vueDuMenu(montres: Groupe[], menu: Groupe[]): string {
+  if (montres.length === 1) return montres[0].id
+  return montres.length === menu.length ? VUE_TOUT : ''
 }
 
 const titreCourt = (id: string) => GRAPHES.find((g) => g.id === id)?.court

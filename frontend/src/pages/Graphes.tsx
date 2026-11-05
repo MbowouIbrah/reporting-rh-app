@@ -8,6 +8,7 @@ import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
+import { useMontageDiffere } from '../hooks/useMontageDiffere'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
@@ -19,7 +20,7 @@ import MenuGroupes from '../components/MenuGroupes'
 import PersonnaliserGroupes from '../components/PersonnaliserGroupes'
 import SnapSections from '../components/SnapSections'
 import {
-  CONFIG_ORIGINE, GRAPHES, type Groupe, groupesAffiches, lireConfig, retablirOrigine, VUE_TOUT, vueInitiale,
+  choisirVue, CONFIG_ORIGINE, GRAPHES, type Groupe, groupesAffiches, groupesDuMenu, lireConfig, retablirOrigine, vueDuMenu,
 } from '../lib/groupesGraphes'
 import { useNomsGroupes } from '../lib/nomsGroupes'
 import { usePreference } from '../lib/preference'
@@ -78,14 +79,18 @@ const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as con
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v))
 
 function Carte({ titre, lecture, note, children }: { titre: string; lecture?: string; note?: string; children: ReactNode }) {
+  // Rapport PDF : tout est monté d'emblée pour l'impression. À l'écran, chaque graphe se monte à son tour, squelette en attendant.
+  const { zone, monte } = useMontageDiffere<HTMLElement>(useLocation().pathname.startsWith('/rapport'))
   return (
-    <figure className="graphe">
+    <figure className="graphe" ref={zone} aria-busy={monte ? undefined : true}>
       <figcaption>{titre}</figcaption>
       {lecture && <p className="graphe-lecture">{lecture}</p>}
       <div className="graphe-zone">
-        <ResponsiveContainer width="100%" height="100%">
-          {children as React.ReactElement}
-        </ResponsiveContainer>
+        {monte && (
+          <ResponsiveContainer width="100%" height="100%">
+            {children as React.ReactElement}
+          </ResponsiveContainer>
+        )}
       </div>
       {note && <p className="graphe-lecture graphe-note">{note}</p>}
     </figure>
@@ -135,7 +140,6 @@ export default function Graphes() {
   const [config, setConfig] = usePreference('groupes.evolution', lireConfig, CONFIG_ORIGINE)
   const [noms, enregistrerNoms] = useNomsGroupes()
   const peutRenommer = usePeut('referentiel:write')
-  const [vue, setVue] = useState<string | null>(null)
   const [personnalise, setPersonnalise] = useState(false)
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
@@ -237,20 +241,25 @@ export default function Graphes() {
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
   // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
   const dispo = new Set(GRAPHES.filter((g) => !g.cle || commun.serie.some((m) => m[g.cle!] != null)).map((g) => g.id))
+  // Groupes cochés : ceux de « Tout afficher ». Le menu propose aussi les autres, qui s'affichent seuls.
   const affiches = groupesAffiches(config, dispo, noms)
-  // Vue choisie par l'utilisateur ; sans choix (ou si le groupe n'est plus affiché), celle du réglage d'ouverture
-  const vueActive = vue !== null && (vue === VUE_TOUT || affiches.some((g) => g.id === vue)) ? vue : vueInitiale(config, affiches)
+  // Les groupes cochés s'affichent directement. Aucun n'a de données : le premier disponible plutôt qu'une page vide
+  const menu = groupesDuMenu(config, dispo, noms)
+  // Le rapport PDF garde tous les groupes : choisir un groupe à l'écran ne doit pas le réduire
+  const montres = rapport ? menu : affiches.length > 0 ? affiches : menu.slice(0, 1)
+  const vueActive = montres.map((g) => g.id).join('|')
   // Vue rendue en arrière-plan : au changement de vue, le squelette de la vue demandée s'affiche
   // tout de suite et les graphes (lourds en « tout afficher ») arrivent sans figer la page.
   const vueRendue = useDeferredValue(vueActive)
   const enBascule = vueRendue !== vueActive
-  const groupeActif = affiches.find((g) => g.id === vueRendue)
-  const groupeCible = affiches.find((g) => g.id === vueActive) ?? affiches[0]
+  const rendus = vueRendue.split('|').flatMap((id) => menu.filter((g) => g.id === id))
+  const groupeCible = montres[0]
   // Squelette : les quatre cartes du groupe d'ouverture, avant même de savoir quelles données existent
   const tousLesIds = new Set(GRAPHES.map((g) => g.id))
-  const groupesSquelette = groupesAffiches(config, tousLesIds, noms)
-  const vueSquelette = vueInitiale(config, groupesSquelette)
-  const titresSquelette = (groupesSquelette.find((g) => g.id === vueSquelette) ?? groupesSquelette[0])?.graphes.map((id) => T[id]) ?? []
+  const groupesSquelette = groupesDuMenu(config, tousLesIds, noms)
+  const affichesSquelette = groupesAffiches(config, tousLesIds, noms)
+  const montresSquelette = affichesSquelette.length > 0 ? affichesSquelette : groupesSquelette.slice(0, 1)
+  const titresSquelette = montresSquelette[0]?.graphes.map((id) => T[id]) ?? []
 
   // Retour du 16/10 : même présentation que la rémunération globale (aire N, pointillés N-1) ;
   // l'effectif a son propre graphe.
@@ -372,33 +381,28 @@ export default function Graphes() {
   )
   const retablir = () => {
     setConfig(retablirOrigine(config))
-    setVue(null)
   }
 
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
-    <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && vueRendue === VUE_TOUT ? ' graphes-tout' : ''}`}>
+    <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture. */}
-      {!rapport && (serie ? affiches.length > 0 : premier && groupesSquelette.length > 0) && (
+      {!rapport && (serie ? menu.length > 0 : premier && groupesSquelette.length > 0) && (
         <MenuGroupes
-          groupes={serie ? affiches : groupesSquelette}
-          vue={serie ? vueActive : vueSquelette}
-          defaut={config.defaut}
-          onVue={(v) => {
-            setVue(v)
-            // le dernier choix du menu devient la vue d'ouverture de l'utilisateur
-            if (v !== config.defaut) setConfig({ ...config, defaut: v })
-          }}
+          groupes={serie ? menu : groupesSquelette}
+          nbAffiches={serie ? montres.length : montresSquelette.length}
+          vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
+          onVue={(v) => setConfig(choisirVue(config, v, noms))}
           onPersonnaliser={() => setPersonnalise(true)}
         />
       )}
       {f.vide && <Etat type="vide" />}
-      {serie && affiches.length === 0 && (
+      {serie && menu.length === 0 && (
         <p className="graphes-aucun">
           Aucun groupe à afficher.
           {!rapport && <> <button type="button" className="bouton bouton-lien" onClick={retablir}>Rétablir les groupes d’origine</button> <button type="button" className="bouton bouton-lien" onClick={() => setPersonnalise(true)}>Personnaliser…</button></>}
@@ -426,11 +430,11 @@ export default function Graphes() {
           ))}
         </div>
       )}
-      {serie && !enBascule && affiches.length > 0 && (rapport || vueRendue === VUE_TOUT || !groupeActif ? (
+      {serie && !enBascule && rendus.length > 0 && (rapport || rendus.length > 1 ? (
         // Tous les groupes (et toujours le rapport PDF) : un écran par groupe
         <SnapSections
           libelle="Groupes de graphiques"
-          sections={affiches.map((g) => ({
+          sections={rendus.map((g) => ({
             id: `groupe-${g.id}`,
             titre: g.nom,
             contenu: (
@@ -442,7 +446,7 @@ export default function Graphes() {
           }))}
         />
       ) : (
-        grille(groupeActif, true)
+        grille(rendus[0], true)
       ))}
       {personnalise && !rapport && (
         <PersonnaliserGroupes

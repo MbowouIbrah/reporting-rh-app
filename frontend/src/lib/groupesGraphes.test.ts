@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import {
-  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, lireConfig, lireNoms, nouvelId, retablirOrigine, tousLesGroupes, vueInitiale,
+  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, groupesDuMenu, lireConfig, lireNoms, nouvelId, retablirOrigine, tousLesGroupes, choisirVue, vueDuMenu,
 } from './groupesGraphes'
 
 const tous = new Set(GRAPHES.map((g) => g.id))
@@ -36,12 +36,17 @@ test('groupesAffiches : groupe d’origine absent de l’ordre masqué, groupe p
   expect(tousLesGroupes(config)).toHaveLength(6)
 })
 
-test('vueInitiale : réglage par défaut, « tout », sinon premier groupe affiché', () => {
-  const affiches = groupesAffiches(CONFIG_ORIGINE, tous)
-  expect(vueInitiale(CONFIG_ORIGINE, affiches)).toBe('ensemble')
-  expect(vueInitiale({ ...CONFIG_ORIGINE, defaut: 'tout' }, affiches)).toBe('tout')
-  expect(vueInitiale({ ...CONFIG_ORIGINE, defaut: 'ventes' }, affiches.slice(1, 3))).toBe('salaire')
-  expect(vueInitiale({ ...CONFIG_ORIGINE, defaut: 'ventes' }, [])).toBe('tout')
+test('choisirVue : un groupe devient le seul coché, « tout » recoche tout sans doublon', () => {
+  const trois = { ...CONFIG_ORIGINE, ordre: ['ventes', 'ensemble', 'salaire'], defaut: 'tout' }
+  expect(choisirVue(trois, 'ateliers')).toMatchObject({ ordre: ['ateliers'], defaut: 'ateliers' })
+  expect(choisirVue(trois, 'tout')).toMatchObject({ ordre: ['ventes', 'ensemble', 'salaire', 'avantages', 'ateliers'], defaut: 'tout' })
+})
+
+test('vueDuMenu : groupe seul, tout, ou aucune ligne pour une sélection', () => {
+  const menu = groupesAffiches(CONFIG_ORIGINE, tous)
+  expect(vueDuMenu(menu.slice(0, 1), menu)).toBe('ensemble')
+  expect(vueDuMenu(menu, menu)).toBe('tout')
+  expect(vueDuMenu(menu.slice(0, 3), menu)).toBe('')
 })
 
 test('descGroupe : noms courts séparés par des virgules', () => {
@@ -88,6 +93,12 @@ test('noms choisis : appliqués aux groupes d’origine seulement', () => {
   expect(tousLesGroupes(config, noms).map((g) => g.nom)).toContain('Chiffre')
   expect(tousLesGroupes(config).find((g) => g.id === 'ventes')?.nom).toBe('Ventes, marge et commissions')
   expect(groupesAffiches(config, tous, noms).map((g) => g.nom)).toEqual(['Chiffre', 'Mes ventes'])
+})
+
+test('groupesDuMenu : un groupe décoché reste proposé, après les cochés et sans doublon ; un groupe sans donnée non', () => {
+  const config = { ...CONFIG_ORIGINE, ordre: ['ventes', 'ensemble'] }
+  expect(groupesDuMenu(config, tous).map((g) => g.id)).toEqual(['ventes', 'ensemble', 'salaire', 'avantages', 'ateliers'])
+  expect(groupesDuMenu(config, sans('salaire', 'primes', 'assurance', 'formation')).map((g) => g.id)).not.toContain('salaire')
 })
 
 test('noms personnels : lus depuis le réglage et prioritaires sur les noms communs', () => {

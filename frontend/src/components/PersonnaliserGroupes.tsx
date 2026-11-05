@@ -4,11 +4,9 @@ import {
   type ConfigGroupes, descGroupe, GRAPHES, type Groupe, GROUPES_ORIGINE, MAX_NOM, MAX_PAR_GROUPE, nouvelId, retablirOrigine, tousLesGroupes, VUE_TOUT,
 } from '../lib/groupesGraphes'
 
-/** Le groupe d'ouverture doit être affiché : sinon il passe au premier groupe affiché. */
+/** Le défaut suit les cases : le groupe s'il est seul coché, sinon tous les groupes cochés. */
 function normaliser(c: ConfigGroupes): ConfigGroupes {
-  if (c.ordre.length === 1) return { ...c, defaut: c.ordre[0] } // un seul groupe : c'est lui, par défaut
-  if (c.defaut === VUE_TOUT || c.ordre.includes(c.defaut)) return c
-  return { ...c, defaut: c.ordre[0] ?? VUE_TOUT }
+  return { ...c, defaut: c.ordre.length === 1 ? c.ordre[0] : VUE_TOUT }
 }
 
 interface Edition {
@@ -72,26 +70,10 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
   const ids = [...new Set([...rang, ...tous.map((g) => g.id)])].filter((id) => parId.has(id))
   const lignes: Groupe[] = ids.map((id) => parId.get(id)!)
   const affiches = ids.filter((id) => travail.ordre.includes(id))
-  // Groupe par défaut toujours choisi, même quand on ouvre sur tous les groupes
-  const [groupe, setGroupe] = useState(config.defaut !== VUE_TOUT ? config.defaut : (config.ordre[0] ?? ''))
-  const groupeDefaut = travail.defaut !== VUE_TOUT ? travail.defaut : affiches.includes(groupe) ? groupe : (affiches[0] ?? '')
   const maj = (c: ConfigGroupes) => setTravail(normaliser(c))
-  const montrer = (montres: string[], tout = travail.defaut === VUE_TOUT, ordreLignes = ids) => {
-    const ordre = ordreLignes.filter((id) => montres.includes(id))
-    const g = ordre.includes(groupeDefaut) ? groupeDefaut : (ordre[0] ?? '')
-    setGroupe(g)
-    maj({ ...travail, ordre, defaut: tout && ordre.length > 1 ? VUE_TOUT : g || VUE_TOUT })
-  }
-
-  // Décocher un groupe quand tous sont ouverts revient au groupe par défaut (comme « tout cocher »)
-  const basculer = (id: string) =>
-    affiches.includes(id) ? montrer(affiches.filter((x) => x !== id), false) : montrer([...affiches, id])
-  // Tout décocher garde seulement le groupe par défaut
-  const toutAfficher = (oui: boolean) => (oui ? montrer(ids, true) : montrer([groupeDefaut], false))
-  const choisirDefaut = (id: string) => {
-    setGroupe(id)
-    maj({ ...travail, defaut: id })
-  }
+  const montrer = (montres: string[]) => maj({ ...travail, ordre: ids.filter((id) => montres.includes(id)) })
+  const basculer = (id: string) => montrer(affiches.includes(id) ? affiches.filter((x) => x !== id) : [...affiches, id])
+  const toutAfficher = (oui: boolean) => montrer(oui ? ids : [])
   const deplacer = (id: string, sens: -1 | 1) => {
     const i = ids.indexOf(id)
     const j = i + sens
@@ -107,7 +89,6 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
   const retablir = () => {
     const c = retablirOrigine(travail)
     setRang([...c.ordre, ...travail.perso.map((g) => g.id)])
-    setGroupe(c.defaut)
     maj(c)
   }
 
@@ -221,9 +202,9 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
       ) : (
         <>
           <h3 id={idTitre}>Personnaliser les groupes</h3>
-          <p className="perso-aide">Choisissez les groupes affichés, leur ordre et celui qui s’ouvre en premier.</p>
+          <p className="perso-aide">Cochez les groupes à afficher directement et choisissez leur ordre. Les autres restent accessibles dans le menu.</p>
           <label className="perso-defaut perso-tout">
-            <input type="checkbox" checked={travail.defaut === VUE_TOUT} disabled={ids.length < 2} onChange={(e) => toutAfficher(e.target.checked)} />
+            <input type="checkbox" checked={affiches.length === ids.length} disabled={ids.length < 2} onChange={(e) => toutAfficher(e.target.checked)} />
             Afficher tous les groupes
           </label>
           <ul className="perso-liste">
@@ -245,18 +226,6 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
                     <button type="button" className="perso-icone" aria-label={`Descendre ${g.nom}`} disabled={!affiche || i === ids.length - 1} onClick={() => deplacer(g.id, 1)}>
                       <ArrowDown aria-hidden="true" size={16} />
                     </button>
-                    <label className="perso-defaut">
-                      <input
-                        type="radio"
-                        name="defaut"
-                        aria-label={`Ouvrir sur ${g.nom}`}
-                        checked={groupeDefaut === g.id}
-                        disabled={!affiche}
-                        onChange={() => choisirDefaut(g.id)}
-                        onClick={() => travail.defaut === VUE_TOUT && choisirDefaut(g.id)}
-                      />
-                      par défaut
-                    </label>
                     <button
                       type="button"
                       className="bouton bouton-lien"

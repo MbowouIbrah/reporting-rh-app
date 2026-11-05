@@ -472,7 +472,6 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .menu-groupes-coche { flex: none; width: 14px; height: 18px; display: inline-flex; align-items: center; color: var(--red); }
 .menu-groupes-texte { flex: 1; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 2px; min-width: 0; }
 .menu-groupes-texte small { flex-basis: 100%; color: var(--muted); font-size: var(--fs-xs); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.menu-groupes-defaut { margin-left: auto; padding-left: var(--sp-2); color: var(--muted); font-size: var(--fs-xs); font-style: normal; }
 /* Fenêtre « Personnaliser les groupes » */
 .perso-groupes { margin: auto; border: 1px solid var(--rule-strong); border-radius: 0; padding: var(--sp-4); box-shadow: var(--shadow-3); width: min(92vw, 640px); max-height: 88vh; overflow: auto; background: var(--surface); color: var(--ink); }
 .perso-groupes::backdrop { background: rgba(0, 0, 0, 0.4); }

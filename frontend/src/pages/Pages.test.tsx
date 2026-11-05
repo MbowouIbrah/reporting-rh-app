@@ -245,39 +245,46 @@ test('Graphes : CA et marge par mois absents sans données de marge, affichés a
   }
 })
 
-test('Graphes : un groupe à la fois, groupe personnel gardé dans le navigateur et retrouvé au rechargement', async () => {
+test('Graphes : les groupes cochés s’affichent, choisir un groupe décoche les autres sans les retirer du menu', async () => {
   localStorage.clear()
   const legende = (t: string) => [...document.querySelectorAll('figcaption')].some((f) => f.textContent === t)
+  const dansMenu = (nom: RegExp) => within(document.querySelector('details')!).getByRole('button', { name: nom })
+  const garde = () => JSON.parse(localStorage.getItem('reporting-rh.pref.1.groupes.evolution')!)
   const { unmount } = rendu(<Graphes />, '/graphes', ['report:read'])
-  // Ouverture sur « Effectif et masse salariale » : ses graphiques seulement
+  // Ouverture : tous les groupes sont cochés, donc tous affichés
   expect(await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)).toBeInTheDocument()
-  expect(screen.getByText('Groupe : Effectif et masse salariale', { selector: 'summary' })).toBeInTheDocument()
+  expect(screen.getByText('Tous les groupes', { selector: 'summary' })).toBeInTheDocument()
   expect(legende('Masse salariale mensuelle (FCFA)')).toBe(true)
-  expect(legende('Salaire par mois (FCFA)')).toBe(false)
-  // Autre groupe
-  fireEvent.click(screen.getByRole('button', { name: /Salaires, primes et charges/ }))
   expect(legende('Salaire par mois (FCFA)')).toBe(true)
-  expect(legende('Primes par mois (FCFA)')).toBe(true)
-  expect(legende('Masse salariale mensuelle (FCFA)')).toBe(false)
-  // Nouveau groupe personnel
-  fireEvent.click(screen.getByRole('button', { name: 'Personnaliser…' }))
+  // Un groupe choisi devient le seul coché, les autres restent dans le menu
+  fireEvent.click(dansMenu(/Salaires, primes et charges/))
+  await waitFor(() => expect(legende('Masse salariale mensuelle (FCFA)')).toBe(false))
+  expect(screen.getByText('Groupe : Salaires, primes et charges', { selector: 'summary' })).toBeInTheDocument()
+  expect(legende('Salaire par mois (FCFA)')).toBe(true)
+  expect(garde().ordre).toEqual(['salaire'])
+  expect(dansMenu(/Frais et avantages/)).toBeInTheDocument()
+  // Nouveau groupe personnel : coché avec le groupe déjà affiché
+  fireEvent.click(dansMenu(/Personnaliser/))
   fireEvent.click(screen.getByRole('button', { name: 'Nouveau groupe' }))
   fireEvent.change(screen.getByLabelText('Nom du groupe'), { target: { value: 'Mes salaires' } })
   fireEvent.click(screen.getByRole('checkbox', { name: 'Salaire par mois (FCFA)' }))
   fireEvent.click(screen.getByRole('button', { name: 'Valider' }))
   fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
   expect(screen.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
-  const gardé = JSON.parse(localStorage.getItem('reporting-rh.pref.1.groupes.evolution')!)
-  expect(gardé.perso).toEqual([{ id: expect.stringMatching(/^p-/), nom: 'Mes salaires', graphes: ['salaire'] }])
-  expect(gardé.ordre).toEqual(['ensemble', 'salaire', 'avantages', 'ventes', 'ateliers', gardé.perso[0].id])
+  expect(garde().perso).toEqual([{ id: expect.stringMatching(/^p-/), nom: 'Mes salaires', graphes: ['salaire'] }])
+  expect(garde().ordre).toEqual(['salaire', garde().perso[0].id])
   unmount()
-  // Rechargé : le groupe personnel est proposé
+  // Rechargé : le réglage est retrouvé
   rendu(<Graphes />, '/graphes', ['report:read'])
-  expect(await screen.findByRole('button', { name: /Mes salaires/ })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /Mes salaires/ }))
-  expect(screen.getByText('Groupe : Mes salaires', { selector: 'summary' })).toBeInTheDocument()
+  expect(await screen.findByText('2 groupes affichés', { selector: 'summary' })).toBeInTheDocument()
+  fireEvent.click(dansMenu(/Mes salaires/))
+  await waitFor(() => expect(screen.getByText('Groupe : Mes salaires', { selector: 'summary' })).toBeInTheDocument())
   expect(legende('Salaire par mois (FCFA)')).toBe(true)
   expect(legende('Primes par mois (FCFA)')).toBe(false)
+  // « Tout afficher » recoche tout
+  fireEvent.click(dansMenu(/Tout afficher/))
+  await waitFor(() => expect(legende('Primes par mois (FCFA)')).toBe(true))
+  expect(garde().ordre).toHaveLength(6)
   localStorage.clear()
 })
 

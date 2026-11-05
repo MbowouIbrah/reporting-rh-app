@@ -3,20 +3,19 @@ import { expect, test, vi } from 'vitest'
 import { GROUPES_ORIGINE } from '../lib/groupesGraphes'
 import MenuGroupes from './MenuGroupes'
 
-function menu(vue = 'ensemble') {
+function menu(vue = 'ensemble', nbAffiches?: number) {
   const onVue = vi.fn()
   const onPersonnaliser = vi.fn()
-  const r = render(<MenuGroupes groupes={GROUPES_ORIGINE.slice(0, 3)} vue={vue} defaut="ensemble" onVue={onVue} onPersonnaliser={onPersonnaliser} />)
+  const r = render(<MenuGroupes groupes={GROUPES_ORIGINE.slice(0, 3)} nbAffiches={nbAffiches} vue={vue} onVue={onVue} onPersonnaliser={onPersonnaliser} />)
   return { ...r, onVue, onPersonnaliser, details: r.container.querySelector('details')! }
 }
 
-test('menu des groupes : le groupe courant est annoncé, chaque groupe a sa description et « par défaut » est signalé', () => {
+test('menu des groupes : le groupe courant est annoncé, chaque groupe a sa description', () => {
   menu()
   expect(screen.getByText('Groupe : Effectif et masse salariale', { selector: 'summary' })).toBeInTheDocument()
   expect(screen.getByText('Masse salariale, Rémunération, Effectif, Absences')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /Effectif et masse salariale/ })).toHaveAttribute('aria-current', 'true')
   expect(screen.getByRole('button', { name: /Frais et avantages/ })).not.toHaveAttribute('aria-current')
-  expect(screen.getAllByText('par défaut')).toHaveLength(1)
 })
 
 test('menu des groupes : choisir un groupe change la vue et ferme le menu', () => {
@@ -37,6 +36,11 @@ test('menu des groupes : « Tout afficher » et « Personnaliser… »', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Personnaliser…' }))
   expect(onPersonnaliser).toHaveBeenCalledTimes(1)
   expect(details.open).toBe(false)
+})
+
+test('menu des groupes : plusieurs groupes cochés sont annoncés par leur nombre', () => {
+  menu('', 3)
+  expect(screen.getByText('3 groupes affichés', { selector: 'summary' })).toBeInTheDocument()
 })
 
 test('menu des groupes : fermé par Échap (focus rendu) et par un clic à côté', () => {
