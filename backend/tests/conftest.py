@@ -49,3 +49,34 @@ def make_client(db):
         return c
 
     return _make
+
+
+# Carte des tests (CARTE_TESTS=1) : note quels fichiers de app/ chaque fichier de test exécute,
+# pour ne relancer ensuite que les tests touchés par un changement (tools/tests_cibles.py).
+if os.environ.get("CARTE_TESTS"):
+    import json
+    from pathlib import Path
+
+    import coverage
+
+    _RACINE = Path(__file__).resolve().parents[1]
+    _cov = coverage.Coverage(data_file=None, source=[str(_RACINE / "app")], concurrency=["thread"])
+
+    def pytest_sessionstart(session):
+        _cov.start()
+
+    def pytest_runtest_setup(item):
+        _cov.switch_context(item.nodeid.split("::")[0])
+
+    def pytest_sessionfinish(session, exitstatus):
+        _cov.stop()
+        donnees = _cov.get_data()
+        carte: dict[str, list[str]] = {}
+        for f in donnees.measured_files():
+            ctx = set()
+            for c in donnees.contexts_by_lineno(f).values():
+                ctx.update(c)
+            ctx.discard("")
+            rel = Path(f).resolve().relative_to(_RACINE).as_posix()
+            carte[rel] = sorted(ctx)
+        (_RACINE / ".carte-tests.json").write_text(json.dumps(carte, indent=0), encoding="utf-8")

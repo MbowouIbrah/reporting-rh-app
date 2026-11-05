@@ -16,3 +16,6 @@ backups/
 
 # Captures d ecran : peuvent montrer des donnees
 frontend/captures/
+
+# Carte des tests ciblés (régénérée par tools/tests_cibles.py --carte)
+backend/.carte-tests.json
