@@ -162,7 +162,13 @@ def plan_recette(fichiers: list[str]) -> list[str] | None:
 
 def lancer(titre: str, cmd: list[str], cwd: Path, env: dict | None = None) -> bool:
     print(f"\n== {titre} : {' '.join(cmd)}", flush=True)
-    r = subprocess.run(cmd, cwd=cwd, env={**os.environ, **(env or {})}, shell=(os.name == "nt" and cmd[0] in ("npm", "npx")), check=False)
+    r = subprocess.run(
+        cmd, cwd=cwd, env={**os.environ, **(env or {})}, shell=(os.name == "nt" and cmd[0] in ("npm", "npx")),
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )
+    # Sortie courte : le bilan si tout va bien, la fin du journal en cas d'échec.
+    lignes = [x for x in (r.stdout + r.stderr).splitlines() if x.strip()]
+    print("\n".join(lignes[-(40 if r.returncode else 3):]))
     print(f"== {titre} : {'OK' if r.returncode == 0 else 'ÉCHEC'}", flush=True)
     return r.returncode == 0
 
