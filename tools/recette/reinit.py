@@ -3,7 +3,7 @@
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
 Options : --base recette.db (fichier SQLite, dans backend/), --historique <xlsx>.
 Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon <début de l'adresse><suffixe-retire>
-(admin@exemple.invalid -> <mot-de-passe-recette>).
+(comptes locaux de recette, jamais en production).
 
 Contenu : comptes de comptes.csv, historique de paie (Excel REPORTING RH, 18 mois),
 CA et marge de ca_marge.csv, objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
@@ -167,12 +167,13 @@ def main() -> None:
     from app.seed import _user, run
 
     with SessionLocal() as db:
-        run(db, admins[0]["email"], mdp(admins[0]["email"]), None)
+        run(db, admins[0]["email"], mdp(admins[0]["email"]), None, mdp_provisoire=False)
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
             email = c["email"].strip().lower()
             _user(db, email, c["nom"], mdp(c["email"]), c["modele"],
-                  perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui")
+                  perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui",
+                  provisoire=False)
             # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
             db.flush()
             u = db.scalar(select(Utilisateur).where(Utilisateur.email == email))

@@ -17,7 +17,7 @@ const EMAIL = {
 
 type Portee = { tout?: boolean; perimetres?: number[]; services?: string[]; sites?: string[] }
 type Droits = { fonction?: string; permissions?: string[]; portee?: Portee }
-type User = { id: number; email: string; nom: string; fonction: string; actif: boolean; permissions: string[]; portee: Required<Portee> }
+type User = { id: number; email: string; nom: string; fonction: string; actif: boolean; doit_changer_mdp: boolean; permissions: string[]; portee: Required<Portee> }
 type Audit = { id: number; action: string; entite: string; entite_id: string; utilisateur_id: number | null; avant: any; apres: any }
 type Perimetre = { id: number; code: string; libelle: string; regles: { dimension: string; valeur: string }[] }
 
@@ -212,6 +212,29 @@ test.describe.serial('gestion des utilisateurs', () => {
     const s = await session(browser, baseURL, EMAIL.global)
     await expect(onglets(s.page).first()).toBeVisible()
     await s.context.close()
+  })
+
+  test('compte créé par un admin : changement imposé avant tout accès', async ({ page, browser, baseURL }) => {
+    const email = 'provisoire@exemple.invalid'
+    expect((await creer(page.request, email, 'Compte provisoire', { portee: GLOBAL })).status()).toBe(201)
+    const context = await browser.newContext({ baseURL })
+    const p = await context.newPage()
+    await p.goto('login')
+    await p.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(email)
+    await p.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(MDP)
+    await p.getByRole('button', { name: 'Se connecter' }).click()
+    const titre = p.getByRole('heading', { name: 'Changez votre mot de passe' })
+    await expect(titre).toBeVisible()
+    expect((await p.request.get('api/v1/rapports/periodes')).status()).toBe(403)
+    await p.goto('resume')
+    await expect(titre).toBeVisible()
+    await p.getByLabel('Mot de passe actuel', { exact: true }).fill(MDP)
+    await p.getByLabel('Nouveau mot de passe', { exact: true }).fill('<mot-de-passe-test-4>')
+    await p.getByLabel('Confirmer le mot de passe', { exact: true }).fill('<mot-de-passe-test-4>')
+    await p.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
+    await expect(onglets(p).first()).toBeVisible()
+    expect((await p.request.get('api/v1/rapports/periodes')).status()).toBe(200)
+    await context.close()
   })
 
   test('mot de passe : trop court refusé à la création et au changement, nouveau mot de passe pris en compte', async ({ page, browser, baseURL }) => {

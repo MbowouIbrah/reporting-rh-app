@@ -5,14 +5,14 @@ const PY = process.platform === 'win32' ? '.venv\\Scripts\\python' : '.venv/bin/
 const API_PORT = process.env.E2E_API_PORT || '8000'
 const WEB_PORT = process.env.E2E_WEB_PORT || '5173'
 const DB = 'sqlite:///e2e.db'
-const ENV_API = { DATABASE_URL: DB, ENV: 'test', COOKIE_SECURE: 'false', COOKIE_PATH_PREFIX: '/reporting-rh', SECRET_KEY: '<cle-de-test>' }
+const ENV_API = { DATABASE_URL: DB, ENV: 'test', COOKIE_SECURE: 'false', SECRET_KEY: '<cle-de-test>' }
 
 export default defineConfig({
   testDir: './e2e',
   workers: 1,
   reporter: 'dot',
   use: {
-    baseURL: `http://localhost:${WEB_PORT}/reporting-rh/`,
+    baseURL: `http://localhost:${WEB_PORT}/`,
     headless: true,
     launchOptions: { executablePath: process.env.E2E_CHROMIUM || undefined },
   },
@@ -28,7 +28,7 @@ export default defineConfig({
     {
       command: 'npx vite --port ' + WEB_PORT + ' --strictPort',
       env: { API_PORT },
-      url: `http://localhost:${WEB_PORT}/reporting-rh/`,
+      url: `http://localhost:${WEB_PORT}/`,
       reuseExistingServer: false,
       timeout: 60_000,
     },

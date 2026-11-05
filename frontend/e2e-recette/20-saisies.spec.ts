@@ -38,7 +38,7 @@ async function ouvrirMois(page: Page, mois: string) {
 // Page dédiée aux données du mois (CA et marge, activité, objectifs), ouverte depuis la page de départ.
 async function ouvrirDonnees(page: Page, mois: string) {
   await ouvrirMois(page, mois)
-  await page.getByRole('button', { name: `Saisir le CA et la marge de ${mois} 2026 →` }).click()
+  await page.getByRole('button', { name: `Saisir les résultats financiers de ${mois} 2026 →` }).click()
   await expect(page.getByRole('heading', { level: 2, name: `DONNÉES — ${mois.toUpperCase()} 2026` })).toBeVisible()
 }
 

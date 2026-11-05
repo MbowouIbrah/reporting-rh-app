@@ -190,3 +190,51 @@ def test_0018_objectifs_acceptes_unicite_gardee_et_descente(tmp_path, monkeypatc
             c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
                            "VALUES (1, 'ca', 7)"))
     command.upgrade(cfg, "head")
+
+
+def test_0022_comptes_existants_sans_changement_impose(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'm.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0021")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO utilisateur (email, nom, password_hash, actif, cree_le) "
+                       "VALUES ('a@exemple.invalid', 'A', 'h', 1, '2026-01-01')"))
+    command.upgrade(cfg, "0022")
+    with eng.begin() as c:
+        assert not c.execute(text("SELECT doit_changer_mdp FROM utilisateur")).scalar()
+    command.downgrade(cfg, "0021")
+    assert "doit_changer_mdp" not in {x["name"] for x in inspect(eng).get_columns("utilisateur")}
+
+
+def test_0021_dates_saisies_remplies_unicite_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'd.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0020")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO periode (id, annee, mois) VALUES (1, 2026, 1)"))
+        c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur) "
+                       "VALUES (1, 'ca', 1000.5)"))
+    command.upgrade(cfg, "0021")
+    colonnes = {x["name"]: x for x in inspect(eng).get_columns("valeur_saisie")}
+    assert colonnes["modifie_le"]["nullable"] is False
+    assert colonnes["tranche_le"]["nullable"] is True
+    with eng.begin() as c:
+        assert c.execute(text("SELECT modifie_le FROM valeur_saisie")).scalar() is not None
+        # l'unicité de la saisie survit à la copie de la table
+        with pytest.raises(IntegrityError), c.begin_nested():
+            c.execute(text("INSERT INTO valeur_saisie (periode_id, indicateur, valeur, modifie_le)"
+                           " VALUES (1, 'ca', 7, CURRENT_TIMESTAMP)"))
+        ajout = text("INSERT INTO date_employes (periode_id, indicateur, modifie_le) "
+                     "VALUES (1, 'ca', CURRENT_TIMESTAMP)")
+        c.execute(ajout)
+        with pytest.raises(IntegrityError), c.begin_nested():
+            c.execute(ajout)  # le niveau global (site et service vides) reste unique
+    command.downgrade(cfg, "0020")
+    i = inspect(eng)
+    assert "date_employes" not in i.get_table_names()
+    assert "modifie_le" not in {x["name"] for x in i.get_columns("valeur_saisie")}
+    command.upgrade(cfg, "head")

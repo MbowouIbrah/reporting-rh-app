@@ -40,7 +40,7 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | # | Question | Appliqué aujourd'hui |
 |---|---|---|
 | D1 | Rôle « super administrateur » : que peut-il faire de plus que l'administrateur RH (gérer les autres administrateurs, consulter le journal, modifier le paramétrage) ? Qui le détient ? | **Précisé** : le super administrateur attribue les rôles et permissions, ajoute, désactive ou supprime les utilisateurs. Reporté à plus tard ; aujourd'hui tout administrateur RH gère les comptes. |
-| D2 | Plusieurs administrateurs avec saisie limitée à un périmètre, avec ou sans circuit de validation ? | **Confirmé (16/10)** : deux administrateurs RH de même niveau (Administrateurs RH), saisie sur tout, sans circuit de validation. |
+| D2 | Plusieurs administrateurs avec saisie limitée à un périmètre, avec ou sans circuit de validation ? | **Confirmé (16/10)** : deux administrateurs RH de même niveau (deux personnes), saisie sur tout, sans circuit de validation. |
 | D3 | Périmètre Equipment = SAV PL, SAV Engins, Pneumatique, Sites Déportés (sans Administration) ; Commerce VN = service Commerce VN seul ? | Oui ; **remplacé (16/10)** : périmètre DPS = Commerce Pièces, SAV PL, SAV Engins, Sites Déportés, plus un périmètre par service (Pneumatique, SAV PL, SAV Engins, Sites Déportés) ; voir P0 §2. |
 | D4 | Les directeurs à périmètre voient-ils les données nominatives ou seulement des totaux ? | Totaux seulement. |
 | D5 | La marge et le taux de marge sont-ils réservés à l'administrateur RH et aux lecteurs globaux ? | Oui (le CA n'existe pas par périmètre). |

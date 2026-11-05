@@ -5,7 +5,7 @@ import { chromium } from '@playwright/test'
 
 const dossier = `captures/${process.argv[2] || 'avant'}`
 const PW = '<mot-de-passe-test>'
-const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/reporting-rh/`
+const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/`
 const roles = [
   ['drh', 'drh@exemple.invalid', ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']],
   ['perimetre', 'dps.equipment@exemple.invalid', ['resume', 'mensuel']],
@@ -20,7 +20,7 @@ for (const [nom, email, pages] of roles) {
     const page = await ctx.newPage()
     await page.goto(`${BASE}login`)
     await page.getByLabel('Adresse e-mail').fill(email)
-    await page.getByLabel('Mot de passe').fill(PW)
+    await page.getByLabel('Mot de passe', { exact: true }).fill(PW)
     if (nom === 'drh' && w === 1440) await page.screenshot({ path: `${dossier}/connexion-${w}.png` })
     await page.getByRole('button', { name: 'Se connecter' }).click()
     await page.waitForURL(/resume/)

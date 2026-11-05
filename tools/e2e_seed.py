@@ -31,10 +31,12 @@ PW = "<mot-de-passe-test>"
 
 
 def main() -> None:
+    if not engine.url.drivername.startswith("sqlite"):
+        sys.exit("e2e_seed : base SQLite uniquement")
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
-        run(db, "admin@exemple.invalid", PW, PW)
+        run(db, "admin@exemple.invalid", PW, PW, mdp_provisoire=False)
         c = TestClient(app)
         assert c.post(f"{API}/auth/login", json={"email": "admin@exemple.invalid", "password": PW}).status_code == 200
         lot = c.post(f"{API}/imports", files={"fichier": ("d.xlsx", xlsx(donnees()), XLSX)}).json()

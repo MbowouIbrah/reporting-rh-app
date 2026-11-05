@@ -91,5 +91,5 @@ Création : bouton « Nouveau compte » qui ouvre une fiche vide dans le même p
 1. « IO » = lecture / écriture : c'est l'axe des permissions (§5), pas une donnée de plus. Portée sur services, sites et périmètres.
 2. Service + site accordés ensemble : **ET** (seulement ce service sur ce site), OU à l'intérieur d'une même dimension.
 3. Écriture (import, corrections, référentiels, comptes) réservée à une portée *tout*.
-4. « Gérer les comptes et les droits » : les administrateurs RH, comme aujourd'hui.
+4. « Gérer les comptes et les droits » : les deux administrateurs RH, comme aujourd'hui.
 5. Une barre « Enregistrer / Annuler » par fiche.

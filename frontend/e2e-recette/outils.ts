@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, type APIRequestContext, type Page, type Request, type Route } from '@playwright/test'
 
-// Mot de passe des comptes de recette : début de l'adresse + « <suffixe-retire> » (admin@exemple.invalid -> <mot-de-passe-recette>)
+// Mot de passe des comptes de recette : début de l'adresse + « <suffixe-retire> »
 export const mdpDe = (email: string) => `${email.toLowerCase().split('@')[0]}<suffixe-retire>`
 export const ADMIN = 'admin@exemple.invalid'
 
@@ -12,7 +12,23 @@ export async function connecter(page: Page, email: string, mdp = mdpDe(email)) {
   await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(email)
   await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(mdp)
   await page.getByRole('button', { name: 'Se connecter' }).click()
-  await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
+  const menu = page.getByRole('navigation', { name: 'Rapports' })
+  const changement = page.getByRole('heading', { name: 'Changez votre mot de passe' })
+  await expect(menu.or(changement)).toBeVisible()
+  if (await changement.isVisible()) {
+    await leverProvisoire(page, mdp)
+    await page.goto('resume')
+  }
+  await expect(menu).toBeVisible()
+}
+
+// Compte créé par un admin : lève l'obligation en gardant le mot de passe attendu par les parcours.
+async function leverProvisoire(page: Page, mdp: string) {
+  const etape = `${mdp}-etape`
+  for (const [actuel, nouveau] of [[mdp, etape], [etape, mdp]]) {
+    const r = await page.request.post('api/v1/auth/changer-mot-de-passe', { data: { actuel, nouveau } })
+    expect(r.status()).toBe(200)
+  }
 }
 
 export async function deconnecter(page: Page) {

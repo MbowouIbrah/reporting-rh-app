@@ -117,10 +117,14 @@ test('groupes de graphiques : un administrateur renomme un groupe d’origine, l
     await page.goto('graphes')
     await expect(menu(page)).toBeVisible()
     const f = await ouvrir()
-    await f.getByRole('button', { name: `Modifier ${NOUVEAU}` }).click()
-    await f.getByLabel('Nom du groupe').fill('')
-    await f.getByRole('button', { name: 'Valider' }).click()
-    await f.getByRole('button', { name: 'Enregistrer' }).click()
-    await expect(f).toHaveCount(0)
+    // Sans renommage (échec plus haut), rien à rétablir : l'erreur d'origine reste celle du rapport
+    const renomme = f.getByRole('button', { name: `Modifier ${NOUVEAU}` })
+    if (await renomme.count()) {
+      await renomme.click()
+      await f.getByLabel('Nom du groupe').fill('')
+      await f.getByRole('button', { name: 'Valider' }).click()
+      await f.getByRole('button', { name: 'Enregistrer' }).click()
+      await expect(f).toHaveCount(0)
+    }
   }
 })
