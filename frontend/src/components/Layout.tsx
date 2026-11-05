@@ -1,8 +1,9 @@
 import { BarChart3, CalendarDays, CalendarRange, Database, LayoutDashboard, UserRound } from 'lucide-react'
 import { useIsFetching } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { prechargerGraphes } from '../lib/pagesDifferees'
 import Fond from './Fond'
 import { premierePageAdmin } from './AdminNav'
 import LienPage from './LienPage'
@@ -18,6 +19,7 @@ const ONGLETS = [
 
 export default function Layout() {
   const { can } = useAuth()
+  useEffect(() => prechargerGraphes(), [])
   // Administration : visible dès qu'un de ses onglets est accordé, et ouvre le premier d'entre eux.
   const admin = premierePageAdmin(can)
   const enAdmin = useLocation().pathname.startsWith('/admin')

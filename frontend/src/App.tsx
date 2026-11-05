@@ -14,9 +14,10 @@ import Saisie from './pages/admin/Saisie'
 import Utilisateurs from './pages/admin/Utilisateurs'
 import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
+import { chargerGraphes, chargerRapport } from './lib/pagesDifferees'
 
-const Graphes = lazy(() => import('./pages/Graphes'))
-const Rapport = lazy(() => import('./pages/Rapport'))
+const Graphes = lazy(chargerGraphes)
+const Rapport = lazy(chargerRapport)
 
 export default function App() {
   return (
@@ -47,8 +48,8 @@ export default function App() {
         <Route
           path="/graphes"
           element={
-            // Le temps du chargement du code, rien : la page dessine ensuite sa propre structure.
-            <Suspense fallback={null}>
+            // Le temps du chargement du code, un écran vide de même taille (la page ne rétrécit pas) : la page dessine ensuite sa propre structure.
+            <Suspense fallback={<section className="page-ecran page-etroite" />}>
               <Graphes />
             </Suspense>
           }

@@ -39,7 +39,8 @@
 .page { view-transition-name: page; }
 ::view-transition-old(page) { animation: var(--mv-sortie) var(--mv-dur-sortie) var(--mv-courbe-sortie) both; }
 ::view-transition-new(page) { animation: none; }
-::view-transition-group(page) { animation-duration: var(--mv-dur-sortie); }
+/* Pas d'animation de taille entre deux pages : seul le fondu joue, quelle que soit la page ouverte */
+::view-transition-group(page) { animation: none; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--mv-dur-sortie); }
 
 /* Éléments qui surgissent : l'animation joue à chaque passage de masqué à affiché. */
