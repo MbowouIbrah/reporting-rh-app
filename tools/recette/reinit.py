@@ -6,7 +6,8 @@ Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon <début de l'adress
 (comptes locaux de recette, jamais en production).
 
 Contenu : comptes de comptes.csv, historique de paie (Excel REPORTING RH, 18 mois),
-CA et marge de ca_marge.csv, objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
+CA et marge de ca_marge.csv, activité fictive (activite_fictive.py),
+objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
 Les mois suivants restent vides :
 ils servent au test d'import en direct (voir LISEZMOI.md).
 """
@@ -109,6 +110,11 @@ def historique_recette(source: Path) -> tuple[bytes, list[str]]:
         "Pic de fin d'année : +100 000 de primes exceptionnelles par CDI en décembre 2025",
         "Pic d'absences : avril 2026 (2 à 5 jours pour un salarié sur cinq)",
     ]
+
+    from activite_fictive import ajouter
+    entetes, lignes = ajouter(entetes, lignes)
+    notes.append("Activité : ventes, clients, CA et marge individuels en front office ; indice de "
+                 "productivité en back office SAV ; un vendeur sans CA, une marge négative")
 
     wb = openpyxl.Workbook()
     out = wb.active

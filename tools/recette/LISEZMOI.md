@@ -9,6 +9,9 @@ Mêmes données à chaque passage : on réinitialise avant chaque test de profil
 3. Relancer l'API sur la base de recette :
    `DATABASE_URL=sqlite:///recette.db ENV=test COOKIE_SECURE=false SECRET_KEY=<cle-de-test> .venv/Scripts/python -m uvicorn app.main:app --port 8100`
 
+L'historique contient aussi une activité fictive (`activite_fictive.py`) : ventes, clients, CA et marge individuels en front office, indice de productivité en back office SAV.
+Pour l'ajouter à un fichier d'import : `python tools/recette/activite_fictive.py <source.xlsx> <sortie.xlsx>`.
+
 Mot de passe : début de l'adresse + `<suffixe-retire>` (comptes locaux de recette, jamais en production). La variable `RECETTE_PASSWORD` impose un mot de passe commun.
 
 ## Fichiers
