@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Fragment, type ReactNode, useDeferredValue, useState } from 'react'
+import { Fragment, type ReactNode, useCallback, useDeferredValue, useRef, useState } from 'react'
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -141,6 +141,12 @@ export default function Graphes() {
   const [noms, enregistrerNoms] = useNomsGroupes()
   const peutRenommer = usePeut('referentiel:write')
   const [personnalise, setPersonnalise] = useState(false)
+  // Titre du groupe visible, à côté du menu : écrit directement, sans redessiner les graphiques
+  const titreActif = useRef<HTMLHeadingElement>(null)
+  const surGroupeActif = useCallback((id: string) => {
+    const t = document.getElementById(id)?.dataset.titre
+    if (t && titreActif.current) titreActif.current.textContent = t
+  }, [])
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
   const salaries = useSalaries(f.filtres?.annee, f.filtres?.calendrier)
@@ -391,15 +397,21 @@ export default function Graphes() {
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
-      {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture. */}
+      {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
+          Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}
       {!rapport && (serie ? menu.length > 0 : premier && groupesSquelette.length > 0) && (
-        <MenuGroupes
-          groupes={serie ? menu : groupesSquelette}
-          nbAffiches={serie ? montres.length : montresSquelette.length}
-          vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
-          onVue={(v) => setConfig(choisirVue(config, v))}
-          onPersonnaliser={() => setPersonnalise(true)}
-        />
+        <div className="graphes-tete">
+          <MenuGroupes
+            groupes={serie ? menu : groupesSquelette}
+            nbAffiches={serie ? montres.length : montresSquelette.length}
+            vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
+            onVue={(v) => setConfig(choisirVue(config, v))}
+            onPersonnaliser={() => setPersonnalise(true)}
+          />
+          {serie && !enBascule && rendus.length > 1 && (
+            <h2 ref={titreActif} className="graphes-groupe-titre graphes-tete-titre">{rendus[0].nom}</h2>
+          )}
+        </div>
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {serie && menu.length === 0 && (
@@ -434,6 +446,7 @@ export default function Graphes() {
         // Tous les groupes (et toujours le rapport PDF) : un écran par groupe
         <SnapSections
           libelle="Groupes de graphiques"
+          onActif={surGroupeActif}
           sections={rendus.map((g) => ({
             id: `groupe-${g.id}`,
             titre: g.nom,

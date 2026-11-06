@@ -23,7 +23,12 @@ export interface SectionSnap {
  * Sections plein écran avec accrochage (scroll-snap) et rail de navigation à droite,
  * sur le modèle du portail Academy Assist. Sous 1100 px : simple empilement.
  */
-export default function SnapSections({ sections, libelle = 'Tableaux du rapport' }: { sections: SectionSnap[]; libelle?: string }) {
+export default function SnapSections({ sections, libelle = 'Tableaux du rapport', onActif }: {
+  sections: SectionSnap[]
+  libelle?: string
+  /** Appelé quand la section visible change (ex. titre affiché hors des sections). */
+  onActif?: (id: string) => void
+}) {
   const zone = useRef<HTMLDivElement>(null)
   const cles = sections.map((x) => x.id).join('|')
 
@@ -133,7 +138,7 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
     <div className="snap-zone">
       <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label={libelle}>
         {sections.map((s, i) => (
-          <div key={s.id} id={s.id} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
+          <div key={s.id} id={s.id} data-titre={s.titre} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
             {s.contenu ?? s.panneaux?.map((pn) =>
               Array.isArray(pn) ? (
                 <div key={pn[0].titre} className="snap-colonne">
@@ -165,17 +170,18 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
           </div>
         ))}
       </div>
-      <Rail sections={sections} zone={zone} cles={cles} aller={aller} />
+      <Rail sections={sections} zone={zone} cles={cles} aller={aller} onActif={onActif} />
     </div>
   )
 }
 
 /** Rail à part : le changement de section active ne redessine que lui, pas les tableaux. */
-function Rail({ sections, zone, cles, aller }: {
+function Rail({ sections, zone, cles, aller, onActif }: {
   sections: SectionSnap[]
   zone: RefObject<HTMLDivElement | null>
   cles: string
   aller: (id: string) => void
+  onActif?: (id: string) => void
 }) {
   const [actif, setActif] = useState(sections[0]?.id)
   useEffect(() => {
@@ -184,13 +190,16 @@ function Rail({ sections, zone, cles, aller }: {
     const obs = new IntersectionObserver(
       (entrees) => {
         const visible = entrees.find((e) => e.isIntersecting)
-        if (visible) setActif(visible.target.id)
+        if (visible) {
+          setActif(visible.target.id)
+          onActif?.(visible.target.id)
+        }
       },
       { root: racine, threshold: 0.55 },
     )
     racine.querySelectorAll('.snap-section').forEach((el) => obs.observe(el))
     return () => obs.disconnect()
-  }, [cles, zone])
+  }, [cles, zone, onActif])
   return (
     <nav className="rail" aria-label="Sections du rapport">
       {sections.map((s) => (

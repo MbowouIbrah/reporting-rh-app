@@ -16,7 +16,7 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 ## Options
 | Option | Pour | Contre |
 |---|---|---|
-| A. La section défile en elle-même (hauteur d'écran, `overflow-y: auto`) | Accrochage inchangé ; la molette garde sa logique (on remplace le tableau par la section) ; en-têtes et totaux figés restent visibles en haut et en bas de la section | Deux niveaux de défilement (section puis page de sections) |
+| A. La section défile en elle-même (hauteur d'écran, `overflow-y: auto`) | Accrochage inchangé ; la molette garde sa logique (on remplace le tableau par la section) ; en-têtes figés restent visibles en haut de la section | Deux niveaux de défilement (section puis page de sections) |
 | B. Section à hauteur libre (`min-height: 100%`) dans le défilement global | Un seul niveau | Accrochage obligatoire peu fiable sur une section plus haute que l'écran ; molette à réécrire ; totaux figés perdus |
 
 ## Choix : A
@@ -24,7 +24,8 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 - Étirement gardé : s'il reste de la place, les lignes s'étirent jusqu'à `--ligne-max` comme avant ; sinon hauteur naturelle et la section défile.
 - Graphiques : hauteur minimale (11rem par zone de tracé), la section défile en dessous.
 - Molette : défile la section tant qu'elle peut ; au bout, le geste s'arrête ; le geste suivant change de section. En remontant, on arrive en bas de la section précédente ; en descendant ou par le rail, en haut.
-- En-tête de tableau et ligne de total restent figés, mais par rapport à la section.
+- Seul l'en-tête de tableau reste figé (par rapport à la section). La ligne de total suit le contenu : figée, elle masquait les lignes du dessous (retour utilisateur). Figer aussi les lignes CA / marge / effectifs de chaque tableau a été écarté : trop de hauteur prise, et on aurait l'impression que le tableau défile. DONNEES garde son total figé.
+- Graphiques : le titre du groupe affiché est placé sur la ligne du menu des groupes et suit la section visible.
 - Sous 1360 px : plus de cadre défilant pour le tableau à total, la page défile.
 
 ## Non touché

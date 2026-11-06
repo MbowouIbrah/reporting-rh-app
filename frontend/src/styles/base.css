@@ -372,7 +372,9 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.tab-global tbody tr.exclu:nth-child(n) > * { color: var(--muted); font-style: italic; }
 .mention-hors-total { font-size: var(--fs-xs); }
 /* Lignes de total en pied figé : restent visibles en bas quand le tableau défile. */
-.rapport-excel .panneau table.dense tbody.pied { position: sticky; bottom: 0; z-index: 2; background: var(--surface); }
+/* Rapports : le total suit le contenu (seul l'en-tête reste figé) ; DONNEES garde son total figé. */
+.rapport-excel .panneau table.dense tbody.pied { background: var(--surface); }
+.donnees-excel .panneau table.dense tbody.pied { position: sticky; bottom: 0; z-index: 2; }
 /* Bordures fusionnées non suivies par le pied figé (le texte dessous transparaîtrait) : traits dessinés dans les cellules. */
 .rapport-excel .panneau table.dense tbody.pied.pied.pied > tr > * { padding-block: 8px; }
 /* Bloc des lignes de total (ligne figée + celles qui suivent) : un trait pleine largeur au début et à la fin seulement. */
@@ -416,8 +418,9 @@ table.dense td.num { text-align: right; }
   .rapport-excel .snap-section .panneau > h3 { font-size: var(--fs-md); padding: calc(var(--v) * .6) 16px; }
   .rapport-excel .snap-section .panneau-corps { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .rapport-excel .panneau table.dense { font-size: var(--fs-sm); }
-  .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { padding-block: clamp(1px, .45vh, 6px); line-height: 1.3; }
-  .rapport-excel .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; padding-block: clamp(3px, .7vh, 8px); font-size: var(--fs-xs); }
+  /* Hauteurs minimales (repère Carbon : compact 24 px, court 32 px) : ligne 28 px, en-tête 32 px ; la section défile au-delà */
+  .rapport-excel .panneau table.dense th, .rapport-excel .panneau table.dense td { padding-block: 4px; line-height: 1.3; height: 28px; box-sizing: border-box; }
+  .rapport-excel .panneau table.dense thead th { position: sticky; top: 0; z-index: 2; padding-block: 6px; height: 32px; font-size: var(--fs-xs); }
 
   .rail { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .rail-point { position: relative; display: flex; align-items: center; justify-content: center; padding: 10px; border: 0; background: none; cursor: pointer; }
@@ -447,7 +450,6 @@ table.dense td.num { text-align: right; }
 @media (max-width: 1099px) { .rapport-excel .snap-colonne { display: flex; flex-direction: column; gap: var(--sp-4); } }
 @media (min-width: 1360px) {
   .rapport-excel .snap-colonne table.dense { font-size: var(--fs-sm); }
-  .rapport-excel .snap-colonne table.dense th, .rapport-excel .snap-colonne table.dense td { padding-block: clamp(0px, .15vh, 2px); line-height: 1.25; }
   .rapport-excel .snap-colonne > .panneau > h3 { padding-block: calc(var(--v) * .4); }
 }
 table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, var(--rapport-entete)); color: var(--navy); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; padding-block: 3px; }
@@ -519,6 +521,14 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-groupe { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .graphes-groupe .graphes { flex: 1; min-height: 0; }
 .page .graphes-groupe-titre { margin: 0 0 var(--sp-2); font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--navy); }
+.graphes-tete { display: flex; align-items: center; gap: var(--sp-4); margin: 0 0 var(--sp-2); }
+.graphes-tete > .menu-groupes { margin: 0; }
+.page .graphes-tete-titre { display: none; margin: 0; }
+/* Accrochage actif : le titre du groupe visible passe à côté du menu, celui des sections est masqué */
+@media screen and (min-width: 1360px) {
+  .page .graphes-tete-titre { display: block; }
+  .graphes-tout .snap-section .graphes-groupe-titre { display: none; }
+}
 .graphes-excel .graphes-aucun { margin: var(--sp-4) 0; color: var(--muted); }
 .graphes-excel .graphe-lecture { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.35; }
 .graphes-excel .graphe-note { padding: 0 16px 8px; font-style: italic; }
