@@ -13,7 +13,7 @@ Mêmes données à chaque passage : on réinitialise avant chaque test de profil
 L'historique contient aussi une activité fictive (`activite_fictive.py`) : ventes, clients, CA et marge individuels en front office, indice de productivité en back office SAV.
 Pour l'ajouter à un fichier d'import : `python tools/recette/activite_fictive.py <source.xlsx> <sortie.xlsx>`.
 
-Comptes : `comptes.exemple.csv` (suivi) décrit les profils par identifiant, sans adresse. `generer_comptes.py` en tire `comptes.local.csv` (ignoré par git) : adresse `<identifiant>@RECETTE_DOMAINE` (défaut `exemple.invalid`) et mot de passe aléatoire par compte, ou `RECETTE_PASSWORD` pour un mot de passe commun. Le fichier est créé automatiquement par `reinit.py` et par la recette Playwright s'il manque ; `python tools/recette/generer_comptes.py --force` le régénère (puis relancer `reinit.py`). Comptes locaux de recette, jamais en production.
+Comptes : `comptes.exemple.csv` (suivi) décrit les profils par identifiant, sans adresse. `generer_comptes.py` en tire `comptes.local.csv` (ignoré par git) : adresse `<identifiant>@RECETTE_DOMAINE` (défaut `exemple.invalid`) et mot de passe = identifiant + `RECETTE_SUFFIXE` (suffixe choisi en local), sinon aléatoire par compte. Le fichier est créé automatiquement par `reinit.py` et par la recette Playwright s'il manque ; `python tools/recette/generer_comptes.py --force` le régénère (puis relancer `reinit.py`). Comptes locaux de recette, jamais en production.
 
 ## Fichiers
 

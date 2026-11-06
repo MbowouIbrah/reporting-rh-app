@@ -2,7 +2,8 @@
 
 Usage : python tools/recette/generer_comptes.py [--force]
 Adresse : <identifiant>@RECETTE_DOMAINE (défaut exemple.invalid, domaine réservé sans boîte réelle).
-Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon un mot de passe aléatoire par compte.
+Mot de passe : <identifiant><RECETTE_SUFFIXE> (suffixe choisi par chacun, jamais écrit dans le dépôt),
+sinon un mot de passe aléatoire par compte.
 Un fichier existant n'est pas réécrit sans --force.
 """
 
@@ -19,12 +20,22 @@ COLONNES = ["identifiant", "email", "mot_de_passe", "nom", "fonction", "modele",
             "nominatif"]
 
 
+def mot_de_passe(ident: str, suffixe: str) -> str:
+    """Règle simple : identifiant + suffixe local ; sans suffixe, aléatoire."""
+    if not suffixe:
+        return secrets.token_urlsafe(12)
+    mdp = ident + suffixe
+    if len(mdp) < 8:
+        raise SystemExit("RECETTE_SUFFIXE trop court : le mot de passe doit faire 8 caractères minimum")
+    return mdp
+
+
 def generer(force: bool = False) -> Path:
     """Écrit comptes.local.csv s'il manque (ou avec force) et renvoie son chemin."""
     if LOCAL.exists() and not force:
         return LOCAL
     domaine = os.environ.get("RECETTE_DOMAINE") or "exemple.invalid"
-    commun = os.environ.get("RECETTE_PASSWORD")
+    suffixe = os.environ.get("RECETTE_SUFFIXE") or ""
     with open(EXEMPLE, encoding="utf-8", newline="") as f:
         modeles = list(csv.DictReader(f, delimiter=";"))
     with open(LOCAL, "w", encoding="utf-8", newline="") as f:
@@ -36,7 +47,7 @@ def generer(force: bool = False) -> Path:
                 **{k: m[k] for k in COLONNES if k in m},
                 "identifiant": ident,
                 "email": f"{ident}@{domaine}",
-                "mot_de_passe": commun or secrets.token_urlsafe(12),
+                "mot_de_passe": mot_de_passe(ident, suffixe),
             })
     return LOCAL
 

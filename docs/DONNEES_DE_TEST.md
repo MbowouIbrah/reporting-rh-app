@@ -23,9 +23,9 @@ cd frontend && npx playwright test
    ```
    backend/.venv/Scripts/python tools/recette/generer_comptes.py
    ```
-   Cela crée `tools/recette/comptes.local.csv` (adresse + mot de passe aléatoire par profil). Variables facultatives :
+   Cela crée `tools/recette/comptes.local.csv` (adresse et mot de passe de chaque profil). Variables facultatives :
    - `RECETTE_DOMAINE` : domaine des adresses (par défaut `exemple.invalid`) ;
-   - `RECETTE_PASSWORD` : un mot de passe commun, si on en veut un.
+   - `RECETTE_SUFFIXE` : règle simple à retenir, mot de passe = identifiant + suffixe (exemple de forme : `admin` + votre suffixe). Choisissez votre suffixe, ne l'écrivez jamais dans un fichier suivi. Sans suffixe : mot de passe aléatoire.
 3. Lancer la recette : la configuration Playwright génère les comptes s'ils manquent.
    ```
    cd frontend && E2E_BASE=recette-e2e.db npx playwright test -c playwright.recette.config.ts
