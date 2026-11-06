@@ -65,7 +65,7 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | F5 | Familles du tableau des types de charge : Brut Réel et Salaire brut garanti = Salaire ; Bonus, primes exceptionnelles, sur ventes, sur résultats, productivité, commission = Primes ; frais de mission, logement, carburant, crédit téléphonique = Avantages et frais ; le reste = Charges. Correct ? | Oui, ce classement ; une rubrique nouvelle va dans Charges. |
 | F6 | Le graphique « Salaire par mois » montre le Salaire brut garanti (et non le Brut Réel) ? | Salaire brut garanti. |
 | F7 | Le Bonus est dans le Brut Réel et aussi compté à part : double compte voulu ? Même question pour la rémunération globale (masse salariale + rubriques hors total). | **Bonus : confirmé (06/11)**, sorti du total (migration 0023), il ne compte plus qu'une fois, dans le Brut Réel. Rémunération globale : **décidé (06/11)** = TOTAL + rubriques hors total, sauf absences et composantes du Brut Réel (salaire garanti, commission, bonus, primes sur ventes) ; reste donc primes sur résultats et productivité. Même règle pour l'objectif. L'Excel (« charges + postes exclus ») les comptait deux fois. |
-| F8 | Choix des graphiques : gardé par navigateur, ou à retrouver sur tous les postes de l'utilisateur ? | Par navigateur. |
+| F8 | Choix des graphiques : gardé par navigateur, ou à retrouver sur tous les postes de l'utilisateur ? | Gardé sur le serveur, par utilisateur : le même choix sur tous ses postes (04/11, B-021). |
 
 ## G. Mise en service
 
