@@ -46,7 +46,7 @@ async function session(browser: Browser, baseURL: string | undefined, email: str
 
 async function voir(page: Page, attendus: { onglets: string[]; services: string[]; marge: boolean }) {
   await expect(onglets(page)).toHaveText(attendus.onglets)
-  await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ })).toHaveCount(attendus.marge ? 1 : 0)
+  await expect(page.locator('.tuile .micro', { hasText: /^Marge(partiel)?$/ })).toHaveCount(attendus.marge ? 1 : 0)
   await page.getByRole('link', { name: 'Mensuel', exact: true }).click()
   await expect(optionsService(page)).toHaveText(['Tous', ...attendus.services])
 }

@@ -39,7 +39,12 @@ for (const p of PROFILS) {
 
     const attendus = p.nominatif ? BASE_ONGLETS : BASE_ONGLETS.slice(0, 4)
     await expect(onglets(page)).toHaveText(p.admin ? [...attendus, 'Administration'] : attendus)
-    await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ })).toHaveCount(p.nominatif ? 1 : 0)
+    // Résumé chargé d'abord (sinon un compte à 0 passe avant l'affichage) ; badge « partiel » toléré après les saisies incomplètes
+    const tuile = (titre: RegExp) => page.locator('.tuile .micro', { hasText: titre })
+    await expect(tuile(/^Masse salariale$/)).toHaveCount(1, { timeout: 15_000 })
+    await expect(page.locator('section.resume-excel[aria-busy]')).toHaveCount(0, { timeout: 15_000 })
+    await expect(tuile(/^Marge(partiel)?$/)).toHaveCount(p.nominatif ? 1 : 0)
+    await expect(tuile(/^Chiffre d’affaires(partiel)?$/)).toHaveCount(p.nominatif ? 1 : 0)
 
     for (const rapport of ['Graphes', 'Annuel', 'Mensuel']) {
       await page.getByRole('link', { name: rapport, exact: true }).click()
