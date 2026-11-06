@@ -5,7 +5,7 @@ import { motDePasseOublie } from '../api/rapports'
 import { useAuth } from '../auth/AuthContext'
 import ChampMotDePasse from '../components/ChampMotDePasse'
 import PageConnexion from '../components/PageConnexion'
-import { cibleSure } from '../lib/connexion'
+import { cibleSure, messagePanne } from '../lib/connexion'
 
 export default function Login() {
   const { login } = useAuth()
@@ -51,7 +51,7 @@ export default function Login() {
           ? 'Identifiants invalides.'
           : err instanceof ApiError && err.status === 429
             ? 'Trop de tentatives. Réessayez dans une minute.'
-            : 'Connexion impossible pour le moment. Réessayez.',
+            : messagePanne(err, 'Connexion impossible pour le moment. Réessayez.'),
       )
     } finally {
       setBusy(false)
@@ -69,8 +69,8 @@ export default function Login() {
     try {
       await motDePasseOublie(emailOubli.trim())
       setEnvoye(true)
-    } catch {
-      setErrorOubli('Envoi impossible pour le moment. Réessayez.')
+    } catch (err) {
+      setErrorOubli(messagePanne(err, 'Envoi impossible pour le moment. Réessayez.'))
     } finally {
       setBusy(false)
     }

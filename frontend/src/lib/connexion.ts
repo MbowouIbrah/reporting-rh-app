@@ -1,3 +1,4 @@
+import { ApiError, ErreurReseau } from '../api/client'
 /** Longueur minimale d'un mot de passe : même règle que le serveur, qui reste l'autorité. */
 export const MDP_MIN = 8
 
@@ -18,4 +19,14 @@ export function cibleSure(next: string | null) {
   } catch {
     return '/resume'
   }
+}
+
+/** Message d'échec d'une page de connexion : dit si le serveur est injoignable ou en panne,
+ *  plutôt qu'un « Réessayez » générique. `autre` sert pour toute autre erreur. */
+export function messagePanne(err: unknown, autre: string): string {
+  if (err instanceof ErreurReseau) return 'Le serveur est injoignable : réseau coupé ou serveur arrêté. Vérifiez votre connexion, puis réessayez dans quelques minutes.'
+  if (err instanceof ApiError && err.status >= 500) {
+    return `Le serveur a rencontré une erreur (${err.status}). Réessayez dans quelques minutes ; si cela dure, prévenez l’administrateur.`
+  }
+  return autre
 }
