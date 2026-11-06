@@ -2,7 +2,9 @@
 import { chromium } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-const PW = '<mot-de-passe-test>'
+const PW = process.env.E2E_PASSWORD
+if (!PW) throw new Error('E2E_PASSWORD absent')
+const courriel = (nom) => `${nom}@exemple.invalid`
 const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/`
 const browser = await chromium.launch({ executablePath: process.env.E2E_CHROMIUM || undefined })
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
@@ -18,7 +20,7 @@ async function audit(nom) {
 }
 await page.goto(`${BASE}login`)
 await audit('connexion')
-await page.getByLabel('Adresse e-mail').fill('drh@exemple.invalid')
+await page.getByLabel('Adresse e-mail').fill(courriel('drh'))
 await page.getByLabel('Mot de passe', { exact: true }).fill(PW)
 await page.getByRole('button', { name: 'Se connecter' }).click()
 await page.getByRole('navigation', { name: 'Rapports' }).waitFor()
@@ -27,7 +29,7 @@ for (const p of ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule
   await audit(p.split('?')[0])
 }
 await page.goto(`${BASE}login`)
-await page.getByLabel('Adresse e-mail').fill('admin@exemple.invalid')
+await page.getByLabel('Adresse e-mail').fill(courriel('admin'))
 await page.getByLabel('Mot de passe', { exact: true }).fill(PW)
 await page.getByRole('button', { name: 'Se connecter' }).click()
 await page.getByRole('navigation', { name: 'Rapports' }).waitFor()

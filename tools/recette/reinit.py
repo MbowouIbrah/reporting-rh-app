@@ -2,10 +2,9 @@
 
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
 Options : --base recette.db (fichier SQLite, dans backend/), --historique <xlsx>.
-Mot de passe : RECETTE_PASSWORD pour tous les comptes, sinon <début de l'adresse><suffixe-retire>
-(comptes locaux de recette, jamais en production).
+Comptes : comptes.local.csv (généré par generer_comptes.py à partir de comptes.exemple.csv, non suivi).
 
-Contenu : comptes de comptes.csv, historique de paie (Excel REPORTING RH, 18 mois),
+Contenu : comptes de comptes.local.csv, historique de paie (Excel REPORTING RH, 18 mois),
 CA et marge de ca_marge.csv, activité fictive (activite_fictive.py),
 objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
 Les mois suivants restent vides :
@@ -15,9 +14,12 @@ ils servent au test d'import en direct (voir LISEZMOI.md).
 import argparse
 import csv
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
+
+from generer_comptes import charger
 
 ICI = Path(__file__).resolve().parent
 BACKEND = ICI.parent.parent / "backend"
@@ -139,7 +141,7 @@ def _preparer(base: str) -> None:
         sys.exit(f"{base} est ouvert : arrêter l'API puis relancer")
     os.environ.update(
         DATABASE_URL=f"sqlite:///{base}", ENV="test", COOKIE_SECURE="false",
-        SECRET_KEY=os.environ.get("SECRET_KEY", "<cle-de-test>"),
+        SECRET_KEY=os.environ.get("SECRET_KEY") or secrets.token_urlsafe(48),
     )
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND,
                    check=True, capture_output=True)
@@ -150,15 +152,11 @@ def main() -> None:
     ap.add_argument("--base", default="recette.db")
     ap.add_argument("--historique", type=Path, default=HISTORIQUE)
     args = ap.parse_args()
-    commun = os.environ.get("RECETTE_PASSWORD")
-
-    def mdp(email: str) -> str:
-        return commun or email.strip().lower().split("@")[0] + "<suffixe-retire>"
-
-    comptes = _csv("comptes.csv")
+    comptes = charger()
+    mdp_de = {c["email"]: c["mot_de_passe"] for c in comptes}
     admins = [c for c in comptes if c["modele"] == "admin"]
     if not admins:
-        sys.exit("comptes.csv : au moins un compte de modèle admin requis")
+        sys.exit("comptes.local.csv : au moins un compte de modèle admin requis")
     _preparer(args.base)
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
@@ -173,11 +171,11 @@ def main() -> None:
     from app.seed import _user, run
 
     with SessionLocal() as db:
-        run(db, admins[0]["email"], mdp(admins[0]["email"]), None, mdp_provisoire=False)
+        run(db, admins[0]["email"], mdp_de[admins[0]["email"]], None, mdp_provisoire=False)
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
             email = c["email"].strip().lower()
-            _user(db, email, c["nom"], mdp(c["email"]), c["modele"],
+            _user(db, email, c["nom"], c["mot_de_passe"], c["modele"],
                   perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui",
                   provisoire=False)
             # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
@@ -202,7 +200,7 @@ def main() -> None:
     c = TestClient(app)
     api = "/api/v1"
     admin = admins[0]["email"]
-    r = c.post(f"{api}/auth/login", json={"email": admin, "password": mdp(admin)})
+    r = c.post(f"{api}/auth/login", json={"email": admin, "password": mdp_de[admin]})
     assert r.status_code == 200, r.text
     contenu, notes = historique_recette(args.historique)
     fichier = ("historique_recette.xlsx", contenu, XLSX)
@@ -244,7 +242,7 @@ def main() -> None:
         assert r.status_code == 200, r.text
 
     print(f"Base {args.base} prête : {lot['nb_lignes']} lignes de paie, "
-          f"{len(comptes)} comptes (mot de passe : {commun or '<début de l’adresse><suffixe-retire>'}).")
+          f"{len(comptes)} comptes (mots de passe dans tools/recette/comptes.local.csv).")
     print("Scénarios :\n- " + "\n- ".join(notes))
 
 

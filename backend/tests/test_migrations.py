@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from alembic import command
 from app.core.config import settings
+from tests.identites import courriel
 
 TABLES = {"perimetre", "perimetre_regle", "utilisateur", "utilisateur_permission",
           "utilisateur_portee", "audit_event"}
@@ -200,7 +201,7 @@ def test_0022_comptes_existants_sans_changement_impose(tmp_path, monkeypatch):
     eng = create_engine(url)
     with eng.begin() as c:
         c.execute(text("INSERT INTO utilisateur (email, nom, password_hash, actif, cree_le) "
-                       "VALUES ('a@exemple.invalid', 'A', 'h', 1, '2026-01-01')"))
+                       f"VALUES ('{courriel('a')}', 'A', 'h', 1, '2026-01-01')"))
     command.upgrade(cfg, "0022")
     with eng.begin() as c:
         assert not c.execute(text("SELECT doit_changer_mdp FROM utilisateur")).scalar()

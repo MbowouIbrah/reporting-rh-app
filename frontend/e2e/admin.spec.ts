@@ -1,6 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-
-const PW = '<mot-de-passe-test>'
+import { PW, courriel } from './identites'
 
 async function connecter(page: Page, email: string) {
   await page.goto('login')
@@ -11,7 +10,7 @@ async function connecter(page: Page, email: string) {
 }
 
 test('admin : feuille DONNEES filtrable puis réinitialisée', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.getByRole('link', { name: 'Administration' }).click()
   await expect(page).toHaveURL(/admin$/)
   await expect(page.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/, level: 2 })).toBeVisible()
@@ -43,7 +42,7 @@ test('admin : feuille DONNEES filtrable puis réinitialisée', async ({ page }) 
 })
 
 test('session conservée après expiration du jeton d’accès', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.context().clearCookies({ name: 'access_token' })
   await page.reload()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
@@ -51,14 +50,14 @@ test('session conservée après expiration du jeton d’accès', async ({ page }
 })
 
 test('anciens liens d’administration : renvoi vers la feuille DONNEES', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.goto('admin/cloture')
   await expect(page).toHaveURL(/admin$/)
   await expect(page.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeVisible()
 })
 
 test('lecteur de périmètre : pas d’administration', async ({ page }) => {
-  await connecter(page, 'dps.equipment@exemple.invalid')
+  await connecter(page, courriel('dps.equipment'))
   await expect(page.getByRole('link', { name: 'Administration' })).toHaveCount(0)
   await page.goto('admin')
   // Page non accordée : renvoi vers le résumé, sans page d'erreur
@@ -69,7 +68,7 @@ test('lecteur de périmètre : pas d’administration', async ({ page }) => {
 // L'export xlsx des rapports a été retiré de l'écran au profit de l'export PDF : même règle vérifiée,
 // le rapport s'ouvre avec les filtres de l'écran (période choisie).
 test('export PDF mensuel : le rapport s’ouvre avec les filtres de l’écran', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.getByRole('link', { name: 'Mensuel' }).click()
   await page.getByRole('combobox', { name: 'Période' }).click()
   await page.getByRole('option').filter({ hasText: 'Janvier' }).filter({ hasText: '2026' }).click()

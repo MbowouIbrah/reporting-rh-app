@@ -4,9 +4,15 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
 import RequireAuth from '../auth/RequireAuth'
 import { cibleSure } from '../lib/connexion'
+import { courriel, mdpTest } from '../test/identites'
 import ChangerMotDePasse from './ChangerMotDePasse'
 
-const ME = { id: 1, email: 'admin@exemple.invalid', nom: 'Admin', fonction: '', permissions: [] }
+const ACTUEL = mdpTest()
+const NOUVEAU = mdpTest()
+const AUTRE = mdpTest()
+const PROVISOIRE = mdpTest()
+const FAUX = mdpTest()
+const ME = { id: 1, email: courriel('admin'), nom: 'Admin', fonction: '', permissions: [] }
 const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps), { status })
 
 function rendu(url: string, me: unknown) {
@@ -51,7 +57,7 @@ test('mot de passe déjà choisi : changement volontaire, retour à la page dema
   expect(screen.getByRole('link', { name: 'Annuler' })).toHaveAttribute('href', '/admin/utilisateurs')
   expect(screen.queryByRole('button', { name: 'Se déconnecter' })).toBeNull()
   spy.mockImplementation(async () => json({ ...ME, doit_changer_mdp: false }))
-  saisir('<mot-de-passe-test-a1>', '<mot-de-passe-test-m1>')
+  saisir(ACTUEL, NOUVEAU)
   expect(await screen.findByRole('status')).toHaveTextContent('Mot de passe modifié.')
   fireEvent.click(screen.getByRole('link', { name: 'Continuer' }))
   expect(await screen.findByText('page cible')).toBeInTheDocument()
@@ -61,7 +67,7 @@ test('une adresse extérieure dans next mène au résumé', async () => {
   const spy = rendu('/changer-mot-de-passe?next=//exemple.org', { ...ME, doit_changer_mdp: false })
   await screen.findByText('Changer mon mot de passe')
   spy.mockImplementation(async () => json({ ...ME, doit_changer_mdp: false }))
-  saisir('<mot-de-passe-test-a1>', '<mot-de-passe-test-m1>')
+  saisir(ACTUEL, NOUVEAU)
   expect(await screen.findByRole('link', { name: 'Continuer' })).toHaveAttribute('href', '/resume')
 })
 
@@ -70,7 +76,7 @@ test('redirection imposée : après le changement, retour à la page demandée',
   await screen.findByText('Changez votre mot de passe')
   expect(screen.queryByText('page cible')).toBeNull()
   spy.mockImplementation(async () => json({ ...ME, doit_changer_mdp: false }))
-  saisir('<mot-de-passe-provisoire>', '<mot-de-passe-test-m1>')
+  saisir(PROVISOIRE, NOUVEAU)
   expect(await screen.findByText('page cible')).toBeInTheDocument()
 })
 
@@ -108,9 +114,9 @@ test('sans session : retour à la connexion', async () => {
 test('saisie incohérente : refusée sans appel au serveur', async () => {
   const spy = rendu('/changer-mot-de-passe', { ...ME, doit_changer_mdp: true })
   await screen.findByText('Changez votre mot de passe')
-  saisir('<mot-de-passe-provisoire>', 'court')
+  saisir(PROVISOIRE, 'court')
   expect(screen.getByRole('alert')).toHaveTextContent('8 caractères')
-  saisir('<mot-de-passe-provisoire>', '<mot-de-passe-test-m1>', '<mot-de-passe-test-m2>')
+  saisir(PROVISOIRE, NOUVEAU, AUTRE)
   expect(screen.getByRole('alert')).toHaveTextContent('pas identiques')
   expect(spy.mock.calls.filter(([u]) => String(u).includes('changer-mot-de-passe'))).toHaveLength(0)
 })
@@ -123,7 +129,7 @@ test('mot de passe actuel faux : message du serveur, la page reste', async () =>
       ? json({ detail: 'Mot de passe actuel incorrect' }, 400)
       : json({ ...ME, doit_changer_mdp: true }),
   )
-  saisir('<mot-de-passe-faux>', '<mot-de-passe-test-m1>')
+  saisir(FAUX, NOUVEAU)
   expect(await screen.findByRole('alert')).toHaveTextContent('Mot de passe actuel incorrect')
   expect(screen.getByText('Changez votre mot de passe')).toBeInTheDocument()
 })
@@ -132,10 +138,10 @@ test('succès : envoie les deux mots de passe et ouvre l’application', async (
   const spy = rendu('/changer-mot-de-passe', { ...ME, doit_changer_mdp: true })
   await screen.findByText('Changez votre mot de passe')
   spy.mockImplementation(async () => json({ ...ME, doit_changer_mdp: false }))
-  saisir('<mot-de-passe-provisoire>', '<mot-de-passe-test-m1>')
+  saisir(PROVISOIRE, NOUVEAU)
   expect(await screen.findByText('page résumé')).toBeInTheDocument()
   const appel = spy.mock.calls.find(([u]) => String(u).includes('changer-mot-de-passe'))
-  expect(JSON.parse(String(appel?.[1]?.body))).toEqual({ actuel: '<mot-de-passe-provisoire>', nouveau: '<mot-de-passe-test-m1>' })
+  expect(JSON.parse(String(appel?.[1]?.body))).toEqual({ actuel: PROVISOIRE, nouveau: NOUVEAU })
 })
 
 test('déconnexion possible sans changer le mot de passe', async () => {

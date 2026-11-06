@@ -1,13 +1,13 @@
 from app.models.auth import AuditEvent
-from tests.conftest import mot_de_passe_choisi
+from tests.conftest import PW, mot_de_passe_choisi
+from tests.identites import courriel
 
 API = "/api/v1/reglages/noms_groupes"
-ADMIN = "admin@exemple.invalid"
-PW = "<mot-de-passe-test>"
+ADMIN = courriel("admin")
 
 
 def _lecteur(admin):
-    r = admin.post("/api/v1/users", json={"email": "lecteur@exemple.invalid", "nom": "Lecteur", "password": PW,
+    r = admin.post("/api/v1/users", json={"email": courriel("lecteur"), "nom": "Lecteur", "password": PW,
                                           "permissions": [], "portee": {"tout": True}})
     assert r.status_code in (200, 201), r.text
 
@@ -23,8 +23,8 @@ def test_admin_ecrit_et_un_autre_utilisateur_lit(make_client, db):
     attendu = {"valeur": {"ventes": "Nouveau nom", "ensemble": "Autre"}}
     assert r.json() == attendu
     _lecteur(admin)
-    mot_de_passe_choisi(db, "lecteur@exemple.invalid")
-    lecteur = make_client("lecteur@exemple.invalid")
+    mot_de_passe_choisi(db, courriel("lecteur"))
+    lecteur = make_client(courriel("lecteur"))
     assert lecteur.get(API).json() == attendu
     assert admin.put(API, json={"valeur": {}}).json() == {"valeur": {}}
     assert lecteur.get(API).json() == {"valeur": {}}
@@ -34,7 +34,7 @@ def test_admin_ecrit_et_un_autre_utilisateur_lit(make_client, db):
 def test_non_admin_ne_peut_pas_ecrire(make_client):
     admin = make_client(ADMIN)
     _lecteur(admin)
-    lecteur = make_client("lecteur@exemple.invalid")
+    lecteur = make_client(courriel("lecteur"))
     assert lecteur.put(API, json={"valeur": {"ventes": "X"}}).status_code == 403
     assert admin.get(API).json() == {"valeur": {}}
     assert make_client().get(API).status_code == 401

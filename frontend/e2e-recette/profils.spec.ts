@@ -1,27 +1,29 @@
+import { randomBytes } from 'node:crypto'
 import { expect, type Page, test } from '@playwright/test'
-import { mdpDe } from './outils'
+import { compte } from './outils'
 
 const BASE_ONGLETS = ['Résumé', 'Graphes', 'Annuel', 'Mensuel', 'Individuel']
 const TOUS = ['Administration', 'Commerce Pièces', 'Commerce VN', 'Pneumatique', 'SAV Engins', 'SAV PL', 'Sites Déportés']
 
-type Profil = { email: string; admin?: boolean; nominatif: boolean; services: string[] }
+type Profil = { identifiant: string; admin?: boolean; nominatif: boolean; services: string[] }
 const PROFILS: Profil[] = [
-  { email: 'admin@exemple.invalid', admin: true, nominatif: true, services: TOUS },
-  { email: 'rh.partenaire@exemple.invalid', admin: true, nominatif: true, services: TOUS },
-  { email: 'drh@exemple.invalid', nominatif: true, services: TOUS },
-  { email: 'dop@exemple.invalid', nominatif: true, services: TOUS },
-  { email: 'dps@exemple.invalid', nominatif: false, services: ['Commerce Pièces', 'SAV Engins', 'SAV PL', 'Sites Déportés'] },
-  { email: 'commerce.vn@exemple.invalid', nominatif: false, services: ['Commerce VN'] },
-  { email: 'pneumatique@exemple.invalid', nominatif: false, services: ['Pneumatique'] },
-  { email: 'sav.pl@exemple.invalid', nominatif: false, services: ['SAV PL'] },
-  { email: 'resp.sav.engins@exemple.invalid', nominatif: false, services: ['SAV Engins'] },
-  { email: 'sites.deportes@exemple.invalid', nominatif: false, services: ['Sites Déportés'] },
+  { identifiant: 'admin', admin: true, nominatif: true, services: TOUS },
+  { identifiant: 'rh.partenaire', admin: true, nominatif: true, services: TOUS },
+  { identifiant: 'drh', nominatif: true, services: TOUS },
+  { identifiant: 'dop', nominatif: true, services: TOUS },
+  { identifiant: 'dps', nominatif: false, services: ['Commerce Pièces', 'SAV Engins', 'SAV PL', 'Sites Déportés'] },
+  { identifiant: 'commerce.vn', nominatif: false, services: ['Commerce VN'] },
+  { identifiant: 'pneumatique', nominatif: false, services: ['Pneumatique'] },
+  { identifiant: 'sav.pl', nominatif: false, services: ['SAV PL'] },
+  { identifiant: 'resp.sav.engins', nominatif: false, services: ['SAV Engins'] },
+  { identifiant: 'sites.deportes', nominatif: false, services: ['Sites Déportés'] },
 ]
 
-async function connecter(page: Page, email: string) {
+async function connecter(page: Page, identifiant: string) {
+  const { email, mdp } = compte(identifiant)
   await page.goto('login')
   await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(email)
-  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(mdpDe(email))
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill(mdp)
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toBeVisible()
 }
@@ -30,10 +32,10 @@ const onglets = (page: Page) => page.getByRole('navigation', { name: 'Rapports' 
 const optionsService = (page: Page) => page.getByRole('combobox', { name: 'Service' }).locator('option')
 
 for (const p of PROFILS) {
-  test(`${p.email} : parcours complet`, async ({ page }) => {
+  test(`${p.identifiant} : parcours complet`, async ({ page }) => {
     const erreurs: string[] = []
     page.on('pageerror', (e) => erreurs.push(e.message))
-    await connecter(page, p.email)
+    await connecter(page, p.identifiant)
 
     const attendus = p.nominatif ? BASE_ONGLETS : BASE_ONGLETS.slice(0, 4)
     await expect(onglets(page)).toHaveText(p.admin ? [...attendus, 'Administration'] : attendus)
@@ -78,7 +80,7 @@ for (const p of PROFILS) {
     }
 
     await page.getByRole('button', { name: 'Profil' }).click()
-    await expect(page.locator('#profil-menu').getByText(p.email)).toBeVisible()
+    await expect(page.locator('#profil-menu').getByText(compte(p.identifiant).email)).toBeVisible()
     await page.getByRole('button', { name: 'Déconnexion' }).click()
     await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible()
     expect(erreurs).toEqual([])
@@ -87,8 +89,8 @@ for (const p of PROFILS) {
 
 test('mauvais mot de passe : refusé', async ({ page }) => {
   await page.goto('login')
-  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill('drh@exemple.invalid')
-  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill('<mot-de-passe-faux-2>')
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Adresse e-mail').fill(compte('drh').email)
+  await page.getByRole('group', { name: 'Connexion' }).getByLabel('Mot de passe', { exact: true }).fill('t-' + randomBytes(12).toString('hex'))
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Rapports' })).toHaveCount(0)

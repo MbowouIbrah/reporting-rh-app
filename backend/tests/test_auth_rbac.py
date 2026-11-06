@@ -6,14 +6,15 @@ from app.models.auth import AuditEvent, Perimetre, Utilisateur
 from app.repos.scope import apply_scope, scope_for
 from app.security.deps import to_principal
 from tests.conftest import PW
+from tests.identites import courriel
 
 API = "/api/v1"
-ADMIN = "admin@exemple.invalid"
-DRH = "drh@exemple.invalid"
-EQUIP = "dps.equipment@exemple.invalid"
-VN = "dir.commercial.vn@exemple.invalid"
+ADMIN = courriel("admin")
+DRH = courriel("drh")
+EQUIP = courriel("dps.equipment")
+VN = courriel("dir.commercial.vn")
 NEW_USER = {
-    "email": "x@exemple.invalid",
+    "email": courriel("x"),
     "nom": "X",
     "password": PW,
     "permissions": ["nominatif", "marge"],
@@ -31,7 +32,7 @@ def test_login_ok_et_cookies_httponly(make_client):
 
 
 @pytest.mark.parametrize(
-    "email,pw", [(ADMIN, "faux"), ("inconnu@exemple.invalid", PW), ("", "")]
+    "email,pw", [(ADMIN, "faux"), (courriel("inconnu"), PW), ("", "")]
 )
 def test_login_refuse(make_client, email, pw):
     r = make_client().post(f"{API}/auth/login", json={"email": email, "password": pw})

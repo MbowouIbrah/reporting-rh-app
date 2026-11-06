@@ -24,7 +24,7 @@ Contraintes qui restent (P0 §2, QUESTIONS_CLIENT D1–D5, Q2–Q3) :
 | Filtre de données | `repos/scope.py` : `scope_for` / `apply_scope` | Global si rôle global ; sinon **union** (OU) de toutes les règles, service et site confondus. |
 | Contrôle des appels | ~60 appels `authorize(p, "action")` / `is_allowed` dans `api/*.py` | Raisonnent déjà en **actions**, pas en rôles : ils ne changent pas si `Principal` porte des permissions. |
 | Front | `AuthContext.can(p)` sur `me.permissions` | Déjà fondé sur les permissions. Seules la page Utilisateurs, `lib/roles.ts`, `api/admin.ts` connaissent les rôles. |
-| Recette | `tools/recette/comptes.csv` (colonnes `role;perimetre;nominatif;profil`), `reinit.py`, e2e `40-utilisateurs`, `60-lecteurs` | À adapter. |
+| Recette | `tools/recette/comptes.exemple.csv` (colonnes `role;perimetre;nominatif;profil`), `reinit.py`, e2e `40-utilisateurs`, `60-lecteurs` | À adapter. |
 | Données filtrables | `SituationMensuelle` : service, site, activité, type de contrat, poste | Seuls service et site sont utilisés pour limiter aujourd'hui. |
 
 ## 3. Bonnes pratiques retenues
@@ -83,7 +83,7 @@ Création : bouton « Nouveau compte » qui ouvre une fiche vide dans le même p
 - **Sécurité** : changement du cœur des droits. Tests pytest par permission et par portée ; test de non-régression qui vérifie que les 10 comptes de recette gardent exactement les mêmes accès après migration. Revue `/code-review` obligatoire.
 - **API** : les ~60 `authorize` ne bougent pas. Changent : `Principal`, `policy.py`, `scope.py`, `deps.py`, `/auth/me` (fonction au lieu de rôles), `/api/v1/users` (corps `fonction`, `permissions`, `portee`).
 - **Front** : page Utilisateurs refaite, `lib/roles.ts` remplacé par le catalogue des permissions, badge de l'en-tête = fonction.
-- **Recette** : `comptes.csv` (colonnes `fonction;portee;permissions`), `reinit.py`, e2e 40 et 60.
+- **Recette** : `comptes.exemple.csv` (colonnes `fonction;portee;permissions`), `reinit.py`, e2e 40 et 60.
 - **Performance** : une ou deux petites requêtes de plus à la connexion, négligeable.
 - **Démo du 21/10** : travail sur une nouvelle branche ; `page-utilisateurs` et `recette.db` restent intacts pour la présentation.
 

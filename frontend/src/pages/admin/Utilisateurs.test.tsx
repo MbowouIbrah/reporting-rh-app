@@ -1,14 +1,16 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
+import { courriel, mdpTest } from '../../test/identites'
 import Utilisateurs from './Utilisateurs'
 import { erreurApi, monter, type Appel } from './testSupport'
 
+const MDP = mdpTest()
 const TOUT = { tout: true, perimetres: [], services: [], sites: [] }
 const ADMIN = ['nominatif', 'marge', 'import', 'saisie', 'referentiel', 'comptes', 'journal']
 const COMPTES = [
-  { id: 1, email: 'admin@exemple.invalid', nom: 'Admin RH', fonction: 'DRH', actif: true, doit_changer_mdp: false, permissions: ADMIN, portee: TOUT },
-  { id: 2, email: 'chef.sav@exemple.invalid', nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, doit_changer_mdp: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
-  { id: 3, email: 'dg@exemple.invalid', nom: 'Élise Directrice', fonction: '', actif: false, doit_changer_mdp: false, permissions: ['nominatif', 'marge'], portee: TOUT },
+  { id: 1, email: courriel('admin'), nom: 'Admin RH', fonction: 'DRH', actif: true, doit_changer_mdp: false, permissions: ADMIN, portee: TOUT },
+  { id: 2, email: courriel('chef.sav'), nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, doit_changer_mdp: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
+  { id: 3, email: courriel('dg'), nom: 'Élise Directrice', fonction: '', actif: false, doit_changer_mdp: false, permissions: ['nominatif', 'marge'], portee: TOUT },
 ]
 const PERIMETRES = [
   { id: 5, code: 'sav_pl', libelle: 'SAV PL', regles: [{ dimension: 'service', valeur: 'SAV PL' }] },
@@ -101,10 +103,10 @@ test('fiche : espaces seuls = pas de modification ; après enregistrement, mot d
   const f = await ouvrir('Chef Sav')
   fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Chef Sav ' } })
   expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
-  fireEvent.change(f.getByLabelText('Nouveau mot de passe'), { target: { value: '<mot-de-passe-test-12>' } })
+  fireEvent.change(f.getByLabelText('Nouveau mot de passe'), { target: { value: MDP } })
   enregistrer()
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
-  expect(ecritures(appels)[0].body).toEqual({ password: '<mot-de-passe-test-12>' })
+  expect(ecritures(appels)[0].body).toEqual({ password: MDP })
   await waitFor(() => expect(f.getByLabelText('Nouveau mot de passe')).toHaveValue(''))
   expect(f.queryByRole('button', { name: 'Enregistrer' })).toBeNull()
 })
@@ -204,12 +206,12 @@ test('création depuis un modèle, puis sélection du nouveau compte', async () 
   expect(f.getByLabelText('Fonction')).toHaveValue('Lecteur global')
   expect(within(await f.findByRole('group', { name: 'Services' })).getByLabelText('Tout')).toBeChecked()
   fireEvent.change(f.getByLabelText('Nom'), { target: { value: 'Nouveau' } })
-  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: 'n@exemple.invalid' } })
-  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: '<mot-de-passe-test-12>' } })
+  fireEvent.change(f.getByLabelText('Adresse e-mail'), { target: { value: courriel('n') } })
+  fireEvent.change(f.getByLabelText('Mot de passe'), { target: { value: MDP } })
   fireEvent.click(f.getByRole('button', { name: 'Créer le compte' }))
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({
-    email: 'n@exemple.invalid', nom: 'Nouveau', fonction: 'Lecteur global', password: '<mot-de-passe-test-12>',
+    email: courriel('n'), nom: 'Nouveau', fonction: 'Lecteur global', password: MDP,
     permissions: ['nominatif', 'marge'], portee: TOUT,
   })
   expect(await screen.findByText('Compte de Nouveau créé.')).toBeInTheDocument()

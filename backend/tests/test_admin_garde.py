@@ -1,15 +1,15 @@
 from app.security.policy import ACCORDABLES
-from tests.conftest import mot_de_passe_choisi
+from tests.conftest import PW, mot_de_passe_choisi
+from tests.identites import DOMAINE, courriel
 
 API = "/api/v1"
-ADMIN = "admin@exemple.invalid"
-PW = "<mot-de-passe-test>"
+ADMIN = courriel("admin")
 ADMIN_DROITS = {"permissions": list(ACCORDABLES), "portee": {"tout": True}}
 GLOBAL_DROITS = {"permissions": ["nominatif", "marge"], "portee": {"tout": True}}
 
 
 def second_admin(c):
-    r = c.post(f"{API}/users", json={"email": "a2@exemple.invalid", "nom": "A2", "password": PW,
+    r = c.post(f"{API}/users", json={"email": courriel("a2"), "nom": "A2", "password": PW,
                                      **ADMIN_DROITS})
     assert r.status_code == 201
     return r.json()["id"]
@@ -43,7 +43,7 @@ def test_audit_filtres_et_pagination(db, make_client):
 
 def test_creation_email_invalide_refusee(db, make_client):
     c = make_client(ADMIN)
-    for email in ["pas-un-email", "a@b", "a b@exemple.invalid", "@exemple.invalid"]:
+    for email in ["pas-un-email", "a@b", f"a b@{DOMAINE}", f"@{DOMAINE}"]:
         r = c.post(f"{API}/users", json={"email": email, "nom": "X", "password": PW,
                                          **GLOBAL_DROITS})
         assert r.status_code == 422, email
@@ -52,12 +52,12 @@ def test_creation_email_invalide_refusee(db, make_client):
 def test_modification_email(db, make_client):
     c = make_client(ADMIN)
     uid = second_admin(c)
-    r = c.put(f"{API}/users/{uid}", json={"email": " Nouveau@exemple.invalid "})
-    assert r.status_code == 200 and r.json()["email"] == "nouveau@exemple.invalid"
+    r = c.put(f"{API}/users/{uid}", json={"email": f" Nouveau@{DOMAINE.upper()} "})
+    assert r.status_code == 200 and r.json()["email"] == courriel("nouveau")
     assert c.put(f"{API}/users/{uid}", json={"email": "a@b"}).status_code == 422
     assert c.put(f"{API}/users/{uid}", json={"email": ADMIN}).status_code == 409
     # le changement d'adresse ne touche pas le reste du compte
-    assert c.put(f"{API}/users/{uid}", json={"nom": "B"}).json()["email"] == "nouveau@exemple.invalid"
+    assert c.put(f"{API}/users/{uid}", json={"nom": "B"}).json()["email"] == courriel("nouveau")
 
 
 def test_retrait_de_sa_propre_gestion_refuse_meme_avec_un_autre_admin(db, make_client):
@@ -72,7 +72,7 @@ def test_retrait_de_sa_propre_gestion_refuse_meme_avec_un_autre_admin(db, make_c
 
 def test_droits_valides(db, make_client):
     c = make_client(ADMIN)
-    base = {"email": "v@exemple.invalid", "nom": "V", "password": PW}
+    base = {"email": courriel("v"), "nom": "V", "password": PW}
     pid = c.get(f"{API}/perimetres").json()[0]["id"]
     # permission d'écriture sans « toutes les données » : refusée
     r = c.post(f"{API}/users", json={**base, "permissions": ["import"],
@@ -96,7 +96,7 @@ def test_droits_valides(db, make_client):
 def test_journal_exige_toutes_les_donnees(db, make_client):
     c = make_client(ADMIN)
     pid = c.get(f"{API}/perimetres").json()[0]["id"]
-    r = c.post(f"{API}/users", json={"email": "j@exemple.invalid", "nom": "J", "password": PW,
+    r = c.post(f"{API}/users", json={"email": courriel("j"), "nom": "J", "password": PW,
                                      "permissions": ["journal"],
                                      "portee": {"perimetres": [pid]}})
     assert r.status_code == 422 and "toutes les données" in r.json()["detail"]
@@ -108,7 +108,7 @@ def test_portee_directe_suit_le_renommage(db, make_client):
     from app.models.referentiel import Service
 
     c = make_client(ADMIN)
-    r = c.post(f"{API}/users", json={"email": "s@exemple.invalid", "nom": "S", "password": PW,
+    r = c.post(f"{API}/users", json={"email": courriel("s"), "nom": "S", "password": PW,
                                      "portee": {"services": ["SAV PL"]}})
     uid = r.json()["id"]
     rid = db.scalar(select(Service.id).where(Service.libelle == "SAV PL"))
@@ -130,26 +130,26 @@ def test_perimetre_une_dimension_et_suppression_si_inutilise(db, make_client):
     r = c.post(f"{API}/perimetres", json={**mixte, "regles": mixte["regles"][1:]})
     assert r.status_code == 201, r.text
     pid = r.json()["id"]
-    c.post(f"{API}/users", json={"email": "p@exemple.invalid", "nom": "P", "password": PW,
+    c.post(f"{API}/users", json={"email": courriel("p"), "nom": "P", "password": PW,
                                  "portee": {"perimetres": [pid]}})
     r = c.delete(f"{API}/perimetres/{pid}")
-    assert r.status_code == 409 and "p@exemple.invalid" in r.json()["detail"]
+    assert r.status_code == 409 and courriel("p") in r.json()["detail"]
 
 
 def test_gestionnaire_de_comptes_liste_services_et_sites(db, make_client):
     c = make_client(ADMIN)
-    r = c.post(f"{API}/users", json={"email": "g@exemple.invalid", "nom": "G", "password": PW,
+    r = c.post(f"{API}/users", json={"email": courriel("g"), "nom": "G", "password": PW,
                                      "permissions": ["comptes"], "portee": {"tout": True}})
     assert r.status_code == 201
-    mot_de_passe_choisi(db, "g@exemple.invalid")
-    g = make_client("g@exemple.invalid")
+    mot_de_passe_choisi(db, courriel("g"))
+    g = make_client(courriel("g"))
     r = g.get(f"{API}/referentiels/service")
     assert r.status_code == 200 and "alias" not in r.json()
     assert g.get(f"{API}/referentiels/site").status_code == 200
     assert g.get(f"{API}/referentiels/rubrique").status_code == 403
     assert g.get(f"{API}/referentiels/poste").status_code == 403
-    lecteur = c.post(f"{API}/users", json={"email": "l@exemple.invalid", "nom": "L", "password": PW,
+    lecteur = c.post(f"{API}/users", json={"email": courriel("l"), "nom": "L", "password": PW,
                                            **GLOBAL_DROITS})
     assert lecteur.status_code == 201
-    mot_de_passe_choisi(db, "l@exemple.invalid")
-    assert make_client("l@exemple.invalid").get(f"{API}/referentiels/site").status_code == 403
+    mot_de_passe_choisi(db, courriel("l"))
+    assert make_client(courriel("l")).get(f"{API}/referentiels/site").status_code == 403

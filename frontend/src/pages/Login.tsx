@@ -158,7 +158,7 @@ export default function Login() {
                   ref={champOubli}
                   type="email"
                   autoComplete="email"
-                  placeholder="prénom.nom"
+                  placeholder="prénom.nom@…"
                   value={emailOubli}
                   onChange={(e) => setEmailOubli(e.target.value)}
                   disabled={envoye}

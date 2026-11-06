@@ -1,18 +1,19 @@
 import { expect, type APIRequestContext, type Browser, type Page, test } from '@playwright/test'
-import { ADMIN, connecter, lireJson } from './outils'
+import { ADMIN, compte, connecter, courriel, lireJson, motDePasse } from './outils'
 
 // Gestion des utilisateurs : pas d'écran, tout passe par l'API d'administration ; on contrôle ensuite ce que
 // voit chaque nouveau compte dans l'application.
-const MDP = '<mot-de-passe-test-2>'
+const MDP = motDePasse()
+const CHOISI = motDePasse()
 const BASE_ONGLETS = ['Résumé', 'Graphes', 'Annuel', 'Mensuel', 'Individuel']
 const TOUS = ['Administration', 'Commerce Pièces', 'Commerce VN', 'Pneumatique', 'SAV Engins', 'SAV PL', 'Sites Déportés']
 
 const EMAIL = {
-  admin: 'admin.recette@exemple.invalid',
-  global: 'lecteur.global@exemple.invalid',
-  anonyme: 'lecteur.anonyme@exemple.invalid',
-  perimetre: 'lecteur.perimetre@exemple.invalid',
-  perimetreNominatif: 'lecteur.perimetre.nominatif@exemple.invalid',
+  admin: courriel('admin.recette'),
+  global: courriel('lecteur.global'),
+  anonyme: courriel('lecteur.anonyme'),
+  perimetre: courriel('lecteur.perimetre'),
+  perimetreNominatif: courriel('lecteur.perimetre.nominatif'),
 }
 
 type Portee = { tout?: boolean; perimetres?: number[]; services?: string[]; sites?: string[] }
@@ -59,14 +60,14 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('administrateur créé : connexion (e-mail en majuscules accepté), écran d’administration et API admin', async ({ page, browser, baseURL }) => {
-    const rep = await creer(page.request, 'Admin.Recette@exemple.invalid', 'Admin Recette', ADMIN_DROITS)
+    const rep = await creer(page.request, courriel('Admin.Recette'), 'Admin Recette', ADMIN_DROITS)
     expect(rep.status()).toBe(201)
     const cree = (await rep.json()) as User
     expect(cree).toMatchObject({ email: EMAIL.admin, nom: 'Admin Recette', fonction: 'Administrateur RH', actif: true })
     expect(cree.permissions).toEqual(TOUTES)
     expect(cree.portee).toEqual(portee({ tout: true }))
 
-    const { context, page: p } = await session(browser, baseURL, 'Admin.Recette@exemple.invalid')
+    const { context, page: p } = await session(browser, baseURL, courriel('Admin.Recette'))
     await voir(p, { onglets: [...BASE_ONGLETS, 'Administration'], services: TOUS, marge: true })
     await p.goto('admin')
     await expect(p.getByRole('heading', { name: /ADMINISTRATION DES DONNÉES/ })).toBeVisible()
@@ -137,12 +138,12 @@ test.describe.serial('gestion des utilisateurs', () => {
     const avant = (await utilisateurs(page.request)).length
     const essai = async (email: string, droits: Droits) => (await creer(page.request, email, 'Essai', droits)).status()
     const pneu = { perimetres: [perimetrePneu.id] }
-    expect(await essai('import.perimetre@exemple.invalid', { permissions: ['import'], portee: pneu })).toBe(422)
-    expect(await essai('marge.perimetre@exemple.invalid', { permissions: ['marge'], portee: pneu })).toBe(422)
-    expect(await essai('comptes.service@exemple.invalid', { permissions: ['comptes'], portee: { services: ['Pneumatique'] } })).toBe(422)
-    expect(await essai('permission.inconnue@exemple.invalid', { permissions: ['super_admin'], portee: GLOBAL })).toBe(422)
-    expect(await essai('perimetre.inconnu@exemple.invalid', { portee: { perimetres: [99999] } })).toBe(422)
-    expect(await essai('service.inconnu@exemple.invalid', { portee: { services: ['Service fantôme'] } })).toBe(422)
+    expect(await essai(courriel('import.perimetre'), { permissions: ['import'], portee: pneu })).toBe(422)
+    expect(await essai(courriel('marge.perimetre'), { permissions: ['marge'], portee: pneu })).toBe(422)
+    expect(await essai(courriel('comptes.service'), { permissions: ['comptes'], portee: { services: ['Pneumatique'] } })).toBe(422)
+    expect(await essai(courriel('permission.inconnue'), { permissions: ['super_admin'], portee: GLOBAL })).toBe(422)
+    expect(await essai(courriel('perimetre.inconnu'), { portee: { perimetres: [99999] } })).toBe(422)
+    expect(await essai(courriel('service.inconnu'), { portee: { services: ['Service fantôme'] } })).toBe(422)
     expect((await utilisateurs(page.request)).length).toBe(avant)
   })
 
@@ -215,7 +216,7 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('compte créé par un admin : changement imposé avant tout accès', async ({ page, browser, baseURL }) => {
-    const email = 'provisoire@exemple.invalid'
+    const email = courriel('provisoire')
     expect((await creer(page.request, email, 'Compte provisoire', { portee: GLOBAL })).status()).toBe(201)
     const context = await browser.newContext({ baseURL })
     const p = await context.newPage()
@@ -229,8 +230,8 @@ test.describe.serial('gestion des utilisateurs', () => {
     await p.goto('resume')
     await expect(titre).toBeVisible()
     await p.getByLabel('Mot de passe actuel', { exact: true }).fill(MDP)
-    await p.getByLabel('Nouveau mot de passe', { exact: true }).fill('<mot-de-passe-test-4>')
-    await p.getByLabel('Confirmer le mot de passe', { exact: true }).fill('<mot-de-passe-test-4>')
+    await p.getByLabel('Nouveau mot de passe', { exact: true }).fill(CHOISI)
+    await p.getByLabel('Confirmer le mot de passe', { exact: true }).fill(CHOISI)
     await p.getByRole('button', { name: 'Enregistrer le mot de passe' }).click()
     await expect(onglets(p).first()).toBeVisible()
     expect((await p.request.get('api/v1/rapports/periodes')).status()).toBe(200)
@@ -238,17 +239,17 @@ test.describe.serial('gestion des utilisateurs', () => {
   })
 
   test('mot de passe : trop court refusé à la création et au changement, nouveau mot de passe pris en compte', async ({ page, browser, baseURL }) => {
-    const faible = await creer(page.request, 'mdp.faible@exemple.invalid', 'Mot de passe faible', { portee: GLOBAL }, 'court-7')
+    const faible = await creer(page.request, courriel('mdp.faible'), 'Mot de passe faible', { portee: GLOBAL }, 'court-7')
     expect(faible.status()).toBe(422)
     expect(JSON.stringify(await faible.json())).toContain('8 caractères')
-    expect(await utilisateur(page.request, 'mdp.faible@exemple.invalid')).toBeUndefined()
+    expect(await utilisateur(page.request, courriel('mdp.faible'))).toBeUndefined()
 
     const u = (await utilisateur(page.request, EMAIL.anonyme))!
     expect((await modifier(page.request, u.id, { password: 'court' })).status()).toBe(422)
     const s = await session(browser, baseURL, EMAIL.anonyme)
     await s.context.close()
 
-    const NOUVEAU = '<mot-de-passe-test-n3>'
+    const NOUVEAU = motDePasse()
     expect((await modifier(page.request, u.id, { password: NOUVEAU })).status()).toBe(200)
     const ancien = await browser.newContext({ baseURL })
     const refus = await ancien.request.post('api/v1/auth/login', { data: { email: EMAIL.anonyme, password: MDP } })
@@ -261,8 +262,8 @@ test.describe.serial('gestion des utilisateurs', () => {
   test('création refusée : e-mail déjà utilisé (même en majuscules), nom manquant', async ({ page }) => {
     const avant = (await utilisateurs(page.request)).length
     expect((await creer(page.request, EMAIL.admin, 'Doublon', { portee: GLOBAL })).status()).toBe(409)
-    expect((await creer(page.request, 'ADMIN.RECETTE@exemple.invalid', 'Doublon', { portee: GLOBAL })).status()).toBe(409)
-    const sansNom = await page.request.post('api/v1/users', { data: { email: 'sans.nom@exemple.invalid', password: MDP, portee: GLOBAL } })
+    expect((await creer(page.request, courriel('admin.recette').toUpperCase(), 'Doublon', { portee: GLOBAL })).status()).toBe(409)
+    const sansNom = await page.request.post('api/v1/users', { data: { email: courriel('sans.nom'), password: MDP, portee: GLOBAL } })
     expect(sansNom.status()).toBe(422)
     expect((await utilisateurs(page.request)).length).toBe(avant)
   })
@@ -276,7 +277,7 @@ test.describe.serial('gestion des utilisateurs', () => {
   test('gestionnaires des comptes : jamais d’auto-retrait, le dernier actif est protégé', async ({ page, browser, baseURL }) => {
     const moi = (await lireJson<{ id: number }>(page.request, 'auth/me')).id
     const temp = (await utilisateur(page.request, EMAIL.admin))!
-    const admin2 = (await utilisateur(page.request, 'rh.partenaire@exemple.invalid'))!
+    const admin2 = (await utilisateur(page.request, compte('rh.partenaire').email))!
 
     // Son propre compte : ni désactivation, ni retrait de « Gérer les comptes », même s'il reste d'autres gestionnaires
     const s = await session(browser, baseURL, EMAIL.admin)
@@ -304,7 +305,7 @@ test.describe.serial('gestion des utilisateurs', () => {
     } finally {
       expect((await modifier(page.request, admin2.id, { actif: true })).status()).toBe(200)
     }
-    expect((await utilisateur(page.request, 'rh.partenaire@exemple.invalid'))!.actif).toBe(true)
+    expect((await utilisateur(page.request, compte('rh.partenaire').email))!.actif).toBe(true)
   })
 
   test('journal d’audit : créations, modifications et connexions tracées', async ({ page }) => {

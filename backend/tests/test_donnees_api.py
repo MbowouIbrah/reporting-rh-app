@@ -2,10 +2,11 @@ import io
 
 from openpyxl import load_workbook
 
+from tests.identites import courriel
 from tests.test_import_regles import ligne, xlsx
 
 API = "/api/v1"
-ADMIN, DRH = "admin@exemple.invalid", "drh@exemple.invalid"
+ADMIN, DRH = courriel("admin"), courriel("drh")
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 BR = "Brut Réel"
 

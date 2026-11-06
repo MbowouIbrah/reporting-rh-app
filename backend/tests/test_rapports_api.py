@@ -7,11 +7,12 @@ from app.models.auth import AuditEvent
 from app.models.donnees import Periode, Salarie, SituationMensuelle
 from app.models.pilotage import ValeurSaisie
 from app.models.referentiel import Poste, Site
+from tests.identites import courriel
 from tests.test_import_regles import ligne, xlsx
 
 API = "/api/v1"
-ADMIN, DRH, EQUIP, VN = ("admin@exemple.invalid", "drh@exemple.invalid", "dps.equipment@exemple.invalid",
-                         "dir.commercial.vn@exemple.invalid")
+ADMIN, DRH, EQUIP, VN = (courriel("admin"), courriel("drh"), courriel("dps.equipment"),
+                         courriel("dir.commercial.vn"))
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 BR, ABS = "Brut Réel", "Absences (nb)"
 
@@ -104,9 +105,9 @@ def test_perimetre_filtre_cote_serveur(charge, make_client):
 
 
 @pytest.mark.parametrize("email, ms", [
-    ("dir.technique@exemple.invalid", "1000.5"),  # SAV PL
-    ("dc.pneumatique@exemple.invalid", None),  # aucun salarié Pneumatique en janvier
-    ("resp.sav.engins@exemple.invalid", None),
+    (courriel("dir.technique"), "1000.5"),  # SAV PL
+    (courriel("dc.pneumatique"), None),  # aucun salarié Pneumatique en janvier
+    (courriel("resp.sav.engins"), None),
 ])
 def test_lecteurs_a_un_service(charge, make_client, email, ms):
     c = make_client(email)

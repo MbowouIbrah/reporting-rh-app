@@ -1,8 +1,9 @@
 from app.models.auth import PreferenceUtilisateur
-from tests.conftest import mot_de_passe_choisi
+from tests.conftest import PW, mot_de_passe_choisi
+from tests.identites import courriel
 
 API = "/api/v1/auth/preferences"
-ADMIN = "admin@exemple.invalid"
+ADMIN = courriel("admin")
 
 
 def test_preference_lue_ecrite_effacee(make_client, db):
@@ -21,13 +22,12 @@ def test_preference_lue_ecrite_effacee(make_client, db):
 
 def test_preference_propre_a_chaque_utilisateur(make_client, db):
     admin = make_client(ADMIN)
-    pw = "<mot-de-passe-test>"
-    r = admin.post("/api/v1/users", json={"email": "x@exemple.invalid", "nom": "X", "password": pw,
+    r = admin.post("/api/v1/users", json={"email": courriel("x"), "nom": "X", "password": PW,
                                           "permissions": [], "portee": {"tout": True}})
     assert r.status_code in (200, 201), r.text
     admin.put(f"{API}/graphes.evolution", json={"valeur": ["ca"]})
-    mot_de_passe_choisi(db, "x@exemple.invalid")
-    x = make_client("x@exemple.invalid")
+    mot_de_passe_choisi(db, courriel("x"))
+    x = make_client(courriel("x"))
     assert x.get(f"{API}/graphes.evolution").json() == {"valeur": None}
 
 

@@ -12,6 +12,7 @@ from app.imports.regles import valider
 from app.imports.service import charger_refs
 from app.models.donnees import Montant, SituationMensuelle
 from app.models.referentiel import Rubrique
+from tests.identites import courriel
 from tests.test_import_regles import V4
 
 pytestmark = pytest.mark.skipif(
@@ -30,7 +31,7 @@ def test_v4_import_complet_sommes_exactes(make_client, db):
         for rub, v in L.montants.items():
             attendu[rub] += v
 
-    c = make_client("admin@exemple.invalid")
+    c = make_client(courriel("admin"))
     r = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", contenu, XLSX)})
     assert r.status_code == 201, r.text
     lot = r.json()

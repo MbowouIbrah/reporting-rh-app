@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.identites import courriel
 from tests.test_import_regles import V4
 from tests.test_parite_v4 import API, XLSX, proche, regles_v4
 
@@ -33,7 +34,7 @@ def ecarts():
 @pytest.fixture()
 def rapports(make_client, db):
     regles_v4(db)
-    c = make_client("admin@exemple.invalid")
+    c = make_client(courriel("admin"))
     lot = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)}).json()
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200
 

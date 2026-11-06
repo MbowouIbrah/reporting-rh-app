@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from sqlalchemy import delete, select
 
 from app.models.referentiel import Rubrique, RubriqueRegle
+from tests.identites import courriel
 from tests.test_import_regles import V4
 
 pytestmark = pytest.mark.skipif(not V4.exists(), reason="fichier V4 requis")
@@ -40,7 +41,7 @@ def excel():
 @pytest.fixture()
 def rapport(make_client, db):
     regles_v4(db)
-    c = make_client("admin@exemple.invalid")
+    c = make_client(courriel("admin"))
     r = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)})
     assert r.status_code == 201
     assert c.post(f"{API}/imports/{r.json()['id']}/valider").status_code == 200

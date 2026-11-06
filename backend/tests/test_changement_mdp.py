@@ -13,9 +13,12 @@ from app.security.passwords import verify_password
 from app.security.tokens import empreinte, make_token
 from app.seed import _user, run
 from tests.conftest import PW
+from tests.identites import DOMAINE, courriel, mot_de_passe
 
-ADMIN = "admin@exemple.invalid"
-NOUVEAU = "<mot-de-passe-test-n2>"
+ADMIN = courriel("admin")
+NOUVEAU = mot_de_passe()
+AUTRE = mot_de_passe()
+DEMO = mot_de_passe()
 CHANGER = "/api/v1/auth/changer-mot-de-passe"
 LECTEUR = {"permissions": [], "portee": {"tout": True}}
 
@@ -45,36 +48,36 @@ def test_le_demarrage_cree_un_admin_provisoire_sans_le_remettre_ensuite(db):
     for u in db.scalars(select(Utilisateur)):
         u.actif = False
     db.commit()
-    run(db, "neuf@exemple.invalid", PW, None)
-    u = db.scalar(select(Utilisateur).where(Utilisateur.email == "neuf@exemple.invalid"))
+    run(db, courriel("neuf"), PW, None)
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == courriel("neuf")))
     assert u.doit_changer_mdp is True
     u.doit_changer_mdp = False
     db.commit()
-    run(db, "neuf@exemple.invalid", "autre-mot-de-passe-3", None)
+    run(db, courriel("neuf"), AUTRE, None)
     db.refresh(u)
     assert u.doit_changer_mdp is False
 
 
 def test_pas_de_nouvel_admin_si_un_gestionnaire_actif_existe(db):
-    run(db, "second@exemple.invalid", PW, None)
-    assert db.scalar(select(Utilisateur).where(Utilisateur.email == "second@exemple.invalid")) is None
+    run(db, courriel("second"), PW, None)
+    assert db.scalar(select(Utilisateur).where(Utilisateur.email == courriel("second"))) is None
 
 
 def test_comptes_d_exemple_provisoires_et_refuses_en_production(db, monkeypatch):
-    assert _user(db, "defaut@exemple.invalid", "Défaut", PW, "global") is None
+    assert _user(db, courriel("defaut"), "Défaut", PW, "global") is None
     db.flush()
-    assert db.scalar(select(Utilisateur).where(Utilisateur.email == "defaut@exemple.invalid")).doit_changer_mdp is True
-    drh = db.scalar(select(Utilisateur).where(Utilisateur.email == "drh@exemple.invalid"))
-    drh.email = "ancien@exemple.invalid"
+    assert db.scalar(select(Utilisateur).where(Utilisateur.email == courriel("defaut"))).doit_changer_mdp is True
+    drh = db.scalar(select(Utilisateur).where(Utilisateur.email == courriel("drh")))
+    drh.email = courriel("ancien")
     db.commit()
-    run(db, ADMIN, PW, "<mot-de-passe-demo>")
-    assert db.scalar(select(Utilisateur).where(Utilisateur.email == "drh@exemple.invalid")).doit_changer_mdp is True
+    run(db, ADMIN, PW, DEMO, demo_domaine=DOMAINE)
+    assert db.scalar(select(Utilisateur).where(Utilisateur.email == courriel("drh"))).doit_changer_mdp is True
     assert seed.mot_de_passe_demo(["seed"]) is None
     monkeypatch.setenv("DEMO_PASSWORD", "court")
     with pytest.raises(SystemExit):
         seed.mot_de_passe_demo(["seed", "--demo"])
-    monkeypatch.setenv("DEMO_PASSWORD", "<mot-de-passe-demo>")
-    assert seed.mot_de_passe_demo(["seed", "--demo"]) == "<mot-de-passe-demo>"
+    monkeypatch.setenv("DEMO_PASSWORD", DEMO)
+    assert seed.mot_de_passe_demo(["seed", "--demo"]) == DEMO
     monkeypatch.setattr(settings, "ENV", "prod")
     with pytest.raises(SystemExit):
         seed.mot_de_passe_demo(["seed", "--demo"])
@@ -127,7 +130,7 @@ def test_toute_route_passe_par_la_porte_sauf_les_routes_prevues():
 def test_changement_refuse(db, make_client):
     u = provisoire(db)
     c = make_client(ADMIN)
-    assert c.post(CHANGER, json={"actuel": "<mot-de-passe-faux>", "nouveau": NOUVEAU}).status_code == 400
+    assert c.post(CHANGER, json={"actuel": mot_de_passe(), "nouveau": NOUVEAU}).status_code == 400
     assert c.post(CHANGER, json={"actuel": PW, "nouveau": "court"}).status_code == 422
     assert c.post(CHANGER, json={"actuel": PW, "nouveau": PW}).status_code == 422
     assert db.scalar(select(AuditEvent).where(AuditEvent.action == "changement_mdp_refuse")) is not None
@@ -168,7 +171,7 @@ def test_changement_sans_session(make_client):
 
 def test_admin_pose_un_mot_de_passe_provisoire_mais_pas_sur_son_compte(db, make_client):
     c = make_client(ADMIN)
-    cree = c.post("/api/v1/users", json={"email": "n@exemple.invalid", "nom": "N", "password": PW, **LECTEUR})
+    cree = c.post("/api/v1/users", json={"email": courriel("n"), "nom": "N", "password": PW, **LECTEUR})
     assert cree.status_code == 201, cree.text
     u = db.get(Utilisateur, cree.json()["id"])
     assert u.doit_changer_mdp is True

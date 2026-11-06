@@ -14,8 +14,8 @@ Projet autonome (API, page web, base) ; seule la page web publie un port, la bas
 - Premier compte : administrateur créé au démarrage (étape 1.2).
 - Les autres comptes (mot de passe demandé au clavier, jamais en argument) :
   - `$C perimetres` : codes disponibles (`dps`, `commerce_vn`, `pneumatique`, `sav_pl`, `sav_engins`, `sites_deportes`) ;
-  - `$C creer drh@exemple.invalid --nom "DRH" --modele global` ;
-  - `$C creer dps@exemple.invalid --nom "DPS" --modele perimetre --perimetre dps`.
+  - `$C creer <adresse> --nom "DRH" --modele global` ;
+  - `$C creer <adresse> --nom "DPS" --modele perimetre --perimetre dps`.
 - Modèle d'attribution : les deux administrateurs RH en `admin` ; DRH et DOP en `global` ; en `perimetre` : DPS `dps`, directeur commercial `commerce_vn`, DC Pneumatique `pneumatique`, directeur technique `sav_pl`, responsable technique SAV Engins `sav_engins`, responsable des sites déportés `sites_deportes`. `--nominatif` ouvre le reporting individuel à un compte `perimetre` (`global` l'a d'office).
 - `$C lister`, `$C droits EMAIL --modele ...`, `$C mot-de-passe EMAIL`, `$C exiger-changement EMAIL`, `$C desactiver EMAIL` / `$C activer EMAIL`.
 - Mots de passe : 8 caractères minimum, 72 octets maximum, pas seulement des espaces, communiqués hors e-mail. Tout mot de passe posé par un administrateur est provisoire : l'utilisateur doit le changer avant de continuer. Un administrateur change le sien par le lien de sa fiche. Il reste toujours au moins un compte actif qui gère les comptes (refus sinon). Si aucun compte actif ne gère les comptes et que `ADMIN_EMAIL` désigne un compte existant, le démarrage le signale sans rien créer : `$C activer EMAIL` ou `$C droits EMAIL --modele admin`.

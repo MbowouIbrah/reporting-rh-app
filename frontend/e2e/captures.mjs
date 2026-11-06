@@ -4,11 +4,13 @@ import { mkdirSync } from 'node:fs'
 import { chromium } from '@playwright/test'
 
 const dossier = `captures/${process.argv[2] || 'avant'}`
-const PW = '<mot-de-passe-test>'
+const PW = process.env.E2E_PASSWORD
+if (!PW) throw new Error('E2E_PASSWORD absent')
+const courriel = (nom) => `${nom}@exemple.invalid`
 const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/`
 const roles = [
-  ['drh', 'drh@exemple.invalid', ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']],
-  ['perimetre', 'dps.equipment@exemple.invalid', ['resume', 'mensuel']],
+  ['drh', courriel('drh'), ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']],
+  ['perimetre', courriel('dps.equipment'), ['resume', 'mensuel']],
 ]
 const tailles = [[1440, 900], [1024, 768], [390, 844]]
 

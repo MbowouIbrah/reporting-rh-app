@@ -3,8 +3,9 @@ from sqlalchemy import select
 from app.comptes import main
 from app.models.auth import AuditEvent, Utilisateur
 from app.security.passwords import verify_password
+from tests.identites import DOMAINE, courriel, mot_de_passe
 
-NOUVEAU = "<mot-de-passe-test-n1>"
+NOUVEAU = mot_de_passe()
 
 
 def _u(db, email):
@@ -18,10 +19,10 @@ def _dernier_audit(db):
 
 def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
-    argv = ["creer", " DPS.Sav@exemple.invalid ", "--nom", "DPS SAV", "--modele",
+    argv = ["creer", f" DPS.Sav@{DOMAINE.upper()} ", "--nom", "DPS SAV", "--modele",
             "perimetre", "--perimetre", "dps"]
     assert main(argv, db) == 0
-    u = _u(db, "dps.sav@exemple.invalid")
+    u = _u(db, courriel("dps.sav"))
     assert u.actif and verify_password(NOUVEAU, u.password_hash)
     assert u.doit_changer_mdp is True
     assert u.fonction == "Lecteur de périmètre" and u.permissions == []
@@ -31,45 +32,45 @@ def test_creer_lecteur_perimetre_trace_au_journal(db, monkeypatch, capsys):
         "create", "utilisateur", str(u.id), None
     )
     main(["lister"], db)
-    assert "dps.sav@exemple.invalid" in capsys.readouterr().out
+    assert courriel("dps.sav") in capsys.readouterr().out
 
 
 def test_creer_refuse_doublon_mot_de_passe_court_et_perimetre_manquant(db, monkeypatch):
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
-    assert main(["creer", "drh@exemple.invalid", "--nom", "X", "--modele", "global"], db) == 1
-    assert main(["creer", "a@exemple.invalid", "--nom", "A", "--modele", "perimetre"], db) == 1
-    assert main(["creer", "b@exemple.invalid", "--nom", "B", "--modele", "global",
+    assert main(["creer", courriel("drh"), "--nom", "X", "--modele", "global"], db) == 1
+    assert main(["creer", courriel("a"), "--nom", "A", "--modele", "perimetre"], db) == 1
+    assert main(["creer", courriel("b"), "--nom", "B", "--modele", "global",
                  "--perimetre", "dps"], db) == 1
-    assert main(["creer", "c@exemple.invalid", "--nom", "C", "--modele", "perimetre",
+    assert main(["creer", courriel("c"), "--nom", "C", "--modele", "perimetre",
                  "--perimetre", "inconnu"], db) == 1
     monkeypatch.setenv("MOT_DE_PASSE", "court")
-    assert main(["creer", "d@exemple.invalid", "--nom", "D", "--modele", "global"], db) == 1
-    assert db.scalars(select(Utilisateur).where(Utilisateur.email.like("_@exemple.invalid"))).all() \
+    assert main(["creer", courriel("d"), "--nom", "D", "--modele", "global"], db) == 1
+    assert db.scalars(select(Utilisateur).where(Utilisateur.email.like(courriel("_")))).all() \
         == []
 
 
 def test_desactiver_activer_et_mot_de_passe(db, monkeypatch):
-    assert main(["desactiver", "drh@exemple.invalid"], db) == 0
-    assert _u(db, "drh@exemple.invalid").actif is False
-    assert main(["activer", "drh@exemple.invalid"], db) == 0
-    assert _u(db, "drh@exemple.invalid").actif is True
+    assert main(["desactiver", courriel("drh")], db) == 0
+    assert _u(db, courriel("drh")).actif is False
+    assert main(["activer", courriel("drh")], db) == 0
+    assert _u(db, courriel("drh")).actif is True
     monkeypatch.setenv("MOT_DE_PASSE", NOUVEAU)
-    assert main(["mot-de-passe", "drh@exemple.invalid"], db) == 0
-    assert verify_password(NOUVEAU, _u(db, "drh@exemple.invalid").password_hash)
-    assert _u(db, "drh@exemple.invalid").doit_changer_mdp is True
-    assert main(["desactiver", "personne@exemple.invalid"], db) == 1
+    assert main(["mot-de-passe", courriel("drh")], db) == 0
+    assert verify_password(NOUVEAU, _u(db, courriel("drh")).password_hash)
+    assert _u(db, courriel("drh")).doit_changer_mdp is True
+    assert main(["desactiver", courriel("personne")], db) == 1
 
 
 def test_jamais_zero_admin_actif(db):
-    assert main(["desactiver", "admin@exemple.invalid"], db) == 1
-    assert main(["droits", "admin@exemple.invalid", "--modele", "global"], db) == 1
-    assert _u(db, "admin@exemple.invalid").actif is True
-    assert main(["droits", "drh@exemple.invalid", "--modele", "admin"], db) == 0
-    assert main(["desactiver", "admin@exemple.invalid"], db) == 0
+    assert main(["desactiver", courriel("admin")], db) == 1
+    assert main(["droits", courriel("admin"), "--modele", "global"], db) == 1
+    assert _u(db, courriel("admin")).actif is True
+    assert main(["droits", courriel("drh"), "--modele", "admin"], db) == 0
+    assert main(["desactiver", courriel("admin")], db) == 0
 
 
 def test_droits_remplaces_et_journal(db, capsys):
-    assert main(["droits", "dop@exemple.invalid", "--modele", "perimetre",
+    assert main(["droits", courriel("dop"), "--modele", "perimetre",
                  "--perimetre", "commerce_vn", "--nominatif", "--fonction", "DOP VN"], db) == 0
     e = _dernier_audit(db)
     assert e.avant["portee"]["tout"] and e.avant["permissions"] == ["marge", "nominatif"]
@@ -82,13 +83,13 @@ def test_droits_remplaces_et_journal(db, capsys):
 
 
 def test_exiger_changement_et_affichage(db, capsys):
-    u = _u(db, "drh@exemple.invalid")
+    u = _u(db, courriel("drh"))
     u.doit_changer_mdp = False
     db.commit()
-    assert main(["exiger-changement", "drh@exemple.invalid"], db) == 0
-    assert _u(db, "drh@exemple.invalid").doit_changer_mdp is True
-    assert main(["exiger-changement", "personne@exemple.invalid"], db) == 1
+    assert main(["exiger-changement", courriel("drh")], db) == 0
+    assert _u(db, courriel("drh")).doit_changer_mdp is True
+    assert main(["exiger-changement", courriel("personne")], db) == 1
     capsys.readouterr()
     assert main(["lister"], db) == 0
-    ligne = next(x for x in capsys.readouterr().out.splitlines() if x.startswith("drh@exemple.invalid"))
+    ligne = next(x for x in capsys.readouterr().out.splitlines() if x.startswith(courriel("drh")))
     assert "provisoire" in ligne

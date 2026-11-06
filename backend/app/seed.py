@@ -2,8 +2,9 @@
 
 Crée l'administrateur, avec un mot de passe provisoire à changer à la première connexion, et les
 deux périmètres du cadrage (hypothèses [H], éditables ensuite).
---demo ajoute des comptes de lecture d'exemple (mot de passe provisoire : DEMO_PASSWORD), refusé
-en production. L'administrateur n'est créé que si aucun compte actif ne gère les comptes.
+--demo ajoute des comptes de lecture d'exemple (mot de passe provisoire : DEMO_PASSWORD, adresses
+<identifiant>@DEMO_DOMAINE), refusé en production. L'administrateur n'est créé que si aucun compte
+actif ne gère les comptes.
 """
 
 import os
@@ -61,7 +62,9 @@ def _user(db: Session, email: str, nom: str, pw: str, modele: str, pid=None, nom
 
 
 def run(db: Session, admin_email: str, admin_password: str, demo_password: str | None,
-        mdp_provisoire: bool = True) -> None:
+        mdp_provisoire: bool = True, demo_domaine: str | None = None) -> None:
+    if demo_password and not demo_domaine:
+        raise ValueError("demo_domaine requis avec demo_password")
     seed_referentiels(db)
     ids: dict[str, int] = {}
     for code, (libelle, services) in PERIMETRES.items():
@@ -89,21 +92,21 @@ def run(db: Session, admin_email: str, admin_password: str, demo_password: str |
             _user(db, email, "Administrateur RH", admin_password, "admin",
                   provisoire=mdp_provisoire)
     if demo_password:
-        _user(db, "drh@exemple.invalid", "DRH", demo_password, "global", None, True,
+        _user(db, f"drh@{demo_domaine}", "DRH", demo_password, "global", None, True,
               provisoire=mdp_provisoire)
-        _user(db, "dop@exemple.invalid", "DOP", demo_password, "global", None, True,
+        _user(db, f"dop@{demo_domaine}", "DOP", demo_password, "global", None, True,
               provisoire=mdp_provisoire)
-        _user(db, "dps.equipment@exemple.invalid", "DPS", demo_password,
+        _user(db, f"dps.equipment@{demo_domaine}", "DPS", demo_password,
               "perimetre", ids["dps"], provisoire=mdp_provisoire)
-        _user(db, "dir.commercial.vn@exemple.invalid", "Directeur commercial VN", demo_password,
+        _user(db, f"dir.commercial.vn@{demo_domaine}", "Directeur commercial VN", demo_password,
               "perimetre", ids["commerce_vn"], provisoire=mdp_provisoire)
-        _user(db, "dc.pneumatique@exemple.invalid", "DC Pneumatique", demo_password,
+        _user(db, f"dc.pneumatique@{demo_domaine}", "DC Pneumatique", demo_password,
               "perimetre", ids["pneumatique"], provisoire=mdp_provisoire)
-        _user(db, "dir.technique@exemple.invalid", "Directeur technique", demo_password,
+        _user(db, f"dir.technique@{demo_domaine}", "Directeur technique", demo_password,
               "perimetre", ids["sav_pl"], provisoire=mdp_provisoire)
-        _user(db, "resp.sav.engins@exemple.invalid", "Responsable technique SAV Engins",
+        _user(db, f"resp.sav.engins@{demo_domaine}", "Responsable technique SAV Engins",
               demo_password, "perimetre", ids["sav_engins"], provisoire=mdp_provisoire)
-        _user(db, "resp.sites.deportes@exemple.invalid", "Responsable des sites déportés",
+        _user(db, f"resp.sites.deportes@{demo_domaine}", "Responsable des sites déportés",
               demo_password, "perimetre", ids["sites_deportes"], provisoire=mdp_provisoire)
     db.commit()
 
@@ -129,11 +132,20 @@ def mot_de_passe_demo(argv: list[str]) -> str | None:
     return demo
 
 
+def domaine_demo() -> str:
+    """Domaine des adresses d'exemple, lu en environnement local (jamais écrit dans le dépôt)."""
+    domaine = os.environ.get("DEMO_DOMAINE")
+    if not domaine:
+        sys.exit("DEMO_DOMAINE requis avec --demo")
+    return domaine
+
+
 if __name__ == "__main__":
     email, pw = os.environ.get("ADMIN_EMAIL"), os.environ.get("ADMIN_PASSWORD")
     if not email or not pw:
         sys.exit("ADMIN_EMAIL et ADMIN_PASSWORD requis")
     _exiger_mot_de_passe_valide("ADMIN_PASSWORD", pw)
     with SessionLocal() as session:
-        run(session, email, pw, mot_de_passe_demo(sys.argv))
+        demo = mot_de_passe_demo(sys.argv)
+        run(session, email, pw, demo, demo_domaine=domaine_demo() if demo else None)
     print("seed ok")

@@ -1,8 +1,9 @@
 import os
+import secrets
 
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
-os.environ.setdefault("SECRET_KEY", "<cle-de-test>")
+os.environ.setdefault("SECRET_KEY", secrets.token_urlsafe(48))
 os.environ["COOKIE_SECURE"] = "false"
 
 import bcrypt  # noqa: E402
@@ -15,8 +16,9 @@ from app.db.session import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.auth import Utilisateur  # noqa: E402
 from app.seed import run  # noqa: E402
+from tests.identites import DOMAINE, courriel, mot_de_passe  # noqa: E402
 
-PW = "<mot-de-passe-test>"
+PW = mot_de_passe()
 
 # Vrai bcrypt au coût minimal : chaque test recrée 9 comptes, soit 5 s de préparation au coût normal.
 _gensalt = bcrypt.gensalt
@@ -35,7 +37,7 @@ def db():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     with SessionLocal() as session:
-        run(session, "admin@exemple.invalid", PW, PW, mdp_provisoire=False)
+        run(session, courriel("admin"), PW, PW, mdp_provisoire=False, demo_domaine=DOMAINE)
         yield session
 
 

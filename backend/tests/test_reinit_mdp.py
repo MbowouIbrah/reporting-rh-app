@@ -10,11 +10,12 @@ from app.core.config import settings
 from app.models.auth import AuditEvent, Utilisateur
 from app.security.tokens import empreinte, make_token
 from tests.conftest import PW
+from tests.identites import courriel, mot_de_passe
 
 API = "/api/v1"
-ADMIN = "admin@exemple.invalid"
-DRH = "drh@exemple.invalid"
-NOUVEAU = "<mot-de-passe-test-n9>"
+ADMIN = courriel("admin")
+DRH = courriel("drh")
+NOUVEAU = mot_de_passe()
 LOGGER = "app.api.auth"
 
 
@@ -103,7 +104,7 @@ def test_jeton_reset_refuse_comme_cookie_de_session(make_client, db):
 def test_oubli_reponse_identique_compte_inconnu(make_client, caplog):
     c = make_client()
     with caplog.at_level(logging.WARNING, logger=LOGGER):
-        connu, inconnu = _oubli(c), _oubli(c, "inconnu@exemple.invalid")
+        connu, inconnu = _oubli(c), _oubli(c, courriel("inconnu"))
     assert connu.status_code == inconnu.status_code == 200
     assert connu.json() == inconnu.json() == {"status": "ok"}
     assert len([r for r in caplog.records if "jeton=" in r.getMessage()]) == 1
@@ -167,7 +168,7 @@ def test_oubli_en_prod_sans_smtp_pas_de_lien_dans_le_journal(make_client, monkey
 
 def test_mail_sans_serveur_renvoie_false(monkeypatch):
     monkeypatch.setattr(settings, "SMTP_HOST", "")
-    assert mail.envoyer("a@exemple.invalid", "s", "t") is False
+    assert mail.envoyer(courriel("a"), "s", "t") is False
 
 
 # Réinitialisation
@@ -180,7 +181,7 @@ def test_reinit_succes_puis_jeton_reutilise(make_client, caplog):
     r = _reinit(c, jeton)
     assert r.status_code == 200 and r.json() == {"status": "ok"}
     assert c.get(f"{API}/auth/me").status_code == 401  # pas de connexion automatique
-    r2 = _reinit(c, jeton, "<mot-de-passe-test-u1>")
+    r2 = _reinit(c, jeton, mot_de_passe())
     assert r2.status_code == 400
     assert r2.json()["detail"] == "Lien invalide ou expiré"
 

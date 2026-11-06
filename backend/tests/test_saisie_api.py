@@ -5,9 +5,10 @@ from sqlalchemy import select
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode
 from app.models.pilotage import ValeurSaisie
+from tests.identites import courriel
 
 API = "/api/v1"
-ADMIN, DRH = "admin@exemple.invalid", "drh@exemple.invalid"
+ADMIN, DRH = courriel("admin"), courriel("drh")
 
 
 def periode(db):

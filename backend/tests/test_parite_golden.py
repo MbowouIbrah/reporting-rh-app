@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests import test_parite_v4 as pv
+from tests.identites import courriel
 from tests.test_import_regles import V4
 from tests.test_parite_v4 import API, XLSX
 
@@ -20,7 +21,7 @@ VERIF = (pv.test_bloc_a_type_de_charge, pv.test_bloc_b_service_activite, pv.test
 def test_parite_18_periodes(make_client, db):
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert len(golden) == 18
-    c = make_client("admin@exemple.invalid")
+    c = make_client(courriel("admin"))
     pv.regles_v4(db)
     lot = c.post(f"{API}/imports", files={"fichier": ("v4.xlsx", V4.read_bytes(), XLSX)}).json()
     assert c.post(f"{API}/imports/{lot['id']}/valider").status_code == 200

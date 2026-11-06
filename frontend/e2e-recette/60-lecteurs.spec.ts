@@ -1,12 +1,12 @@
 import { expect, type Page, test } from '@playwright/test'
-import { ADMIN, connecter, deconnecter, lireJson } from './outils'
+import { ADMIN, compte, connecter, courriel, deconnecter, lireJson, motDePasse } from './outils'
 
 type Appel = { methode: 'POST' | 'PUT' | 'DELETE'; url: string; data?: object }
 
 // Écritures réservées à l'administrateur, avec un contenu valide : seul le droit doit les refuser
 const ECRITURES: Appel[] = [
-  { methode: 'POST', url: 'users', data: { email: 'intrus@exemple.invalid', nom: 'Intrus', password: '<mot-de-passe-test-2>', permissions: ['comptes'], portee: { tout: true } } },
-  { methode: 'PUT', url: 'users/1', data: { email: 'admin@exemple.invalid', nom: 'Piraté', permissions: ['comptes'], portee: { tout: true } } },
+  { methode: 'POST', url: 'users', data: { email: courriel('intrus'), nom: 'Intrus', password: motDePasse(), permissions: ['comptes'], portee: { tout: true } } },
+  { methode: 'PUT', url: 'users/1', data: { email: ADMIN, nom: 'Piraté', permissions: ['comptes'], portee: { tout: true } } },
   { methode: 'DELETE', url: 'users/2' },
   { methode: 'POST', url: 'perimetres', data: { code: 'INTRUS', libelle: 'Intrus', regles: [] } },
   { methode: 'PUT', url: 'perimetres/1', data: { code: 'INTRUS', libelle: 'Intrus', regles: [] } },
@@ -39,7 +39,7 @@ async function essayer(page: Page, a: Appel) {
   return a.methode === 'POST' ? page.request.post(url, options) : a.methode === 'PUT' ? page.request.put(url, options) : page.request.delete(url)
 }
 
-for (const profil of [{ email: 'drh@exemple.invalid', nom: 'DRH (lecteur global)' }, { email: 'dps@exemple.invalid', nom: 'DPS (lecteur de périmètre)' }]) {
+for (const profil of [{ email: compte('drh').email, nom: 'DRH (lecteur global)' }, { email: compte('dps').email, nom: 'DPS (lecteur de périmètre)' }]) {
   test.describe.serial(`lecteur sans droit d’écriture : ${profil.nom}`, () => {
     let avant = { utilisateurs: 0, perimetres: 0, salaries: 0, audit: 0 }
 

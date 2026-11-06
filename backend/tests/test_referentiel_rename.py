@@ -3,6 +3,7 @@ from sqlalchemy import select
 from app.models.auth import AuditEvent, PerimetreRegle
 from app.models.referentiel import Service, Site
 from tests import test_rapports_api as rapports
+from tests.identites import courriel
 from tests.test_import_api import XLSX
 from tests.test_import_regles import ligne, xlsx
 
@@ -42,7 +43,7 @@ def test_renommage_refus(charge, make_client, db):
     assert c.put(f"{API}/referentiels/service/{a}", json={"libelle": "Administration"}
                  ).status_code == 409
     assert c.put(f"{API}/referentiels/service/999", json={"libelle": "Z"}).status_code == 404
-    assert make_client("drh@exemple.invalid").put(
+    assert make_client(courriel("drh")).put(
         f"{API}/referentiels/service/{b}", json={"libelle": "Z"}).status_code == 403
     rub = c.get(f"{API}/referentiels/rubrique").json()["valeurs"]
     absences = next(r["id"] for r in rub if r["libelle"] == "Absences (nb)")
@@ -115,6 +116,6 @@ def test_creation_refus(charge, db, make_client):
     assert c.post(f"{API}/referentiels/rubrique", json={"libelle": "X"}).status_code == 422
     assert c.post(f"{API}/referentiels/poste", json={"libelle": "X"}).status_code == 422
     assert c.post(f"{API}/referentiels/inconnue", json={"libelle": "X"}).status_code == 404
-    lecteur = make_client("drh@exemple.invalid")
+    lecteur = make_client(courriel("drh"))
     assert lecteur.post(f"{API}/referentiels/site", json={"libelle": "Nord"}).status_code == 403
     assert db.scalar(select(Site.id).where(Site.libelle == "Nord")) is None

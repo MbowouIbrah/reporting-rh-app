@@ -19,3 +19,7 @@ frontend/captures/
 
 # Carte des tests ciblés (régénérée par tools/tests_cibles.py --carte)
 backend/.carte-tests.json
+
+# Comptes de recette locaux (adresses et mots de passe générés) et notes de passation
+tools/recette/comptes.local.csv
+PASSATION.md

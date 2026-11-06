@@ -1,6 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-
-const PW = '<mot-de-passe-test>'
+import { PW, courriel } from './identites'
 
 async function connecter(page: Page, email: string) {
   await page.goto('login')
@@ -29,7 +28,7 @@ async function choisirMois(page: Page, mois: string, annee = '2026') {
 }
 
 test('renseigner un mois : cases, collage Excel, aperçu, enregistrement puis annulation', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.goto('admin')
   await page.getByRole('link', { name: 'Renseigner des données' }).click()
   await expect(page).toHaveURL(/admin\/saisie$/)
@@ -64,7 +63,7 @@ test('renseigner un mois : cases, collage Excel, aperçu, enregistrement puis an
 })
 
 test('employés ajoutés : nom proche d’un employé connu signalé, aucun identifiant technique visible', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.goto('admin/saisie')
   await choisirMois(page, 'Avril')
   await page.getByRole('button', { name: 'Étape 1 : choisir les employés de Avril 2026 →' }).click()
@@ -110,7 +109,7 @@ test('employés ajoutés : nom proche d’un employé connu signalé, aucun iden
 
 test('pilotage d’un mois sans paie : CA, marge et budgets ouvrent le mois', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 900 })
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.goto('admin/saisie')
   await choisirMois(page, 'Octobre')
   await expect(page.getByRole('heading', { name: 'DONNÉES DE OCTOBRE 2026' })).toBeVisible()
@@ -145,7 +144,7 @@ test('pilotage d’un mois sans paie : CA, marge et budgets ouvrent le mois', as
 })
 
 test('départ : deux façons de faire, retour en haut à gauche ; grille triable et filtrable', async ({ page }) => {
-  await connecter(page, 'admin@exemple.invalid')
+  await connecter(page, courriel('admin'))
   await page.goto('admin')
   await page.getByRole('link', { name: 'Renseigner des données' }).click()
   await expect(page.getByRole('link', { name: 'Retour : Administration' })).toBeVisible()

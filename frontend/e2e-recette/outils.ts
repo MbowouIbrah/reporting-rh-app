@@ -1,11 +1,40 @@
 import { execFileSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, type APIRequestContext, type Page, type Request, type Route } from '@playwright/test'
 
-// Mot de passe des comptes de recette : début de l'adresse + « <suffixe-retire> »
-export const mdpDe = (email: string) => `${email.toLowerCase().split('@')[0]}<suffixe-retire>`
-export const ADMIN = 'admin@exemple.invalid'
+// Comptes de recette : tools/recette/comptes.local.csv (adresses et mots de passe générés, non suivis).
+type Compte = { identifiant: string; email: string; mdp: string }
+let comptes: Compte[] | null = null
+function lireComptes(): Compte[] {
+  if (!comptes) {
+    const [entete, ...lignes] = readFileSync(resolve('..', 'tools', 'recette', 'comptes.local.csv'), 'utf-8')
+      .split(/\r?\n/).filter((l) => l.trim())
+    const col = entete.split(';')
+    comptes = lignes.map((l) => {
+      const v = l.split(';')
+      return { identifiant: v[col.indexOf('identifiant')], email: v[col.indexOf('email')], mdp: v[col.indexOf('mot_de_passe')] }
+    })
+  }
+  return comptes
+}
+export function compte(identifiant: string): { email: string; mdp: string } {
+  const c = lireComptes().find((x) => x.identifiant === identifiant)
+  if (!c) throw new Error(`Compte de recette inconnu : ${identifiant}`)
+  return c
+}
+export const mdpDe = (email: string) => {
+  const c = lireComptes().find((x) => x.email.toLowerCase() === email.toLowerCase())
+  if (!c) throw new Error(`Compte de recette inconnu : ${email}`)
+  return c.mdp
+}
+export const ADMIN = compte('admin').email
+
+// Comptes créés pendant les parcours : domaine réservé (RFC 2606), aucune boîte ne peut exister.
+export const courriel = (nom: string) => `${nom}@exemple.invalid`
+// Mot de passe tiré au hasard à chaque chargement.
+export const motDePasse = () => 't-' + randomBytes(12).toString('hex')
 
 export async function connecter(page: Page, email: string, mdp = mdpDe(email)) {
   await page.goto('login')

@@ -1,0 +1,11 @@
+identifiant;nom;fonction;modele;perimetre;nominatif
+admin;Administration RH;Administratrice RH;admin;;oui
+rh.partenaire;Partenaire RH;RH Business Partner;admin;;oui
+drh;Direction RH;Directeur des ressources humaines;global;;oui
+dop;Direction des opérations;Directeur des opérations;global;;oui
+dps;Direction pièces et service;Responsable Pieces et Service EQUIPMENT;perimetre;dps;non
+commerce.vn;Responsable Commerce VN;Commerce VN;perimetre;commerce_vn;non
+pneumatique;Responsable Pneumatique;Pneumatique;perimetre;pneumatique;non
+sav.pl;Responsable SAV PL;SAV PL;perimetre;sav_pl;non
+resp.sav.engins;Responsable technique SAV Engins;SAV Engins;perimetre;sav_engins;non
+sites.deportes;Responsable Sites Déportés;Sites Déportés;perimetre;sites_deportes;non

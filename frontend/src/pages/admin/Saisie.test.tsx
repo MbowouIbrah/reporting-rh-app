@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../../auth/AuthContext'
+import { courriel } from '../../test/identites'
 import Saisie from './Saisie'
 import BandeauEnregistre from './saisie/Enregistre'
 
@@ -93,7 +94,7 @@ function rendu(perms = ['import:read', 'marge:read']) {
     if (url.includes('/donnees/lots')) return new Response(JSON.stringify(LOT), { status: 201 })
     if (url.includes('/apercu')) return new Response(JSON.stringify(APERCU))
     if (url.includes('/valider')) return new Response(JSON.stringify({ ...LOT, statut: 'valide' }))
-    if (url.includes('/auth/me')) return new Response(JSON.stringify({ id: 1, email: 'admin@exemple.invalid', fonction: '', permissions: perms }))
+    if (url.includes('/auth/me')) return new Response(JSON.stringify({ id: 1, email: courriel('admin'), fonction: '', permissions: perms }))
     if (url.includes('/pilotage/saisies')) {
       if (init?.method === 'PUT') return reponsePut(JSON.parse(String(init.body)))
       if (init?.method === 'POST') return reponsePost()

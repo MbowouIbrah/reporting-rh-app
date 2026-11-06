@@ -16,7 +16,8 @@ from app.models.donnees import Periode
 from app.models.pilotage import DateEmployes, ValeurSaisie
 from app.models.referentiel import Service, Site
 from app.repos.scope import Scope
-from tests.conftest import mot_de_passe_choisi
+from tests.conftest import PW, mot_de_passe_choisi
+from tests.identites import courriel
 from tests.test_donnees_activite import _sans_marge, charger, envoyer, lig
 from tests.test_donnees_api import ADMIN, API, BR, DRH
 from tests.test_kpi_moteur import REFS
@@ -748,12 +749,12 @@ def test_journal_masque_la_marge_sans_droit_marge(make_client, db):
     c = make_client(ADMIN)
     saisir(c, "obj_ca_marge", "global", [case(obj_ca="100", obj_marge="10")])
     saisir(c, "obj_activite", "global", [case(obj_ventes="4")])
-    r = c.post(f"{API}/users", json={"email": "j@exemple.invalid", "nom": "J",
-                                     "password": "<mot-de-passe-test>",
+    r = c.post(f"{API}/users", json={"email": courriel("j"), "nom": "J",
+                                     "password": PW,
                                      "permissions": ["journal"], "portee": {"tout": True}})
     assert r.status_code == 201, r.text
-    mot_de_passe_choisi(db, "j@exemple.invalid")
-    j = make_client("j@exemple.invalid").get(f"{API}/audit").json()
+    mot_de_passe_choisi(db, courriel("j"))
+    j = make_client(courriel("j")).get(f"{API}/audit").json()
     ev = {e["apres"]["groupe"]: e["apres"] for e in j if e["action"] == "saisie_pilotage"}
     assert ev["obj_ca_marge"]["valeurs"] is None
     assert ev["obj_activite"]["valeurs"] == {"obj_ventes//": "4.000"}
@@ -955,12 +956,12 @@ def test_journal_masque_les_chiffres_du_conflit_sans_droit_marge(make_client, db
     c = make_client(ADMIN)
     cell = cellule_saisie(c, db)
     assert trancher(c, cell, "saisie").status_code == 200
-    r = c.post(f"{API}/users", json={"email": "j@exemple.invalid", "nom": "J",
-                                     "password": "<mot-de-passe-test>",
+    r = c.post(f"{API}/users", json={"email": courriel("j"), "nom": "J",
+                                     "password": PW,
                                      "permissions": ["journal"], "portee": {"tout": True}})
     assert r.status_code == 201, r.text
-    mot_de_passe_choisi(db, "j@exemple.invalid")
-    ev = next(e for e in make_client("j@exemple.invalid").get(f"{API}/audit").json()
+    mot_de_passe_choisi(db, courriel("j"))
+    ev = next(e for e in make_client(courriel("j")).get(f"{API}/audit").json()
               if e["action"] == "saisie_conflit")
     assert (ev["avant"]["saisie"], ev["avant"]["employes"]) == (None, None)
     assert ev["avant"]["indicateur"] == "ca"
@@ -972,12 +973,12 @@ def test_journal_masque_les_chiffres_du_conflit_sans_droit_marge(make_client, db
 def test_regler_un_conflit_exige_le_droit_marge(make_client, db):
     c = make_client(ADMIN)
     cell = cellule_saisie(c, db)
-    r = c.post(f"{API}/users", json={"email": "s@exemple.invalid", "nom": "S",
-                                     "password": "<mot-de-passe-test>",
+    r = c.post(f"{API}/users", json={"email": courriel("s"), "nom": "S",
+                                     "password": PW,
                                      "permissions": ["saisie"], "portee": {"tout": True}})
     assert r.status_code == 201, r.text
-    mot_de_passe_choisi(db, "s@exemple.invalid")
-    assert trancher(make_client("s@exemple.invalid"), cell, "saisie").status_code == 403
+    mot_de_passe_choisi(db, courriel("s"))
+    assert trancher(make_client(courriel("s")), cell, "saisie").status_code == 403
     assert ca_de(c, cell)["conflit"] is True
 
 

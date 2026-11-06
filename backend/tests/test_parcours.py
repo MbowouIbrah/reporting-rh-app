@@ -1,7 +1,8 @@
+from tests.identites import courriel
 from tests.test_donnees_api import ADMIN, API, BR, XLSX, charger
 from tests.test_import_regles import ligne, xlsx
 
-DRH = "drh@exemple.invalid"
+DRH = courriel("drh")
 
 
 def etapes(c, annee, mois):

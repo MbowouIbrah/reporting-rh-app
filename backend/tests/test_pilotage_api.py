@@ -5,9 +5,10 @@ from sqlalchemy import func, select
 from app.models.auth import AuditEvent
 from app.models.donnees import Periode
 from app.models.pilotage import Budget
+from tests.identites import courriel
 
 API = "/api/v1"
-ADMIN, DRH, EQUIP = "admin@exemple.invalid", "drh@exemple.invalid", "dps.equipment@exemple.invalid"
+ADMIN, DRH, EQUIP = courriel("admin"), courriel("drh"), courriel("dps.equipment")
 
 
 def lire(c, annee=2026, mois=10):

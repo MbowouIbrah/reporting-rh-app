@@ -7,11 +7,12 @@ from sqlalchemy import func, select
 from app.models.auth import AuditEvent
 from app.models.donnees import Montant, SituationMensuelle
 from app.models.referentiel import Rubrique
+from tests.identites import courriel
 from tests.test_import_regles import ligne, xlsx
 
 API = "/api/v1"
-ADMIN, DRH, EQUIP, VN = ("admin@exemple.invalid", "drh@exemple.invalid", "dps.equipment@exemple.invalid",
-                         "dir.commercial.vn@exemple.invalid")
+ADMIN, DRH, EQUIP, VN = (courriel("admin"), courriel("drh"), courriel("dps.equipment"),
+                         courriel("dir.commercial.vn"))
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 

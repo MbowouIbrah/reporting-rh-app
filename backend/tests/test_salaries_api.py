@@ -2,8 +2,10 @@ import io
 
 from openpyxl import Workbook, load_workbook
 
+from tests.identites import courriel
+
 API = "/api/v1/salaries"
-ADMIN, DRH = "admin@exemple.invalid", "drh@exemple.invalid"
+ADMIN, DRH = courriel("admin"), courriel("drh")
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
