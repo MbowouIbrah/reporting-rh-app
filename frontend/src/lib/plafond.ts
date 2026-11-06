@@ -38,9 +38,7 @@ export function plafonner(panneau: HTMLElement) {
   // Vérifier l'espace vertical disponible dans la section
   const section = panneau.closest<HTMLElement>('.snap-section')
   if (section) {
-    const suite = section.querySelector<HTMLElement>('.snap-suite')
-    const suiteHauteur = suite ? suite.offsetHeight + 14 : 0
-    const dispoSection = Math.max(0, section.clientHeight - suiteHauteur)
+    const dispoSection = Math.max(0, section.clientHeight)
 
     const colonne = panneau.closest<HTMLElement>('.snap-colonne')
     if (colonne) {

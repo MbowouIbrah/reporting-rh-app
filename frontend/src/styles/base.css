@@ -1201,22 +1201,23 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .rapport-excel table.dense.aligne :is(th, td):first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
   .rapport-excel table.dense.aligne.double :is(th, td):first-child { width: calc(24% - 76% / 7); }
   .rapport-excel table.dense.aligne .bourrage { width: auto; }
-  /* Annonce de la section suivante : texte centré sous les tableaux, flèche vers le bas */
-  .rapport-excel .snap-section:has(> .snap-suite) { grid-template-rows: minmax(0, 1fr) auto; row-gap: calc(var(--v) * .5); }
-  .snap-suite { grid-column: 1 / -1; justify-self: center; display: inline-flex; align-items: center; gap: .5rem; padding: .125rem .5rem; border: 0; background: none; color: var(--red); font: 700 var(--fs-md) / 1.3 var(--font-body); text-transform: uppercase; letter-spacing: .02em; cursor: pointer; transition: color var(--dur) var(--ease); }
-  .snap-suite:hover, .snap-suite:focus-visible { color: var(--red-deep); }
-  .snap-suite svg { width: 1.2em; height: 1.2em; stroke-width: 2.5; animation: indice-suite 2.4s var(--ease) infinite; }
 }
-@media (max-width: 1099px) { .snap-suite, table.dense .bourrage { display: none; } }
-@keyframes indice-suite { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 3px; } }
-@media (prefers-reduced-motion: no-preference) { .snap-suite.haut svg { animation-name: indice-haut; } }
-@keyframes indice-haut { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 -3px; } }
-@media (prefers-reduced-motion: reduce) { .snap-suite svg { animation: none; } }
+@media (max-width: 1099px) { table.dense .bourrage { display: none; } }
+/* Suite signalée par une flèche animée sous le rail (contenu plus bas, section suivante, retour en haut) */
+.rail-suite { display: flex; align-items: center; justify-content: center; margin-top: 6px; padding: 6px 8px; border: 0; background: none; color: var(--red); cursor: pointer; transition: color var(--dur) var(--ease); }
+.rail-suite:hover, .rail-suite:focus-visible { color: var(--red-deep); }
+.rail-suite:focus-visible { outline: 2px solid var(--red); outline-offset: 0; }
+.rail-suite svg { width: 18px; height: 18px; stroke-width: 2.5; }
+@media (prefers-reduced-motion: no-preference) {
+  .rail-suite svg { animation: indice-suite 1.6s var(--ease) infinite; }
+  .rail-suite.haut svg { animation-name: indice-haut; }
+}
+@keyframes indice-suite { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 5px; } }
+@keyframes indice-haut { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 -5px; } }
 /* Mensuel, Annuel, Graphiques : aucun tableau ne défile dans son cadre ; la section défile si son contenu dépasse
    l'écran (accrochage gardé). Tableaux à hauteur naturelle au minimum, graphiques à hauteur minimale. */
 @media (min-width: 1360px) {
   .page-ecran.rapport-excel .snap-section { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; grid-template-rows: minmax(min-content, 1fr); }
-  .page-ecran.rapport-excel .snap-section:has(> .snap-suite) { grid-template-rows: minmax(min-content, 1fr) auto; }
   .page-ecran.rapport-excel .snap-section .panneau-corps { flex: 1 0 auto; overflow: visible; }
   .page-ecran.rapport-excel .snap-section > .panneau { max-height: none; }
   .page-ecran.rapport-excel .snap-colonne { min-height: min-content; }
@@ -1539,7 +1540,7 @@ html:has(.rapport-pdf) { font-size: 14px !important; background: var(--paper); }
 .rapport-entete img { height: 36px; }
 .rapport-entete h1 { font-size: var(--fs-xl); color: var(--navy); }
 .rapport-entete p { color: var(--muted); font-size: var(--fs-sm); }
-.rapport-pdf :is(.filtres, .filtre-annee, .rail, .snap-suite, .details-donnees) { display: none !important; }
+.rapport-pdf :is(.filtres, .filtre-annee, .rail, .details-donnees) { display: none !important; }
 .rapport-pdf .panneau table.dense { width: 100%; }
 .rapport-pdf .resume-excel :is(.suivi, .suivi table, .suivi tr) { height: auto !important; }
 .rapport-pdf .resume-excel .suivi :is(th, td) { padding-block: 2px !important; line-height: 1.25; }

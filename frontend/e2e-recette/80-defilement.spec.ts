@@ -68,14 +68,29 @@ test('molette : la section haute défile d’abord, puis on passe à la suivante
   const section = page.locator('.snap-section').nth(i)
   await section.evaluate((s) => s.scrollIntoView({ block: 'start' }))
   await page.waitForTimeout(400)
+  await expect(page.locator('.rail-suite.bas')).toBeVisible()
   const box = (await section.boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.wheel(0, 200)
   await expect.poll(() => section.evaluate((s) => s.scrollTop)).toBeGreaterThan(0)
   const avant = await page.locator('.rail-point').nth(i).getAttribute('aria-label')
-  // Au bout de la section, après une pause, un nouveau geste mène à la suivante
-  await section.evaluate((s) => { s.scrollTop = s.scrollHeight })
-  await page.waitForTimeout(500)
+  // Même geste qui arrive au bout de la section : on reste sur la section
+  await section.evaluate((s) => { s.scrollTop = s.scrollHeight - s.clientHeight - 40 })
+  await page.waitForTimeout(400)
+  for (let k = 0; k < 8; k++) {
+    await page.mouse.wheel(0, 120)
+    await page.waitForTimeout(40)
+  }
+  await page.waitForTimeout(600)
+  await expect(page.locator('.rail-point.actif')).toHaveAttribute('aria-label', avant!)
+  await expect(page.locator('.rail-suite.suivante')).toBeVisible()
+  // Relâché puis nouveau geste : section suivante
   await page.mouse.wheel(0, 120)
   await expect.poll(() => page.locator('.rail-point.actif').getAttribute('aria-label')).not.toBe(avant)
+  // La flèche du rail mène aussi à la suite
+  const ici = await page.locator('.rail-point.actif').getAttribute('aria-label')
+  await page.waitForTimeout(800)
+  await page.locator('.rail-suite').click()
+  await expect.poll(async () => (await page.locator('.rail-point.actif').getAttribute('aria-label')) !== ici
+    || (await page.locator('.snap-section').nth(i + 1).evaluate((s) => s.scrollTop > 0))).toBe(true)
 })

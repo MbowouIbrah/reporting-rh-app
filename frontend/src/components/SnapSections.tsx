@@ -22,6 +22,7 @@ export interface SectionSnap {
 /**
  * Sections plein écran avec accrochage (scroll-snap) et rail de navigation à droite,
  * sur le modèle du portail Academy Assist. Sous 1100 px : simple empilement.
+ * Une flèche animée sous le rail signale la suite (contenu plus bas, section suivante, retour en haut).
  */
 export default function SnapSections({ sections, libelle = 'Tableaux du rapport', onActif }: {
   sections: SectionSnap[]
@@ -32,51 +33,57 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
   const zone = useRef<HTMLDivElement>(null)
   const cles = sections.map((x) => x.id).join('|')
 
-  // Molette : un geste = une section (l'accrochage seul ramène au départ sur un petit cran),
-  // sauf si la section (plus haute que l'écran) peut encore défiler dans ce sens
+  // Molette. Règles :
+  // - dans une section plus haute que l'écran, défilement libre (sans accrochage) ;
+  // - au bout de la section, le geste s'arrête : il faut relâcher (pause) puis relancer pour changer de section ;
+  // - un geste sur une section au bout (ou sans défilement) mène à la section voisine, en une fois ;
+  // - la fin de ce geste (inertie du pavé tactile) est ignorée : elle ne fait pas défiler la section d'arrivée.
   useEffect(() => {
     const racine = zone.current
     if (!racine) return
-    // Verrou levé à l'arrivée (scrollend) et non après un délai fixe ; les crans d'un même geste
-    // (inertie du pavé tactile) restent ignorés tant qu'ils se suivent de près.
-    let enMouvement = false
-    let dernier = 0
+    const PAUSE = 200 // ms sans cran = geste relâché
+    let dernier = -1e9
+    let verrou: 'fin' | 'saut' | null = null
     let depart = -1e9
+    let enMouvement = false
     let secours = 0
-    let dernierInterne = -1e9
     const liberer = () => {
       enMouvement = false
       window.clearTimeout(secours)
     }
     const surMolette = (e: WheelEvent) => {
       if (e.deltaY === 0 || racine.scrollHeight <= racine.clientHeight) return
-      const bas = e.deltaY > 0
       const t = performance.now()
-      const section = (e.target as HTMLElement).closest('.snap-section')
-      if (section && (bas ? section.scrollTop + section.clientHeight < section.scrollHeight - 1 : section.scrollTop > 0)) {
-        dernierInterne = t
-        return
-      }
-      // Section arrivée au bout : le geste en cours s'arrête là, il faut relâcher puis relancer pour changer de section
-      if (section && section.scrollHeight > section.clientHeight + 1 && t - dernierInterne < 300) {
-        e.preventDefault()
-        dernierInterne = t
-        return
-      }
-      // Tous les crans sont bloqués, même les petits de fin d'inertie : laissés au navigateur, ils
-      // interrompaient le défilement doux et l'accrochage recalait la section après coup (à-coup).
-      e.preventDefault()
-      // Crans rapprochés = même geste, mais seulement dans la seconde qui suit un changement de section :
-      // une molette qui envoie des crans sans pause ne doit jamais rester bloquée.
-      const memeGeste = t - dernier < 160 && t - depart < 1000
+      const nouveauGeste = t - dernier > PAUSE
       dernier = t
-      if (enMouvement || memeGeste || Math.abs(e.deltaY) < 4) return
+      // Une molette qui tourne sans pause ne reste pas bloquée indéfiniment après un changement de section
+      if (nouveauGeste || (verrou === 'saut' && t - depart > 1200)) verrou = null
+      if (verrou) {
+        e.preventDefault()
+        return
+      }
+      const bas = e.deltaY > 0
+      const section = (e.target as HTMLElement).closest<HTMLElement>('.snap-section')
+      if (section && (bas ? section.scrollTop + section.clientHeight < section.scrollHeight - 1 : section.scrollTop > 0)) return
+      // Crans suivants bloqués : laissés au navigateur, ils interrompaient le défilement doux (à-coup).
+      e.preventDefault()
+      if (Math.abs(e.deltaY) < 4) {
+        if (nouveauGeste) dernier = -1e9 // un cran minuscule ne compte pas comme début de geste
+        return
+      }
+      // Section défilée jusqu'au bout pendant ce geste : on attend le relâchement
+      if (!nouveauGeste && section && section.scrollHeight > section.clientHeight + 1) {
+        verrou = 'fin'
+        return
+      }
+      if (enMouvement) return
       const liste = [...racine.querySelectorAll<HTMLElement>('.snap-section')]
       const courant = liste.reduce((m, s, i) => (Math.abs(s.offsetTop - racine.scrollTop) < Math.abs(liste[m].offsetTop - racine.scrollTop) ? i : m), 0)
       const cible = liste[courant + (bas ? 1 : -1)]
       if (!cible) return
-      enMouvement = true
+      verrou = 'saut'
       depart = t
+      enMouvement = true
       secours = window.setTimeout(liberer, 900) // navigateur sans scrollend
       aller(cible.id, !bas)
     }
@@ -137,7 +144,7 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
   return (
     <div className="snap-zone">
       <div className="snap-scroll" ref={zone} tabIndex={0} role="region" aria-label={libelle}>
-        {sections.map((s, i) => (
+        {sections.map((s) => (
           <div key={s.id} id={s.id} data-titre={s.titre} className="snap-section" style={{ gridTemplateColumns: s.colonnes }}>
             {s.contenu ?? s.panneaux?.map((pn) =>
               Array.isArray(pn) ? (
@@ -153,19 +160,6 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
                   {pn.contenu}
                 </Panneau>
               ),
-            )}
-            {sections[i + 1] ? (
-              <button type="button" className="snap-suite" onClick={() => aller(sections[i + 1].id)}>
-                {sections[i + 1].titre}
-                <ArrowDown aria-hidden="true" />
-              </button>
-            ) : (
-              i > 0 && (
-                <button type="button" className="snap-suite haut" onClick={() => aller(sections[0].id)}>
-                  Retour en haut
-                  <ArrowUp aria-hidden="true" />
-                </button>
-              )
             )}
           </div>
         ))}
@@ -200,6 +194,48 @@ function Rail({ sections, zone, cles, aller, onActif }: {
     racine.querySelectorAll('.snap-section').forEach((el) => obs.observe(el))
     return () => obs.disconnect()
   }, [cles, zone, onActif])
+
+  // Indicateur de suite : contenu plus bas dans la section, section suivante, ou retour en haut
+  const [suite, setSuite] = useState<'bas' | 'suivante' | 'haut' | null>(null)
+  useEffect(() => {
+    const racine = zone.current
+    if (!racine) return
+    const ids = cles.split('|')
+    let image = 0
+    const maj = () => {
+      image = 0
+      const el = actif ? document.getElementById(actif) : null
+      const i = ids.indexOf(actif ?? '')
+      if (!el) setSuite(null)
+      else if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) setSuite('bas')
+      else if (ids[i + 1]) setSuite('suivante')
+      else setSuite(i > 0 ? 'haut' : null)
+    }
+    const planifier = () => {
+      if (!image) image = requestAnimationFrame(maj)
+    }
+    maj()
+    racine.addEventListener('scroll', planifier, true) // capture : le défilement des sections ne remonte pas
+    window.addEventListener('resize', planifier)
+    return () => {
+      cancelAnimationFrame(image)
+      racine.removeEventListener('scroll', planifier, true)
+      window.removeEventListener('resize', planifier)
+    }
+  }, [actif, cles, zone])
+
+  const rang = sections.findIndex((s) => s.id === actif)
+  function avancer() {
+    const el = actif ? document.getElementById(actif) : null
+    if (!el) return
+    if (suite === 'bas') {
+      const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollBy({ top: el.clientHeight * 0.8, behavior: reduit ? 'auto' : 'smooth' })
+    } else if (suite === 'suivante') aller(sections[rang + 1].id)
+    else aller(sections[0].id)
+  }
+  const libelleSuite =
+    suite === 'bas' ? 'Suite de la section' : suite === 'haut' ? 'Retour en haut' : `Section suivante : ${sections[rang + 1]?.titre ?? ''}`
   return (
     <nav className="rail" aria-label="Sections du rapport">
       {sections.map((s) => (
@@ -215,6 +251,11 @@ function Rail({ sections, zone, cles, aller, onActif }: {
           <span className="rail-puce" aria-hidden="true" />
         </button>
       ))}
+      {suite && (
+        <button type="button" className={`rail-suite ${suite}`} aria-label={libelleSuite} title={libelleSuite} onClick={avancer}>
+          {suite === 'haut' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
+        </button>
+      )}
     </nav>
   )
 }
