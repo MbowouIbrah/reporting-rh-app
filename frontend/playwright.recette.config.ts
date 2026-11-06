@@ -29,7 +29,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `${PY} -W ignore ../tools/recette/reinit.py --base ${BASE} && ${PY} -m uvicorn app.main:app --port ${API_PORT}`,
+      command: `${PY} -W ignore ../tools/recette/reinit.py --base ${BASE} --fin 2026-06 && ${PY} -m uvicorn app.main:app --port ${API_PORT}`,
       cwd: '../backend',
       env: ENV_API,
       url: `http://localhost:${API_PORT}/health`,

@@ -29,4 +29,4 @@ Aucune adresse e-mail ni aucun mot de passe dans le dépôt, historique compris.
 
 ## Risques
 - Les valeurs volontairement refusées (« court », mot de passe trop long) restent dans les tests de règle : ce ne sont les mots de passe d'aucun compte.
-- La base de recette se construit depuis un fichier d'import qui contient des données réelles, jamais suivi. Sans ce fichier, seule la base e2e (100 % fictive) est disponible.
+- Levé (`18-d`) : la base de recette ne dépend plus d'un fichier réel ; son historique est généré par `tools/recette/donnees_fictives.py`. Voir `docs/etude-donnees-fictives.md`.

@@ -21,11 +21,11 @@ Comptes : `comptes.exemple.csv` (suivi) décrit les profils par identifiant, san
 |---|---|
 | `comptes.exemple.csv` | Un compte par profil : identifiant, fonction (libellé affiché), modèle de droits (`admin`, `global`, `perimetre`), périmètre, nominatif. |
 | `comptes.local.csv` | Généré, non suivi : identifiant, adresse, mot de passe et colonnes du fichier précédent. |
-| `ca_marge.csv` | CA et marge de janvier 2025 à juin 2026 (marge négative, CA sans marge, mois non saisi, décimales). |
-| `budgets.csv` | Budgets de mai (services) et juin 2026 (services, sites, toutes les rubriques payées en juin : budgets par famille salaire / primes / avantages / charges affichés), au-dessus et en dessous du réel. |
+| `ca_marge.csv` | CA et marge de janvier 2024 à octobre 2026 (marge négative, CA sans marge, mois non saisi, décimales). |
+| `budgets.csv` | Quelques budgets 2024-2025, budgets de mai (services) et juin 2026 (services, sites, toutes les rubriques payées en juin : budgets par famille salaire / primes / avantages / charges affichés), au-dessus et en dessous du réel. |
 
-L'historique vient de `Reporting RH/REPORTING_RH_V4.xlsx` (18 mois), enrichi par le script ; la liste des cas s'affiche à la fin.
-Juillet à septembre 2026 restent vides : importer `Reporting RH/IMPORT_TEST_JUILLET-SEPTEMBRE_2026.xlsx` en direct.
+L'historique est 100 % fictif (`donnees_fictives.py`, graine fixe) : 98 salariés sur 7 services, de janvier 2024 au dernier mois clos (`--fin AAAA-MM` pour changer). Il couvre entrées, sorties, pause, changements de service, de site, de contrat et de poste, stages, régularisation négative, absences, primes saisonnières ; la liste des cas s'affiche à la fin.
+La recette Playwright s'arrête à juin 2026 (`--fin 2026-06`) : juillet et août sont importés en direct (`fichier_erreurs.py`).
 
 ## Ce que chaque profil doit voir
 

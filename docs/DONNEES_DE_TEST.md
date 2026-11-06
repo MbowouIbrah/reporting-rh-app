@@ -17,16 +17,17 @@ cd frontend && npm test
 cd frontend && npx playwright test
 ```
 
-## 3. Recette (base construite depuis un fichier d'import)
-1. Placer le fichier d'import source à l'endroit indiqué dans `tools/recette/LISEZMOI.md`. Ce fichier contient des données réelles : il n'est jamais suivi.
-2. Générer les comptes locaux à partir des profils de `tools/recette/comptes.exemple.csv` :
+## 3. Recette (base 100 % fictive)
+L'historique de paie est généré par `tools/recette/donnees_fictives.py` (janvier 2024 au dernier mois clos, mêmes données à chaque passage). Aucun fichier réel n'est nécessaire.
+
+1. Générer les comptes locaux à partir des profils de `tools/recette/comptes.exemple.csv` :
    ```
    backend/.venv/Scripts/python tools/recette/generer_comptes.py
    ```
    Cela crée `tools/recette/comptes.local.csv` (adresse et mot de passe de chaque profil). Variables facultatives :
    - `RECETTE_DOMAINE` : domaine des adresses (par défaut `exemple.invalid`) ;
    - `RECETTE_SUFFIXE` : règle simple à retenir, mot de passe = identifiant + suffixe (exemple de forme : `admin` + votre suffixe). Choisissez votre suffixe, ne l'écrivez jamais dans un fichier suivi. Sans suffixe : mot de passe aléatoire.
-3. Lancer la recette : la configuration Playwright génère les comptes s'ils manquent.
+2. Lancer la recette : la configuration Playwright génère les comptes s'ils manquent.
    ```
    cd frontend && E2E_BASE=recette-e2e.db npx playwright test -c playwright.recette.config.ts
    ```

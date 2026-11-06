@@ -1,12 +1,13 @@
 """Base de recette : repart de zéro à chaque passage, toujours avec les mêmes données.
 
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
-Options : --base recette.db (fichier SQLite, dans backend/), --historique <xlsx>.
+Options : --base recette.db (fichier SQLite, dans backend/), --fin AAAA-MM (dernier mois de paie).
 Comptes : comptes.local.csv (généré par generer_comptes.py à partir de comptes.exemple.csv, non suivi).
 
-Contenu : comptes de comptes.local.csv, historique de paie (Excel REPORTING RH, 18 mois),
+Contenu : comptes de comptes.local.csv, historique de paie 100 % fictif (donnees_fictives.py,
+de janvier 2024 à --fin),
 CA et marge de ca_marge.csv, activité fictive (activite_fictive.py),
-objectifs annuels globaux (2025, 2026), budgets de budgets.csv.
+objectifs annuels globaux (2024 à 2026), budgets de budgets.csv (jusqu'à --fin).
 Les mois suivants restent vides :
 ils servent au test d'import en direct (voir LISEZMOI.md).
 """
@@ -23,7 +24,6 @@ from generer_comptes import charger
 
 ICI = Path(__file__).resolve().parent
 BACKEND = ICI.parent.parent / "backend"
-HISTORIQUE = ICI.parent.parent.parent / "Reporting RH" / "REPORTING_RH_V4.xlsx"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -40,89 +40,34 @@ def _num(m: str) -> int:
     return MOIS.index(m.replace("\xa0", " ").strip().capitalize()) + 1
 
 
-def historique_recette(source: Path) -> tuple[bytes, list[str]]:
-    """Valeurs de la feuille DONNEES + scénarios ajoutés (mutations, retour, primes exclues,
-    pic de fin d'année, pic d'absences). Choix déterministes : mêmes données à chaque passage."""
+def _mois_clos() -> tuple[int, int]:
+    from datetime import date
+
+    t = date.today()  # noqa: DTZ011 - mois local suffit
+    return (t.year, t.month - 1) if t.month > 1 else (t.year - 1, 12)
+
+
+def _lire_fin(texte: str) -> tuple[int, int]:
+    a, m = texte.split("-")
+    return int(a), int(m)
+
+
+def historique_recette(fin: tuple[int, int] = (2026, 6)) -> tuple[bytes, list[str]]:
+    """Historique 100 % fictif (donnees_fictives.py) de janvier 2024 à `fin`, avec l'activité
+    fictive (activite_fictive.py). Tirage à graine fixe : mêmes données à chaque passage."""
     import io
 
     import openpyxl
-
-    ws = openpyxl.load_workbook(source, data_only=True)["DONNEES"]
-    entetes = [ws.cell(3, c).value for c in range(2, 29)]  # B3 : ANNÉE … AB3 : Productivité
-    col = {h: i for i, h in enumerate(entetes)}
-    lignes = [list(r) for r in ws.iter_rows(min_row=4, min_col=2, max_col=28, values_only=True)
-              if r[0]]
-    cle = lambda r: r[col["ANNÉE"]] * 100 + _num(r[col["MOIS"]])  # noqa: E731
-    mois = sorted({cle(r) for r in lignes})
-    par_mat: dict[str, list[list]] = {}
-    for r in lignes:
-        par_mat.setdefault(r[col["MATRICULE"]], []).append(r)
-    complets = sorted(m for m, rs in par_mat.items() if len(rs) == len(mois))
-
-    def premier(cond) -> str:
-        return next(m for m in complets if cond(par_mat[m][0]) and m not in pris)
-
-    pris: set[str] = set()
-    notes: list[str] = []
-
-    m = premier(lambda r: r[col["Service"]] == "Commerce VN" and r[col["Type Contrat"]] == "CDI")
-    pris.add(m)
-    for r in par_mat[m]:
-        if cle(r) >= 202601:
-            r[col["Service"]] = "SAV PL"
-    notes.append(f"{m} : mutation Commerce VN -> SAV PL en janvier 2026 (change de périmètre)")
-
-    m = premier(lambda r: r[col["Site"]] in ("Douala", "Yaoundé")
-                and not r[col["Logement site déporté"]])
-    pris.add(m)
-    for r in par_mat[m]:
-        if cle(r) >= 202510:
-            r[col["Site"]], r[col["Logement site déporté"]] = "Dehane", 60000
-    notes.append(f"{m} : mutation agence -> site déporté Dehane en octobre 2025 (+ logement)")
-
-    m = premier(lambda r: r[col["Type Contrat"]] == "CDD")
-    pris.add(m)
-    for r in par_mat[m]:
-        if cle(r) >= 202601:
-            r[col["Type Contrat"]] = "CDI"
-    notes.append(f"{m} : CDD -> CDI en janvier 2026")
-
-    m = premier(lambda r: r[col["Type Contrat"]] == "CDI")
-    pris.add(m)
-    retour = {202507, 202508, 202509}
-    lignes = [r for r in lignes if not (r[col["MATRICULE"]] == m and cle(r) in retour)]
-    notes.append(f"{m} : départ fin juin 2025, retour en octobre 2025")
-
-    for r in lignes:
-        k, svc, act = cle(r), r[col["Service"]], r[col["Activité"]]
-        if svc == "Commerce VN" and act == "Front office" and k % 100 in (3, 6, 9, 12):
-            r[col["Primes sur ventes"]] = 150000
-        if k == 202512 and svc == "Administration" and r[col["Type Contrat"]] == "CDI":
-            r[col["Primes sur résultats"]] = 250000
-        if k >= 202601 and svc in ("SAV PL", "SAV Engins") and act == "Back Office":
-            r[col["Productivité Ateliers"]] = 25000
-        if k == 202512 and r[col["Type Contrat"]] == "CDI":
-            r[col["Primes exceptionnelles"]] = (r[col["Primes exceptionnelles"]] or 0) + 100000
-        if k == 202604 and int(r[col["MATRICULE"]][3:]) % 5 == 0:
-            r[col["Absences (nb)"]] = 2 + int(r[col["MATRICULE"]][3:]) % 4
-    notes += [
-        "Primes sur ventes (exclues du total) : Commerce VN front office, fins de trimestre",
-        "Primes sur résultats (exclues) : Administration CDI, décembre 2025",
-        "Productivité ateliers (exclue) : SAV PL et SAV Engins back office, depuis janvier 2026",
-        "Pic de fin d'année : +100 000 de primes exceptionnelles par CDI en décembre 2025",
-        "Pic d'absences : avril 2026 (2 à 5 jours pour un salarié sur cinq)",
-    ]
-
     from activite_fictive import ajouter
-    entetes, lignes = ajouter(entetes, lignes)
-    notes.append("Activité : ventes, clients, CA et marge individuels en front office ; indice de "
-                 "productivité en back office SAV ; un vendeur sans CA, une marge négative")
+    from donnees_fictives import generer
 
+    entetes, lignes, notes = generer(fin)
+    entetes, lignes = ajouter(entetes, lignes)
     wb = openpyxl.Workbook()
     out = wb.active
     out.title = "DONNEES"
     out["B1"] = "FEUILLE DE DONNÉES CENTRALE (recette)"
-    out["B2"] = "Historique de recette généré par tools/recette/reinit.py"
+    out["B2"] = "Historique fictif généré par tools/recette/donnees_fictives.py"
     for i, h in enumerate(entetes):
         out.cell(3, i + 2, h)
     for n, r in enumerate(lignes, start=4):
@@ -150,7 +95,8 @@ def _preparer(base: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="recette.db")
-    ap.add_argument("--historique", type=Path, default=HISTORIQUE)
+    ap.add_argument("--fin", type=_lire_fin, default=_mois_clos(),
+                    help="dernier mois de paie, AAAA-MM (défaut : dernier mois clos)")
     args = ap.parse_args()
     comptes = charger()
     mdp_de = {c["email"]: c["mot_de_passe"] for c in comptes}
@@ -161,14 +107,13 @@ def main() -> None:
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
 
-    from fastapi.testclient import TestClient
-    from sqlalchemy import select
-
     from app.db.session import SessionLocal
     from app.main import app
     from app.models.auth import Perimetre, Utilisateur
     from app.models.referentiel import Rubrique, Service, Site
     from app.seed import _user, run
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
 
     with SessionLocal() as db:
         run(db, admins[0]["email"], mdp_de[admins[0]["email"]], None, mdp_provisoire=False)
@@ -202,7 +147,7 @@ def main() -> None:
     admin = admins[0]["email"]
     r = c.post(f"{api}/auth/login", json={"email": admin, "password": mdp_de[admin]})
     assert r.status_code == 200, r.text
-    contenu, notes = historique_recette(args.historique)
+    contenu, notes = historique_recette(args.fin)
     fichier = ("historique_recette.xlsx", contenu, XLSX)
     lot = c.post(f"{api}/imports", files={"fichier": fichier}).json()
     if lot.get("statut") != "pret":
@@ -212,7 +157,7 @@ def main() -> None:
     assert r.status_code == 200, r.text
 
     for m in _csv("ca_marge.csv"):
-        if m["ca"]:
+        if m["ca"] and (int(m["annee"]), int(m["mois"])) <= args.fin:
             r = c.put(f"{api}/pilotage/saisies", json={
                 "annee": int(m["annee"]), "mois": int(m["mois"]),
                 "groupe": "ca_marge", "niveau": "global",
@@ -223,7 +168,7 @@ def main() -> None:
     # Objectifs annuels globaux, répartis en 12 mois par le serveur (le reste va sur décembre).
     objectifs = {"obj_ca_marge": {"obj_ca": "24000000000", "obj_marge": "3000000000"},
                  "obj_activite": {"obj_ventes": "1200", "obj_clients": "600", "obj_factures": "2400"}}
-    for annee in (2025, 2026):
+    for annee in (2024, 2025, 2026):
         for groupe, totaux in objectifs.items():
             r = c.put(f"{api}/pilotage/saisies/annee", json={
                 "annee": annee, "groupe": groupe, "niveau": "global",
@@ -232,6 +177,8 @@ def main() -> None:
 
     par_mois: dict[tuple[int, int], list[dict]] = {}
     for b in _csv("budgets.csv"):
+        if (int(b["annee"]), int(b["mois"])) > args.fin:
+            continue
         cible = cibles[b["axe"]].get(b["cible"])
         if cible is None:
             sys.exit(f"budgets.csv : {b['axe']} inconnu « {b['cible']} »")

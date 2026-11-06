@@ -31,3 +31,9 @@ annee;mois;axe;cible;valeur;cas couvert
 2026;6;rubrique;Charges Patronales;5400000;proche du budget (famille charges)
 2026;6;rubrique;Assurance Maladie;1000000;au-dessus du budget (famille charges)
 2026;6;rubrique;TVA & Marge MAD;1900000;sous le budget (famille charges)
+2024;12;service;Commerce VN;4600000;sous le budget (décembre, primes)
+2024;12;service;Administration;5600000;au-dessus du budget
+2025;6;service;SAV PL;6100000;proche du budget
+2025;6;site;Douala;3500000;sous le budget
+2025;12;service;Commerce Pièces;6400000;au-dessus du budget
+2025;12;rubrique;Primes exceptionnelles;2500000;sous le budget

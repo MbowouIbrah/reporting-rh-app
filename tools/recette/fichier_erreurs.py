@@ -17,9 +17,8 @@ from pathlib import Path
 ICI = Path(__file__).resolve().parent
 sys.path.insert(0, str(ICI))
 
-import openpyxl  # noqa: E402
-
-from reinit import HISTORIQUE, _num, historique_recette  # noqa: E402
+import openpyxl
+from reinit import _num, historique_recette
 
 # Position (dans l'ordre du fichier) de l'employé visé par chaque défaut de juillet.
 POS = {"non_numerique": 2, "site_inconnu": 5, "service_faute": 8, "sans_matricule": 11,
@@ -28,7 +27,7 @@ NOUVEAU = {"matricule": "NEW901", "nom": "Recrue Recette"}
 
 
 def _base() -> tuple[list[str], list[list]]:
-    contenu, _ = historique_recette(HISTORIQUE)
+    contenu, _ = historique_recette((2026, 6))
     ws = openpyxl.load_workbook(io.BytesIO(contenu), data_only=True)["DONNEES"]
     entetes = [ws.cell(3, c).value for c in range(2, 29)]
     col = {h: i for i, h in enumerate(entetes)}

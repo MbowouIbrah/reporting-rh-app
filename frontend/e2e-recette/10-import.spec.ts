@@ -49,7 +49,7 @@ test.describe.serial('import de fichiers', () => {
   })
 
   test('juillet : correction des erreurs dans l’écran, confirmation des points, enregistrement', async ({ page }) => {
-    test.slow() // 81 lignes vérifiées puis enregistrées : dépasse le délai par défaut
+    test.slow() // toutes les lignes vérifiées puis enregistrées : dépasse le délai par défaut
     const c = f.manifeste.cibles
     await connecter(page, ADMIN)
     await importer(page, f.juilletErreurs)
@@ -96,21 +96,21 @@ test.describe.serial('import de fichiers', () => {
     await page.getByLabel('Montant négatif : régularisation ou erreur de signe ?').selectOption({ label: 'Régularisation confirmée' })
     await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
 
-    // Vérification avant enregistrement : 81 lignes à ajouter, aucun départ, aucun nouvel employé
+    // Vérification avant enregistrement : toutes les lignes de juin à ajouter, aucun départ, aucun nouvel employé
     await expect(page.getByRole('heading', { name: /VÉRIFICATION AVANT ENREGISTREMENT — juillet_2026_erreurs\.xlsx/ })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Lignes (81)' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Employés (81)' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `Lignes (${f.manifeste.lignes_base})` })).toBeVisible()
+    await expect(page.getByRole('heading', { name: `Employés (${f.manifeste.lignes_base})` })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Contrôles' })).toContainText('0 erreur bloquante')
-    await page.getByRole('button', { name: 'Enregistrer 81 lignes' }).click()
+    await page.getByRole('button', { name: `Enregistrer ${f.manifeste.lignes_base} lignes` }).click()
 
     await expect(page).toHaveURL(/admin$/, { timeout: 30_000 })
-    await expect(page.getByText('Enregistré : 81 lignes')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(`Enregistré : ${f.manifeste.lignes_base} lignes`)).toBeVisible({ timeout: 30_000 })
   })
 
   test('juillet : visible dans le rapport mensuel, valeurs corrigées retrouvées', async ({ page }) => {
     await connecter(page, ADMIN)
     const m = await lireJson(page.request, 'rapports/mensuel?annee=2026&mois=7')
-    expect(m.synthese.effectif.fin).toBe(81)
+    expect(m.synthese.effectif.fin).toBe(f.manifeste.lignes_base)
     expect(m.controles.filter((x: { bloquant: boolean }) => x.bloquant)).toEqual([])
 
     await page.goto('mensuel')
@@ -125,7 +125,7 @@ test.describe.serial('import de fichiers', () => {
     const jul = await lireJson<{ lignes: { matricule: string; nom: string; site: string; service: string; montants: Record<string, string> }[] }>(page.request, 'donnees?annee=2026&mois=7')
     const ligne = (mat: string) => jul.lignes.filter((l) => l.matricule === mat)
     const c = f.manifeste.cibles
-    expect(jul.lignes).toHaveLength(81)
+    expect(jul.lignes).toHaveLength(f.manifeste.lignes_base)
     expect(Number(ligne(c.non_numerique)[0].montants['Crédit téléphonique'])).toBe(12000)
     expect(ligne(c.site_inconnu)[0].site).toBe('Bonamoussadi')
     expect(ligne(c.service_faute)[0].service).toBe('Pneumatique')
