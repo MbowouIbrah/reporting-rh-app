@@ -2,7 +2,7 @@
  * Borne la hauteur d'un panneau dont le tableau s'étire sur la hauteur disponible :
  * - S'il y a assez d'espace, le tableau grandit pour afficher toutes ses lignes sans défilement (scroll).
  * - La hauteur de ligne ne doit pas dépasser --ligne-max pour ne pas rendre l'affichage trop grossier.
- * - Si le contenu dépasse l'espace disponible, le panneau occupe la taille maximale de l'écran/section et défile.
+ * - Si le contenu dépasse l'espace disponible, le tableau garde sa hauteur naturelle et c'est la section qui défile.
  */
 export function plafonner(panneau: HTMLElement) {
   const table = panneau.querySelector<HTMLElement>('.panneau-corps > table')
@@ -47,8 +47,8 @@ export function plafonner(panneau: HTMLElement) {
       panneau.style.maxHeight = `${Math.ceil(cible)}px`
     } else {
       // Panneau seul dans la section (ex: Sites, Services) : il prend la hauteur de la cible
-      // (lignes étirées jusqu'à --ligne-max), bornée par la section ; au-delà, il défile.
-      const h = dispoSection > 0 ? Math.min(cible, dispoSection) : cible
+      // (lignes étirées jusqu'à --ligne-max), bornée par la section, jamais sous sa hauteur naturelle.
+      const h = dispoSection > 0 ? Math.max(besoinNaturel, Math.min(cible, dispoSection)) : cible
       panneau.style.height = `${Math.floor(h)}px`
       panneau.style.maxHeight = `${Math.floor(h)}px`
     }

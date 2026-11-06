@@ -28,7 +28,7 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
   const cles = sections.map((x) => x.id).join('|')
 
   // Molette : un geste = une section (l'accrochage seul ramène au départ sur un petit cran),
-  // sauf si le tableau survolé peut encore défiler dans ce sens
+  // sauf si la section (plus haute que l'écran) peut encore défiler dans ce sens
   useEffect(() => {
     const racine = zone.current
     if (!racine) return
@@ -38,7 +38,7 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
     let dernier = 0
     let depart = -1e9
     let secours = 0
-    let dernierTableau = -1e9
+    let dernierInterne = -1e9
     const liberer = () => {
       enMouvement = false
       window.clearTimeout(secours)
@@ -47,15 +47,15 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
       if (e.deltaY === 0 || racine.scrollHeight <= racine.clientHeight) return
       const bas = e.deltaY > 0
       const t = performance.now()
-      const corps = (e.target as HTMLElement).closest('.panneau-corps')
-      if (corps && (bas ? corps.scrollTop + corps.clientHeight < corps.scrollHeight - 1 : corps.scrollTop > 0)) {
-        dernierTableau = t
+      const section = (e.target as HTMLElement).closest('.snap-section')
+      if (section && (bas ? section.scrollTop + section.clientHeight < section.scrollHeight - 1 : section.scrollTop > 0)) {
+        dernierInterne = t
         return
       }
-      // Tableau arrivé au bout : le geste en cours s'arrête là, il faut relâcher puis relancer pour changer de section
-      if (corps && corps.scrollHeight > corps.clientHeight + 1 && t - dernierTableau < 300) {
+      // Section arrivée au bout : le geste en cours s'arrête là, il faut relâcher puis relancer pour changer de section
+      if (section && section.scrollHeight > section.clientHeight + 1 && t - dernierInterne < 300) {
         e.preventDefault()
-        dernierTableau = t
+        dernierInterne = t
         return
       }
       // Tous les crans sont bloqués, même les petits de fin d'inertie : laissés au navigateur, ils
@@ -73,7 +73,7 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
       enMouvement = true
       depart = t
       secours = window.setTimeout(liberer, 900) // navigateur sans scrollend
-      aller(cible.id)
+      aller(cible.id, !bas)
     }
     racine.addEventListener('wheel', surMolette, { passive: false })
     racine.addEventListener('scrollend', liberer)
@@ -120,9 +120,13 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
     }
   }, [cles])
 
-  function aller(id: string) {
+  /** En remontant, on arrive en bas de la section précédente ; sinon en haut. */
+  function aller(id: string, parLeBas = false) {
     const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    document.getElementById(id)?.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'start' })
+    const cible = document.getElementById(id)
+    if (!cible) return
+    cible.scrollTop = parLeBas ? cible.scrollHeight : 0
+    cible.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: 'start' })
   }
 
   return (
