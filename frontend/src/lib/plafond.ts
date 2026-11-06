@@ -56,3 +56,23 @@ export function plafonner(panneau: HTMLElement) {
     panneau.style.maxHeight = `${Math.ceil(cible)}px`
   }
 }
+
+/** Nombre de lignes occupées par le texte d'une cellule. */
+function lignesTexte(cellule: HTMLElement) {
+  const r = document.createRange()
+  r.selectNodeContents(cellule)
+  if (typeof r.getClientRects !== 'function') return 0 // environnement sans mise en page (tests)
+  return new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size
+}
+
+/** En-têtes de tableau sur deux lignes au plus : élargit chaque colonne (hors colonnes figées) juste ce qu'il faut. */
+export function entetesDeuxLignes(table: HTMLElement) {
+  table.querySelectorAll<HTMLElement>('thead th:not(.fige-g):not(.fige-d1)').forEach((th) => {
+    th.style.minWidth = ''
+    let w = th.getBoundingClientRect().width
+    while (lignesTexte(th) > 2 && w < 480) {
+      w += 8
+      th.style.minWidth = `${Math.ceil(w)}px`
+    }
+  })
+}

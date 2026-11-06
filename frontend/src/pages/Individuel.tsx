@@ -13,9 +13,9 @@ import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
-import { cls, decimal2, fcfa, montantEntier, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { cls, decimal2, fcfa, montantEntier, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { type Calendrier, ordreMois } from '../lib/exercice'
-import { plafonner } from '../lib/plafond'
+import { entetesDeuxLignes, plafonner } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
 
 /** Colonnes du reporting individuel, dans l'ordre demandé (servies aussi par l'API). */
@@ -178,7 +178,10 @@ export default function Individuel() {
   // À refaire si les lignes ou les colonnes changent, ou à la fin de l'attente, pas à chaque rendu.
   const zone = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
-    const poser = () => zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
+    const poser = () => {
+      zone.current?.querySelectorAll<HTMLElement>('table.individuel').forEach(entetesDeuxLignes)
+      zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
+    }
     poser()
     window.addEventListener('resize', poser)
     return () => window.removeEventListener('resize', poser)
@@ -249,7 +252,7 @@ export default function Individuel() {
               <tr>
                 <th scope="col" className="fige-g">Mois</th>
                 {rubriques.map((r) => (
-                  <th scope="col" key={r} {...colonnes.entete(r)} className={classe(r).trim() || undefined} style={{ minWidth: Math.round(largeurEntete(r) * 0.68) }}>
+                  <th scope="col" key={r} {...colonnes.entete(r)} className={classe(r).trim() || undefined}>
                     {r}
                   </th>
                 ))}

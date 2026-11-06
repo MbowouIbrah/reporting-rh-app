@@ -107,11 +107,18 @@ test('individuel : activité en colonnes du tableau, Mois et Total mensuel figé
   const act = page.locator('table.individuel thead th.activite')
   test.skip((await act.count()) === 0, 'pas d’activité dans cette base')
   await expect(act.first()).toHaveText('Nombre de ventes')
+  // En-têtes sur deux lignes au plus
+  const lignes = await page.locator('table.individuel thead th').evaluateAll((ths) => ths.map((th) => {
+    const r = document.createRange()
+    r.selectNodeContents(th)
+    return new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size
+  }))
+  expect(Math.max(...lignes)).toBeLessThanOrEqual(2)
   const corps = page.locator('.individuel-excel .panneau-corps').first()
   await corps.evaluate((c) => { c.scrollLeft = c.scrollWidth })
   await expect(page.locator('table.individuel thead th.fige-d1')).toBeInViewport()
   await expect(page.locator('table.individuel thead th.fige-g')).toBeInViewport()
-  await page.screenshot({ path: 'test-results/individuel-activite.png' })
+  await page.screenshot({ path: 'test-results/individuel-activite.png', clip: { x: 0, y: 150, width: 1440, height: 260 } })
 })
 
 test('rail : points fixes, le bouton remonte en haut sur la dernière section', async ({ page }) => {
