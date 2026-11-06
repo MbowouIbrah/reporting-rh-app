@@ -106,10 +106,12 @@ Constats :
 
 ## 6. Recommandation
 Dans cet ordre, une mesure avant/après à chaque étape (même spec) :
-1. **`plafond.ts` en lot (5.1 A)** et observateur limité aux vrais changements : c'est le premier poste (jusqu'à 3,65 s).
-2. **Squelette à une animation (5.2 A)**, repli en paliers si la mesure le demande.
+1. **`plafond.ts` (5.1)** : CSS d'abord (5.1 B) partout où il donne le même rendu ; le reste en lot, une lecture puis une écriture (5.1 A). `ResizeObserver` sur les panneaux au lieu du MutationObserver sur tout l'arbre. C'est le premier poste (jusqu'à 3,65 s).
+2. **Squelette (5.2)** : moins de barres (une par ligne de tableau, pas une par cellule), délai géré par une classe, pulsation en `opacity` seulement (animée hors du fil principal). Toutes les barres démarrent au même instant, donc elles restent synchrones. Une variable CSS animée (5.2 A) n'est gardée que si la mesure la montre moins coûteuse : elle recalcule le style de chaque barre à chaque image.
 3. **Graphes (5.3 A)** : file vidée au départ, pas d'animation d'entrée en réouverture, axes mémorisés.
 4. **Clic immédiat (5.4 A)**, puis préchargement au survol (5.4 B) pour la 1re ouverture.
+
+Pratiques de référence suivies : seuil INP 200 ms (web.dev), pas d'alternance lecture/écriture de mise en page (web.dev « avoid layout thrashing »), animations limitées à `opacity`/`transform`, `startTransition` pour le rendu non urgent (doc React), préchargement TanStack Query (`prefetchQuery`), mesure avant/après sur poste bridé.
 
 ## 7. Impacts et risques
 - Aucun changement de données, d'API ni de dépendance. Tout se passe dans `frontend/`.
