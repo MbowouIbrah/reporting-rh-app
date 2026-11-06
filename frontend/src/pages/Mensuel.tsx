@@ -45,8 +45,15 @@ export default function Mensuel() {
 }
 
 function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour: string } }) {
+  // Contrôles de cohérence : signalés seulement en cas d'écart, rien quand tout est juste
+  const ecarts = d.controles.filter((c) => c.bloquant)
   return (
     <>
+      {ecarts.length > 0 && (
+        <p className="bandeau ko" role="alert">
+          Contrôles de cohérence en écart : {ecarts.map((c) => c.controle).join(' ; ')}
+        </p>
+      )}
       <SnapSections
         sections={[
           {

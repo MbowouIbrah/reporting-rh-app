@@ -14,6 +14,8 @@ import Resume from './Resume'
 let activiteAnnuel: unknown = null
 // Série mensuelle avec CA et marge renseignés (droit marge).
 let serieCa = false
+// Contrôles de cohérence du mensuel : aucun écart par défaut.
+let controlesMensuel: unknown[] = []
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -43,7 +45,7 @@ function routes(avecMarge: boolean, perms: string[]) {
           ms: cell('1000'), commissions: cell('10'), primes_total: cell('5'),
           ...(avecMarge ? { ca: null, marge: null, taux_marge: null } : {}),
         },
-        controles: [], a_type_charge: [], b_service_activite: [], c_site: [],
+        controles: controlesMensuel, a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [], ventilation: [], total: cell('0') },
       }
     if (url.includes('/rapports/annuel'))
@@ -163,6 +165,21 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
   await screen.findByText('Masse salariale', { selector: '.micro' })
   expect(screen.queryByText('Marge', { selector: '.micro' })).toBeNull()
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
+})
+
+test('Mensuel : un écart de cohérence est signalé au-dessus des tableaux', async () => {
+  controlesMensuel = [
+    { controle: 'Total services = MS globale', ecart: '12', bloquant: true },
+    { controle: 'Écart d’arrondi', ecart: '0.4', bloquant: false },
+  ]
+  try {
+    rendu(<Mensuel />, '/mensuel', ['report:read'])
+    const alerte = await screen.findByRole('alert')
+    expect(alerte).toHaveTextContent('Contrôles de cohérence en écart : Total services = MS globale')
+    expect(alerte).not.toHaveTextContent('arrondi')
+  } finally {
+    controlesMensuel = []
+  }
 })
 
 test('Mensuel : pas de ligne de contrôles et d’indicateurs au-dessus des tableaux', async () => {

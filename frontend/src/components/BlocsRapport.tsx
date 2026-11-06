@@ -427,7 +427,9 @@ const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
 
 /** 5. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
 export function AnalyseEffectifs({ d }: { d: Blocs }) {
-  const cols = [d.d_contrat.indicateurs[d.d_contrat.indicateurs.length - 1], ...d.d_contrat.indicateurs.slice(0, -1)]
+  // Dernière colonne (ensemble) en tête ; aucune colonne sans indicateur
+  const ind = d.d_contrat.indicateurs
+  const cols = ind.length > 0 ? [ind[ind.length - 1], ...ind.slice(0, -1)] : []
   const ligne = (label: string, f: (i: (typeof cols)[number]) => string, className?: string) => (
     <tr className={className}>
       <th scope="row">{label}</th>
