@@ -22,7 +22,7 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 ## Choix : A
 - Tableaux à hauteur naturelle : cadre sans défilement, panneaux non bornés, tableaux empilés jamais rétrécis.
 - Étirement gardé : s'il reste de la place, les lignes s'étirent jusqu'à `--ligne-max` comme avant ; sinon hauteur naturelle et la section défile.
-- Graphiques : hauteur minimale (11rem par zone de tracé), la section défile en dessous.
+- Graphiques : hauteur minimale confortable (15rem = 240 px par zone de tracé), la section défile en dessous.
 - Molette : défilement libre dans la section (pas d'accrochage à l'intérieur). Au bout de la section, le geste s'arrête : il faut relâcher (pause de 200 ms) puis relancer pour changer de section. Un geste lancé au bout mène à la section voisine en une fois ; la fin de ce geste (inertie) ne fait pas défiler la section d'arrivée. En remontant, on arrive en bas de la section précédente.
 - Suite signalée par une flèche animée sous les points du rail (contenu plus bas, section suivante, ou retour en haut) ; cliquable. Le bouton texte sous les tableaux est retiré : la place est rendue aux tableaux.
 - Seul l'en-tête de tableau reste figé (par rapport à la section). La ligne de total suit le contenu : figée, elle masquait les lignes du dessous (retour utilisateur). Figer aussi les lignes CA / marge / effectifs de chaque tableau a été écarté : trop de hauteur prise, et on aurait l'impression que le tableau défile. DONNEES garde son total figé.

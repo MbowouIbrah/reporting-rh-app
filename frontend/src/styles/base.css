@@ -1227,7 +1227,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .page-ecran.rapport-excel .snap-colonne > .panneau { flex-shrink: 0; min-height: auto; }
   .graphes-excel .snap-section .graphes-groupe { height: auto; }
   .graphes-excel .snap-section .graphes, .graphes-excel .snap-section .graphe { min-height: auto; }
-  .graphes-excel .snap-section .graphe-zone { min-height: 11rem; }
+  .graphes-excel .snap-section .graphe-zone { min-height: 15rem; } /* 240 px : 12 barres, axe et légende lisibles */
 }
 /* Écrans de faible hauteur : lignes resserrées pour tenir sur l'écran */
 @media (min-width: 1100px) and (max-height: 820px) {
