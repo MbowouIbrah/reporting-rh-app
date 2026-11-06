@@ -1,4 +1,4 @@
-import { budgetValide, cls, clsCharge, comparer, compact, ecartAbsolu, fcfa, montantExact, montantSigneValide, montantValide, moyenne, pct, signe, somme, valeurBrute } from './format'
+import { budgetValide, cls, clsCharge, comparer, compact, ecartAbsolu, fcfa, montantEntier, montantExact, montantSigneValide, montantValide, moyenne, pct, signe, somme, valeurBrute } from './format'
 
 test('fcfa : séparateur, absent et n/a', () => {
   expect(fcfa('1234567')).toBe('1\u00a0234\u00a0567')
@@ -100,4 +100,14 @@ describe('moyenne', () => {
     expect(moyenne(['0.1', '0.2'])).toBe('0.15')
     expect(moyenne([])).toBeNull()
   })
+})
+
+test('montantEntier : partie entière sans arrondi, texte du serveur découpé', () => {
+  expect(montantEntier('3450000.5')).toBe('3 450 000')
+  expect(montantEntier('3450000.99')).toBe('3 450 000')
+  expect(montantEntier('-1250.7')).toBe('-1 250')
+  expect(montantEntier('-0.4')).toBe('0')
+  expect(montantEntier('42')).toBe('42')
+  expect(montantEntier(null)).toBe('—')
+  expect(montantEntier('n/a')).toBe('—')
 })

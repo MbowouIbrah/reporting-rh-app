@@ -13,7 +13,7 @@ import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
-import { cls, decimal2, fcfa, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { cls, decimal2, fcfa, montantEntier, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { type Calendrier, ordreMois } from '../lib/exercice'
 import { plafonner } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
@@ -37,8 +37,8 @@ const COLONNES = [
 const LOGEMENT = 'Logement site déporté'
 
 type ColActivite = 'ventes' | 'clients' | 'productivite' | 'ca_individuel' | 'marge_individuelle'
-/** Montants (CA, marge) en FCFA entiers ; nombres de ventes ou de clients et indice : deux décimales au plus. */
-const texteActivite = (cle: ColActivite, v: string | null | undefined) => (cle === 'ca_individuel' || cle === 'marge_individuelle' ? fcfa(v) : decimal2(v))
+/** Montants (CA, marge) : partie entière, sans arrondi ; nombres de ventes ou de clients et indice : deux décimales au plus. */
+const texteActivite = (cle: ColActivite, v: string | null | undefined) => (cle === 'ca_individuel' || cle === 'marge_individuelle' ? montantEntier(v) : decimal2(v))
 
 const MODELE_VIDE: IndividuelTous = {
   annee: 0, matricule: null, nom: null, rubriques: COLONNES,

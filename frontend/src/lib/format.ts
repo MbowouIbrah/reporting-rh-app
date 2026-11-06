@@ -35,6 +35,15 @@ export function montantExact(v: Val | undefined): string {
   return `${negatif ? '-' : ''}${entier.replace(/\B(?=(\d{3})+$)/g, SEP)}${fin ? `,${fin}` : ''}`
 }
 
+/** Montant réduit à sa partie entière, sans arrondi (3 450 000,5 -> 3 450 000) : le texte du serveur
+ *  est découpé, sans Number(). La valeur gardée en base reste exacte. */
+export function montantEntier(v: Val | undefined): string {
+  if (v === null || v === undefined || v === 'n/a') return '—'
+  const negatif = v.startsWith('-')
+  const entier = (negatif ? v.slice(1) : v).split('.')[0].replace(/^0+(?=\d)/, '') || '0'
+  return `${negatif && /[1-9]/.test(entier) ? '-' : ''}${entier.replace(/\B(?=(\d{3})+$)/g, SEP)}`
+}
+
 /** Indice ou ratio d'activité (productivité, OR par productif) : deux décimales au plus. Number() sert à l'affichage seulement. */
 export function decimal2(v: Val | undefined): string {
   if (v === null || v === undefined || v === 'n/a') return '—'
