@@ -1,8 +1,9 @@
 """Base de recette : repart de zéro à chaque passage, toujours avec les mêmes données.
 
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
-Options : --demo (cas de démonstration), --base recette.db (fichier SQLite, dans backend/), --fin AAAA-MM (dernier mois de paie).
-Comptes : comptes.local.csv (généré par generer_comptes.py à partir de comptes.exemple.csv, non suivi).
+Options : --demo (cas de démonstration), --base recette.db (fichier SQLite, dans backend/),
+--fin AAAA-MM (dernier mois de paie).
+Comptes : comptes.local.csv (généré par generer_comptes.py depuis comptes.exemple.csv, non suivi).
 
 Contenu : comptes de comptes.local.csv, historique de paie 100 % fictif (donnees_fictives.py,
 de janvier 2024 à --fin),
@@ -173,13 +174,14 @@ def main() -> None:
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
 
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
     from app.db.session import SessionLocal
     from app.main import app
     from app.models.auth import Perimetre, Utilisateur
     from app.models.referentiel import Rubrique, Service, Site
     from app.seed import _user, run
-    from fastapi.testclient import TestClient
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         run(db, admins[0]["email"], mdp_de[admins[0]["email"]], None, mdp_provisoire=False)
