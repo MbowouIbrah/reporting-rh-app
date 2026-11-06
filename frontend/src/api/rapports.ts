@@ -29,6 +29,8 @@ export const qs = (o: Record<string, string | number | undefined>) => {
 export const getMe = () => api<Me>('/auth/me')
 export const login = (email: string, password: string, remember = false) =>
   api<Me>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, remember }) })
+export const connexionParLien = (jeton: string) =>
+  api<Me>('/auth/lien', { method: 'POST', body: JSON.stringify({ jeton }) })
 export const motDePasseOublie = (email: string) =>
   api<{ status: string }>('/auth/mot-de-passe-oublie', { method: 'POST', body: JSON.stringify({ email }) })
 export const reinitialiser = (jeton: string, password: string) =>

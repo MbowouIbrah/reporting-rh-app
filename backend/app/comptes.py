@@ -29,9 +29,10 @@ from app.api.admin import (
     _poser_droits,
     _user_dict,
 )
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.auth import AuditEvent, Perimetre, Utilisateur
-from app.security import audit
+from app.security import audit, liens
 from app.security.deps import portee_de
 from app.security.passwords import check_password, hash_password
 from app.security.policy import MODELES
@@ -164,6 +165,26 @@ def exiger_changement(db: Session, args: argparse.Namespace) -> None:
     print(f"Changement exigé : {args.email} doit changer son mot de passe avant de continuer")
 
 
+def lien(db: Session, args: argparse.Namespace) -> None:
+    u = _utilisateur(db, args.email)
+    if not u.actif:
+        raise Erreur(f"{args.email} est désactivé")
+    if args.jours < 1:
+        raise Erreur("--jours : au moins 1")
+    jeton = liens.creer(db, u, args.jours)
+    audit.record(db, None, "lien_creer", "utilisateur", u.id, apres={"jours": args.jours})
+    db.commit()
+    print(liens.url(args.base or settings.APP_URL, jeton))
+
+
+def revoquer_liens(db: Session, args: argparse.Namespace) -> None:
+    u = _utilisateur(db, args.email) if args.email else None
+    n = liens.revoquer(db, u)
+    audit.record(db, None, "lien_revoquer", "utilisateur", u and u.id, apres={"nombre": n})
+    db.commit()
+    print(f"{n} lien(s) révoqué(s)")
+
+
 def journal(db: Session, args: argparse.Namespace) -> None:
     emails = {u.id: u.email for u in db.scalars(select(Utilisateur))}
     q = select(AuditEvent).order_by(AuditEvent.id.desc()).limit(args.limite)
@@ -210,6 +231,16 @@ def _parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(nom, help=aide)
         sp.add_argument("email")
         sp.set_defaults(fn=fn)
+
+    sp = sub.add_parser("lien", help="lien de connexion directe (affiché une seule fois)")
+    sp.add_argument("email")
+    sp.add_argument("--jours", type=int, default=liens.JOURS_DEFAUT, help="durée de validité")
+    sp.add_argument("--base", help="adresse publique (défaut : APP_URL)")
+    sp.set_defaults(fn=lien)
+
+    sp = sub.add_parser("revoquer-liens", help="coupe les liens actifs (d'un compte, ou tous)")
+    sp.add_argument("email", nargs="?")
+    sp.set_defaults(fn=revoquer_liens)
 
     sp = sub.add_parser("journal", help="dernières entrées du journal d'audit")
     sp.add_argument("--limite", type=int, default=50)

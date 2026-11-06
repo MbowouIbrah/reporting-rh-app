@@ -12,7 +12,7 @@ from app import mail
 from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.auth import AuditEvent, PreferenceUtilisateur, Utilisateur
-from app.security import audit
+from app.security import audit, liens
 from app.security.deps import current_principal, session_principal, to_principal
 from app.security.passwords import check_password, hash_password, verify_password
 from app.security.policy import ACTIONS, Principal, is_allowed
@@ -30,6 +30,10 @@ class LoginIn(BaseModel):
     email: str
     password: str
     remember: bool = False
+
+
+class LienIn(BaseModel):
+    jeton: str
 
 
 class OubliIn(BaseModel):
@@ -87,6 +91,20 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)) -> d
     audit.record(db, user.id, "login", "utilisateur", user.id)
     db.commit()
     _set_cookies(response, user, body.remember)
+    return _me(to_principal(user))
+
+
+@router.post("/lien")
+def connexion_par_lien(body: LienIn, response: Response, db: Session = Depends(get_db)) -> dict:
+    """Connexion directe par lien (démo, invitation) : même session qu'une connexion normale."""
+    user = liens.utiliser(db, body.jeton)
+    if user is None:
+        audit.record(db, None, "login_lien_echec", "utilisateur")
+        db.commit()
+        raise HTTPException(status_code=401, detail="Lien invalide ou expiré")
+    audit.record(db, user.id, "login_lien", "utilisateur", user.id)
+    db.commit()
+    _set_cookies(response, user, False)
     return _me(to_principal(user))
 
 

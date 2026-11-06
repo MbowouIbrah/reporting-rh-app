@@ -124,3 +124,20 @@ class ReglageGlobal(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     cle: Mapped[str] = mapped_column(String(60), unique=True)
     valeur: Mapped[list | dict] = mapped_column(JsonType)
+
+
+class LienConnexion(Base):
+    """Lien de connexion directe (démo, invitation) : seule l'empreinte du jeton est gardée."""
+
+    __tablename__ = "lien_connexion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    utilisateur_id: Mapped[int] = mapped_column(
+        ForeignKey("utilisateur.id", ondelete="CASCADE"), index=True)
+    empreinte: Mapped[str] = mapped_column(String(64), unique=True)
+    cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expire_le: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoque_le: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    derniere_utilisation: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    nb_utilisations: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

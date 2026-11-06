@@ -8,6 +8,7 @@ import ChangerMotDePasse from './pages/ChangerMotDePasse'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Reinitialiser from './pages/Reinitialiser'
+import ConnexionRapide from './pages/ConnexionRapide'
 import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
 import Referentiels from './pages/admin/Referentiels'
@@ -25,6 +26,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reinitialiser" element={<Reinitialiser />} />
+      <Route path="/connexion-rapide" element={<ConnexionRapide />} />
       <Route path="/changer-mot-de-passe" element={<ChangerMotDePasse />} />
       <Route
         path="/rapport"

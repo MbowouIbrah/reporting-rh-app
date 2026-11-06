@@ -2,7 +2,7 @@ import { ApiError, ErreurReseau } from '../api/client'
 /** Longueur minimale d'un mot de passe : même règle que le serveur, qui reste l'autorité. */
 export const MDP_MIN = 8
 
-const PAGES_CONNEXION = ['/login', '/changer-mot-de-passe', '/reinitialiser']
+const PAGES_CONNEXION = ['/login', '/changer-mot-de-passe', '/reinitialiser', '/connexion-rapide']
 
 /**
  * Page d'arrivée demandée, seulement si elle reste dans l'application et n'est pas une page de connexion.
