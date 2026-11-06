@@ -107,7 +107,7 @@ Constats :
 ## 6. Recommandation
 Dans cet ordre, une mesure avant/après à chaque étape (même spec) :
 1. **`plafond.ts` (5.1)** : CSS d'abord (5.1 B) partout où il donne le même rendu ; le reste en lot, une lecture puis une écriture (5.1 A). `ResizeObserver` sur les panneaux au lieu du MutationObserver sur tout l'arbre. C'est le premier poste (jusqu'à 3,65 s).
-2. **Squelette (5.2)** : moins de barres (une par ligne de tableau, pas une par cellule), délai géré par une classe, pulsation en `opacity` seulement (animée hors du fil principal). Toutes les barres démarrent au même instant, donc elles restent synchrones. Une variable CSS animée (5.2 A) n'est gardée que si la mesure la montre moins coûteuse : elle recalcule le style de chaque barre à chaque image.
+2. **Squelette (5.2)** : la structure reste celle demandée (titres, en-têtes, libellés affichés ; une barre à la place de chaque valeur, à sa taille). On garde une seule animation au lieu de trois par valeur : le délai de 300 ms passe par une classe posée par `useAttente`. La pulsation, en `opacity` seulement, démarre au même instant pour toutes les barres, donc elle est synchrone. On mesure aussi une animation unique partagée (variable CSS animée) et on garde la moins coûteuse.
 3. **Graphes (5.3 A)** : file vidée au départ, pas d'animation d'entrée en réouverture, axes mémorisés.
 4. **Clic immédiat (5.4 A)**, puis préchargement au survol (5.4 B) pour la 1re ouverture.
 
