@@ -1209,16 +1209,18 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 /* Suite signalée par une flèche animée sous le rail (contenu plus bas, section suivante, retour en haut) */
 /* Bouton « section suivante » : pastille rouge pleine, halo pulsé, titre de la section suivante au survol */
 .rail-suite { position: relative; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin-top: 10px; padding: 0; border: 0; border-radius: 8px; background: var(--red); color: #fff; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.18); transition: background var(--dur) var(--ease), transform var(--dur) var(--ease); }
-.rail-suite:hover, .rail-suite:focus-visible { background: var(--red-deep); transform: translateY(2px); }
+.rail-suite:hover, .rail-suite:focus-visible { background: var(--red-deep); }
 .rail-suite:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .rail-suite svg { width: 18px; height: 18px; stroke-width: 2.75; }
 .rail-suite:hover .rail-bulle, .rail-suite:focus-visible .rail-bulle { opacity: 1; transform: translate(0, -50%); }
 @media (prefers-reduced-motion: no-preference) {
   .rail-suite::before { content: ""; position: absolute; inset: 0; border-radius: 8px; box-shadow: 0 0 0 0 var(--red); animation: halo-suite 2s var(--ease) infinite; pointer-events: none; }
   .rail-suite svg { animation: indice-suite 1.6s var(--ease) infinite; }
+  .rail-suite.haut svg { animation-name: indice-haut; }
   .rail-suite:hover::before, .rail-suite:hover svg { animation: none; }
 }
 @keyframes indice-suite { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 4px; } }
+@keyframes indice-haut { 0%, 60%, 100% { translate: 0 0; } 30% { translate: 0 -4px; } }
 @keyframes halo-suite { 0% { box-shadow: 0 0 0 0 rgba(227, 0, 27, .45); } 70%, 100% { box-shadow: 0 0 0 12px rgba(227, 0, 27, 0); } }
 /* Mensuel, Annuel, Graphiques : aucun tableau ne défile dans son cadre ; la section défile si son contenu dépasse
    l'écran (accrochage gardé). Tableaux à hauteur naturelle au minimum, graphiques à hauteur minimale. */

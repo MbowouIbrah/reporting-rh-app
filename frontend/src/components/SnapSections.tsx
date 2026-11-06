@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { plafonner } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
 
@@ -22,7 +22,8 @@ export interface SectionSnap {
 /**
  * Sections plein écran avec accrochage (scroll-snap) et rail de navigation à droite,
  * sur le modèle du portail Academy Assist. Sous 1100 px : simple empilement.
- * Un bouton animé sous le rail mène à la section suivante (son titre s'affiche au survol).
+ * Un bouton animé sous le rail mène à la section suivante (son titre s'affiche au survol) ;
+ * sur la dernière, il remonte à la première. Toujours présent : les points du rail ne bougent pas.
  */
 export default function SnapSections({ sections, libelle = 'Tableaux du rapport', onActif }: {
   sections: SectionSnap[]
@@ -196,6 +197,7 @@ function Rail({ sections, zone, cles, aller, onActif }: {
   }, [cles, zone, onActif])
 
   const suivante = sections[sections.findIndex((x) => x.id === actif) + 1]
+  const cible = suivante ?? sections[0]
   return (
     <nav className="rail" aria-label="Sections du rapport">
       {sections.map((s) => (
@@ -211,10 +213,10 @@ function Rail({ sections, zone, cles, aller, onActif }: {
           <span className="rail-puce" aria-hidden="true" />
         </button>
       ))}
-      {suivante && (
-        <button type="button" className="rail-suite" aria-label={suivante.titre} onClick={() => aller(suivante.id)}>
-          <span className="rail-bulle">{suivante.titre}</span>
-          <ArrowDown aria-hidden="true" />
+      {sections.length > 1 && (
+        <button type="button" className={suivante ? 'rail-suite' : 'rail-suite haut'} aria-label={cible.titre} onClick={() => aller(cible.id)}>
+          <span className="rail-bulle">{suivante ? cible.titre : `Retour en haut : ${cible.titre}`}</span>
+          {suivante ? <ArrowDown aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
         </button>
       )}
     </nav>

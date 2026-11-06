@@ -113,3 +113,19 @@ test('individuel : activité en colonnes du tableau, Mois et Total mensuel figé
   await expect(page.locator('table.individuel thead th.fige-g')).toBeInViewport()
   await page.screenshot({ path: 'test-results/individuel-activite.png' })
 })
+
+test('rail : points fixes, le bouton remonte en haut sur la dernière section', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await connecter(page, ADMIN)
+  await page.goto('graphes')
+  await expect.poll(() => page.locator('.snap-section').count(), { timeout: 20_000 }).toBeGreaterThan(1)
+  const points = page.locator('.rail-point')
+  const y0 = (await points.first().boundingBox())!.y
+  await points.last().click()
+  await expect(points.last()).toHaveClass(/actif/)
+  await expect(page.locator('.rail-suite.haut')).toBeVisible()
+  expect(Math.abs((await points.first().boundingBox())!.y - y0)).toBeLessThan(1)
+  await page.locator('.rail-suite').click()
+  await expect(points.first()).toHaveClass(/actif/)
+})
