@@ -660,6 +660,9 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .rapport-excel.individuel-excel .panneau table.individuel th, .rapport-excel.individuel-excel .panneau table.individuel td { border-right: 1px solid var(--rule-strong); }
 .rapport-excel.individuel-excel .panneau table.individuel thead th { border-right-color: rgba(255, 255, 255, .18); }
 .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-g { white-space: nowrap; max-width: none; }
+/* Activité du périmètre : colonnes en fin de partie défilante, séparées des rubriques */
+.rapport-excel.individuel-excel .panneau table.individuel .activite { min-width: 84px; }
+.rapport-excel.individuel-excel .panneau table.individuel .activite.debut { box-shadow: inset 2px 0 0 var(--rule-strong); }
 
 /* Navigation figée : le défilement d'un tableau ne fait jamais bouger la page, la barre d'application ni les filtres */
 html, body { overscroll-behavior: none; }

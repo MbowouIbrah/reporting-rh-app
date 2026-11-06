@@ -94,3 +94,21 @@ test('molette : la section haute défile d’abord, puis on passe à la suivante
   await expect.poll(async () => (await page.locator('.rail-point.actif').getAttribute('aria-label')) !== ici
     || (await page.locator('.snap-section').nth(i + 1).evaluate((s) => s.scrollTop > 0))).toBe(true)
 })
+
+test('individuel : activité en colonnes du tableau, Mois et Total mensuel figés', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await connecter(page, ADMIN)
+  await page.goto('individuel')
+  await expect(page.locator('table.individuel')).toBeVisible({ timeout: 20_000 })
+  await page.waitForLoadState('networkidle')
+  await expect(page.locator('details', { hasText: 'Activité' })).toHaveCount(0)
+  const act = page.locator('table.individuel thead th.activite')
+  test.skip((await act.count()) === 0, 'pas d’activité dans cette base')
+  await expect(act.first()).toHaveText('Nombre de ventes')
+  const corps = page.locator('.individuel-excel .panneau-corps').first()
+  await corps.evaluate((c) => { c.scrollLeft = c.scrollWidth })
+  await expect(page.locator('table.individuel thead th.fige-d1')).toBeInViewport()
+  await expect(page.locator('table.individuel thead th.fige-g')).toBeInViewport()
+  await page.screenshot({ path: 'test-results/individuel-activite.png' })
+})

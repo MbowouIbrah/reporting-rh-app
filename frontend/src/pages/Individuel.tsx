@@ -52,7 +52,7 @@ const modeleVide = (cal?: Calendrier): IndividuelTous => ({ ...MODELE_VIDE, mois
  * rendu de la page (glisser d'un en-tête, attente, filtres). `cle` résume l'ordre et la zone des colonnes.
  */
 const CorpsIndividuel = memo(
-  function CorpsIndividuel({ d, rubriques, exclues }: { d: IndividuelTous; rubriques: string[]; exclues: Set<string>; cle: string }) {
+  function CorpsIndividuel({ d, rubriques, exclues, activite }: { d: IndividuelTous; rubriques: string[]; exclues: Set<string>; activite: ColActivite[]; cle: string }) {
     const classe = (r: string) => (exclues.has(r) ? ' exclu' : '')
     const val = (v: Val | undefined) => v ?? '0'
     const totalMois = (m: IndividuelTous['mois'][number]) => m.total ?? '0'
@@ -74,6 +74,9 @@ const CorpsIndividuel = memo(
                   {!m.present || sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
                 </td>
               ))}
+              {activite.map((c, i) => (
+                <td key={c} className={i ? 'num activite' : 'num activite debut'}>{m.present ? texteActivite(c, m.activite?.[c]) : '-'}</td>
+              ))}
               <td className="num fige-d1">{m.present ? fcfa(totalMois(m)) : '-'}</td>
             </tr>
             <tr className="sous">
@@ -83,6 +86,7 @@ const CorpsIndividuel = memo(
                   {!m.present || sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
                 </td>
               ))}
+              {activite.map((c, i) => <td key={c} className={i ? 'activite' : 'activite debut'} />)}
               <td className="fige-d1" />
             </tr>
           </Fragment>
@@ -94,6 +98,9 @@ const CorpsIndividuel = memo(
               {aucun || sansObjet(r) ? '-' : fcfa(totalRub(r))}
             </td>
           ))}
+          {activite.map((c, i) => (
+            <td key={c} className={i ? 'num activite' : 'num activite debut'}>{aucun ? '-' : texteActivite(c, d.activite_total?.[c])}</td>
+          ))}
           <td className="num fige-d1">{aucun ? '-' : fcfa(somme(d.mois.filter((m) => m.present).map(totalMois)) ?? '0')}</td>
         </tr>
         <tr className="total staff">
@@ -103,6 +110,7 @@ const CorpsIndividuel = memo(
               {aucun || sansObjet(r) ? '-' : totalStaff(r)}
             </td>
           ))}
+          {activite.map((c, i) => <td key={c} className={i ? 'activite' : 'activite debut'} />)}
           <td className="fige-d1" />
         </tr>
       </tbody>
@@ -154,8 +162,7 @@ export default function Individuel() {
   const aActivite = activites.some((m) => Object.values(m.activite ?? {}).some((v) => v != null))
   const avecCaInd = activites.some((m) => m.activite && 'ca_individuel' in m.activite)
   // Total de l'année calculé par le serveur (productivité = moyenne des mois renseignés).
-  const totalActivite = (cle: ColActivite) => d?.activite_total?.[cle] ?? null
-  const colsActivite: { cle: ColActivite; titre: string }[] = [
+  const colsActivite: { cle: ColActivite; titre: string }[] = !aActivite ? [] : [
     { cle: 'ventes', titre: 'Nombre de ventes' },
     { cle: 'clients', titre: 'Nombre de clients' },
     { cle: 'productivite', titre: 'Indice de productivité' },
@@ -246,52 +253,20 @@ export default function Individuel() {
                     {r}
                   </th>
                 ))}
+                {colsActivite.map((c, i) => (
+                  <th scope="col" key={c.cle} className={i ? 'num activite' : 'num activite debut'} title="Activité du périmètre">{c.titre}</th>
+                ))}
                 <th scope="col" className="num fige-d1">Total mensuel</th>
               </tr>
             </thead>
-            <CorpsIndividuel d={d} rubriques={rubriques} exclues={exclues} cle={cleColonnes} />
+            <CorpsIndividuel d={d} rubriques={rubriques} exclues={exclues} activite={colsActivite.map((c) => c.cle)} cle={cleColonnes} />
           </table>
         </Panneau>
-      )}
-      {d && aActivite && (
-        <details className="section details-donnees">
-          <summary>
-            <span className="section-titre">Activité</span>
-          </summary>
-          <div className="section-corps">
-            <div className="table-scroll">
-              <table className="dense">
-                <thead>
-                  <tr>
-                    <th scope="col">Mois</th>
-                    {colsActivite.map((c) => <th key={c.cle} scope="col" className="num">{c.titre}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activites.map((m) => (
-                    <tr key={m.mois}>
-                      <th scope="row">{MOIS[m.mois - 1]}</th>
-                      {colsActivite.map((c) => (
-                        <td key={c.cle} className="num">{texteActivite(c.cle, m.activite?.[c.cle])}</td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="total">
-                    <th scope="row">Total</th>
-                    {colsActivite.map((c) => (
-                      <td key={c.cle} className="num">{texteActivite(c.cle, totalActivite(c.cle))}</td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </details>
       )}
       {d && (
         <p className="note">
           Note : le TOTAL MENSUEL additionne les colonnes ci-dessus, hors{' '}
-          <span className="legende-exclu">colonnes hachurées</span> (exclues du total).
+          <span className="legende-exclu">colonnes hachurées</span> (exclues du total) et colonnes d’activité.
         </p>
       )}
     </section>

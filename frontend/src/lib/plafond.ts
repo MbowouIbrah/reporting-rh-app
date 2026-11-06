@@ -38,7 +38,9 @@ export function plafonner(panneau: HTMLElement) {
   // Vérifier l'espace vertical disponible dans la section
   const section = panneau.closest<HTMLElement>('.snap-section')
   if (section) {
-    const dispoSection = Math.max(0, section.clientHeight)
+    // Hauteur utile : sans les marges internes, sinon le panneau dépasse et une barre de défilement apparaît pour rien
+    const ss = getComputedStyle(section)
+    const dispoSection = Math.max(0, section.clientHeight - parseFloat(ss.paddingTop || '0') - parseFloat(ss.paddingBottom || '0'))
 
     const colonne = panneau.closest<HTMLElement>('.snap-colonne')
     if (colonne) {

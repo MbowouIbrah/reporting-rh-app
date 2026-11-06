@@ -28,6 +28,8 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 - Seul l'en-tête de tableau reste figé (par rapport à la section). La ligne de total suit le contenu : figée, elle masquait les lignes du dessous (retour utilisateur). Figer aussi les lignes CA / marge / effectifs de chaque tableau a été écarté : trop de hauteur prise, et on aurait l'impression que le tableau défile. DONNEES garde son total figé.
 - Hauteurs minimales : ligne 28 px, en-tête 32 px (repère Carbon d'IBM : compact 24, court 32, standard 40) ; étirement plafonné à 36 px. Plus de compression selon la hauteur d'écran : la section défile.
 - Graphiques : le titre du groupe affiché est placé sur la ligne du menu des groupes et suit la section visible.
+- Barre de défilement d'une section seulement si nécessaire : l'étirement des lignes tient compte des marges internes de la section.
+- Individuel : l'activité (ventes, clients, productivité, CA et marge individuels) devient des colonnes du tableau, avant le Total mensuel ; Mois et Total mensuel restent figés, le reste défile en largeur. Le bloc repliable « Activité » est retiré.
 - Sous 1360 px : plus de cadre défilant pour le tableau à total, la page défile.
 
 ## Non touché
