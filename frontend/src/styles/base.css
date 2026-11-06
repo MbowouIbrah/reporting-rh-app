@@ -522,8 +522,8 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 .graphes-groupe .graphes { flex: 1; min-height: 0; }
 .page .graphes-groupe-titre { margin: 0 0 var(--sp-2); font-size: var(--fs-md); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--navy); }
 .graphes-tete { display: flex; align-items: center; gap: var(--sp-4); margin: 0 0 var(--sp-2); }
-.graphes-tete > .menu-groupes { margin: 0; }
-.page .graphes-tete-titre { display: none; margin: 0; }
+.graphes-tete > .menu-groupes { margin: 0; align-self: center; }
+.page .graphes-tete-titre { display: none; margin: 0; line-height: 1; }
 /* Accrochage actif : le titre du groupe visible passe à côté du menu, celui des sections est masqué */
 @media screen and (min-width: 1360px) {
   .page .graphes-tete-titre { display: block; }

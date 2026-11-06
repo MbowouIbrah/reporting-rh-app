@@ -41,7 +41,7 @@ for (const [w, h] of [[1440, 900], [1366, 640]]) {
         // Titre du groupe visible sur la même ligne que le menu des groupes
         const menu = (await page.locator('.graphes-tete .menu-groupes').boundingBox())!
         const titre = (await page.locator('.graphes-tete-titre').boundingBox())!
-        expect(Math.abs(menu.y + menu.height / 2 - (titre.y + titre.height / 2))).toBeLessThan(4)
+        expect(Math.abs(menu.y + menu.height / 2 - (titre.y + titre.height / 2))).toBeLessThan(1.5)
         expect(titre.x).toBeGreaterThan(menu.x + menu.width)
         await expect(page.locator('.snap-section .graphes-groupe-titre').first()).toBeHidden()
         const premier = await page.locator('.graphes-tete-titre').textContent()
