@@ -158,3 +158,29 @@ test('graphes 1912×995 : aucune barre de défilement inutile', async ({ page })
   )
   expect(debords).toBe(0)
 })
+
+test('graphes : les graphiques apparaissent dans l’ordre de lecture', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1912, height: 995 })
+  // Note l'ordre d'apparition des tracés (position du graphe dans le document)
+  await page.addInitScript(() => {
+    const vus: number[] = []
+    ;(window as unknown as { ordreGraphes: number[] }).ordreGraphes = vus
+    new MutationObserver(() => {
+      const figures = [...document.querySelectorAll('figure.graphe')]
+      figures.forEach((f, i) => {
+        if (f.querySelector('.recharts-responsive-container') && !f.hasAttribute('data-vu')) {
+          f.setAttribute('data-vu', '')
+          vus.push(i)
+        }
+      })
+    }).observe(document, { childList: true, subtree: true })
+  })
+  await connecter(page, ADMIN)
+  await page.goto('graphes')
+  await expect.poll(() => page.locator('figure.graphe .recharts-responsive-container').count(), { timeout: 20_000 }).toBeGreaterThan(3)
+  await page.waitForTimeout(1500)
+  const ordre = await page.evaluate(() => (window as unknown as { ordreGraphes: number[] }).ordreGraphes)
+  expect(ordre.length).toBeGreaterThan(3)
+  expect(ordre).toEqual([...ordre].sort((a, b) => a - b))
+})

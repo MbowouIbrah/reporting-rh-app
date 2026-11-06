@@ -32,6 +32,7 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 - Individuel : l'activité (ventes, clients, productivité, CA et marge individuels) devient des colonnes du tableau, avant le Total mensuel ; Mois et Total mensuel restent figés, le reste défile en largeur. Le bloc repliable « Activité » est retiré.
 - Graphiques : zone de tracé au moins min(15rem, 240 px) ; sur grand écran le rem grandit, le plafond de 240 px évite une barre de quelques pixels. Pas de marge sous la grille dans une section.
 - Individuel : colonnes d'activité hors total comme les colonnes exclues, mais d'une autre nature (en-tête bleu clair, trame verticale, légende propre). Lignes Total MS et Total Staff figées en bas du cadre (Individuel seulement : elles ne varient pas).
+- Graphiques : apparition dans l'ordre de lecture (ligne par ligne, de gauche à droite) ; la file de montage est triée selon la position dans la page (`hooks/useMontageDiffere.ts`).
 - Sous 1360 px : plus de cadre défilant pour le tableau à total, la page défile.
 
 ## Non touché
