@@ -115,6 +115,15 @@ test('individuel : activité en colonnes du tableau, Mois et Total mensuel figé
   }))
   expect(Math.max(...lignes)).toBeLessThanOrEqual(2)
   const corps = page.locator('.individuel-excel .panneau-corps').first()
+  // Total MS et Total Staff figés en bas du cadre, même tableau défilé en haut
+  await corps.evaluate((c) => { c.scrollTop = 0 })
+  const pied = await page.evaluate(() => {
+    const c = document.querySelector<HTMLElement>('.individuel-excel .panneau-corps')!
+    const t = document.querySelector('table.individuel tbody.pied-fige')!
+    return { bas: t.getBoundingClientRect().bottom, cadre: c.getBoundingClientRect().bottom, deborde: c.scrollHeight > c.clientHeight + 1 }
+  })
+  if (pied.deborde) expect(pied.bas).toBeLessThanOrEqual(pied.cadre + 1)
+  await expect(page.locator('table.individuel tbody.pied-fige tr.total').first()).toBeInViewport()
   await corps.evaluate((c) => { c.scrollLeft = c.scrollWidth })
   await expect(page.locator('table.individuel thead th.fige-d1')).toBeInViewport()
   await expect(page.locator('table.individuel thead th.fige-g')).toBeInViewport()
@@ -135,4 +144,17 @@ test('rail : points fixes, le bouton remonte en haut sur la dernière section', 
   expect(Math.abs((await points.first().boundingBox())!.y - y0)).toBeLessThan(1)
   await page.locator('.rail-suite').click()
   await expect(points.first()).toHaveClass(/actif/)
+})
+
+test('graphes 1912×995 : aucune barre de défilement inutile', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1912, height: 995 })
+  await connecter(page, ADMIN)
+  await page.goto('graphes')
+  await expect.poll(() => page.locator('.snap-section').count(), { timeout: 20_000 }).toBeGreaterThan(1)
+  await page.waitForLoadState('networkidle')
+  const debords = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('.snap-section')].filter((s) => s.scrollHeight > s.clientHeight + 1).length,
+  )
+  expect(debords).toBe(0)
 })

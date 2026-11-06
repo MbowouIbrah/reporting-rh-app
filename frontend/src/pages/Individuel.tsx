@@ -64,6 +64,7 @@ const CorpsIndividuel = memo(
     const totalRub = (r: string) => somme(d.mois.map((m) => m.montants?.[r] ?? null)) ?? '0'
     const totalStaff = (r: string) => d.mois.reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
     return (
+      <>
       <tbody>
         {d.mois.map((m) => (
           <Fragment key={m.mois}>
@@ -91,6 +92,8 @@ const CorpsIndividuel = memo(
             </tr>
           </Fragment>
         ))}
+      </tbody>
+      <tbody className="pied-fige">
         <tr className="total">
           <th scope="row" className="fige-g">Total MS</th>
           {rubriques.map((r) => (
@@ -114,6 +117,7 @@ const CorpsIndividuel = memo(
           <td className="fige-d1" />
         </tr>
       </tbody>
+      </>
     )
   },
   (a, b) => a.d === b.d && a.cle === b.cle,
@@ -269,7 +273,8 @@ export default function Individuel() {
       {d && (
         <p className="note">
           Note : le TOTAL MENSUEL additionne les colonnes ci-dessus, hors{' '}
-          <span className="legende-exclu">colonnes hachurées</span> (exclues du total) et colonnes d’activité.
+          <span className="legende-exclu">colonnes hachurées</span> (exclues du total) et{' '}
+          <span className="legende-activite">colonnes d’activité</span> (hors total, autre nature).
         </p>
       )}
     </section>

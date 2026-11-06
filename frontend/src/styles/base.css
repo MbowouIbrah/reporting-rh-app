@@ -662,7 +662,15 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .rapport-excel.individuel-excel .panneau table.individuel thead th.fige-g { white-space: nowrap; max-width: none; }
 /* Activité du périmètre : colonnes en fin de partie défilante, séparées des rubriques */
 .rapport-excel.individuel-excel .panneau table.individuel .activite { min-width: 84px; }
-.rapport-excel.individuel-excel .panneau table.individuel .activite.debut { box-shadow: inset 2px 0 0 var(--rule-strong); }
+.rapport-excel.individuel-excel .panneau table.individuel .activite.debut { box-shadow: inset 2px 0 0 var(--navy); }
+/* Activité : hors total comme les colonnes exclues, mais d'une autre nature (pas une charge) : bleu, trame verticale */
+.individuel-excel { --trame-activite: repeating-linear-gradient(90deg, transparent 0 6px, color-mix(in srgb, var(--navy) 7%, transparent) 6px 7px); }
+.rapport-excel.individuel-excel .panneau table.individuel thead th.activite { background: var(--info-soft); color: var(--navy); }
+.rapport-excel.individuel-excel .panneau table.individuel tbody:not(.pied-fige) td.activite { color: var(--muted); background-image: var(--trame-activite); }
+.individuel-excel .legende-activite { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--navy); }
+.individuel-excel .legende-activite::before { content: ''; width: 18px; height: 12px; border-left: 2px solid var(--navy); background: var(--info-soft) var(--trame-activite); }
+/* Lignes Total MS et Total Staff figées en bas du tableau (Individuel seulement) */
+.rapport-excel.individuel-excel .panneau table.individuel tbody.pied-fige { position: sticky; bottom: 0; z-index: 2; }
 
 /* Navigation figée : le défilement d'un tableau ne fait jamais bouger la page, la barre d'application ni les filtres */
 html, body { overscroll-behavior: none; }
@@ -1232,7 +1240,9 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .page-ecran.rapport-excel .snap-colonne > .panneau { flex-shrink: 0; min-height: auto; }
   .graphes-excel .snap-section .graphes-groupe { height: auto; }
   .graphes-excel .snap-section .graphes, .graphes-excel .snap-section .graphe { min-height: auto; }
-  .graphes-excel .snap-section .graphe-zone { min-height: 15rem; } /* 240 px : 12 barres, axe et légende lisibles */
+  .graphes-excel .snap-section .graphe-zone { min-height: min(15rem, 240px); contain: size; }
+  .graphes-excel .snap-section .graphes { margin-bottom: 0; }
+  .graphes-excel .snap-section .graphes-groupe-titre { margin: 0; } /* 240 px : 12 barres, axe et légende lisibles */
 }
 /* Écrans de faible hauteur : lignes resserrées pour tenir sur l'écran */
 @media (min-width: 1100px) and (max-height: 820px) {

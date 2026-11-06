@@ -30,6 +30,8 @@ Sur Mensuel, Annuel et Graphiques (sections plein écran avec accrochage) :
 - Graphiques : le titre du groupe affiché est placé sur la ligne du menu des groupes et suit la section visible.
 - Barre de défilement d'une section seulement si nécessaire : l'étirement des lignes tient compte des marges internes de la section.
 - Individuel : l'activité (ventes, clients, productivité, CA et marge individuels) devient des colonnes du tableau, avant le Total mensuel ; Mois et Total mensuel restent figés, le reste défile en largeur. Le bloc repliable « Activité » est retiré.
+- Graphiques : zone de tracé au moins min(15rem, 240 px) ; sur grand écran le rem grandit, le plafond de 240 px évite une barre de quelques pixels. Pas de marge sous la grille dans une section.
+- Individuel : colonnes d'activité hors total comme les colonnes exclues, mais d'une autre nature (en-tête bleu clair, trame verticale, légende propre). Lignes Total MS et Total Staff figées en bas du cadre (Individuel seulement : elles ne varient pas).
 - Sous 1360 px : plus de cadre défilant pour le tableau à total, la page défile.
 
 ## Non touché
