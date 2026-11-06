@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
+from app.imports.regles import COMPOSANTES_BRUT
 from app.kpi import formules as f
 
 ABSENCES = "Absences (nb)"
@@ -34,6 +35,14 @@ RUBRIQUES_ACTIVITE = (
 )
 REFERENCE_COLONNE = "Référence reporting"
 ZERO = Decimal(0)
+# Rémunération globale : hors absences (des jours) et hors composantes du Brut Réel (déjà dedans).
+HORS_REMUNERATION = frozenset((ABSENCES, *COMPOSANTES_BRUT))
+
+
+def remuneration_globale(pd: "PeriodeData") -> Decimal:
+    """TOTAL CHARGES + rubriques hors total, sauf absences et composantes du Brut Réel (F7, 06/11) :
+    chaque montant compte une fois."""
+    return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r not in HORS_REMUNERATION), ZERO)
 
 
 def total_ligne(montants: dict[str, Decimal], exclues: frozenset[str]) -> Decimal:
@@ -156,8 +165,8 @@ OBJECTIFS_ACTIVITE = ("ventes", "clients", "productivite", "factures")
 def _objectifs(pd: PeriodeData | None, budgets: Budgets, params: Params) -> dict:
     """Objectifs d'un mois (None = non défini) : masse salariale (budget par employé x effectif),
     budgets de rubrique saisis (frais de mission, commissions, rémunération globale = toutes les
-    rubriques hors absences), puis valeurs d'objectif saisies (somme des cases, moyenne pour la
-    productivité)."""
+    rubriques hors absences et composantes du Brut Réel), puis valeurs d'objectif saisies (somme
+    des cases, moyenne pour la productivité)."""
     saisies = pd.saisies if pd else ()
 
     def saisi(cle: str) -> Decimal | None:
@@ -165,7 +174,7 @@ def _objectifs(pd: PeriodeData | None, budgets: Budgets, params: Params) -> dict
         return (_moyenne_opt if cle == "productivite" else _somme_opt)(vals)
 
     rub = budgets.rubrique
-    paie = [v for r, v in rub.items() if r != ABSENCES]
+    paie = [v for r, v in rub.items() if r not in HORS_REMUNERATION]
     return {
         "ms": f.budget(len(pd.ids), params.budget_employe) if _ok(pd) else None,
         "frais_mission": rub.get(FRAIS_MISSION),
@@ -346,7 +355,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "marge": cur.marge,
         "taux_marge": f.taux_marge(cur.ca, cur.marge),
         "exclus": exclus,
-        "remuneration_globale": ms + exclus,
+        "remuneration_globale": remuneration_globale(cur),
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
         "primes_total": cell(sum((cur.rubrique(r) for r in PRIMES), ZERO),
                              sum((prev.rubrique(r) for r in PRIMES), ZERO) if prev else None),
@@ -649,9 +658,6 @@ def annuel(
     `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
     défaut)."""
     refs = _contrats_vus(refs, *n.values(), *n1.values())
-    def remuneration(pd: PeriodeData) -> Decimal:
-        # comme `remuneration_globale` du mensuel : TOTAL CHARGES + exclusions hors absences
-        return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r != ABSENCES), ZERO)
 
     def par_contrat(pd: PeriodeData) -> dict[str, int]:
         return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
@@ -672,7 +678,7 @@ def annuel(
             "formation": pd.rubrique(FORMATION),
             "carburant": pd.rubrique(CARBURANT),
             "credit_telephonique": pd.rubrique(CREDIT_TEL),
-            "remuneration": remuneration(pd),
+            "remuneration": remuneration_globale(pd),
             "effectif_contrat": par_contrat(pd),
         }
 

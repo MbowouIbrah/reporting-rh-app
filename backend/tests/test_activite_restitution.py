@@ -579,7 +579,7 @@ def test_mensuel_frais_mission_a_part_dans_le_total_avec_son_budget():
     assert fm["m1"] is None
     o = r["objectifs"]
     assert (o["frais_mission"], o["commissions"]) == (250, 100)
-    assert o["remuneration"] == 350  # somme des budgets de rubrique, hors absences
+    assert o["remuneration"] == 250  # budgets de rubrique, hors absences et commission (Brut Réel)
     # la ligne n'ajoute rien : le total de paie contient déjà les frais de mission
     ms_sans = mensuel(sans, None, REFS, Params(), bud)["synthese"]
     assert mensuel(avec, None, REFS, Params(), bud)["synthese"] != ms_sans  # 300 de plus
