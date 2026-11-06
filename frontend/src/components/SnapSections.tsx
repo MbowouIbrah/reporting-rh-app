@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ArrowDown } from 'lucide-react'
 import { plafonner } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
 
@@ -22,7 +22,7 @@ export interface SectionSnap {
 /**
  * Sections plein écran avec accrochage (scroll-snap) et rail de navigation à droite,
  * sur le modèle du portail Academy Assist. Sous 1100 px : simple empilement.
- * Une flèche animée sous le rail signale la suite (contenu plus bas, section suivante, retour en haut).
+ * Un bouton animé sous le rail mène à la section suivante (son titre s'affiche au survol).
  */
 export default function SnapSections({ sections, libelle = 'Tableaux du rapport', onActif }: {
   sections: SectionSnap[]
@@ -195,47 +195,7 @@ function Rail({ sections, zone, cles, aller, onActif }: {
     return () => obs.disconnect()
   }, [cles, zone, onActif])
 
-  // Indicateur de suite : contenu plus bas dans la section, section suivante, ou retour en haut
-  const [suite, setSuite] = useState<'bas' | 'suivante' | 'haut' | null>(null)
-  useEffect(() => {
-    const racine = zone.current
-    if (!racine) return
-    const ids = cles.split('|')
-    let image = 0
-    const maj = () => {
-      image = 0
-      const el = actif ? document.getElementById(actif) : null
-      const i = ids.indexOf(actif ?? '')
-      if (!el) setSuite(null)
-      else if (el.scrollTop + el.clientHeight < el.scrollHeight - 1) setSuite('bas')
-      else if (ids[i + 1]) setSuite('suivante')
-      else setSuite(i > 0 ? 'haut' : null)
-    }
-    const planifier = () => {
-      if (!image) image = requestAnimationFrame(maj)
-    }
-    maj()
-    racine.addEventListener('scroll', planifier, true) // capture : le défilement des sections ne remonte pas
-    window.addEventListener('resize', planifier)
-    return () => {
-      cancelAnimationFrame(image)
-      racine.removeEventListener('scroll', planifier, true)
-      window.removeEventListener('resize', planifier)
-    }
-  }, [actif, cles, zone])
-
-  const rang = sections.findIndex((s) => s.id === actif)
-  function avancer() {
-    const el = actif ? document.getElementById(actif) : null
-    if (!el) return
-    if (suite === 'bas') {
-      const reduit = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-      el.scrollBy({ top: el.clientHeight * 0.8, behavior: reduit ? 'auto' : 'smooth' })
-    } else if (suite === 'suivante') aller(sections[rang + 1].id)
-    else aller(sections[0].id)
-  }
-  const libelleSuite =
-    suite === 'bas' ? 'Suite de la section' : suite === 'haut' ? 'Retour en haut' : `Section suivante : ${sections[rang + 1]?.titre ?? ''}`
+  const suivante = sections[sections.findIndex((x) => x.id === actif) + 1]
   return (
     <nav className="rail" aria-label="Sections du rapport">
       {sections.map((s) => (
@@ -251,9 +211,10 @@ function Rail({ sections, zone, cles, aller, onActif }: {
           <span className="rail-puce" aria-hidden="true" />
         </button>
       ))}
-      {suite && (
-        <button type="button" className={`rail-suite ${suite}`} aria-label={libelleSuite} title={libelleSuite} onClick={avancer}>
-          {suite === 'haut' ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
+      {suivante && (
+        <button type="button" className="rail-suite" aria-label={suivante.titre} onClick={() => aller(suivante.id)}>
+          <span className="rail-bulle">{suivante.titre}</span>
+          <ArrowDown aria-hidden="true" />
         </button>
       )}
     </nav>

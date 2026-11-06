@@ -68,7 +68,8 @@ test('molette : la section haute défile d’abord, puis on passe à la suivante
   const section = page.locator('.snap-section').nth(i)
   await section.evaluate((s) => s.scrollIntoView({ block: 'start' }))
   await page.waitForTimeout(400)
-  await expect(page.locator('.rail-suite.bas')).toBeVisible()
+  // Le bouton du rail porte le titre de la section suivante, même au milieu d'une section
+  await expect(page.locator('.rail-suite')).toHaveAttribute('aria-label', (await page.locator('.rail-point').nth(i + 1).getAttribute('aria-label'))!)
   const box = (await section.boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.wheel(0, 200)
@@ -83,16 +84,16 @@ test('molette : la section haute défile d’abord, puis on passe à la suivante
   }
   await page.waitForTimeout(600)
   await expect(page.locator('.rail-point.actif')).toHaveAttribute('aria-label', avant!)
-  await expect(page.locator('.rail-suite.suivante')).toBeVisible()
   // Relâché puis nouveau geste : section suivante
   await page.mouse.wheel(0, 120)
   await expect.poll(() => page.locator('.rail-point.actif').getAttribute('aria-label')).not.toBe(avant)
   // La flèche du rail mène aussi à la suite
   const ici = await page.locator('.rail-point.actif').getAttribute('aria-label')
   await page.waitForTimeout(800)
+  const cible = await page.locator('.rail-suite').getAttribute('aria-label')
   await page.locator('.rail-suite').click()
-  await expect.poll(async () => (await page.locator('.rail-point.actif').getAttribute('aria-label')) !== ici
-    || (await page.locator('.snap-section').nth(i + 1).evaluate((s) => s.scrollTop > 0))).toBe(true)
+  await expect(page.locator('.rail-point.actif')).toHaveAttribute('aria-label', cible!)
+  expect(cible).not.toBe(ici)
 })
 
 test('individuel : activité en colonnes du tableau, Mois et Total mensuel figés', async ({ page }) => {
