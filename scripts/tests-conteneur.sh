@@ -6,7 +6,7 @@ PY=/repo/backend/.venv/bin/python
 pg() {
   echo "== Migrations et import sur PostgreSQL"
   cd /repo/backend
-  export DATABASE_URL="$TEST_DATABASE_URL" ENV=test SECRET_KEY=<cle-de-test>
+  export DATABASE_URL="$TEST_DATABASE_URL" ENV=test SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
   $PY -m alembic upgrade head
   $PY -m alembic downgrade 0020
   $PY -m alembic upgrade head

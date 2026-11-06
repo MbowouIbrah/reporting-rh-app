@@ -6,16 +6,16 @@ Validée le 2026-11-06.
 Aucune adresse e-mail ni aucun mot de passe dans le dépôt, historique compris. Les comptes par défaut et les données de test sont définis en local, hors suivi. Un guide explique comment les générer.
 
 ## Existant
-- `tools/recette/comptes.csv` : 10 adresses. La règle « début de l'adresse + <suffixe-retire> » est écrite dans `reinit.py`, `LISEZMOI.md` et `e2e-recette/outils.ts`.
+- `tools/recette/comptes.csv` : 10 adresses. La règle de mot de passe (début de l'adresse + un suffixe fixe) est écrite dans `reinit.py`, `LISEZMOI.md` et `e2e-recette/outils.ts`.
 - `backend/app/seed.py --demo` : 8 adresses en dur, réutilisées par les tests.
-- Tests (pytest, vitest, Playwright) : environ 150 adresses `@exemple.invalid` / `@exemple.invalid` dans 40 fichiers, une dizaine de mots de passe et deux clés secrètes écrits en dur.
+- Tests (pytest, vitest, Playwright) : environ 150 adresses sur deux domaines d'exemple dans 40 fichiers, une dizaine de mots de passe et deux clés secrètes écrits en dur.
 - `PASSATION.md` : chemins locaux, compte et mot de passe de mesure.
 - Auteurs des commits : adresse gmail et adresse professionnelle.
 
 ## Options
 | Option | Pour | Contre |
 |---|---|---|
-| Garder `@exemple.invalid` (domaine réservé, pratique courante) | Aucun travail | Refusé : des adresses restent écrites |
+| Garder le domaine d'exemple réservé (pratique courante) | Aucun travail | Refusé : des adresses restent écrites |
 | Une seule fonction fabrique les adresses de test, domaine `exemple.invalid` (RFC 2606) | Une seule ligne ; aucune boîte ne peut exister | 40 fichiers à reprendre |
 | Comptes de recette générés en local (`comptes.local.csv`, ignoré) | Rien de personnel suivi ; mots de passe aléatoires | Une étape de plus, automatique au lancement |
 
