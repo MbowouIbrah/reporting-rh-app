@@ -349,7 +349,7 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
         "Salaire brut garanti", "Frais de mission", "Primes exceptionnelles", "Logement site déporté",
         "Carburant véhicule service", "Crédit téléphonique", "Brut réel", "Marge MAD + TVA"]
     assert set(j["exclues"]) == {"Salaire brut garanti", "Commission", "Primes de productivité",
-                                 "Primes sur ventes", "Primes sur résultats"}
+                                 "Primes sur ventes", "Primes sur résultats", "Bonus"}
     jan = j["mois"][0]
     assert D(jan["montants"]["Primes sur ventes"]) == 30 and jan["staff"]["Primes sur résultats"] == 1
     assert D(jan["montants"]["Brut réel"]) == 5000

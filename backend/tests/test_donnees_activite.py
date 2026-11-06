@@ -141,13 +141,13 @@ def test_valeur_non_numerique_dans_nombre_de_ventes(make_client):
 def test_total_de_paie_inchange_par_les_colonnes_d_activite(make_client):
     c = make_client(ADMIN)
     entetes = ATTRIBUTS + PAIE
-    base = [lig(entetes, **{BR: 1000, "Bonus": 50}),
+    base = [lig(entetes, **{BR: 1000, "Primes exceptionnelles": 50}),
             lig(entetes, MATRICULE="E2", Noms="Bob", **{BR: 2000})]
     charger(c, base, entetes)
     avant = (get(c, "mensuel", annee=2026, mois=1).json(),
              get(c, "annuel", annee=2026, mois=1).json(),
              c.get(f"{API}/donnees/tableau", params={"annee": 2026, "mois": 1}).json())
-    riche = [lig(**{BR: 1000, "Bonus": 50, VENTES: 9, CLIENTS: 4, PRODUCTIVITE: 2,
+    riche = [lig(**{BR: 1000, "Primes exceptionnelles": 50, VENTES: 9, CLIENTS: 4, PRODUCTIVITE: 2,
                     CA_INDIVIDUEL: 900000, MARGE_INDIVIDUELLE: 90000, REFERENCE_COLONNE: "R"}),
              lig(MATRICULE="E2", Noms="Bob", **{BR: 2000, VENTES: 1, CA_INDIVIDUEL: 5000})]
     charger(c, riche)

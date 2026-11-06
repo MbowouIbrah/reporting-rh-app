@@ -22,10 +22,11 @@ ALIAS = {"Variable": "Commission", "Salaire brut garantie": "Salaire brut garant
 
 
 def regles_v4(db):
-    """Règles de l'Excel V4 : la commission y comptait dans le total (sortie depuis, décision Q1)."""
-    rid = select(Rubrique.id).where(Rubrique.libelle == "Commission").scalar_subquery()
+    """Règles de l'Excel V4 : la commission et le bonus y comptaient dans le total (sortis depuis,
+    décisions Q1 et F7)."""
+    rid = select(Rubrique.id).where(Rubrique.libelle.in_(("Commission", "Bonus")))
     db.execute(delete(RubriqueRegle).where(
-        RubriqueRegle.rubrique_id == rid, RubriqueRegle.regle == "exclu_total_ligne"))
+        RubriqueRegle.rubrique_id.in_(rid), RubriqueRegle.regle == "exclu_total_ligne"))
     db.commit()
 
 
