@@ -1,6 +1,6 @@
 import { type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { plafonner } from '../lib/plafond'
+import { plafonnerTout } from '../lib/plafond'
 import { Panneau } from './BlocsRapport'
 
 export interface PanneauSnap {
@@ -100,11 +100,11 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
   // Tableaux empilés : chacun grandit au prorata de ses lignes, pour une hauteur de ligne commune,
   // sans dépasser la hauteur de ligne plafonnée
   useLayoutEffect(() => {
-    const poser = () =>
-      zone.current?.querySelectorAll<HTMLElement>('.snap-section .panneau').forEach((p) => {
-        p.style.flexGrow = String(p.querySelectorAll('tbody tr').length || 1)
-        plafonner(p)
-      })
+    const poser = () => {
+      const panneaux = [...(zone.current?.querySelectorAll<HTMLElement>('.snap-section .panneau') ?? [])]
+      panneaux.forEach((p) => (p.style.flexGrow = String(p.querySelectorAll('tbody tr').length || 1)))
+      plafonnerTout(panneaux)
+    }
     // Recalage regroupé en une fois par image, jamais pendant le rendu d'un changement de section
     let image = 0
     const planifier = () => {
@@ -119,9 +119,11 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
     const racine = zone.current
     let mo: MutationObserver | null = null
     if (racine && typeof MutationObserver !== 'undefined') {
-      // les dessins des graphiques (svg) ne changent pas la hauteur des tableaux
+      // Seuls l'ajout ou le retrait d'éléments (arrivée des données, lignes) changent la hauteur des tableaux ;
+      // pas les changements de texte seuls, ni les dessins des graphiques (svg)
+      const element = (n: Node) => n.nodeType === Node.ELEMENT_NODE
       mo = new MutationObserver((l) => {
-        if (l.some((m) => !(m.target as Element).closest?.('svg'))) planifier()
+        if (l.some((m) => !(m.target as Element).closest?.('svg') && ([...m.addedNodes].some(element) || [...m.removedNodes].some(element)))) planifier()
       })
       mo.observe(racine, { childList: true, subtree: true })
     }

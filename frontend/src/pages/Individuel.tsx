@@ -15,7 +15,7 @@ import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
 import { cls, decimal2, fcfa, montantEntier, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { type Calendrier, ordreMois } from '../lib/exercice'
-import { entetesDeuxLignes, plafonner } from '../lib/plafond'
+import { entetesDeuxLignes, plafonnerTout } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
 
 /** Colonnes du reporting individuel, dans l'ordre demandé (servies aussi par l'API). */
@@ -184,7 +184,7 @@ export default function Individuel() {
   useLayoutEffect(() => {
     const poser = () => {
       zone.current?.querySelectorAll<HTMLElement>('table.individuel').forEach(entetesDeuxLignes)
-      zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
+      if (zone.current) plafonnerTout(zone.current.querySelectorAll<HTMLElement>(':scope > .panneau'))
     }
     poser()
     window.addEventListener('resize', poser)

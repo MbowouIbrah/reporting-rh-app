@@ -118,3 +118,23 @@ Pratiques de référence suivies : seuil INP 200 ms (web.dev), pas d'alternance 
 - Risque principal : le dimensionnement des sections (étape 25-g, jugé bon). Garde-fou : la recette `80-defilement` (tailles, barre seulement si nécessaire, en-têtes sur deux lignes) doit rester verte, ainsi que vitest.
 - Squelette : la recette vérifie déjà le délai de 300 ms et le cycle minimal (`useAttente`).
 - Mouvement réduit : la pulsation reste coupée.
+
+## 8. Réalisation
+
+### Étape 1 : mises en page forcées (`26-b`)
+- `lib/plafond.ts` : `plafonnerTout` traite tous les panneaux en lot (toutes les écritures, une série de lectures, puis les écritures finales) au lieu d'alterner lecture et écriture panneau par panneau. Calcul inchangé.
+- `entetesDeuxLignes` : toutes les colonnes cherchées à la fois, essai de 1, 2, 4… pas puis dichotomie ; une mise en page par tour au lieu d'une par pas de 8 px et par colonne. Même largeur finale au pixel près (banc sur le tableau Individuel : identique, 430 ms → 170 ms à CPU ×4).
+- `SnapSections` : l'observateur ne relance le calcul que si des éléments sont ajoutés ou retirés (arrivée des données, lignes), plus pour un simple changement de texte.
+- Écart avec la recommandation : pas de `ResizeObserver`. Les panneaux ont une hauteur fixée par le calcul ; l'arrivée de lignes ne change donc pas leur taille et un `ResizeObserver` ne la verrait pas. Pas de CSS seul non plus : il ne reproduit ni « barre seulement si nécessaire » ni « deux lignes au plus » (5.1 B).
+
+Mesure à CPU ×4 (avant → après) :
+| Action | Données affichées | Mise en page forcée |
+|---|---|---|
+| Annuel, 1re ouverture | 8,8 s → 5,0 s | 2,2 s → 1,2 s |
+| Mensuel, 1re ouverture | 5,1 s → 1,6 s | 1,4 s → 0,1 s |
+| Mensuel : changer la période | 11,2 s → 7,1 s | 1,5 s → 1,1 s |
+| Graphes : point du rail | 8,8 s → 3,1 s | 2,5 s → 0,7 s |
+| Admin / Données, réouverture | 3,9 s → 2,5 s | 0,5 s → 0,4 s |
+| Individuel, 1re ouverture | 6,0 s → 5,2 s | 1,3 s → 2,5 s (variance : 3,65 s dans la mesure de l'étude ; le banc direct montre un gain) |
+
+La mesure varie d'un passage à l'autre (même action : jusqu'à ×2). L'échantillonnage du nombre d'animations (`getAnimations` toutes les 50 ms) coûte lui-même ~1 s à ×4 : il gonfle les chiffres de toutes les actions, avant comme après.
