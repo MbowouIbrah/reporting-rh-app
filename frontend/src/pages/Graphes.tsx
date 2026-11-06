@@ -245,8 +245,8 @@ export default function Graphes() {
   const affiches = groupesAffiches(config, dispo, noms)
   // Les groupes cochés s'affichent directement. Aucun n'a de données : le premier disponible plutôt qu'une page vide
   const menu = groupesDuMenu(config, dispo, noms)
-  // Le rapport PDF garde tous les groupes : choisir un groupe à l'écran ne doit pas le réduire
-  const montres = rapport ? menu : affiches.length > 0 ? affiches : menu.slice(0, 1)
+  // Le rapport PDF montre ce qui est à l'écran : les groupes cochés, dans le même ordre
+  const montres = affiches.length > 0 ? affiches : menu.slice(0, 1)
   const vueActive = montres.map((g) => g.id).join('|')
   // Vue rendue en arrière-plan : au changement de vue, le squelette de la vue demandée s'affiche
   // tout de suite et les graphes (lourds en « tout afficher ») arrivent sans figer la page.
@@ -397,7 +397,7 @@ export default function Graphes() {
           groupes={serie ? menu : groupesSquelette}
           nbAffiches={serie ? montres.length : montresSquelette.length}
           vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
-          onVue={(v) => setConfig(choisirVue(config, v, noms))}
+          onVue={(v) => setConfig(choisirVue(config, v))}
           onPersonnaliser={() => setPersonnalise(true)}
         />
       )}

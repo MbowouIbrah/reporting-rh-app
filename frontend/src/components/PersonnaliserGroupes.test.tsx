@@ -33,7 +33,10 @@ test('personnaliser : masquer un groupe et en monter un : les groupes cochés s�
   fireEvent.click(screen.getByRole('button', { name: 'Monter Ventes, marge et commissions' }))
   fireEvent.click(screen.getByRole('button', { name: 'Monter Ventes, marge et commissions' }))
   enregistrer()
-  expect(sortie(f)).toEqual({ perso: [], ordre: ['ensemble', 'ventes', 'salaire', 'ateliers'], defaut: VUE_TOUT })
+  expect(sortie(f)).toEqual({
+    perso: [], ordre: ['ensemble', 'ventes', 'salaire', 'ateliers'], defaut: VUE_TOUT,
+    rang: ['ensemble', 'ventes', 'salaire', 'avantages', 'ateliers'],
+  })
 })
 
 test('personnaliser : décocher un groupe le laisse à sa place dans la liste', () => {
@@ -126,7 +129,10 @@ test('personnaliser : « N’afficher que mes groupes » affiche aussi les group
   const f = fenetre({ perso, ordre: ['ensemble', 'p-1'], defaut: 'ensemble' })
   fireEvent.click(screen.getByRole('button', { name: 'N’afficher que mes groupes' }))
   enregistrer()
-  expect(sortie(f)).toEqual({ perso, ordre: ['p-1', 'p-2'], defaut: VUE_TOUT })
+  expect(sortie(f)).toEqual({
+    perso, ordre: ['p-1', 'p-2'], defaut: VUE_TOUT,
+    rang: ['ensemble', 'p-1', 'salaire', 'avantages', 'ventes', 'ateliers', 'p-2'],
+  })
 })
 
 function fenetreNoms(onNoms: (n: Record<string, string>) => Promise<void>, noms: Record<string, string> = {}) {

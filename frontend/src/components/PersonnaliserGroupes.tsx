@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import {
-  type ConfigGroupes, descGroupe, GRAPHES, type Groupe, GROUPES_ORIGINE, MAX_NOM, MAX_PAR_GROUPE, nouvelId, retablirOrigine, tousLesGroupes, VUE_TOUT,
+  type ConfigGroupes, descGroupe, GRAPHES, type Groupe, GROUPES_ORIGINE, MAX_NOM, MAX_PAR_GROUPE, nouvelId, rangComplet, retablirOrigine, tousLesGroupes, VUE_TOUT,
 } from '../lib/groupesGraphes'
 
 /** Le défaut suit les cases : le groupe s'il est seul coché, sinon tous les groupes cochés. */
@@ -63,10 +63,7 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     : tousLesGroupes({ ...travail, noms: nomsSaisis }, noms)
   const parId = new Map(tous.map((g) => [g.id, g]))
   // Place de chaque ligne fixe pendant la fenêtre : cocher ou décocher ne la déplace pas
-  const [rang, setRang] = useState<string[]>(() => {
-    const ids = tousLesGroupes(config).map((g) => g.id)
-    return [...new Set([...config.ordre.filter((id) => ids.includes(id)), ...ids])]
-  })
+  const [rang, setRang] = useState<string[]>(() => rangComplet(config))
   const ids = [...new Set([...rang, ...tous.map((g) => g.id)])].filter((id) => parId.has(id))
   const lignes: Groupe[] = ids.map((id) => parId.get(id)!)
   const affiches = ids.filter((id) => travail.ordre.includes(id))
@@ -100,7 +97,10 @@ export default function PersonnaliserGroupes({ config, dispo, noms = {}, onNoms,
     return JSON.stringify(avant) !== JSON.stringify(Object.entries(nomsSaisis))
   }
   const enregistrer = async () => {
-    const base = { ...travail, ordre: affiches }
+    // L'ordre complet n'est gardé que s'il diffère de celui déduit des groupes cochés
+    const { rang: _r, ...sansRang } = travail
+    const deduit = rangComplet({ ...sansRang, ordre: affiches })
+    const base = deduit.join() === ids.join() ? { ...sansRang, ordre: affiches } : { ...sansRang, ordre: affiches, rang: ids }
     const c = normaliser(onNoms ? base : Object.keys(nomsSaisis).length ? { ...base, noms: nomsSaisis } : sansNomsPerso(base))
     if (onNoms && nomsChanges()) {
       setErreur('')

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import {
-  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, groupesDuMenu, lireConfig, lireNoms, nouvelId, retablirOrigine, tousLesGroupes, choisirVue, vueDuMenu,
+  CONFIG_ORIGINE, descGroupe, GRAPHES, GROUPES_ORIGINE, groupesAffiches, groupesDuMenu, lireConfig, lireNoms, nouvelId, rangComplet, retablirOrigine, tousLesGroupes, choisirVue, vueDuMenu,
 } from './groupesGraphes'
 
 const tous = new Set(GRAPHES.map((g) => g.id))
@@ -40,6 +40,29 @@ test('choisirVue : un groupe devient le seul coché, « tout » recoche tout san
   const trois = { ...CONFIG_ORIGINE, ordre: ['ventes', 'ensemble', 'salaire'], defaut: 'tout' }
   expect(choisirVue(trois, 'ateliers')).toMatchObject({ ordre: ['ateliers'], defaut: 'ateliers' })
   expect(choisirVue(trois, 'tout')).toMatchObject({ ordre: ['ventes', 'ensemble', 'salaire', 'avantages', 'ateliers'], defaut: 'tout' })
+})
+
+test('choisirVue : choisir un groupe seul garde l’ordre personnalisé des autres', () => {
+  const perso = { ...CONFIG_ORIGINE, ordre: ['ateliers', 'avantages', 'salaire', 'ensemble', 'ventes'], defaut: 'tout' }
+  const seul = choisirVue(perso, 'salaire')
+  expect(seul.ordre).toEqual(['salaire'])
+  expect(seul.rang).toEqual(['ateliers', 'avantages', 'salaire', 'ensemble', 'ventes'])
+  expect(groupesDuMenu(seul, tous).map((g) => g.id)).toEqual(['salaire', 'ateliers', 'avantages', 'ensemble', 'ventes'])
+  // Un deuxième choix puis « tout » : l'ordre d'origine choisi revient
+  const tout = choisirVue(choisirVue(seul, 'ventes'), 'tout')
+  expect(tout.ordre).toEqual(['ateliers', 'avantages', 'salaire', 'ensemble', 'ventes'])
+  expect(rangComplet(tout)).toEqual(tout.ordre)
+})
+
+test('lireConfig : le rang est lu s’il est valide, ignoré sinon', () => {
+  const base = { perso: [], ordre: ['ventes'], defaut: 'ventes' }
+  expect(lireConfig({ ...base, rang: ['ateliers', 'ventes'] })?.rang).toEqual(['ateliers', 'ventes'])
+  expect(lireConfig({ ...base, rang: [1, 2] })).not.toHaveProperty('rang')
+  expect(lireConfig(base)).not.toHaveProperty('rang')
+})
+
+test('retablirOrigine : l’ordre personnalisé est oublié', () => {
+  expect(retablirOrigine({ ...CONFIG_ORIGINE, rang: ['ateliers'] })).not.toHaveProperty('rang')
 })
 
 test('vueDuMenu : groupe seul, tout, ou aucune ligne pour une sélection', () => {

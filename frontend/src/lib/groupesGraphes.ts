@@ -55,6 +55,8 @@ export interface ConfigGroupes {
   perso: Groupe[]
   ordre: string[]
   defaut: string
+  /** Ordre choisi de tous les groupes, cochés ou non : garde la place des autres quand un seul est coché. */
+  rang?: string[]
   /** Noms personnels des groupes d'origine, vus par l'utilisateur seul ; priment sur les noms communs. */
   noms?: Record<string, string>
 }
@@ -71,7 +73,8 @@ export const CONFIG_ORIGINE: ConfigGroupes = {
 
 /** Groupes d'origine affichés dans leur ordre et ouverture d'origine ; les groupes personnels restent (masqués). */
 export function retablirOrigine(config: ConfigGroupes): ConfigGroupes {
-  return { ...config, ordre: CONFIG_ORIGINE.ordre, defaut: CONFIG_ORIGINE.defaut }
+  const { rang: _r, ...reste } = config
+  return { ...reste, ordre: CONFIG_ORIGINE.ordre, defaut: CONFIG_ORIGINE.defaut }
 }
 
 const texte = (v: unknown, max: number): v is string => typeof v === 'string' && v.length >= 1 && v.length <= max
@@ -80,9 +83,10 @@ const liste = (v: unknown): v is unknown[] => Array.isArray(v)
 /** Valide un réglage venu du serveur ou du navigateur ; null si la forme n'est pas la bonne. */
 export function lireConfig(v: unknown): ConfigGroupes | null {
   if (typeof v !== 'object' || v === null) return null
-  const { perso, ordre, defaut, noms } = v as Record<string, unknown>
+  const { perso, ordre, defaut, noms, rang } = v as Record<string, unknown>
   if (!liste(perso) || perso.length > 20 || !liste(ordre) || ordre.length > 40 || !texte(defaut, 50)) return null
   if (!ordre.every((x) => texte(x, 50))) return null
+  const rangValide = liste(rang) && rang.length <= 40 && rang.every((x) => texte(x, 50))
   const groupes: Groupe[] = []
   for (const p of perso) {
     if (typeof p !== 'object' || p === null) return null
@@ -92,7 +96,10 @@ export function lireConfig(v: unknown): ConfigGroupes | null {
     groupes.push({ id, nom: nom.trim(), graphes: graphes as string[] })
   }
   const persos = noms === undefined ? null : lireNoms(noms)
-  return persos && Object.keys(persos).length ? { perso: groupes, ordre: ordre as string[], defaut, noms: persos } : { perso: groupes, ordre: ordre as string[], defaut }
+  const res: ConfigGroupes = { perso: groupes, ordre: ordre as string[], defaut }
+  if (rangValide) res.rang = rang as string[]
+  if (persos && Object.keys(persos).length) res.noms = persos
+  return res
 }
 
 /** Noms choisis par l'administration pour les groupes d'origine (identifiant -> nom) ; null si la forme
@@ -110,6 +117,12 @@ export function lireNoms(v: unknown): Record<string, string> | null {
  *  `noms` renomme les groupes d'origine seulement ; les groupes personnels gardent leur nom. */
 export function tousLesGroupes(config: ConfigGroupes, noms: Record<string, string> = {}): Groupe[] {
   return [...GROUPES_ORIGINE.map((g) => ({ ...g, nom: config.noms?.[g.id] ?? noms[g.id] ?? g.nom })), ...config.perso]
+}
+
+/** Ordre de tous les groupes connus : l'ordre choisi (`rang`, sinon les cochés), puis les autres. */
+export function rangComplet(config: ConfigGroupes): string[] {
+  const ids = tousLesGroupes(config).map((g) => g.id)
+  return [...new Set([...(config.rang ?? config.ordre), ...ids])].filter((id) => ids.includes(id))
 }
 
 /** Groupes à montrer, dans l'ordre choisi. Un identifiant inconnu est ignoré, un graphique sans donnée
@@ -131,15 +144,15 @@ export function groupesAffiches(config: ConfigGroupes, dispo: Set<string>, noms:
 
 /** Groupes du menu : les cochés d'abord, dans l'ordre choisi, puis les autres, qui restent accessibles. */
 export function groupesDuMenu(config: ConfigGroupes, dispo: Set<string>, noms: Record<string, string> = {}): Groupe[] {
-  const ordre = [...config.ordre, ...tousLesGroupes(config, noms).map((g) => g.id)]
+  const ordre = [...config.ordre, ...rangComplet(config)]
   return groupesAffiches({ ...config, ordre }, dispo, noms)
 }
 
 /** Choix dans le menu : « Tout afficher » recoche tous les groupes, un groupe devient le seul coché. */
-export function choisirVue(config: ConfigGroupes, vue: string, noms: Record<string, string> = {}): ConfigGroupes {
-  if (vue !== VUE_TOUT) return { ...config, ordre: [vue], defaut: vue }
-  const ordre = [...new Set([...config.ordre, ...tousLesGroupes(config, noms).map((g) => g.id)])]
-  return { ...config, ordre, defaut: VUE_TOUT }
+export function choisirVue(config: ConfigGroupes, vue: string): ConfigGroupes {
+  const rang = rangComplet(config)
+  if (vue !== VUE_TOUT) return { ...config, ordre: [vue], defaut: vue, rang }
+  return { ...config, ordre: rang, defaut: VUE_TOUT, rang }
 }
 
 /** Ligne du menu qui correspond à ce qui est affiché : un groupe seul, « tout », ou aucune pour une sélection. */
