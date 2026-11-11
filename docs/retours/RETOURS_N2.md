@@ -13,9 +13,9 @@ Complète `docs/QUESTIONS_CLIENT.md` et `docs/N2_DECISIONS.md`.
 - **Par défaut** : étude `docs/etude-formats-export.md` d'abord : Excel (.xlsx, graphique natif + onglet données), PowerPoint (.pptx, graphique natif avec données intégrées), copier-coller vers Office, autres pistes (Google Sheets / Slides via .xlsx / .pptx, CSV, Power BI). Comparaison pour / contre, puis réalisation du choix le plus simple pour l'utilisateur.
 
 ## 3. KPI : ratio front office / back office (précisé le 11/11)
-- **Demande** : ratio « productifs / administratifs » = **front office / back office**, dans les KPI.
+- **Demande** : ratio « productifs / administratifs » = **front office / back office**, dans les KPI, **en pourcentage**.
 - **Je comprends** : front office et back office sont déjà les deux **activités** de l'appli (`referentiels_init.ACTIVITES`). Ce n'est donc pas la notion de service « productif » (SAV PL, SAV Engins).
-- **Par défaut** : ratio = effectif front office ÷ effectif back office, fin de mois ; case KPI dans Mensuel et Annuel. Calcul côté serveur.
+- **Affiché en pourcentage** : % front office et % back office de l'effectif total (ex. 62 % / 38 %), en fin de mois ; case KPI dans Mensuel et Annuel. Calcul côté serveur.
 
 ## 4. Pourcentages (précisé le 11/11)
 - **Par service** : % front office et % back office de l'effectif du service, et % de l'effectif du service sur l'effectif global.
