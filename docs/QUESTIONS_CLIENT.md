@@ -47,7 +47,7 @@ Mise à jour : 2026-10-30. **Règle (30/10)** : la réponse « appliquée aujour
 | D3 | Périmètre Equipment = SAV PL, SAV Engins, Pneumatique, Sites Déportés (sans Administration) ; Commerce VN = service Commerce VN seul ? | Oui ; **remplacé (16/10)** : périmètre DPS = Commerce Pièces, SAV PL, SAV Engins, Sites Déportés, plus un périmètre par service (Pneumatique, SAV PL, SAV Engins, Sites Déportés) ; voir P0 §2. |
 | D4 | Les directeurs à périmètre voient-ils les données nominatives ou seulement des totaux ? | Totaux seulement. |
 | D5 | La marge et le taux de marge sont-ils réservés à l'administrateur RH et aux lecteurs globaux ? | Oui (le CA n'existe pas par périmètre). |
-| D6 | DOP : qui voit quoi ? | **Décidé (13/11)** : le DOP Nicolas voit tout. L'autre DOP voit les départements Equipment et Winpart ; Motors lui sera ajouté plus tard (voir E7). |
+| D6 | DOP : qui voit quoi ? | **Décidé (13/11), corrigé le jour même** : le DOP Nicolas a une vue globale sur Winpart (Winpart, Motul, Autofast). L'autre DOP voit les départements Equipment et Winpart ; Motors lui sera ajouté plus tard (voir E7). |
 
 ## E. Listes de valeurs (sites, services, employés)
 

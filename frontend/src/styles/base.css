@@ -710,6 +710,8 @@ html, body { overscroll-behavior: none; }
 .dossier-paie-mois { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .dossier-paie-mois input[type="number"] { width: 6em; }
 .saisie-sous-bandeau { margin: var(--sp-5) 0 0; font-size: var(--fs-base); font-weight: 800; color: var(--ink); }
+.apercu-mois { flex: 1; min-height: 420px; display: flex; flex-direction: column; margin-bottom: var(--sp-3); }
+.apercu-mois .champ { display: inline-flex; gap: var(--sp-2); align-items: center; margin: var(--sp-2) 0; }
 .pilotage-champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-3); }
 .pilotage-champs .champ { margin: 0; }
 .pilotage-alertes { margin: 0; padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + 1em); background: var(--warning-soft); border-left: 3px solid var(--warning); color: var(--warning); font-size: var(--fs-sm); display: grid; gap: 2px; }

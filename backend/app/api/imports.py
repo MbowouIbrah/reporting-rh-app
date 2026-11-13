@@ -8,10 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.rapports import _mensuel
 from app.db.session import get_db
 from app.imports import dossier, service
 from app.imports.lecture import MAX_OCTETS
-from app.models.imports import ImportAnomalie, LotImport
+from app.models.imports import ImportAnomalie, LotImport, StagingLigne
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize
 
@@ -50,6 +51,23 @@ def analyser_fichier_du_dossier(
     if lot is None:
         raise HTTPException(409, "Fichier en cours d'écriture : réessayer dans un instant")
     return service.lot_dict(lot)
+
+
+class PublicationAutoIn(BaseModel):
+    actif: bool
+
+
+@router.get("/publication-auto")
+def lire_publication_auto(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(p, "import:read")
+    return {"actif": service.publication_auto(db)}
+
+
+@router.put("/publication-auto")
+def regler_publication_auto(corps: PublicationAutoIn, p: Principal = Depends(current_principal),
+                            db: Session = Depends(get_db)):
+    authorize(p, "import:write")
+    return {"actif": service.regler_publication_auto(db, p.user_id, corps.actif)}
 
 
 @router.get("")
@@ -118,7 +136,8 @@ def corriger(lot_id: int, num: int, corps: CorrectionIn, p: Principal = Depends(
     """Corrige des cellules d'une ligne du fichier ; les contrôles du lot sont relancés."""
     authorize(p, "import:write")
     _lot(db, lot_id)
-    return service.lot_dict(service.corriger_ligne(db, p.user_id, lot_id, num, corps.valeurs))
+    return service.lot_dict(service.publier_si_auto(
+        db, service.corriger_ligne(db, p.user_id, lot_id, num, corps.valeurs)))
 
 
 class DecisionsIn(BaseModel):
@@ -137,7 +156,7 @@ def decisions(lot_id: int, corps: DecisionsIn, p: Principal = Depends(current_pr
     _lot(db, lot_id)
     r = service.appliquer_decisions(db, p.user_id, lot_id, corps.lignes, corps.ajouts,
                                     corps.retirees, corps.ignores, corps.simuler)
-    return {"anomalies": r} if corps.simuler else service.lot_dict(r)
+    return {"anomalies": r} if corps.simuler else service.lot_dict(service.publier_si_auto(db, r))
 
 
 class ReferentielIn(BaseModel):
@@ -153,8 +172,8 @@ def ajouter_referentiel(lot_id: int, corps: ReferentielIn,
     """Ajoute une valeur inconnue à sa liste (gardée dans le lot, créée à la validation)."""
     authorize(p, "import:write")
     _lot(db, lot_id)
-    return service.lot_dict(service.ajouter_referentiel(
-        db, p.user_id, lot_id, corps.dimension, corps.valeur, corps.type_site, corps.activite))
+    return service.lot_dict(service.publier_si_auto(db, service.ajouter_referentiel(
+        db, p.user_id, lot_id, corps.dimension, corps.valeur, corps.type_site, corps.activite)))
 
 
 @router.delete("/{lot_id}/lignes/{num}")
@@ -163,7 +182,8 @@ def retirer_ligne(lot_id: int, num: int, p: Principal = Depends(current_principa
     """Retire une ligne du lot (ex. doublon) ; les contrôles sont relancés."""
     authorize(p, "import:write")
     _lot(db, lot_id)
-    return service.lot_dict(service.retirer_ligne(db, p.user_id, lot_id, num))
+    lot = service.retirer_ligne(db, p.user_id, lot_id, num)
+    return service.lot_dict(service.publier_si_auto(db, lot))
 
 
 @router.get("/{lot_id}/rapport.xlsx")
@@ -217,6 +237,37 @@ class Cle(BaseModel):
 
 class ValidationIn(BaseModel):
     garder: list[Cle] = []  # lignes déjà en base à conserver telles quelles
+
+
+@router.post("/{lot_id}/apercu-mois")
+def apercu_mois(lot_id: int, corps: ValidationIn | None = None,
+                annee: int | None = Query(None, ge=2000, le=2100),
+                mois: int | None = Query(None, ge=1, le=12),
+                p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Reporting mensuel tel qu'il sera une fois le lot rendu disponible : validation jouée
+    dans un point de sauvegarde puis annulée. Mêmes calculs que l'écran Mensuel, rien d'écrit."""
+    authorize(p, "import:write")
+    lot = _lot(db, lot_id)
+    if lot.statut != "pret":
+        raise HTTPException(409, f"Lot au statut « {lot.statut} » : aperçu impossible")
+    q = select(StagingLigne.annee, StagingLigne.mois).where(StagingLigne.lot_id == lot_id)
+    periodes = sorted({(a, m) for a, m in db.execute(q.distinct()) if a and m})
+    if not periodes:
+        raise HTTPException(409, "Lot vide")
+    if annee is None or mois is None:
+        annee, mois = periodes[-1]
+    elif (annee, mois) not in periodes:
+        raise HTTPException(422, "Mois absent du lot")
+    garder = {(c.annee, c.mois, c.matricule.strip()) for c in corps.garder} if corps else None
+    point = db.begin_nested()
+    try:
+        service.valider_lot(db, p.user_id, lot_id, garder, commit=False)
+        mensuel = _mensuel(db, p, annee, mois, None, None)
+    finally:
+        point.rollback()
+        db.rollback()
+    return {"annee": annee, "mois": mois, "periodes": [list(x) for x in periodes],
+            "mensuel": mensuel}
 
 
 @router.post("/{lot_id}/valider")

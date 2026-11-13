@@ -194,6 +194,13 @@ def traiter(db: Session, nom: str, annee: int | None = None, mois: int | None = 
         LOG.exception("Analyse du fichier %s en échec", nom)
         return None
     LOG.info("Fichier %s analysé : lot %s (%s)", nom, lot.id, lot.statut)
+    try:
+        lot = service.publier_si_auto(db, lot)
+    except Exception:
+        db.rollback()
+        if not auto:
+            raise
+        LOG.exception("Publication automatique du lot %s en échec", lot.id)
     return lot
 
 

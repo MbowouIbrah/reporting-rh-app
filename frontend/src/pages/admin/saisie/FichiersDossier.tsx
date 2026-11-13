@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from '../../../api/client'
-import { analyserFichierDossier, useFichiersDossier, type EtatFichier, type FichierDossier } from '../../../api/saisie'
+import { analyserFichierDossier, reglerPublicationAuto, useFichiersDossier, usePublicationAuto, type EtatFichier, type FichierDossier } from '../../../api/saisie'
 import { Badge, Bouton } from '../../../components/Kit'
 import { MOIS } from '../../../lib/format'
 
@@ -25,6 +25,20 @@ export default function FichiersDossier({ onOuvrir }: Props) {
   const q = useFichiersDossier()
   const [enCours, setEnCours] = useState<string>()
   const [erreur, setErreur] = useState<string>()
+  const auto = usePublicationAuto(!!q.data?.actif)
+  const [reglage, setReglage] = useState(false)
+  const basculer = async (actif: boolean) => {
+    setReglage(true)
+    setErreur(undefined)
+    try {
+      await reglerPublicationAuto(actif)
+      await auto.refetch()
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Réglage impossible.')
+    } finally {
+      setReglage(false)
+    }
+  }
 
   const analyser = async (nom: string, periode?: { annee: number; mois: number }) => {
     setEnCours(nom)
@@ -45,6 +59,12 @@ export default function FichiersDossier({ onOuvrir }: Props) {
     <section className="dossier-paie" aria-label="Fichiers du dossier de paie">
       <div className="dossier-paie-entete">
         <h3 className="saisie-sous-bandeau">FICHIERS DU DOSSIER DE PAIE</h3>
+        {q.data?.actif && auto.data && (
+          <label className="admin-case" title="Un fichier sans problème, ou dont le dernier problème vient d’être réglé, est rendu disponible sans clic. Jamais quand il modifie des lignes déjà enregistrées.">
+            <input type="checkbox" checked={auto.data.actif} disabled={reglage} onChange={(e) => void basculer(e.target.checked)} />{' '}
+            Publication automatique
+          </label>
+        )}
         <Bouton variante="lien" onClick={() => void q.refetch()} disabled={q.isFetching}>Actualiser</Bouton>
       </div>
       {erreur && <p className="bandeau ko" role="alert">{erreur}</p>}

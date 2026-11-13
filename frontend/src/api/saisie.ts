@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, BASE, queryRetry, telecharger } from './client'
 import { qs } from './rapports'
+import type { Mensuel } from './types'
 
 export const ATTRIBUTS = ['poste', 'type_contrat', 'activite', 'site', 'service'] as const
 export type Attribut = (typeof ATTRIBUTS)[number]
@@ -223,6 +224,15 @@ export const simulerDecisions = (id: number, d: Decisions) =>
   api<{ anomalies: { ligne: number | null; colonne: string | null; code: string }[] }>(
     `/imports/${id}/decisions`, json({ ...d, simuler: true }))
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
+/** Tableaux Mensuel du mois calculés comme si le lot était enregistré ; rien n'est écrit. */
+export interface ApercuMois { annee: number; mois: number; periodes: [number, number][]; mensuel: Mensuel }
+export const apercuMois = (id: number, garder: Cle[], periode?: { annee: number; mois: number }) =>
+  api<ApercuMois>(`/imports/${id}/apercu-mois${periode ? qs({ ...periode }) : ''}`, json({ garder }))
+/** Publication automatique des fichiers du dossier sans problème (coupée par défaut). */
+export const usePublicationAuto = (enabled: boolean) =>
+  useQuery({ queryKey: ['saisie', 'publication-auto'], queryFn: () => api<{ actif: boolean }>('/imports/publication-auto'), enabled, retry: queryRetry })
+export const reglerPublicationAuto = (actif: boolean) =>
+  api<{ actif: boolean }>('/imports/publication-auto', { ...json({ actif }), method: 'PUT' })
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 
 export const urlRapport = (id: number) => `${BASE}/imports/${id}/rapport.xlsx`

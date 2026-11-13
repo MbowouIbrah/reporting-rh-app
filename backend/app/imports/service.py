@@ -36,7 +36,7 @@ from app.imports.regles import (
     valider,
 )
 from app.imports.similarite import SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
-from app.models.auth import AuditEvent
+from app.models.auth import AuditEvent, ReglageGlobal
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
@@ -852,6 +852,44 @@ ATTRS_APERCU = (("poste", "Poste", Poste, "poste_id"), ("type_contrat", "Type Co
                 ("site", "Site", Site, "site_id"), ("service", "Service", Service, "service_id"))
 
 
+CLE_PUBLICATION_AUTO = "publication_auto"
+
+
+def publication_auto(db: Session) -> bool:
+    v = db.scalar(select(ReglageGlobal.valeur).where(ReglageGlobal.cle == CLE_PUBLICATION_AUTO))
+    return bool(isinstance(v, dict) and v.get("actif"))
+
+
+def regler_publication_auto(db: Session, user_id: int, actif: bool) -> bool:
+    ligne = db.scalar(select(ReglageGlobal).where(ReglageGlobal.cle == CLE_PUBLICATION_AUTO))
+    avant = dict(ligne.valeur) if ligne else None
+    if ligne:
+        ligne.valeur = {"actif": actif}
+    else:
+        db.add(ReglageGlobal(cle=CLE_PUBLICATION_AUTO, valeur={"actif": actif}))
+    db.flush()
+    audit.record(db, user_id, "update", "reglage", CLE_PUBLICATION_AUTO, avant, {"actif": actif})
+    db.commit()
+    return actif
+
+
+def publier_si_auto(db: Session, lot: LotImport) -> LotImport:
+    """Publication automatique (réglage, coupée par défaut) d'un lot du dossier sans problème.
+    Jamais d'écrasement en silence : un lot qui modifie des lignes déjà en base attend l'admin."""
+    if lot.origine != "dossier" or lot.statut != "pret" or not publication_auto(db):
+        return lot
+    if apercu(db, lot.id)["modifiee"]:
+        return lot
+    try:
+        lot = valider_lot(db, None, lot.id)
+    except HTTPException:  # déjà importé, vide : reste à l'admin
+        db.rollback()
+        return db.get(LotImport, lot.id)
+    audit.record(db, None, "import_publie_auto", "lot_import", lot.id, None, {"statut": "valide"})
+    db.commit()
+    return lot
+
+
 def apercu(db: Session, lot_id: int) -> dict:
     """Différences entre le lot et la base, sans écriture : ce que la validation changerait."""
     from app.kpi.chargement import exclues_a_date
@@ -944,8 +982,10 @@ def _departements_des_services(db: Session, lot: LotImport) -> dict[str, int]:
     return {s: idx[norm(d)] for s, d in cites.items() if norm(d) in idx}
 
 
-def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None = None) -> LotImport:
-    """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée)."""
+def valider_lot(db: Session, user_id: int | None, lot_id: int, garder: set[Cle] | None = None,
+                commit: bool = True) -> LotImport:
+    """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée).
+    `commit=False` : écritures seulement envoyées (aperçu du mois, annulé ensuite)."""
     lot = _get_lot(db, lot_id, verrou=True)
     if lot.statut != "pret":
         raise HTTPException(409, f"Lot au statut « {lot.statut} » : validation impossible")
@@ -969,7 +1009,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
         lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
         audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                      {"situations": 0, "montants": 0, "remplacees": 0, "ignorees": ignorees})
-        db.commit()
+        db.commit() if commit else db.flush()
         return lot
 
     cles_periodes = {(r.annee, r.mois) for r in rows}
@@ -1109,7 +1149,7 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
     audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                  {"situations": len(sits), "montants": len(montants),
                   "remplacees": len(a_remplacer), "ignorees": ignorees})
-    db.commit()
+    db.commit() if commit else db.flush()
     return lot
 
 

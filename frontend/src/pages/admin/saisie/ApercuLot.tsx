@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { lireAnomalies, lireApercu, validerLot, type Cle, type LigneApercu, type Lot } from '../../../api/saisie'
+import { apercuMois, lireAnomalies, lireApercu, validerLot, type Cle, type LigneApercu, type Lot } from '../../../api/saisie'
 import { queryRetry } from '../../../api/client'
 import Etat, { etatErreur } from '../../../components/Etat'
+import { Contenu as TableauxMensuel } from '../../Mensuel'
 import { Badge, Bouton } from '../../../components/Kit'
 import { matriculeAffiche, MOIS, valeurBrute } from '../../../lib/format'
 import BarreParcours from './BarreParcours'
@@ -53,6 +54,9 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
   }, [choixVolet])
   const [enAttente, setEnAttente] = useState(0)
   const [pied, setPied] = useState<HTMLElement | null>(null)
+  // Aperçu du mois : tableaux Mensuel calculés sur le lot, rien n'est écrit.
+  const [voirMois, setVoirMois] = useState(false)
+  const [moisChoisi, setMoisChoisi] = useState<{ annee: number; mois: number }>()
   const d = q.data
 
   if (q.isLoading) return <Etat type="chargement" />
@@ -70,6 +74,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
     (m, l) => (!m || l.annee * 12 + l.mois > m.annee * 12 + m.mois ? l : m), undefined)
   const effectif = dernier && new Set(d.lignes.filter((l) => l.annee === dernier.annee && l.mois === dernier.mois).map((l) => l.matricule)).size
   const aEcrire = nouvelles.length + modifiees.length - gardees.size
+  const garderCles = (): Cle[] => modifiees.filter((l) => gardees.has(cle(l))).map(({ annee, mois, matricule }) => ({ annee, mois, matricule }))
   const choisir = (k: string, garder: boolean) =>
     setGardees((g) => {
       const n = new Set(g)
@@ -80,7 +85,7 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
 
   const enregistrer = async () => {
     setEnvoi({ cours: true })
-    const garder: Cle[] = modifiees.filter((l) => gardees.has(cle(l))).map(({ annee, mois, matricule }) => ({ annee, mois, matricule }))
+    const garder = garderCles()
     try {
       const fini = await validerLot(lot.id, garder)
       onFini(fini, aEcrire)
@@ -131,7 +136,8 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
           {d.effaces} montant{s(d.effaces)} existant{s(d.effaces)} {d.effaces > 1 ? 'seront' : 'sera'} effacé{s(d.effaces)} (cellule vide dans la saisie) si vous remplacez la ligne.
         </p>
       )}
-      <div className="panneau">
+      {voirMois && <ApercuDuMois lotId={lot.id} garder={garderCles()} choix={moisChoisi} onChoix={setMoisChoisi} />}
+      <div className="panneau" hidden={voirMois}>
         <div ref={volets} className="panneau-corps volets" role="region" aria-label="Détail de l'aperçu">
           {d.nb_absents > 0 && (
             <Volet titre={<><span className="saisie-oubli">Oublis</span> ou départs</>} valeur={d.nb_absents} ton="ko"
@@ -238,10 +244,45 @@ export default function ApercuLot({ lot: recu, parcours, onRetour, onFini }: Pro
         {enAttente > 0 && <span className="muted">Enregistrez ou annulez d’abord les corrections.</span>}
         <span ref={setPied} className="pied-actions" />
         <Bouton variante="secondaire" onClick={onRetour} disabled={envoi.cours}>Revenir à l’étape précédente</Bouton>
+        {lot.statut === 'pret' && aEcrire > 0 && (
+          <Bouton variante="secondaire" onClick={() => setVoirMois((v) => !v)} disabled={envoi.cours || enAttente > 0} aria-pressed={voirMois}>
+            {voirMois ? 'Revenir aux contrôles' : 'Voir le mois'}
+          </Bouton>
+        )}
         <Bouton onClick={enregistrer} disabled={envoi.cours || enAttente > 0}>
-          {aEcrire > 0 ? `Enregistrer ${aEcrire} ligne${aEcrire > 1 ? 's' : ''}` : 'Terminer sans rien changer'}
+          {lot.origine === 'dossier' && aEcrire > 0 ? 'Rendre disponible' : aEcrire > 0 ? `Enregistrer ${aEcrire} ligne${aEcrire > 1 ? 's' : ''}` : 'Terminer sans rien changer'}
         </Bouton>
       </div>
+    </section>
+  )
+}
+
+/** Les tableaux du Reporting mensuel du mois, tels que les utilisateurs les verront une fois le lot rendu disponible. */
+function ApercuDuMois({ lotId, garder, choix, onChoix }: {
+  lotId: number; garder: Cle[]; choix?: { annee: number; mois: number }; onChoix: (p: { annee: number; mois: number }) => void
+}) {
+  const q = useQuery({
+    queryKey: ['saisie', 'apercu-mois', lotId, garder, choix],
+    queryFn: () => apercuMois(lotId, garder, choix),
+    retry: queryRetry,
+  })
+  if (q.isLoading) return <p className="note">Calcul du mois…</p>
+  if (q.error || !q.data) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
+  const { annee, mois, periodes, mensuel } = q.data
+  const prec = mois === 1 ? { annee: annee - 1, mois: 12 } : { annee, mois: mois - 1 }
+  return (
+    <section className="apercu-mois" aria-label="Aperçu du mois">
+      <h3 className="saisie-sous-bandeau">
+        APERÇU DU MOIS — {periode({ annee, mois }).toUpperCase()} (visible par vous seul tant que non rendu disponible)
+      </h3>
+      {periodes.length > 1 && (
+        <label className="champ">Mois{' '}
+          <select value={`${annee}-${mois}`} onChange={(e) => { const [a, m] = e.target.value.split('-').map(Number); onChoix({ annee: a, mois: m }) }}>
+            {periodes.map(([a, m]) => <option key={`${a}-${m}`} value={`${a}-${m}`}>{periode({ annee: a, mois: m })}</option>)}
+          </select>
+        </label>
+      )}
+      <TableauxMensuel d={mensuel} lib={{ prec: periode(prec), cour: periode({ annee, mois }) }} />
     </section>
   )
 }

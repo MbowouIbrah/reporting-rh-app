@@ -278,3 +278,55 @@ def test_fichier_modifie_sans_la_valeur_ajoutee_ne_la_reprend_pas(paie, db):
     db.refresh(ancien)
     assert ancien.statut == "annule" and nouveau.statut == "pret"
     assert not (nouveau.feuille or {}).get("ajouts")
+
+
+def test_apercu_du_mois_calcule_sans_rien_ecrire(paie, db, make_client):
+    from app.models.donnees import SituationMensuelle
+    deposer(paie)
+    lot = dossier.traiter(db, "BrutFinal1026.csv")
+    c = make_client(ADMIN)
+    r = c.post(f"/api/v1/imports/{lot.id}/apercu-mois")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert (d["annee"], d["mois"], d["periodes"]) == (2026, 10, [[2026, 10]])
+    assert d["mensuel"]["synthese"] and d["mensuel"]["d_contrat"]
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(SituationMensuelle)) == 0
+    assert db.get(LotImport, lot.id).statut == "pret"
+    assert db.scalar(select(AuditEvent.id).where(AuditEvent.action == "import_valide")) is None
+    assert c.post(f"/api/v1/imports/{lot.id}/apercu-mois", params={"annee": 2026, "mois": 9}).status_code == 422
+    assert make_client(DRH).post(f"/api/v1/imports/{lot.id}/apercu-mois").status_code == 403
+    # puis « Rendre disponible » : la vraie validation passe
+    assert c.post(f"/api/v1/imports/{lot.id}/valider").json()["statut"] == "valide"
+    assert c.post(f"/api/v1/imports/{lot.id}/apercu-mois").status_code == 409
+
+
+def test_publication_automatique_coupee_par_defaut_puis_activee(paie, db, make_client):
+    c = make_client(ADMIN)
+    assert c.get("/api/v1/imports/publication-auto").json() == {"actif": False}
+    deposer(paie)
+    assert dossier.traiter(db, "BrutFinal1026.csv").statut == "pret"
+    assert c.put("/api/v1/imports/publication-auto", json={"actif": True}).json() == {"actif": True}
+    assert make_client(DRH).put("/api/v1/imports/publication-auto", json={"actif": False}).status_code == 403
+    deposer(paie, "BrutFinal1126.csv", BRUT="160 000")  # contenu différent (même sha = ignoré)
+    lot = dossier.traiter(db, "BrutFinal1126.csv")
+    assert lot.statut == "valide" and lot.valide_par is None
+    assert db.scalar(select(AuditEvent).where(AuditEvent.action == "import_publie_auto")).entite_id == str(lot.id)
+
+
+def test_publication_automatique_jamais_sur_des_lignes_deja_entrees(paie, db, make_client, monkeypatch):
+    monkeypatch.setattr(service, "publication_auto", lambda db: True)
+    deposer(paie)
+    assert dossier.traiter(db, "BrutFinal1026.csv").statut == "valide"
+    deposer(paie, BRUT="160 000")  # même mois, montant changé : l'admin choisit Remplacer ou Garder
+    assert dossier.traiter(db, "BrutFinal1026.csv").statut == "pret"
+
+
+def test_publication_automatique_apres_le_dernier_probleme_regle(paie, db, make_client, monkeypatch):
+    monkeypatch.setattr(service, "publication_auto", lambda db: True)
+    deposer(paie, **{"Emploi occupé": "Technicien"})
+    lot = dossier.traiter(db, "BrutFinal1026.csv")
+    assert lot.statut == "rejete"
+    r = make_client(ADMIN).post(f"/api/v1/imports/{lot.id}/referentiels",
+                                json={"dimension": "poste", "valeur": "Technicien", "activite": "Front office"})
+    assert r.json()["statut"] == "valide"

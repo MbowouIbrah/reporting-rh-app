@@ -87,7 +87,24 @@ test('surveillance coupée, dossier vide et actualisation', async () => {
   actif = true
   fireEvent.click(screen.getByRole('button', { name: 'Actualiser' }))
   expect(await screen.findByText('Aucun fichier dans le dossier.')).toBeTruthy()
-  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(fetch.mock.calls.filter(([u]) => String(u).endsWith('/imports/dossier'))).toHaveLength(2)
+})
+
+test('case « Publication automatique » : lue puis réglée', async () => {
+  let auto = false
+  const { fetch } = rendre((url, init) => {
+    if (url.endsWith('/imports/publication-auto')) {
+      if (init?.method === 'PUT') auto = JSON.parse(String(init.body)).actif
+      return json(200, { actif: auto })
+    }
+    return json(200, { actif: true, fichiers: [] })
+  })
+  const caseAuto = await screen.findByRole('checkbox', { name: /Publication automatique/ })
+  expect(caseAuto).not.toBeChecked()
+  fireEvent.click(caseAuto)
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: /Publication automatique/ })).toBeChecked())
+  const put = fetch.mock.calls.find(([, i]) => i?.method === 'PUT')!
+  expect(JSON.parse(String(put[1]!.body))).toEqual({ actif: true })
 })
 
 test('un lot du dossier s’ouvre sans renvoyer de fichier', async () => {
