@@ -395,7 +395,7 @@ export default function Graphes() {
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}

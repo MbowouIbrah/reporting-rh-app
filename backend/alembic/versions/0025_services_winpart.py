@@ -43,7 +43,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     for libelle, productif in SERVICES.items():
         conn.execute(sa.text(
-            "INSERT INTO service (libelle, actif, productif) SELECT :l, true, :p "
+            "INSERT INTO service (libelle, actif, productif) SELECT CAST(:l AS VARCHAR), true, :p "
             "WHERE NOT EXISTS (SELECT 1 FROM service WHERE libelle = :l)"),
             {"l": libelle, "p": productif})
     for code, (libelle, services) in PERIMETRES.items():

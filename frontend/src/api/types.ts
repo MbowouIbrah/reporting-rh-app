@@ -77,6 +77,7 @@ export interface Periode {
 
 
 export interface Filtres {
+  departements?: string[]
   services: string[]
   sites: string[]
   types_site?: string[]
@@ -85,7 +86,7 @@ export interface Filtres {
   postes?: string[]
   activites?: string[]
   types_contrat?: string[]
-  /** N-uplets présents [service, site, type de site, activité, contrat, poste] ; '' = sans valeur. */
+  /** N-uplets présents [département, service, site, type de site, activité, contrat, poste] ; '' = sans valeur. */
   combinaisons?: string[][]
 }
 

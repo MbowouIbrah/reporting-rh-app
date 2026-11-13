@@ -138,16 +138,17 @@ def main() -> None:
     adresse = args.url or (ADRESSE.read_text(encoding="utf-8").strip() if ADRESSE.exists() else "")
     if not adresse.startswith("http"):
         sys.exit("adresse publique inconnue : --url https://...")
-    base = (BACKEND / args.base).resolve()
-    if not base.exists():
+    pg = args.base.startswith("postgresql")
+    base = Path(".") if pg else (BACKEND / args.base).resolve()
+    if not pg and not base.exists():
         sys.exit(f"{base} introuvable : lancer d'abord reinit.py")
     sortie = Path(args.sortie).resolve()
     comptes = charger()
-    os.environ.update(DATABASE_URL=f"sqlite:///{base.as_posix()}", ENV="test")
+    os.environ.update(DATABASE_URL=args.base if pg else f"sqlite:///{base.as_posix()}", ENV="test")
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
 
-    from sqlalchemy import func, select
+    from sqlalchemy import Integer, func, literal, select
 
     from app.db.session import SessionLocal
     from app.models.auth import Perimetre, PerimetreRegle, Utilisateur
@@ -155,7 +156,7 @@ def main() -> None:
     from app.security import liens
 
     with SessionLocal() as db:
-        cle = Periode.annee * 100 + Periode.mois
+        cle = Periode.annee * literal(100, Integer) + Periode.mois
         bornes = db.execute(select(func.min(cle), func.max(cle))
                             .join(SituationMensuelle)).one()
         if bornes[0] is None:

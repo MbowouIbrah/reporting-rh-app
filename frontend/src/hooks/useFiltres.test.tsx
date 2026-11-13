@@ -71,9 +71,9 @@ test("en fiscal : années d'exercice, exercice et mois par défaut", async () =>
 
 // [service, site, type de site, activité, contrat, poste]
 const COMBIS = [
-  ['SAV PL', 'Douala', 'principal', 'Atelier', 'CDI', 'Mécanicien'],
-  ['SAV PL', 'Kribi', 'deporte', 'Atelier', 'CDD', ''],
-  ['Commerce VN', 'Douala', 'principal', 'Vente', 'CDI', 'Vendeur'],
+  ['DPS', 'SAV PL', 'Douala', 'principal', 'Atelier', 'CDI', 'Mécanicien'],
+  ['DPS', 'SAV PL', 'Kribi', 'deporte', 'Atelier', 'CDD', ''],
+  ['', 'Commerce VN', 'Douala', 'principal', 'Vente', 'CDI', 'Vendeur'],
 ]
 
 test('facettes : seules les valeurs compatibles avec les autres choix, la valeur choisie gardée', () => {

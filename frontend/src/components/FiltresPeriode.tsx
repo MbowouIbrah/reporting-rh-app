@@ -14,6 +14,8 @@ type Patch = Record<string, string | number | undefined>
 interface Props {
   filtres: FiltresPage
   annees: number[]
+  /** Départements proposés ; absent : pas de filtre « Département ». */
+  departements?: string[]
   services?: string[]
   sites?: string[]
   /** Types de site présents dans les données. */
@@ -208,7 +210,7 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 }
 
 export default function FiltresPeriode({
-  filtres, annees, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
+  filtres, annees, departements, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
   children, onChange, partage,
 }: Props) {
   const avecType = !!typesSite?.length
@@ -221,6 +223,7 @@ export default function FiltresPeriode({
     'annee',
     ...(avecMois ? (['mois'] as const) : []),
     ...(comparaison === 'annee' ? (['cmp_annee'] as const) : comparaison === 'periode' ? (['cmp_periode'] as const) : []),
+    ...(departements ? (['departement'] as const) : []),
     ...(services ? (['service'] as const) : []),
     ...(sites ? (['site'] as const) : []),
     ...(avecType ? (['type_site'] as const) : []),
@@ -242,6 +245,17 @@ export default function FiltresPeriode({
       )}
       {comparaison && (
         <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />
+      )}
+      {departements && (
+        <label className="souple">
+          Département
+          <select value={filtres.departement ?? ''} onChange={(e) => onChange({ departement: e.target.value })}>
+            <option value="">Tous</option>
+            {departements.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        </label>
       )}
       {services && (
         <label className="souple">

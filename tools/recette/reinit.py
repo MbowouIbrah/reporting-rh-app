@@ -81,6 +81,10 @@ def historique_recette(fin: tuple[int, int] = (2026, 6)) -> tuple[bytes, list[st
 
 
 def _preparer(base: str) -> None:
+    if base.startswith("postgresql"):
+        os.environ.update(DATABASE_URL=base, ENV="test", COOKIE_SECURE="false",
+                          SECRET_KEY=os.environ.get("SECRET_KEY") or "presentation-" + "x" * 40)
+        return
     fichier = BACKEND / base
     try:
         fichier.unlink(missing_ok=True)
@@ -188,9 +192,10 @@ def main() -> None:
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
             email = c["email"].strip().lower()
+            ps = [perim[x] for x in c["perimetre"].split("+")] if c["perimetre"] else []
             _user(db, email, c["nom"], c["mot_de_passe"], c["modele"],
-                  perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui",
-                  provisoire=False)
+                  ps[0] if ps else None, c["nominatif"] == "oui",
+                  provisoire=False, autres=tuple(ps[1:]))
             # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
             db.flush()
             u = db.scalar(select(Utilisateur).where(Utilisateur.email == email))

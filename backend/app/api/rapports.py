@@ -13,8 +13,8 @@ from app.kpi import exercice as ex
 from app.kpi import moteur
 from app.kpi.exercice import Calendrier
 from app.models.donnees import Periode, Salarie
-from app.models.referentiel import Rubrique
-from app.repos.scope import scope_for
+from app.models.referentiel import Departement, Rubrique, Service
+from app.repos.scope import restreindre, scope_for
 from app.security import audit
 from app.security.deps import current_principal
 from app.security.policy import Principal, authorize, is_allowed
@@ -121,13 +121,17 @@ def filtres(
 ):
     authorize(p, "report:read")
     lignes = list(_lignes_annee(db, p, annee, calendrier))
+    dep = dict(db.execute(select(Service.libelle, Departement.libelle)
+                          .join(Departement, Departement.id == Service.departement_id)).all())
     # Combinaisons présentes : le front n'offre, pour chaque filtre, que les valeurs compatibles
     # avec les autres filtres choisis (jamais d'option qui mène à un résultat vide).
     combinaisons = sorted(
-        {(L.service, L.site, L.type_site, L.activite or "", L.contrat, L.poste or "")
+        {(dep.get(L.service, ""), L.service, L.site, L.type_site, L.activite or "", L.contrat,
+          L.poste or "")
          for L in lignes}
     )
     return {"combinaisons": [list(c) for c in combinaisons],
+            "departements": sorted({dep[L.service] for L in lignes if L.service in dep}),
             "services": sorted({L.service for L in lignes}),
             "sites": sorted({L.site for L in lignes}),
             "types_site": sorted({L.type_site for L in lignes}),
@@ -179,9 +183,10 @@ def _params(db, crit: dict, annee: int, mois: int):
 
 
 def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
-             type_site=None, poste=None, matricule=None, activite=None, type_contrat=None) -> dict:
+             type_site=None, poste=None, matricule=None, activite=None, type_contrat=None,
+             departement=None) -> dict:
     authorize(p, "report:read")
-    scope = scope_for(db, p)
+    scope = restreindre(db, scope_for(db, p), departement)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
             "activite": activite, "type_contrat": type_contrat}
     cur = ch.filtrer(ch.charger_periode(db, scope, annee, mois), service, site, **crit)
@@ -208,11 +213,13 @@ def mensuel(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    departement: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
-                    matricule, activite, type_contrat)
+                    matricule, activite, type_contrat,
+                    departement=departement)
 
 
 @router.get("/mensuel/export")
@@ -228,15 +235,17 @@ def mensuel_export(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    departement: str | None = Query(None, max_length=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     res = _mensuel(db, p, annee, mois, service, site, ref_annee, ref_mois, type_site, poste,
-                   matricule, activite, type_contrat)
+                   matricule, activite, type_contrat,
+                    departement=departement)
     audit.record(db, p.user_id, "export", "rapport_mensuel", f"{annee}-{mois:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
-                  "type_contrat": type_contrat})
+                  "type_contrat": type_contrat, "departement": departement})
     db.commit()
     if ref_annee is None or ref_mois is None:
         ref_annee, ref_mois = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
@@ -247,11 +256,11 @@ def mensuel_export(
 
 def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
             matricule=None, activite=None, type_contrat=None,
-            calendrier: Calendrier = "civil") -> dict:
+            calendrier: Calendrier = "civil", departement=None) -> dict:
     """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
     l'exercice). Le moteur reçoit des rangs 1 à 12 (kpi/exercice.py)."""
     authorize(p, "report:read")
-    scope = scope_for(db, p)
+    scope = restreindre(db, scope_for(db, p), departement)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
             "activite": activite, "type_contrat": type_contrat}
 
@@ -291,12 +300,13 @@ def annuel(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    departement: str | None = Query(None, max_length=100),
     calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite, type_contrat, calendrier)
+                   activite, type_contrat, calendrier, departement)
 
 
 @router.get("/annuel/export")
@@ -311,17 +321,19 @@ def annuel_export(
     matricule: str | None = Query(None, max_length=30),
     activite: str | None = Query(None, max_length=100),
     type_contrat: str | None = Query(None, max_length=100),
+    departement: str | None = Query(None, max_length=100),
     calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                  activite, type_contrat, calendrier)
+                  activite, type_contrat, calendrier, departement)
     an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
     audit.record(db, p.user_id, "export", "rapport_annuel", f"{an_fin}-{mois_fin:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
-                  "type_contrat": type_contrat, "calendrier": calendrier})
+                  "type_contrat": type_contrat, "calendrier": calendrier,
+                  "departement": departement})
     db.commit()
     suffixe = "-fiscal" if calendrier == "fiscal" else ""
     # libellé du cumul : dernier mois réellement cumulé, comme à l'écran

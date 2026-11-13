@@ -69,7 +69,7 @@ export function usePartage() {
 }
 
 /** Filtres liés, dans l'ordre des colonnes de `combinaisons` (/rapports/filtres). */
-const DIMS = ['service', 'site', 'type_site', 'activite', 'type_contrat', 'poste'] as const
+const DIMS = ['departement', 'service', 'site', 'type_site', 'activite', 'type_contrat', 'poste'] as const
 type Dim = (typeof DIMS)[number]
 type Choix = Partial<Record<Dim, string | undefined>>
 
@@ -152,6 +152,7 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
   const filtres: FiltresPage | null = annee === undefined ? null : {
     annee,
     mois,
+    departement: p.departement,
     service: p.service,
     site: p.site,
     type_site: p.type_site,
@@ -181,6 +182,10 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     periodes: periodes.data ?? [],
     calendrier,
     annees: [...new Set(periodes.data?.map((x) => exerciceDe(x.annee, x.mois, calendrier)))],
+    // Filtre « Département » proposé seulement quand le périmètre en couvre plusieurs.
+    departements: (options.data?.departements?.length ?? 0) > 1
+      ? (f?.departement ?? options.data?.departements)
+      : undefined,
     services: f?.service ?? options.data?.services ?? [],
     sites: f?.site ?? options.data?.sites ?? [],
     typesSite: f?.type_site ?? options.data?.types_site ?? [],

@@ -5,6 +5,8 @@ import type { Annuel, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode,
 export interface FiltresPage {
   annee: number
   mois: number
+  /** Département : le rapport ne garde que ses services. */
+  departement?: string
   service?: string
   site?: string
   type_site?: string

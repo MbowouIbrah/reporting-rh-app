@@ -286,12 +286,13 @@ def test_filtre_type_contrat(charge):
 def test_filtres_combinaisons(charge):
     f = get(charge, "filtres", annee=2026).json()
     combis = f["combinaisons"]
-    assert combis and all(len(c) == 6 for c in combis)
-    assert sorted({c[0] for c in combis}) == f["services"]
-    assert sorted({c[1] for c in combis}) == f["sites"]
-    assert sorted({c[4] for c in combis}) == f["types_contrat"]
+    assert combis and all(len(c) == 7 for c in combis)
+    assert sorted({c[0] for c in combis}) == f["departements"]
+    assert sorted({c[1] for c in combis}) == f["services"]
+    assert sorted({c[2] for c in combis}) == f["sites"]
+    assert sorted({c[5] for c in combis}) == f["types_contrat"]
     # Chaque couple service + site proposé renvoie des effectifs.
-    for service, site in {(c[0], c[1]) for c in combis}:
+    for service, site in {(c[1], c[2]) for c in combis}:
         r = get(charge, "mensuel", annee=2026, mois=1, service=service, site=site).json()
         assert r["synthese"]["effectif"]["fin"] > 0, (service, site)
 
@@ -358,3 +359,24 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
     db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "deporte"
     db.commit()
     assert get(c, "individuel/tous", annee=2025).json()["mois"][0]["deporte"] is True
+
+
+def test_filtre_departement(charge, make_client):
+    # Les trois services de janvier sont dans Equipment ; Winpart n'a personne.
+    r = get(charge, "mensuel", annee=2026, mois=1, departement="Equipment").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("7000.5")
+    assert r["synthese"]["ca"] is None  # pas de CA par département, comme par service
+    assert get(charge, "mensuel", annee=2026, mois=1, departement="Winpart").status_code == 404
+    assert get(charge, "mensuel", annee=2026, mois=1, departement="Inconnu").status_code == 404
+    a = get(charge, "annuel", annee=2026, mois=2, departement="Equipment").json()
+    assert D(a["cumul_ytd"]["m"]) == D("10700.5")
+    # le département ne peut pas élargir le périmètre : DPS Equipment reste sur SAV PL
+    e = get(make_client(EQUIP), "mensuel", annee=2026, mois=1, departement="Equipment").json()
+    assert D(e["synthese"]["ms"]["m"]) == D("1000.5")
+    f = get(charge, "filtres", annee=2026).json()
+    assert f["departements"] == ["Equipment"]
+    assert {c[0] for c in f["combinaisons"]} == {"Equipment"}
+    assert {c[1] for c in f["combinaisons"]} == {"SAV PL", "Commerce VN", "Administration"}
+    ex = charge.get(f"{API}/rapports/annuel/export",
+                    params={"annee": 2026, "mois": 2, "departement": "Equipment"})
+    assert ex.status_code == 200

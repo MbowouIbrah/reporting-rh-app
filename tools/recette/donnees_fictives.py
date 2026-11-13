@@ -66,6 +66,10 @@ SITES = {
     "SAV PL": ["Douala", "Yaoundé", "Garoua", "Dehane", "Nkoteng"],
     "SAV Engins": ["Douala", "Garoua", "Dehane", "Libongo", "Nkoteng"],
     "Sites Déportés": DEPORTES,
+    "SAV Chariot": ["Douala", "Yaoundé"],
+    "Winpart": AGENCES,
+    "Motul": ["Douala", "Yaoundé"],
+    "Autofast": ["Douala", "Yaoundé", "Garoua"],
 }
 POSTES = {  # service -> (postes front office, postes back office) ; postes déjà connus seulement
     "Commerce VN": (["Commercial", "Chargé de clientèle"], ["Agent logistique"]),
@@ -75,6 +79,10 @@ POSTES = {  # service -> (postes front office, postes back office) ; postes déj
     "SAV Engins": (["Conseiller SAV"], ["Technicien SAV", "Mécanicien"]),
     "Sites Déportés": (["Chef d'agence"], ["Mécanicien", "Chauffeur", "Agent logistique"]),
     "Administration": (["Chef d'agence"], ["Comptable", "Assistant RH"]),
+    "SAV Chariot": (["Conseiller SAV"], ["Technicien SAV", "Mécanicien"]),
+    "Winpart": (["Vendeur pièces"], ["Magasinier"]),
+    "Motul": (["Vendeur pièces"], ["Magasinier"]),
+    "Autofast": (["Vendeur pièces"], ["Magasinier", "Mécanicien"]),
 }
 SALAIRE = {  # salaire brut garanti de base (2024), FCFA
     "Commercial": 520000,
@@ -160,14 +168,14 @@ def _employes(rng: random.Random) -> list[dict]:
     rng.shuffle(noms)
     services = list(POSTES)
     emps = []
-    for i in range(1, 99):
-        service = services[(i - 1) % 7]
+    for i in range(1, 99 + 4 * 12):
+        service = services[(i - 1) % 7] if i < 99 else services[7 + (i - 99) // 12]
         front = rng.random() < 0.45
         poste = rng.choice(POSTES[service][0 if front else 1])
         contrat = rng.choices(["CDI", "CDD", "MAD"], [70, 15, 15])[0]
         emps.append(
             {
-                "matricule": f"EMP{i:03d}",
+                "matricule": f"EMP{i if i < 99 else 400 + i:03d}",
                 "nom": noms[i - 1],
                 "poste": poste,
                 "contrat": contrat,
