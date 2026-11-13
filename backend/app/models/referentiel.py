@@ -21,10 +21,17 @@ class _Ref:
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class Departement(_Ref, Base):
+    __tablename__ = "departement"
+
+
 class Service(_Ref, Base):
     __tablename__ = "service"
 
     productif: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Département (BU) du service ; vide = non rattaché.
+    departement_id: Mapped[int | None] = mapped_column(
+        ForeignKey("departement.id", name="fk_service_departement"), nullable=True)
 
 
 class Activite(_Ref, Base):
@@ -54,7 +61,8 @@ class Poste(_Ref, Base):
     activite_id: Mapped[int | None] = mapped_column(ForeignKey("activite.id"), nullable=True)
 
 
-DIMENSIONS = ("service", "activite", "site", "type_contrat", "poste", "rubrique", "mois")
+DIMENSIONS = ("service", "activite", "site", "type_contrat", "poste", "rubrique", "mois",
+              "departement")
 
 
 class RefAlias(Base):
@@ -62,7 +70,9 @@ class RefAlias(Base):
     __table_args__ = (
         UniqueConstraint("dimension", "alias_norm"),
         CheckConstraint(
-            "dimension IN ('service','activite','site','type_contrat','poste','rubrique','mois')"
+            "dimension IN ('service','activite','site','type_contrat','poste','rubrique','mois',"
+            "'departement')",
+            name="ck_ref_alias_dimension",
         ),
     )
 

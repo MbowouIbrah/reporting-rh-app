@@ -18,6 +18,8 @@ RE_NOM_FICHIER = re.compile(r"brutfinal(\d{2})(\d{2})(?!\d)", re.IGNORECASE)
 SOURCES = {"matricule": "Matricule", "nom": "Nom", "prenom": "Prénom", "emploi occupe": "Emploi occupé",
            "nature du contrat": "Nature du contrat", "intitule etablissement": "Intitulé établissement",
            "intitule service": "Intitulé service"}
+# Colonne facultative : département de la ligne, retenu pour rattacher un service créé par l'import.
+DEPARTEMENT = "intitule departement"
 # En-têtes de la feuille ramenée aux colonnes de l'application (avant les rubriques).
 ENTETES = ["ANNÉE", "MOIS", "MATRICULE", "Noms", "Poste", "Type Contrat", "Activité", "Site", "Service"]
 
@@ -101,11 +103,15 @@ def lire_csv(contenu: bytes, rubriques: list[str], liens: dict[str, str], annee:
         return total if vu else None
 
     sortie = []
+    departements: dict[str, str] = {}
     for num, row in lignes:
         v = {cle: _cellule(row, j) for cle, j in position.items() if cle in SOURCES}
         noms = " ".join(x for x in (v["nom"], v["prenom"]) if x)
+        dep = _cellule(row, position.get(DEPARTEMENT))
+        if dep and v["intitule service"]:
+            departements.setdefault(norm(v["intitule service"]), dep)
         sortie.append((num, (
             annee, MOIS[mois - 1], v["matricule"] or None, noms or None, v["emploi occupe"] or None,
             v["nature du contrat"] or None, None, v["intitule etablissement"] or None,
             v["intitule service"] or None, *(montant(row, par_rubrique[r]) for r in rubriques))))
-    return Feuille(1, [*ENTETES, *rubriques], sortie, None, {})
+    return Feuille(1, [*ENTETES, *rubriques], sortie, None, {}, departements)

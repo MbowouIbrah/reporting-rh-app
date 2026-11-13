@@ -37,7 +37,7 @@ const libellePerimetre = (perimetres: Perimetre[] | undefined, id: number) =>
 /** « Toutes les données », « DPS, Commerce VN », « DPS, Douala +2 ». */
 export function resumePortee(p: Portee, perimetres?: Perimetre[]) {
   if (p.tout) return 'Toutes les données'
-  const noms = [...p.perimetres.map((id) => libellePerimetre(perimetres, id)), ...p.services, ...p.sites]
+  const noms = [...p.perimetres.map((id) => libellePerimetre(perimetres, id)), ...p.services, ...p.sites, ...p.departements]
   if (!noms.length) return 'Aucune donnée'
   return noms.length <= 2 ? noms.join(', ') : `${noms.slice(0, 2).join(', ')} +${noms.length - 2}`
 }
@@ -59,7 +59,7 @@ function ficheDe(c?: Compte): Fiche {
     password: '',
     actif: c?.actif ?? true,
     permissions: c?.permissions ?? [],
-    ...(c?.portee ?? { tout: false, perimetres: [], services: [], sites: [] }),
+    ...(c?.portee ?? { tout: false, perimetres: [], services: [], sites: [], departements: [] }),
   }
 }
 
@@ -68,8 +68,8 @@ function droitsDe(f: Fiche): Pick<Compte, 'permissions' | 'portee'> {
   return {
     permissions: f.tout ? f.permissions : f.permissions.filter((c) => !exigeTout(c)),
     portee: f.tout
-      ? { tout: true, perimetres: [], services: [], sites: [] }
-      : { tout: false, perimetres: f.perimetres, services: f.services, sites: f.sites },
+      ? { tout: true, perimetres: [], services: [], sites: [], departements: [] }
+      : { tout: false, perimetres: f.perimetres, services: f.services, sites: f.sites, departements: f.departements },
   }
 }
 const memes = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
@@ -115,9 +115,13 @@ export function normaliser<F extends Portee>(f: F, t: Toutes): F {
   const complet = (v: Set<string>, tous: string[]) => tous.length > 0 && tous.every((x) => v.has(x))
   const sv = vus('service', f.services)
   const st = vus('site', f.sites)
+  // Un département coché restreint aussi les services.
+  const restreintService = sv.size > 0 || f.departements.length > 0
   const cs = complet(sv, t.services)
   const ct = complet(st, t.sites)
-  return (cs || ct) && (cs || !sv.size) && (ct || !st.size) ? { ...f, tout: true, perimetres: [], services: [], sites: [] } : f
+  return (cs || ct) && (cs || !restreintService) && (ct || !st.size)
+    ? { ...f, tout: true, perimetres: [], services: [], sites: [], departements: [] }
+    : f
 }
 
 /** Cases d'une dimension, repliables ; ouvertes si une case est cochée. « Tout » coche le groupe entier ;
@@ -211,8 +215,8 @@ function CopierEmail({ email }: { email: string }) {
   )
 }
 
-// Services et sites accordables : les actifs, plus ceux déjà accordés (marqués inactifs).
-function useValeurs(dim: 'service' | 'site', choisis: string[]): { options: Option<string>[]; actifs: string[]; erreur: boolean } {
+// Services, sites et départements accordables : les actifs, plus ceux déjà accordés (marqués inactifs).
+function useValeurs(dim: 'service' | 'site' | 'departement', choisis: string[]): { options: Option<string>[]; actifs: string[]; erreur: boolean } {
   const q = useReferentiel(dim)
   const valeurs = q.data?.valeurs ?? []
   const actifs = valeurs.filter((v) => v.actif).map((v) => ({ valeur: v.libelle, libelle: v.libelle }))
@@ -248,12 +252,15 @@ function FicheCompte({
   const [erreurApi, setErreurApi] = useState<string | null>(null)
   const services = useValeurs('service', fiche.services)
   const sites = useValeurs('site', fiche.sites)
+  const departements = useValeurs('departement', fiche.departements)
   const envoi = creer.isPending || modifier.isPending
   const maj = <K extends keyof Fiche>(c: K, v: Fiche[K]) => setFiche((f) => ({ ...f, [c]: v }))
   const toutes: Toutes = { perimetres: perimetres.data ?? [], services: services.actifs, sites: sites.actifs }
   // Depuis « toutes les données », seule la dimension touchée garde ses cases (toutes moins celle décochée).
-  const changer = <K extends 'perimetres' | 'services' | 'sites'>(dim: K, v: Fiche[K]) =>
-    setFiche((f) => normaliser({ ...f, ...(f.tout && { tout: false, perimetres: [], services: [], sites: [] }), [dim]: v }, toutes))
+  const changer = <K extends 'perimetres' | 'services' | 'sites' | 'departements'>(dim: K, v: Fiche[K]) =>
+    setFiche((f) =>
+      normaliser({ ...f, ...(f.tout && { tout: false, perimetres: [], services: [], sites: [], departements: [] }), [dim]: v }, toutes),
+    )
   const patch = patchDe(fiche, initiale)
   // Comparé sur ce qui partirait : une espace en fin de nom ne compte pas comme une modification.
   const modifie = nouveau ? !memes(fiche, initiale) : Object.keys(patch).length > 0
@@ -271,6 +278,7 @@ function FicheCompte({
       perimetres: [],
       services: [],
       sites: [],
+      departements: [],
       permissions: m.permissions,
     }))
 
@@ -303,9 +311,9 @@ function FicheCompte({
   // Dimension vide alors que l'autre est restreinte : non restreinte (« service X sur tous les sites »).
   const viaServices = viaPerimetres(fiche.perimetres, toutes.perimetres, 'service')
   const viaSites = viaPerimetres(fiche.perimetres, toutes.perimetres, 'site')
-  const aServices = fiche.services.length > 0 || viaServices.size > 0
+  const aServices = fiche.services.length > 0 || viaServices.size > 0 || fiche.departements.length > 0
   const aSites = fiche.sites.length > 0 || viaSites.size > 0
-  const rienVisible = !fiche.tout && !fiche.perimetres.length && !fiche.services.length && !fiche.sites.length
+  const rienVisible = !fiche.tout && !fiche.perimetres.length && !fiche.services.length && !fiche.sites.length && !fiche.departements.length
   const raison = (code: string) => {
     if (code === LECTURE) return 'Toujours accordée'
     if (soi && code === GESTION_COMPTES) return 'Vous ne pouvez pas retirer ce droit à votre propre compte'
@@ -378,6 +386,14 @@ function FicheCompte({
             onChange={(v) => changer('perimetres', v)}
           />
           {(services.erreur || sites.erreur) && <p className="champ-erreur" role="alert">Liste des services ou des sites indisponible</p>}
+          <Cases
+            titre="Départements"
+            options={departements.options}
+            choisis={fiche.departements}
+            tout={fiche.tout}
+            desactive={soi}
+            onChange={(v) => changer('departements', v)}
+          />
           <Cases
             titre="Services"
             options={services.options}

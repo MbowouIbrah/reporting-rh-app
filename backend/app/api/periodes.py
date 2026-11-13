@@ -14,7 +14,7 @@ from app.imports.service import DIM_MODELS
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
 from app.models.auth import PerimetreRegle, UtilisateurPortee
 from app.models.donnees import Periode
-from app.models.referentiel import TYPES_SITE, Activite, RefAlias, Rubrique
+from app.models.referentiel import TYPES_SITE, Activite, Departement, RefAlias, Rubrique
 from app.repos import saisies
 from app.security import audit
 from app.security.deps import current_principal
@@ -115,6 +115,8 @@ def saisir_ca(
 def _modele(dimension: str):
     if dimension == "rubrique":
         return Rubrique
+    if dimension == "departement":  # hors DIM_MODELS : l'import ne l'utilise pas comme colonne
+        return Departement
     if dimension not in DIM_MODELS:
         raise HTTPException(404, "Dimension inconnue")
     return DIM_MODELS[dimension]
@@ -124,9 +126,10 @@ def _modele(dimension: str):
 def referentiel(
     dimension: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
-    # la fiche d'un compte liste les services et sites accordables, sans les alias d'import
+    # la fiche d'un compte liste les services, sites et départements accordables, sans les alias
     import_lu = is_allowed(p, "import:read")
-    if not import_lu and not (dimension in ("service", "site") and is_allowed(p, "users:read")):
+    if not import_lu and not (dimension in ("service", "site", "departement")
+                              and is_allowed(p, "users:read")):
         authorize(p, "import:read")
     model = _modele(dimension)
     valeurs = [_valeur(dimension, r) for r in db.scalars(select(model).order_by(model.id))]
@@ -147,7 +150,8 @@ class RefIn(BaseModel):
 def _valeur(dimension: str, r) -> dict:
     return {"id": r.id, "libelle": r.libelle, "actif": r.actif,
             **({"type_site": r.type_site} if dimension == "site" else {}),
-            **({"productif": r.productif} if dimension == "service" else {}),
+            **({"productif": r.productif, "departement_id": r.departement_id}
+               if dimension == "service" else {}),
             **({"activite_id": r.activite_id} if dimension == "poste" else {})}
 
 
@@ -156,11 +160,12 @@ def creer_referentiel(
     dimension: str, body: RefIn, p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    """Ajoute un service ou un site ; les autres dimensions naissent de l'import."""
+    """Ajoute un service, un site ou un département ; les autres dimensions naissent de l'import."""
     authorize(p, "referentiel:write")
     model = _modele(dimension)
-    if dimension not in ("service", "site"):
-        raise HTTPException(422, "Création possible pour les services et les sites seulement")
+    if dimension not in ("service", "site", "departement"):
+        raise HTTPException(
+            422, "Création possible pour les services, les sites et les départements seulement")
     libelle = body.libelle.strip()
     if not libelle:
         raise HTTPException(422, "Libellé vide")
@@ -221,6 +226,7 @@ class RefPatch(BaseModel):
     type_site: str | None = None
     productif: bool | None = None
     activite_id: int | None = None  # poste : activité ; null explicite = non classé
+    departement_id: int | None = None  # service : département ; null explicite = non rattaché
 
 
 @router.put("/referentiels/{dimension}/{rid}")
@@ -244,6 +250,12 @@ def modifier_referentiel(
         raise HTTPException(422, "Seul un poste a une activité")
     if classe and body.activite_id is not None and db.get(Activite, body.activite_id) is None:
         raise HTTPException(422, "Activité inconnue")
+    rattache = dimension == "service" and "departement_id" in body.model_fields_set
+    if "departement_id" in body.model_fields_set and dimension != "service":
+        raise HTTPException(422, "Seul un service a un département")
+    if (rattache and body.departement_id is not None
+            and db.get(Departement, body.departement_id) is None):
+        raise HTTPException(422, "Département inconnu")
     avant = {"libelle": row.libelle, "actif": row.actif}
     if dimension == "poste":
         avant["activite_id"] = row.activite_id
@@ -251,6 +263,7 @@ def modifier_referentiel(
         avant["type_site"] = row.type_site
     if dimension == "service":
         avant["productif"] = row.productif
+        avant["departement_id"] = row.departement_id
     ancien = row.libelle
     nouveau = body.libelle.strip() if body.libelle is not None else ancien
     renomme = nouveau != ancien
@@ -269,9 +282,10 @@ def modifier_referentiel(
         if pris is not None and pris.cible_id != rid:
             raise HTTPException(409, "Libellé déjà utilisé comme alias d'une autre valeur")
     regles, portees = [], []
-    if renomme and dimension in ("service", "site"):
-        regles = list(db.scalars(select(PerimetreRegle).where(
-            PerimetreRegle.dimension == dimension, PerimetreRegle.valeur == ancien)))
+    if renomme and dimension in ("service", "site", "departement"):
+        if dimension != "departement":  # un périmètre ne porte que des services ou des sites
+            regles = list(db.scalars(select(PerimetreRegle).where(
+                PerimetreRegle.dimension == dimension, PerimetreRegle.valeur == ancien)))
         # Valeur accordée en direct à un compte : suit le renommage, comme les périmètres.
         portees = list(db.scalars(select(UtilisateurPortee).where(
             UtilisateurPortee.type == dimension, UtilisateurPortee.valeur == ancien)))
@@ -286,6 +300,8 @@ def modifier_referentiel(
         row.productif = body.productif
     if classe:
         row.activite_id = body.activite_id
+    if rattache:
+        row.departement_id = body.departement_id
     if renomme:
         row.libelle = nouveau
         for r in [*regles, *portees]:
@@ -304,6 +320,7 @@ def modifier_referentiel(
         apres["type_site"] = row.type_site
     if dimension == "service":
         apres["productif"] = row.productif
+        apres["departement_id"] = row.departement_id
     if dimension == "poste":
         apres["activite_id"] = row.activite_id
     audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant, apres)

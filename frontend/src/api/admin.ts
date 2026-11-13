@@ -47,7 +47,7 @@ export const useActiverColonne = () =>
   useEcriture(({ id, actif }: { id: number; actif: boolean }) => api(`/parametrage/rubriques/${id}`, json('PUT', { actif })))
 
 // ---- listes de valeurs (sites et services) ----
-export type DimensionRef = 'site' | 'service' | 'poste'
+export type DimensionRef = 'site' | 'service' | 'poste' | 'departement'
 export interface ValeurRef {
   id: number
   libelle: string
@@ -57,6 +57,8 @@ export interface ValeurRef {
   activite_id?: number | null
   /** Services seulement : compte dans l'effectif productif (OR et factures par productif). */
   productif?: boolean
+  /** Services seulement : département de rattachement (null : non rattaché). */
+  departement_id?: number | null
 }
 export interface ModifRef {
   dim: DimensionRef
@@ -66,6 +68,7 @@ export interface ModifRef {
   type_site?: string
   productif?: boolean
   activite_id?: number | null
+  departement_id?: number | null
 }
 export const TYPES_SITE = ['principal', 'agence', 'deporte'] as const
 
@@ -117,6 +120,7 @@ export interface Portee {
   perimetres: number[]
   services: string[]
   sites: string[]
+  departements: string[]
 }
 export interface Compte {
   id: number

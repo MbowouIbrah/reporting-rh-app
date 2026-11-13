@@ -9,7 +9,11 @@ const SITES = [
   { id: 1, libelle: 'Yaoundé', actif: true, type_site: 'principal' },
   { id: 2, libelle: 'Douala', actif: true, type_site: 'agence' },
 ]
-const SERVICES = [{ id: 10, libelle: 'SAV PL', actif: false }]
+const SERVICES = [
+  { id: 10, libelle: 'SAV PL', actif: false, departement_id: 1 },
+  { id: 11, libelle: 'Motul', actif: true, departement_id: null },
+]
+const DEPARTEMENTS = [{ id: 1, libelle: 'Equipment', actif: true }, { id: 2, libelle: 'Winpart', actif: true }]
 const POSTES = [
   { id: 30, libelle: 'Vendeur', actif: true, activite_id: 1 },
   { id: 31, libelle: 'Comptable', actif: true, activite_id: null },
@@ -23,6 +27,7 @@ const servir = (a: Appel) => {
   if (a.url.includes('/colonnes/remplissage')) return { annee: 2026, annees: [2026], colonnes: [{ id: 1, libelle: 'Brut Réel', nature: 'paie', unite: 'FCFA', actif: true, moteur: true, valeurs: 6, dernier_mois: 2 }] }
   if (a.url.endsWith('/poste')) return { valeurs: POSTES, alias: [] }
   if (a.url.endsWith('/activite')) return { valeurs: ACTIVITES, alias: [] }
+  if (a.url.endsWith('/departement')) return { valeurs: DEPARTEMENTS, alias: [] }
   return { valeurs: a.url.endsWith('/site') ? SITES : SERVICES, alias: [] }
 }
 const page = <Referentiels />
@@ -163,4 +168,36 @@ test('postes : activité de chaque poste, non classé possible, PUT avec activit
   fireEvent.change(postes.getByLabelText('Activité de Vendeur'), { target: { value: '' } })
   await waitFor(() => expect(ecritures(appels)).toHaveLength(2))
   expect(ecritures(appels)[1].body).toEqual({ activite_id: null })
+})
+
+test('départements : liste, ajout et désactivation', async () => {
+  const appels = monter(page, PERMS, servir)
+  const bloc = within(await screen.findByRole('region', { name: 'Départements' }))
+  expect(await bloc.findByRole('row', { name: /Winpart/ })).toBeInTheDocument()
+  expect(bloc.queryByRole('columnheader', { name: 'Productif' })).toBeNull()
+  fireEvent.change(bloc.getByLabelText('Nouveau département'), { target: { value: ' Lubrifiants ' } })
+  fireEvent.click(within(screen.getByRole('form', { name: 'Ajouter un département' })).getByRole('button', { name: 'Ajouter' }))
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].url).toMatch(/\/referentiels\/departement$/)
+  expect(ecritures(appels)[0].body).toEqual({ libelle: 'Lubrifiants' })
+  fireEvent.click(bloc.getByRole('button', { name: 'Désactiver Winpart' }))
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(2))
+  expect(ecritures(appels)[1].url).toMatch(/\/referentiels\/departement\/2$/)
+  expect(ecritures(appels)[1].body).toEqual({ actif: false })
+})
+
+test('service : le département se choisit, « Non rattaché » le retire', async () => {
+  const appels = monter(page, PERMS, servir)
+  const services = within(await screen.findByRole('region', { name: 'Services' }))
+  const motul = (await services.findByLabelText('Département de Motul')) as HTMLSelectElement
+  expect(motul).toHaveValue('')
+  expect([...motul.options].map((o) => o.textContent)).toEqual(['Non rattaché', 'Equipment', 'Winpart'])
+  expect(services.getByLabelText('Département de SAV PL')).toHaveValue('1')
+  fireEvent.change(motul, { target: { value: '2' } })
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].url).toMatch(/\/referentiels\/service\/11$/)
+  expect(ecritures(appels)[0].body).toEqual({ departement_id: 2 })
+  fireEvent.change(services.getByLabelText('Département de SAV PL'), { target: { value: '' } })
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(2))
+  expect(ecritures(appels)[1].body).toEqual({ departement_id: null })
 })

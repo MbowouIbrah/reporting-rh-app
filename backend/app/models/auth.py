@@ -78,13 +78,14 @@ class UtilisateurPermission(Base):
 
 
 class UtilisateurPortee(Base):
-    """Données accordées : tout, un périmètre (perimetre_id), un service ou un site (valeur)."""
+    """Données accordées : tout, un périmètre (perimetre_id), ou un service, un site ou un
+    département (valeur)."""
 
     __tablename__ = "utilisateur_portee"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
-    type: Mapped[str] = mapped_column(String(20))  # tout | perimetre | service | site
+    type: Mapped[str] = mapped_column(String(20))  # tout | perimetre | service | site | departement
     perimetre_id: Mapped[int | None] = mapped_column(ForeignKey("perimetre.id"), nullable=True)
     valeur: Mapped[str | None] = mapped_column(String(200), nullable=True)
 

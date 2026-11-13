@@ -19,6 +19,7 @@ from app.models.imports import (  # noqa: F401
 from app.models.pilotage import Budget, DateEmployes, Parametre, ValeurSaisie  # noqa: F401
 from app.models.referentiel import (  # noqa: F401
     Activite,
+    Departement,
     Poste,
     RefAlias,
     Rubrique,

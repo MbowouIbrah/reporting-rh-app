@@ -42,6 +42,7 @@ from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, St
 from app.models.referentiel import (
     TYPES_SITE,
     Activite,
+    Departement,
     Poste,
     RefAlias,
     Rubrique,
@@ -213,7 +214,8 @@ def _feuille_json(f: Feuille) -> dict:
         return x if x is None or isinstance(x, str | int | float | bool) else str(x)
     return {"entete_ligne": f.entete_ligne, "entetes": [v(x) for x in f.entetes],
             "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree,
-            "formules": [[n, j, t] for n, fs in f.formules.items() for j, t in fs.items()]}
+            "formules": [[n, j, t] for n, fs in f.formules.items() for j, t in fs.items()],
+            **({"departements": f.departements} if f.departements else {})}
 
 
 def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
@@ -280,7 +282,7 @@ def _feuille_du_lot(lot: LotImport) -> Feuille:
     for n, j, t in f.get("formules", []):
         formules.setdefault(n, {})[j] = t
     return Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
-                   f["ligne_ignoree"], formules)
+                   f["ligne_ignoree"], formules, f.get("departements", {}))
 
 
 # Rapport annoté : à corriger, à confirmer.
@@ -901,6 +903,17 @@ def _absents_du_lot(db: Session, presents: set[Cle], periodes: set[tuple[int, in
     return sortie
 
 
+def _departements_des_services(db: Session, lot: LotImport) -> dict[str, int]:
+    """Service normalisé -> id du département connu (libellé ou alias) cité par le fichier de paie."""
+    cites = (lot.feuille or {}).get("departements") or {}
+    if not cites:
+        return {}
+    idx = {norm(d.libelle): d.id for d in db.scalars(select(Departement))}
+    for a in db.scalars(select(RefAlias).where(RefAlias.dimension == "departement")):
+        idx.setdefault(a.alias_norm, a.cible_id)
+    return {s: idx[norm(d)] for s, d in cites.items() if norm(d) in idx}
+
+
 def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None = None) -> LotImport:
     """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée)."""
     lot = _get_lot(db, lot_id, verrou=True)
@@ -981,9 +994,14 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
     for dim, valeurs in ((lot.feuille or {}).get("ajouts") or {}).items():
         model = DIM_MODELS[dim]
         connus = {norm(k) for k in _ids(db, model)}
+        dep_de = _departements_des_services(db, lot) if dim == "service" else {}
         for v, type_site in valeurs.items():
             if norm(v) not in connus:
-                db.add(Site(libelle=v, type_site=type_site) if dim == "site" else model(libelle=v))
+                if dim == "site":
+                    db.add(Site(libelle=v, type_site=type_site))
+                else:  # un service créé rejoint le département de sa ligne ; un service connu reste tel quel
+                    db.add(model(libelle=v, **({"departement_id": dep_de.get(norm(v))}
+                                               if dim == "service" else {})))
         db.flush()
 
     ids = {d: _ids(db, m) for d, m in DIM_MODELS.items() if d != "poste"}

@@ -35,7 +35,9 @@ interface Apercu {
 
 function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; singulier: string }) {
   const sites = dim === 'site'
+  const services = dim === 'service'
   const q = useReferentiel(dim)
+  const departements = useReferentiel('departement')
   const modifier = useModifierRef()
   const creer = useCreerRef()
   const [renommage, setRenommage] = useState<Renommage | null>(null)
@@ -84,12 +86,19 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
       { onSuccess: () => setLibelle(''), onError: (x) => setErreurAjout(x.message) },
     )
   }
-  const changer = (v: ValeurRef, b: { actif?: boolean; type_site?: string; productif?: boolean }) => {
+  const changer = (
+    v: ValeurRef,
+    b: { actif?: boolean; type_site?: string; productif?: boolean; departement_id?: number | null },
+  ) => {
     setErreur(null)
     modifier.mutate({ dim, id: v.id, ...b }, { onError: surErreur })
   }
 
-  const colonnes = sites ? ['Libellé', 'Type de site', 'Statut', 'Actions'] : ['Libellé', 'Productif', 'Statut', 'Actions']
+  const colonnes = sites
+    ? ['Libellé', 'Type de site', 'Statut', 'Actions']
+    : services
+      ? ['Libellé', 'Productif', 'Département', 'Statut', 'Actions']
+      : ['Libellé', 'Statut', 'Actions']
   if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
   if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
   const valeurs = q.data?.valeurs ?? []
@@ -160,7 +169,7 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                     </select>
                   </td>
                 )}
-                {!sites && (
+                {services && (
                   <td>
                     <input
                       type="checkbox"
@@ -169,6 +178,21 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                       disabled={modifier.isPending}
                       onChange={(e) => changer(v, { productif: e.target.checked })}
                     />
+                  </td>
+                )}
+                {services && (
+                  <td>
+                    <select
+                      aria-label={`Département de ${v.libelle}`}
+                      value={v.departement_id ?? ''}
+                      disabled={modifier.isPending}
+                      onChange={(e) => changer(v, { departement_id: e.target.value === '' ? null : Number(e.target.value) })}
+                    >
+                      <option value="">Non rattaché</option>
+                      {(departements.data?.valeurs ?? [])
+                        .filter((d) => d.actif || d.id === v.departement_id)
+                        .map((d) => <option key={d.id} value={d.id}>{d.libelle}</option>)}
+                    </select>
                   </td>
                 )}
                 <td><span className={v.actif ? 'statut statut-ok' : 'statut'}>{v.actif ? 'Actif' : 'Inactif'}</span></td>
@@ -284,6 +308,7 @@ export default function Referentiels() {
       </div>
       <div className="admin-duo">
         <Postes />
+        <Bloc dim="departement" titre="Départements" singulier="département" />
       </div>
       <Colonnes />
     </section>

@@ -105,7 +105,8 @@ def lister(db: Session, args: argparse.Namespace) -> None:
     for u in db.scalars(select(Utilisateur).order_by(Utilisateur.email)):
         pt = portee_de(u)
         donnees = "tout" if pt.tout else ", ".join(
-            [codes.get(i, str(i)) for i in sorted(pt.perimetres)] + sorted(pt.services | pt.sites)
+            [codes.get(i, str(i)) for i in sorted(pt.perimetres)]
+            + sorted(pt.services | pt.sites | pt.departements)
         ) or "aucune donnée"
         perms = ", ".join(sorted(x.permission for x in u.permissions)) or "lecture"
         etat = "actif" if u.actif else "INACTIF"

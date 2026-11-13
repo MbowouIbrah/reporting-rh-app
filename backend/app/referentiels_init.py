@@ -12,6 +12,7 @@ from app.models.pilotage import Parametre
 from app.models.referentiel import (
     Activite,
     CorrespondancePaie,
+    Departement,
     RefAlias,
     Rubrique,
     RubriqueRegle,
@@ -23,6 +24,9 @@ from app.models.referentiel import (
 SERVICES = ["Commerce VN", "Commerce Pièces", "Administration", "SAV PL",
             "SAV Engins", "SAV Chariot", "Sites Déportés", "Pneumatique",
             "Winpart", "Motul", "Autofast"]
+DEPARTEMENTS = ["Equipment", "Winpart"]
+# Département de chaque service (les autres : Equipment).
+DEPARTEMENT_DE = {"Winpart": "Winpart", "Motul": "Winpart", "Autofast": "Winpart"}
 ACTIVITES = ["Front office", "Back Office"]
 CONTRATS = ["CDI", "CDD", "MAD", "Stage"]
 SITES = ["Yaoundé", "Douala", "Bertoua", "Ngaoundéré", "Garoua", "Dehane",
@@ -68,9 +72,14 @@ def _fill(db: Session, model, libelles: list[str]) -> None:
 def seed_referentiels(db: Session) -> None:
     """Idempotent : ne touche pas à ce qui existe déjà."""
     services_existants = {s.id for s in db.scalars(select(Service))}
-    for model, libelles in ((Service, SERVICES), (Activite, ACTIVITES),
-                            (TypeContrat, CONTRATS), (Site, SITES)):
+    for model, libelles in ((Departement, DEPARTEMENTS), (Service, SERVICES),
+                            (Activite, ACTIVITES), (TypeContrat, CONTRATS), (Site, SITES)):
         _fill(db, model, libelles)
+    db.flush()
+    departements = {d.libelle: d.id for d in db.scalars(select(Departement))}
+    for srv in db.scalars(select(Service)):
+        if srv.id not in services_existants and srv.departement_id is None:
+            srv.departement_id = departements[DEPARTEMENT_DE.get(srv.libelle, "Equipment")]
     existantes = set(db.scalars(select(Rubrique.libelle)))
     for ordre, (lib, unite) in enumerate(RUBRIQUES, start=1):
         if lib not in existantes:

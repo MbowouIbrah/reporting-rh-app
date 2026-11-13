@@ -90,7 +90,7 @@ def test_droits_valides(db, make_client):
     u = r.json()
     assert u["fonction"] == "Chef" and u["permissions"] == ["nominatif"]
     assert u["portee"] == {"tout": False, "perimetres": [], "services": ["SAV PL"],
-                           "sites": ["Douala"]}
+                           "sites": ["Douala"], "departements": []}
 
 
 def test_journal_exige_toutes_les_donnees(db, make_client):
