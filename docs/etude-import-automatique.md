@@ -63,8 +63,8 @@ Réglages `.env` : `IMPORT_DOSSIER` (vide = détection coupée), `IMPORT_STABILI
 | Cas | Traitement |
 |---|---|
 | Nouveau fichier (nouveau mois) | Nouveau lot `en_attente`. |
-| Fichier modifié **avant** publication | Le lot en attente est relu ; les décisions déjà prises (ajouts, rattachements, Remplacer / Laisser) sont reprises si la valeur est toujours là. |
-| Fichier modifié **après** publication, ou cumulatif | Nouveau lot. Lignes identiques à la base : ignorées. Ligne changée sur un mois déjà publié : problème **« Données déjà entrées modifiées »**, avec l'ancien et le nouveau montant côte à côte, et deux boutons **Remplacer** / **Laisser tel quel** (par ligne, ou pour toutes les lignes du fichier). Jamais d'écrasement en silence. |
+| Fichier modifié **avant** publication | Nouveau lot ; l'ancien lot en attente du même fichier est annulé (trace « remplacé par »). Les valeurs ajoutées aux listes sont reprises si le nouveau fichier les cite encore. Corrections et choix par cellule ne sont pas repris : les lignes du fichier ont pu bouger (`service._remplacer_version`, 13/11). |
+| Fichier modifié **après** publication, ou cumulatif | Nouveau lot. Lignes identiques à la base : ignorées. Ligne changée sur un mois déjà publié : volet « Lignes à mettre à jour » de l'aperçu (déjà en place), avec l'ancien et le nouveau montant côte à côte, et deux boutons **Remplacer** / **Laisser tel quel** (par ligne, ou pour toutes les lignes du fichier). Jamais d'écrasement en silence. |
 | Fichier supprimé du dossier | Aucun effet sur les données. Alerte si un lot en attente venait de ce fichier. |
 
 **Mois du fichier : question au client** (§ 8). Le modèle n'a pas de colonne mois. En attendant : mois lu dans le nom (`…MMAA`) ; sinon problème « Mois à préciser », l'admin le choisit.

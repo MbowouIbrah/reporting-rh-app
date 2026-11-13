@@ -4,7 +4,7 @@ from contextlib import nullcontext
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.imports import dossier, service
@@ -250,3 +250,31 @@ def test_demarrer_sans_dossier_ne_lance_rien(db, monkeypatch, caplog):
     with caplog.at_level("WARNING", logger="app.imports.dossier"):
         assert dossier.demarrer() is False
     assert "IMPORT_DIR" in caplog.text
+
+
+def test_fichier_modifie_avant_validation_remplace_le_lot_en_attente(paie, db):
+    deposer(paie, **{"Emploi occupé": "Technicien"})
+    ancien = dossier.traiter(db, "BrutFinal1026.csv")
+    assert ancien.statut == "rejete"
+    service.ajouter_referentiel(db, admin_id(db), ancien.id, "poste", "Technicien", activite="Front office")
+    # le fichier change avant validation : le poste ajouté est toujours cité, il est repris
+    deposer(paie, Matricule="E002", **{"Emploi occupé": "Technicien"})
+    nouveau = dossier.traiter(db, "BrutFinal1026.csv")
+    db.refresh(ancien)
+    assert ancien.statut == "annule" and nouveau.statut == "pret"
+    assert "Technicien" in nouveau.feuille["ajouts"]["poste"]
+    trace = db.scalar(select(AuditEvent).where(AuditEvent.action == "import_abandonne"))
+    assert trace.entite_id == str(ancien.id) and trace.apres["remplace_par"] == nouveau.id
+    assert db.scalar(select(func.count()).select_from(LotImport).where(
+        LotImport.statut.in_(("pret", "rejete")))) == 1
+
+
+def test_fichier_modifie_sans_la_valeur_ajoutee_ne_la_reprend_pas(paie, db):
+    deposer(paie, **{"Emploi occupé": "Technicien"})
+    ancien = dossier.traiter(db, "BrutFinal1026.csv")
+    service.ajouter_referentiel(db, admin_id(db), ancien.id, "poste", "Technicien", activite="Front office")
+    deposer(paie, Matricule="E002")
+    nouveau = dossier.traiter(db, "BrutFinal1026.csv")
+    db.refresh(ancien)
+    assert ancien.statut == "annule" and nouveau.statut == "pret"
+    assert not (nouveau.feuille or {}).get("ajouts")

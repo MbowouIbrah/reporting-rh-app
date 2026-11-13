@@ -179,7 +179,37 @@ def analyser(db: Session, user_id: int | None, nom: str, contenu: bytes, reprise
             feuille = lire(contenu, entetes_reconnus(refs))
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
-    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs, origine, chemin)
+    lot = analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs, origine, chemin)
+    if origine == "dossier" and lot.chemin:
+        _remplacer_version(db, user_id, lot)
+    return lot
+
+
+def _remplacer_version(db: Session, user_id: int | None, lot: LotImport) -> None:
+    """Fichier du dossier modifié avant validation : l'ancien lot en vérification est abandonné et ses
+    valeurs ajoutées aux listes sont reprises si le nouveau fichier les cite encore (inconnues).
+    Corrections et choix par cellule ne sont pas repris : les lignes du fichier ont pu bouger."""
+    anciens = list(db.scalars(select(LotImport).where(
+        LotImport.origine == "dossier", LotImport.chemin == lot.chemin, LotImport.id != lot.id,
+        LotImport.statut.in_(("pret", "rejete"))).order_by(LotImport.id)))
+    if not anciens:
+        return
+    inconnues = {norm(v) for v in db.scalars(select(ImportAnomalie.valeur).where(
+        ImportAnomalie.lot_id == lot.id, ImportAnomalie.code.in_(NOUVELLES))) if v}
+    ajouts: dict[str, dict] = {}
+    for x in anciens:
+        for dim, valeurs in ((x.feuille or {}).get("ajouts") or {}).items():
+            for v, extra in valeurs.items():
+                if dim in DIM_REFS and norm(v) in inconnues:
+                    ajouts.setdefault(dim, {})[v] = extra
+        x.statut, x.annule_par, x.annule_le = "annule", user_id, _now()
+        audit.record(db, user_id, "import_abandonne", "lot_import", x.id, None,
+                     {"statut": "annule", "remplace_par": lot.id})
+    if ajouts and lot.feuille:
+        _relancer(db, lot, _feuille_du_lot(lot), _refs_du_lot(db, lot, ajouts), ajouts=ajouts)
+        audit.record(db, user_id, "import_ajout_referentiel", "lot_import", lot.id, None,
+                     {"repris_de": [x.id for x in anciens], "ajouts": ajouts})
+    db.commit()
 
 
 def analyser_feuille(db: Session, user_id: int | None, nom: str, feuille: Feuille, sha: str,
