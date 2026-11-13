@@ -17,7 +17,7 @@ import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } fro
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
 import GrilleSaisie, { lignesSelection } from './saisie/GrilleSaisie'
-import ImportFichier, { ACCEPT } from './saisie/ImportFichier'
+import ImportFichier, { ACCEPT_IMPORT } from './saisie/ImportFichier'
 
 type Etape =
   | { e: 'depart' }
@@ -129,7 +129,7 @@ export default function Saisie() {
               <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
                 <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
               </a>
-              <ChoixFichier libelle="Importer un fichier (.xlsx)" variante="primaire" accept={ACCEPT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
+              <ChoixFichier libelle="Importer un fichier (.xlsx ou .csv)" variante="primaire" accept={ACCEPT_IMPORT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
             </div>
           </Carte>
         </div>

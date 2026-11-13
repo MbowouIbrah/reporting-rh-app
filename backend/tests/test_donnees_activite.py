@@ -73,7 +73,7 @@ def test_rubriques_d_activite_semees(db):
 
 def test_services_productifs(db):
     prod = {s.libelle for s in db.scalars(select(Service)) if s.productif}
-    assert prod == {"SAV PL", "SAV Engins"}
+    assert prod == {"SAV PL", "SAV Engins", "SAV Chariot"}
 
 
 def test_import_avec_colonnes_d_activite_et_reference(make_client):

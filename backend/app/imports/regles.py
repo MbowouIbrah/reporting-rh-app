@@ -66,6 +66,8 @@ class Refs:
     rubriques_activite: list[tuple[str, str]] = field(default_factory=list)
     rubrique_alias: dict[str, str] = field(default_factory=dict)  # norm -> libellé canonique
     postes: set[str] = field(default_factory=set)  # normalisés
+    # poste normalisé (alias compris) -> libellé de son activité ; None tant que le poste n'est pas classé
+    postes_activite: dict[str, str | None] = field(default_factory=dict)
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
     annuaire: dict[str, tuple[str, str]] = field(default_factory=dict)  # matricule casefold -> (matricule, nom)
     # matricule casefold -> mois enregistrés (année, mois, {colonne: libellé}), du plus ancien au plus récent
@@ -189,7 +191,8 @@ def texte(v):
 def ligne_de_total(row, cols, formules) -> tuple[str, str] | None:
     """(colonne, valeur) qui montre qu'une ligne est un total et non un employé, sinon None."""
     def g(nom):
-        return row[cols[nom]] if cols[nom] < len(row) else None
+        j = cols.get(nom)
+        return row[j] if j is not None and j < len(row) else None
     mat = texte(g("MATRICULE"))
     for nom in ATTRIBUTS:
         t = texte(g(nom))
@@ -401,7 +404,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
             f"Données après {MAX_LIGNES_VIDES} lignes vides consécutives : elles ne seraient pas "
             "importées. Supprimer les lignes vides au-dessus.")
-    requis = ATTRIBUTS + [r for r, _ in refs.rubriques]
+    # L'activité est facultative : absente ou vide, elle vient du poste (voir plus bas).
+    requis = [a for a in ATTRIBUTS if a != "Activité"] + [r for r, _ in refs.rubriques]
     manquants = [e for e in requis if e not in cols]
     for m in manquants:
         add(feuille.entete_ligne, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
@@ -441,6 +445,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     # Valeurs absentes des listes : (colonne, valeur normalisée) -> (valeur lue, lignes).
     inconnus: dict[tuple[str, str], tuple[str, list[int]]] = {}
     postes_nouveaux: dict[str, tuple[str, list[int]]] = {}
+    postes_sans_activite: dict[str, tuple[str, list[int]]] = {}
     sans_matricule: dict[str, tuple[str, list[int]]] = {}
 
     for num, row in feuille.lignes:
@@ -453,8 +458,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         inconnu = False
 
         def g(nom, row=row):
-            j = cols[nom]
-            return row[j] if j < len(row) else None
+            j = cols.get(nom)
+            return row[j] if j is not None and j < len(row) else None
 
         total = ligne_de_total(row, cols, feuille.formules.get(num, {}))
         if total:
@@ -480,6 +485,17 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                                  ("Service", refs.services, "service")):
             v = g(nom)
             t = texte(v)
+            if not t and nom == "Activité":
+                # Activité vide ou colonne absente : celle du poste de la ligne.
+                p_txt = re.sub(r"\s+", " ", texte(g("Poste")) or "")
+                if p_txt:
+                    deduite = refs.postes_activite.get(norm(p_txt))
+                    if deduite:
+                        L.activite = deduite
+                    else:
+                        postes_sans_activite.setdefault(norm(p_txt), (p_txt, []))[1].append(num)
+                        inconnu = True
+                    continue
             if not t:
                 add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, f"{SUJETS[nom]} est obligatoire et la cellule est vide. {admis(nom, index)}")
                 continue
@@ -629,7 +645,14 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     for (nom, _n), (t, nums) in inconnus.items():
         add(nums[0], nom, "REFERENTIEL_INCONNU", BLOQUANT, t,
             f"« {t} » ne figure pas dans la liste{_sur_lignes(nums)}. {admis(nom, index_de[nom])}")
-    for p, nums in postes_nouveaux.values():
+    for cle, (p, nums) in postes_sans_activite.items():
+        existe = cle in refs.postes
+        add(nums[0], "Poste", "POSTE_SANS_ACTIVITE", BLOQUANT, p,
+            f"Le poste « {p} » {'n’a pas encore d’activité' if existe else 'n’existe pas encore'}"
+            f"{_sur_lignes(nums)} : choisir son activité (Front office ou Back Office).")
+    for cle, (p, nums) in postes_nouveaux.items():
+        if cle in postes_sans_activite:
+            continue
         add(nums[0], "Poste", "POSTE_NOUVEAU", AVERT, p,
             f"Le poste « {p} » n’existe pas encore{_sur_lignes(nums)} : le créer ou le remplacer par un poste existant.")
 

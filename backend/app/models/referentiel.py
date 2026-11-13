@@ -50,6 +50,9 @@ class TypeContrat(_Ref, Base):
 class Poste(_Ref, Base):
     __tablename__ = "poste"
 
+    # Activité du poste (Front office / Back Office) : la ligne importée la reprend.
+    activite_id: Mapped[int | None] = mapped_column(ForeignKey("activite.id"), nullable=True)
+
 
 DIMENSIONS = ("service", "activite", "site", "type_contrat", "poste", "rubrique", "mois")
 
@@ -82,6 +85,18 @@ class Rubrique(Base):
     ordre: Mapped[int] = mapped_column(Integer)
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
     nature: Mapped[str] = mapped_column(String(10), default="paie", server_default="paie")
+
+
+class CorrespondancePaie(Base):
+    """Colonne de l'export de paie -> rubrique de l'application (plusieurs colonnes peuvent viser la
+    même rubrique : leurs montants sont additionnés)."""
+
+    __tablename__ = "correspondance_paie"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    colonne: Mapped[str] = mapped_column(String(200))
+    colonne_norm: Mapped[str] = mapped_column(String(200), unique=True)
+    rubrique_id: Mapped[int] = mapped_column(ForeignKey("rubrique.id"))
 
 
 class RubriqueRegle(Base):

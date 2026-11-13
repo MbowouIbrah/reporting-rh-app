@@ -324,6 +324,22 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
     return [(n, cell(a.get(n, ZERO), b.get(n, ZERO) if prev else None)) for n in noms]
 
 
+def _front_back(pd: PeriodeData | None) -> dict | None:
+    """Retours N2 : effectif de fin de mois en front office et en back office, et leurs parts de
+    l'effectif total (ratios). Une ligne sans activité ne compte dans aucune des deux parts."""
+    if pd is None:
+        return None
+
+    def compte(mot: str) -> int:
+        return len({L.salarie_id for L in pd.lignes if mot in (L.activite or "").lower()})
+
+    total = len({L.salarie_id for L in pd.lignes})
+    front, back = compte("front"), compte("back")
+    part = (lambda x: Decimal(x) / total) if total else (lambda x: None)
+    return {"front": front, "back": back, "total": total,
+            "front_pct": part(front), "back_pct": part(back)}
+
+
 def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
             budgets: Budgets | None = None) -> dict:
     budgets = budgets or Budgets()
@@ -367,6 +383,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             {"rubrique": r, **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
             for r in PRIMES
         ],
+        "front_back": _front_back(cur),
     }
 
     def mont(rub):
@@ -825,6 +842,7 @@ def annuel(
         "effectif_moyen": eff,
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
+        "front_back": _front_back(fin),
         "effectif_fin_contrat": {ct: avec_part(eff_fin(lambda L, ct=ct: L.contrat == ct),
                                                eff_fin_total) for ct in refs.contrats},
         # Part des MAD dans l'effectif : moyennes sur les mois de paie saisis (QUESTIONS_CLIENT C1)

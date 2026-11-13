@@ -6,10 +6,12 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.imports.lecture import norm
 from app.kpi.moteur import RUBRIQUES_ACTIVITE
 from app.models.pilotage import Parametre
 from app.models.referentiel import (
     Activite,
+    CorrespondancePaie,
     RefAlias,
     Rubrique,
     RubriqueRegle,
@@ -19,7 +21,8 @@ from app.models.referentiel import (
 )
 
 SERVICES = ["Commerce VN", "Commerce Pièces", "Administration", "SAV PL",
-            "SAV Engins", "Sites Déportés", "Pneumatique"]
+            "SAV Engins", "SAV Chariot", "Sites Déportés", "Pneumatique",
+            "Winpart", "Motul", "Autofast"]
 ACTIVITES = ["Front office", "Back Office"]
 CONTRATS = ["CDI", "CDD", "MAD", "Stage"]
 SITES = ["Yaoundé", "Douala", "Bertoua", "Ngaoundéré", "Garoua", "Dehane",
@@ -35,10 +38,23 @@ RUBRIQUES = [
     ("Assurance Maladie", "FCFA"), ("Formation", "FCFA"),
     ("TVA & Marge MAD", "FCFA"),
 ]
-SERVICES_PRODUCTIFS = ["SAV PL", "SAV Engins"]
+SERVICES_PRODUCTIFS = ["SAV PL", "SAV Engins", "SAV Chariot"]
 # Règles d'exclusion du total de ligne à date d'effet (docs/P0_CADRAGE.md §1).
 EXCLUES_TOTAL_LIGNE = ["Absences (nb)", "Salaire brut garantie", "Primes sur ventes",
                        "Primes sur résultats", "Productivité Ateliers", "Commission", "Bonus"]
+# Export de paie : colonnes additionnées dans chaque rubrique (proposition par défaut, modifiable
+# dans l'administration). Une rubrique absente de la base est sautée.
+CORRESPONDANCE_PAIE = {
+    "Brut Réel": ["BRUT"],
+    "Salaire brut garantie": ["SALAIRE DE BASE"],
+    "Bonus": ["BONUS"],
+    "Commission": ["COMMISSIONS"],
+    "Primes exceptionnelles": ["PRIME EXCEPTIONNELLE"],
+    "Productivité Ateliers": ["PRIME SUR RENDEMENT", "RAPPEL RENDEMENT"],
+    "Logement site déporté": ["LOGEMENT DEPLACE"],
+    "Charges Patronales": ["CNPS PAT", "AT PAT", "ALLOC FAM", "CF PAT", "FNE"],
+    "Assurance Maladie": ["ASS. MALADIE"],
+}
 DEBUT = date(2000, 1, 1)
 PARAMETRES_DEFAUT = {"jours_ouvres": "22", "budget_employe": "600000"}
 
@@ -76,6 +92,11 @@ def seed_referentiels(db: Session) -> None:
         )
     if not db.scalar(select(RefAlias.id).where(RefAlias.dimension == "rubrique")):
         db.add(RefAlias(dimension="rubrique", alias_norm="variable", cible_id=rub["Commission"]))
+    if not db.scalar(select(CorrespondancePaie.id).limit(1)):
+        db.add_all(
+            CorrespondancePaie(colonne=c, colonne_norm=norm(c), rubrique_id=rub[lib])
+            for lib, colonnes in CORRESPONDANCE_PAIE.items() if lib in rub for c in colonnes
+        )
     if not db.scalar(select(Parametre.id).limit(1)):
         db.add_all(Parametre(cle=c, valeur=Decimal(v), date_debut=DEBUT)
                    for c, v in PARAMETRES_DEFAUT.items())

@@ -11,6 +11,7 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
+from app.imports import paie
 from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
     ATTRIBUTS,
@@ -71,6 +72,9 @@ def charger_refs(db: Session) -> Refs:
                 idx[a.alias_norm] = base[a.cible_id]
         return idx
 
+    lib_act = libelles(Activite)
+    activite_du_poste = {p.libelle: lib_act.get(p.activite_id) for p in db.scalars(select(Poste))}
+    idx_postes = index("poste", Poste)
     rubs = list(db.scalars(select(Rubrique).where(Rubrique.actif).order_by(Rubrique.ordre)))
     par_id = {r.id: r.libelle for r in rubs}
     paie_ids = {r.id for r in rubs if r.nature == "paie"}
@@ -102,7 +106,8 @@ def charger_refs(db: Session) -> Refs:
         rubriques=[(r.libelle, r.unite) for r in rubs if r.nature == "paie"],
         rubriques_activite=[(r.libelle, r.unite) for r in rubs if r.nature != "paie"],
         rubrique_alias=alias,
-        postes=set(index("poste", Poste)), noms_connus=noms,
+        postes=set(idx_postes), noms_connus=noms,
+        postes_activite={k: activite_du_poste.get(v) for k, v in idx_postes.items()},
         annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
         historique=historique, montants=montants,
     )
@@ -128,10 +133,12 @@ def _nb_modifications(db: Session, lot: LotImport) -> int:
         AuditEvent.action.in_(ACTIONS_MODIF))) or 0
 
 
-def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str | None = None) -> LotImport:
+def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str | None = None,
+             annee: int | None = None, mois: int | None = None) -> LotImport:
     """Fichier déjà en vérification : avec des modifications enregistrées, `reprise` choisit de les
     reprendre (« reprendre ») ou de tout annuler (« recommencer ») ; sans modification, l'ancien lot
-    est abandonné et le fichier analysé comme neuf."""
+    est abandonné et le fichier analysé comme neuf.
+    Export de paie (.csv) : le mois est celui choisi (`annee`, `mois`), sinon celui du nom du fichier."""
     sha = hashlib.sha256(contenu).hexdigest()
     lots = list(db.scalars(select(LotImport).where(LotImport.sha256 == sha).order_by(LotImport.id.desc())))
     valide = next((x for x in lots if x.statut == "valide"), None)
@@ -156,7 +163,17 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str |
     db.flush()
     refs = charger_refs(db)
     try:
-        feuille = lire(contenu, entetes_reconnus(refs))
+        if paie.est_csv(nom):
+            periode = (annee, mois) if annee and mois else paie.mois_du_nom(nom)
+            if periode is None:
+                raise HTTPException(422, "Mois du fichier introuvable : son nom n'est pas de la forme "
+                                         "BrutFinalMMAA (ex. BrutFinal1026.csv). Choisir le mois à importer.")
+            if not (1 <= periode[1] <= 12 and 2000 <= periode[0] <= 2100):
+                raise HTTPException(422, "Mois ou année invalide")
+            feuille = paie.lire_csv(contenu, [lib for lib, _u in refs.rubriques],
+                                    paie.correspondance(db), *periode)
+        else:
+            feuille = lire(contenu, entetes_reconnus(refs))
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
     return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs)
@@ -183,6 +200,11 @@ def _statut(anos) -> str:
 def _feuille_json(f: Feuille) -> dict:
     """Valeurs JSON telles quelles ; une date ou une heure est gardée comme la lisent les règles (texte)."""
     def v(x):
+        if isinstance(x, Decimal):  # montant de la paie : entier, ou décimal qui se relit à l'identique
+            if x == x.to_integral_value():
+                return int(x)
+            f = float(x)
+            return f if Decimal(repr(f)) == x else str(x)
         return x if x is None or isinstance(x, str | int | float | bool) else str(x)
     return {"entete_ligne": f.entete_ligne, "entetes": [v(x) for x in f.entetes],
             "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree,
@@ -271,9 +293,31 @@ def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Ref
         for v in valeurs:
             if isinstance(idx, set):  # postes : textes normalisés seulement
                 idx.add(norm(v))
+                if valeurs[v]:  # activité choisie pour ce poste
+                    refs.postes_activite[norm(v)] = refs.activites.get(norm(valeurs[v]), valeurs[v])
             else:
                 idx[norm(v)] = v
     return refs
+
+
+def _verifier_ajout(refs: Refs, dim: str, valeur: str, activite: str | None) -> str | None:
+    """Valeur à ajouter à sa liste. Un poste déjà connu mais sans activité peut recevoir la sienne.
+    Renvoie l'activité retenue (poste seulement)."""
+    if not valeur or len(valeur) > 200:
+        raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
+    if dim != "poste":
+        if norm(valeur) in getattr(refs, DIM_REFS[dim]):
+            raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+        return None
+    choisie = None
+    if activite:
+        choisie = refs.activites.get(norm(activite))
+        if choisie is None:
+            raise HTTPException(422, "Activité inconnue : " + ", ".join(sorted(set(refs.activites.values()))))
+    cle = norm(valeur)
+    if cle in refs.postes and (not choisie or refs.postes_activite.get(cle)):
+        raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+    return choisie
 
 
 def _relancer(db: Session, lot: LotImport, feuille: Feuille, refs: Refs, **decisions) -> None:
@@ -320,11 +364,10 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
         dim, valeur, type_site = a["dimension"], (a.get("valeur") or "").strip(), a.get("type_site")
         if dim not in DIM_REFS:
             raise HTTPException(422, "Liste inconnue")
-        if not valeur or len(valeur) > 200:
-            raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
-        if norm(valeur) in getattr(refs, DIM_REFS[dim]):
-            raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
-        if dim != "site":
+        activite = _verifier_ajout(refs, dim, valeur, a.get("activite"))
+        if dim == "poste":
+            type_site = activite  # pour un poste, la valeur gardée est l'activité choisie
+        elif dim != "site":
             type_site = None
         elif type_site not in TYPES_SITE and not simuler:
             raise HTTPException(422, "Type de site obligatoire : " + ", ".join(TYPES_SITE))
@@ -410,8 +453,9 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
 
 
 def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, valeur: str,
-                        type_site: str | None = None) -> LotImport:
-    """Décide d'ajouter une valeur inconnue à sa liste : gardée dans le lot, créée à la validation."""
+                        type_site: str | None = None, activite: str | None = None) -> LotImport:
+    """Décide d'ajouter une valeur inconnue à sa liste : gardée dans le lot, créée à la validation.
+    Pour un poste, `activite` classe le poste (nouveau, ou connu mais sans activité)."""
     if dimension not in DIM_REFS:
         raise HTTPException(422, "Liste inconnue")
     valeur = (valeur or "").strip()
@@ -424,13 +468,13 @@ def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, 
         type_site = None
     lot = _lot_modifiable(db, lot_id)
     refs = _refs_du_lot(db, lot)
-    if norm(valeur) in getattr(refs, DIM_REFS[dimension]):
-        raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+    choisie = _verifier_ajout(refs, dimension, valeur, activite)
     ajouts = {d: dict(v) for d, v in lot.feuille.get("ajouts", {}).items()}
-    ajouts.setdefault(dimension, {})[valeur] = type_site
+    ajouts.setdefault(dimension, {})[valeur] = choisie if dimension == "poste" else type_site
     _relancer(db, lot, _feuille_du_lot(lot), _refs_du_lot(db, lot, ajouts), ajouts=ajouts)
     audit.record(db, user_id, "import_ajout_referentiel", "lot_import", lot.id, None,
-                 {"dimension": dimension, "valeur": valeur, "type_site": type_site})
+                 {"dimension": dimension, "valeur": valeur, "type_site": type_site,
+                  **({"activite": choisie} if dimension == "poste" else {})})
     db.commit()
     return lot
 
@@ -658,7 +702,7 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
 
 
 CODES_NOMS = ("NOM_PROCHE", "NOM_INCOHERENT", "NOM_SIMILAIRE", "MATRICULE_DOUTEUX")
-NOUVELLES = ("REFERENTIEL_INCONNU", "POSTE_NOUVEAU")
+NOUVELLES = ("REFERENTIEL_INCONNU", "POSTE_NOUVEAU", "POSTE_SANS_ACTIVITE")
 SEUIL_VALEUR_PROCHE = 0.75  # valeur existante proposée en remplacement d'une valeur inconnue
 
 
@@ -682,7 +726,7 @@ def _proposition_nouvelle(nouvelles: tuple, col: str | None, valeur: str) -> dic
     j = cols.get(col)
     if j is not None:
         prop["lignes"] = [n for n, r in rows if j < len(r) and r[j] is not None and norm(str(r[j])) == norm(valeur)]
-    scores = [(similarite(valeur, v), v) for v in existantes.get(col, [])]
+    scores = [(similarite(valeur, v), v) for v in existantes.get(col, []) if norm(v) != norm(valeur)]
     meilleur = max(scores, default=(0, None))
     if meilleur[0] >= SEUIL_VALEUR_PROCHE:
         prop["proche"] = meilleur[1]
@@ -908,6 +952,17 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
                 audit.record(db, user_id, "salarie_renomme", "salarie", s.id, {"nom": s.nom}, {"nom": nom})
                 s.nom = nom
 
+    # postes ajoutés dans le lot (avec leur activité) ou classés ici : avant ceux créés d'après les lignes
+    act_ids = {norm(k): v for k, v in _ids(db, Activite).items()}
+    postes_base = {norm(p.libelle): p for p in db.scalars(select(Poste))}
+    for v, act in (((lot.feuille or {}).get("ajouts") or {}).get("poste") or {}).items():
+        aid = act_ids.get(norm(act)) if act else None
+        existant = postes_base.get(norm(v))
+        if existant is None:
+            db.add(Poste(libelle=v, activite_id=aid))
+        elif aid is not None and existant.activite_id is None:
+            existant.activite_id = aid
+    db.flush()
     postes = {norm(k): v for k, v in _ids(db, Poste).items()}
     for r in rows:
         p = r.donnees.get("poste")

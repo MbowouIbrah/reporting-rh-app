@@ -7,13 +7,14 @@ afterEach(() => vi.restoreAllMocks())
 
 const onglets = () => screen.getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])
 
-test('les trois onglets avec tous les droits, Données actif sur /admin', async () => {
+test('les quatre onglets avec tous les droits, Données actif sur /admin', async () => {
   monter(<AdminNav />, ['saisie:write', 'referentiel:write'], () => ({}))
   await screen.findByRole('link', { name: 'Sites, services et colonnes' })
   expect(onglets()).toEqual([
     ['Données', '/admin'],
     ['Employés', '/admin/employes'],
     ['Sites, services et colonnes', '/admin/referentiels'],
+    ['Correspondance de la paie', '/admin/correspondance'],
   ])
   expect(screen.getByRole('link', { name: 'Données' })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: 'Employés' })).not.toHaveAttribute('aria-current')

@@ -276,6 +276,22 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
     decisions({ ajouts: [{ dimension: 'site', valeur: 'Kribi', type_site: 'agence' }] })))
 })
 
+test('poste sans activité : enregistrement bloqué tant qu’aucune activité n’est choisie, puis envoyée avec le poste', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('POSTE_SANS_ACTIVITE', 'bloquant', 'Poste sans activité.', 'Poste'), ligne: 40, valeur: 'Comptable',
+    proposition: { dimension: 'poste' } })
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Poste « Comptable » sans activité : que faire ?' }),
+    { target: { value: '0' } })
+  const bouton = screen.getByRole('button', { name: 'Enregistrer' })
+  expect(bouton).toBeDisabled()  // activité du poste attendue
+  fireEvent.change(screen.getByRole('combobox', { name: 'Activité du poste' }), { target: { value: 'Back Office' } })
+  expect(bouton).toBeEnabled()
+  fireEvent.click(bouton)
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7,
+    decisions({ ajouts: [{ dimension: 'poste', valeur: 'Comptable', type_site: null, activite: 'Back Office' }] })))
+})
+
 test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le point passe au vert sans quitter la liste', async () => {
   vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
   const { simuler, appliquer } = serveur()

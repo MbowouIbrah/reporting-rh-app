@@ -21,11 +21,13 @@ router = APIRouter(prefix="/imports", tags=["imports"])
 @router.post("", status_code=201)
 async def creer_lot(
     fichier: UploadFile, reprise: str | None = Query(None, pattern="^(reprendre|recommencer)$"),
+    annee: int | None = Query(None, ge=2000, le=2100), mois: int | None = Query(None, ge=1, le=12),
     p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     authorize(p, "import:write")
     contenu = await fichier.read(MAX_OCTETS + 1)
-    lot = service.analyser(db, p.user_id, fichier.filename or "import.xlsx", contenu, reprise)
+    lot = service.analyser(db, p.user_id, fichier.filename or "import.xlsx", contenu, reprise,
+                           annee, mois)
     return service.lot_dict(lot)
 
 
@@ -100,7 +102,7 @@ def corriger(lot_id: int, num: int, corps: CorrectionIn, p: Principal = Depends(
 
 class DecisionsIn(BaseModel):
     lignes: dict[int, dict[str, str | None]] = {}  # numéro de ligne -> colonne -> valeur saisie
-    ajouts: list[dict] = []  # {dimension, valeur, type_site}
+    ajouts: list[dict] = []  # {dimension, valeur, type_site, activite}
     retirees: list[int] = []
     ignores: list[str] = []  # "ligne|colonne" : avertissement accepté, cellule laissée vide
     simuler: bool = False
@@ -121,6 +123,7 @@ class ReferentielIn(BaseModel):
     dimension: str
     valeur: str
     type_site: str | None = None  # obligatoire pour un site
+    activite: str | None = None  # poste : activité choisie (Front office, Back Office)
 
 
 @router.post("/{lot_id}/referentiels")
@@ -130,7 +133,7 @@ def ajouter_referentiel(lot_id: int, corps: ReferentielIn,
     authorize(p, "import:write")
     _lot(db, lot_id)
     return service.lot_dict(service.ajouter_referentiel(
-        db, p.user_id, lot_id, corps.dimension, corps.valeur, corps.type_site))
+        db, p.user_id, lot_id, corps.dimension, corps.valeur, corps.type_site, corps.activite))
 
 
 @router.delete("/{lot_id}/lignes/{num}")

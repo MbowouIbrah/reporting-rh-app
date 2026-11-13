@@ -101,7 +101,7 @@ def test_lecteur_perimetre_ne_voit_que_le_sien(make_client):
     assert equip.get(f"{API}/perimetres/{ids['dps']}").status_code == 200
     assert equip.get(f"{API}/perimetres/{ids['commerce_vn']}").status_code == 403
     assert make_client(VN).get(f"{API}/perimetres/{ids['dps']}").status_code == 403
-    assert len(make_client(DRH).get(f"{API}/perimetres").json()) == 6
+    assert len(make_client(DRH).get(f"{API}/perimetres").json()) == 8
 
 
 def test_filtre_de_perimetre_couche_depot(db):
@@ -172,3 +172,12 @@ def test_me_fonction_et_actions(make_client):
     assert me["permissions"] == ["perimetre:read", "report:read"]
     admin = make_client(ADMIN).get(f"{API}/auth/me").json()
     assert {"users:write", "import:write", "marge:read"} <= set(admin["permissions"])
+
+
+def test_dop_equipment_voit_equipment_et_winpart(make_client):
+    """Retours N2 : l'autre DOP voit Equipment et Winpart, pas Commerce VN."""
+    liste = make_client(courriel("dop.equipment")).get(f"{API}/perimetres").json()
+    regles = {p["code"]: {r["valeur"] for r in p["regles"]} for p in liste}
+    assert set(regles) == {"equipment", "winpart"}
+    assert regles["winpart"] == {"Winpart", "Motul", "Autofast"}
+    assert "SAV Chariot" in regles["equipment"] and "Commerce VN" not in regles["equipment"]

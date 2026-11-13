@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import {
   apercuRenommage,
   TYPES_SITE,
+  useActivites,
   useCreerRef,
   useModifierRef,
   useReferentiel,
@@ -221,6 +222,57 @@ function TypesContrat() {
   )
 }
 
+// Les postes viennent des imports : ils ne se créent pas ici, seule leur activité se règle.
+function Postes() {
+  const q = useReferentiel('poste')
+  const activites = useActivites()
+  const modifier = useModifierRef()
+  const [erreur, setErreur] = useState<string | null>(null)
+  const colonnes = ['Libellé', 'Activité', 'Statut']
+  if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
+  if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
+  const valeurs = q.data?.valeurs ?? []
+  const choix = activites.data?.valeurs ?? []
+  const classer = (v: ValeurRef, valeur: string) => {
+    setErreur(null)
+    modifier.mutate({ dim: 'poste', id: v.id, activite_id: valeur === '' ? null : Number(valeur) }, { onError: (e) => setErreur(e.message) })
+  }
+  return (
+    <Panneau titre="Postes">
+      <p className="note">Chaque poste est Front office ou Back Office : les lignes importées reprennent l’activité de leur poste.</p>
+      {erreur && <p className="champ-erreur admin-erreur admin-erreur-bloc" role="alert">{erreur}</p>}
+      {valeurs.length === 0 ? (
+        <Etat type="vide" titre="Aucun poste" aide="Les postes apparaissent avec les fichiers importés." />
+      ) : (
+        <table className="dense">
+          <thead>
+            <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {valeurs.map((v) => (
+              <tr key={v.id}>
+                <th scope="row">{v.libelle}</th>
+                <td>
+                  <select
+                    aria-label={`Activité de ${v.libelle}`}
+                    value={v.activite_id ?? ''}
+                    disabled={modifier.isPending}
+                    onChange={(e) => classer(v, e.target.value)}
+                  >
+                    <option value="">Non classé</option>
+                    {choix.map((a) => <option key={a.id} value={a.id}>{a.libelle}</option>)}
+                  </select>
+                </td>
+                <td><span className={v.actif ? 'statut statut-ok' : 'statut'}>{v.actif ? 'Actif' : 'Inactif'}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Panneau>
+  )
+}
+
 export default function Referentiels() {
   return (
     <section className="page-ecran rapport-excel admin-excel">
@@ -229,6 +281,9 @@ export default function Referentiels() {
         <Bloc dim="site" titre="Sites" singulier="site" />
         <Bloc dim="service" titre="Services" singulier="service" />
         <TypesContrat />
+      </div>
+      <div className="admin-duo">
+        <Postes />
       </div>
       <Colonnes />
     </section>

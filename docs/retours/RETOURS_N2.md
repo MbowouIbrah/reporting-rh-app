@@ -38,3 +38,12 @@ Complète `docs/QUESTIONS_CLIENT.md` et `docs/N2_DECISIONS.md`.
 - **Annonce du client** : tous les employés (MAD compris) auront un matricule.
 - **Aujourd'hui** : un employé sans matricule reçoit un identifiant déduit de son nom (`SM-…`, `imports/regles.py:108`), ce qui peut confondre des homonymes.
 - **Par défaut** : une ligne sans matricule devient bloquante à l'import (message clair) ; le rapprochement par le nom reste seulement pour signaler un matricule douteux. Les fiches `SM-` existantes sont gardées et pourront être rattachées à leur vrai matricule.
+
+## 9. Winpart, Motul, Autofast et les deux DOP (13/11)
+- **Demande** : ajouter Winpart, Motul et Autofast. DOP Nicolas : vue globale (Winpart compris). L'autre DOP : seulement ce qui concerne Equipment (Motors plus tard, Equipment, Winpart).
+- **Par défaut** : trois services de plus (comme Pneumatique, non productifs) ; périmètre **Equipment** (Commerce Pièces, SAV PL, SAV Engins, SAV Chariot, Sites Déportés, Pneumatique) et périmètre **Winpart** (Winpart, Motul, Autofast). Nicolas : portée « tout » ; l'autre DOP : Equipment + Winpart. Motors (Commerce VN) plus tard. Détail : `docs/etude-retours-n2.md`.
+- **À confirmer** : Winpart / Motul / Autofast sont des services (pas des sociétés à part dans la paie) ; l'autre DOP voit bien Winpart.
+
+## 10. Import automatique depuis un dossier (13/11)
+- **Demande** : chemin d'un dossier dans `.env` ; l'appli lit seule chaque fichier nouveau ou modifié (un fichier par mois, plus probable, ou un fichier cumulatif), met de côté ce qui est correct, prévient l'admin de chaque problème. Données invisibles pour tous tant que les problèmes ne sont pas réglés. Élément inconnu (département, service, employé…) : bouton « Ajouter comme nouveau … ». Ancien import mis de côté, pas supprimé.
+- **Étude** : [etude-import-automatique.md](../etude-import-automatique.md) (deux étapes automatiques avant la comparaison). Précisé (13/11) : détection à l'événement (pas en boucle) ; ligne d'un mois déjà entré qui change = problème Remplacer / Laisser tel quel ; aperçu du mois seul puis « Rendre disponible », publication automatique en option ; notifications admin et utilisateurs dans l'appli, e-mail sur abonnement (comme les nouveautés de Precis Translator) ; partage réseau simulé pour l'instant ; mois du fichier = question client E9.

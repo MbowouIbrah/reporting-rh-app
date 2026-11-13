@@ -92,11 +92,13 @@ interface Plan {
   choix: Record<string, { index: number; decision: Decision; ligne: number }>
   /** Type de chaque nouveau site, par nom de site. */
   typeSite: Record<string, string>
+  /** Activité de chaque poste créé ou classé, par nom de poste. */
+  activitePoste: Record<string, string>
   /** « ligne|colonne » : cellule laissée vide, point accepté. */
   ignores: string[]
 }
 
-const VIDE: Plan = { modifs: {}, choix: {}, typeSite: {}, ignores: [] }
+const VIDE: Plan = { modifs: {}, choix: {}, typeSite: {}, activitePoste: {}, ignores: [] }
 
 function nombre(p: Plan) {
   return Object.keys(p.choix).length + p.ignores.length
@@ -115,7 +117,8 @@ function corps(p: Plan): Decisions {
     for (const [n, v] of Object.entries(d.parLigne ?? {})) lignes[+n] = { ...lignes[+n], ...v }
     if (d.ajout) {
       const typeSite = d.ajout.dimension === 'site' ? p.typeSite[d.ajout.valeur] ?? null : null
-      ajouts.set(`${d.ajout.dimension}|${d.ajout.valeur}`, { ...d.ajout, type_site: typeSite })
+      const activite = d.ajout.dimension === 'poste' ? { activite: p.activitePoste[d.ajout.valeur] ?? null } : {}
+      ajouts.set(`${d.ajout.dimension}|${d.ajout.valeur}`, { ...d.ajout, type_site: typeSite, ...activite })
     }
     d.retirer?.forEach((n) => retirees.add(n))
   }
@@ -179,20 +182,21 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
   const restants = new Set((envoi && simulation.data ? simulation.data.anomalies : anomalies).map(cle))
   const occupe = enregistrer.isPending
   const sansType = envoi?.ajouts.some((a) => a.dimension === 'site' && !a.type_site) ?? false
+  const sansActivite = envoi?.ajouts.some((a) => a.dimension === 'poste' && !a.activite) ?? false
   const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan, lectureSeule }
   const erreur = enregistrer.error ?? (envoi ? simulation.error : null)
   // Barre des corrections : dans le pied de l'écran quand il est fourni, sinon sous les volets.
   const barre = lotId != null && afficherLigne && !lectureSeule && (n > 0 || erreur) ? (
     <span className="corrections-pied">
-      {n > 0 && (sansType || (envoi && simulation.isFetching)) && (
+      {n > 0 && (sansType || sansActivite || (envoi && simulation.isFetching)) && (
         <span className="muted" aria-live="polite">
-          {sansType ? 'Choisir le type du nouveau site' : 'Vérification…'}
+          {sansType ? 'Choisir le type du nouveau site' : sansActivite ? 'Choisir l’activité du poste' : 'Vérification…'}
         </span>
       )}
       {erreur && <span className="champ-erreur" role="alert">{erreur.message}</span>}
       {n > 0 && <Bouton variante="secondaire" className="bouton-annuler" disabled={occupe} onClick={() => setPlan(() => VIDE)}>{`Annuler (${n} modification${n > 1 ? 's' : ''})`}</Bouton>}
       {n > 0 && (
-        <Bouton disabled={occupe || sansType} onClick={() => enregistrer.mutate()}>
+        <Bouton disabled={occupe || sansType || sansActivite} onClick={() => enregistrer.mutate()}>
           {occupe ? 'Enregistrement…' : 'Enregistrer'}
         </Bouton>
       )}
@@ -347,6 +351,7 @@ const LISTES: Record<string, { dimension: string; pluriel: string }> = {
 }
 
 const TYPES_SITE = [['agence', 'Agence'], ['deporte', 'Site déporté'], ['principal', 'Siège / principal']]
+const ACTIVITES_POSTE = ['Front office', 'Back Office']
 
 /** Décision possible sur un point : ce qu'elle change dans la ligne, ajoute à une liste ou retire du lot. */
 interface Decision {
@@ -473,15 +478,19 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
     }
   }
   const liste = LISTES[col]
-  if ((point.code === 'REFERENTIEL_INCONNU' || point.code === 'POSTE_NOUVEAU') && liste && point.valeur) {
+  if (['REFERENTIEL_INCONNU', 'POSTE_NOUVEAU', 'POSTE_SANS_ACTIVITE'].includes(point.code) && liste && point.valeur) {
     // Une seule décision pour toutes les lignes qui portent cette valeur.
     const lignes = prop?.lignes?.length ? prop.lignes : point.ligne != null ? [point.ligne] : []
     const remplacer: Decision[] = prop?.proche
       ? [{ libelle: `Remplacer par « ${prop.proche} »`, parLigne: partout(lignes, { [col]: prop.proche }) }]
       : []
+    const sansActivite = point.code === 'POSTE_SANS_ACTIVITE'
+    const plusieurs = lignes.length > 1 ? ` (${lignes.length} lignes)` : ''
     return {
-      question: `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel}${lignes.length > 1 ? ` (${lignes.length} lignes)` : ''} : que faire ?`,
-      choix: [{ libelle: col === 'Poste' ? `Créer le poste « ${point.valeur} »` : `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
+      question: sansActivite ? `Poste « ${point.valeur} » sans activité${plusieurs} : que faire ?`
+        : `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel}${plusieurs} : que faire ?`,
+      choix: [{ libelle: sansActivite ? `Choisir l’activité du poste « ${point.valeur} »`
+        : col === 'Poste' ? `Créer le poste « ${point.valeur} »` : `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
         ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...remplacer, ...precedent],
     }
   }
@@ -538,6 +547,7 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
   const choisi = plan.choix[k]
   const ignore = plan.ignores.includes(c)
   const nouveauSite = choisi?.decision.ajout?.dimension === 'site' ? choisi.decision.ajout.valeur : null
+  const nouveauPoste = choisi?.decision.ajout?.dimension === 'poste' ? choisi.decision.ajout.valeur : null
   const regle = !edition.restants.has(k) && choisi == null && !ignore
   // Choisir une solution annule « ignorer » sur la même cellule, et inversement.
   const choisir = (i: number) => setPlan((p) => ({
@@ -605,6 +615,16 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
                         onChange={(e) => setPlan((p) => ({ ...p, typeSite: { ...p.typeSite, [nouveauSite]: e.target.value } }))}>
                         <option value="" disabled>Choisir…</option>
                         {TYPES_SITE.map(([v, libelle]) => <option key={v} value={v}>{libelle}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {nouveauPoste && (
+                    <label className="decision">
+                      <span>Activité du poste</span>
+                      <select value={plan.activitePoste[nouveauPoste] ?? ''} disabled={occupe}
+                        onChange={(e) => setPlan((p) => ({ ...p, activitePoste: { ...p.activitePoste, [nouveauPoste]: e.target.value } }))}>
+                        <option value="" disabled>Choisir…</option>
+                        {ACTIVITES_POSTE.map((a) => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </label>
                   )}

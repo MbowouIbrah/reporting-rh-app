@@ -442,3 +442,15 @@ def test_exclusion_changeant_en_cours_d_annee():
                 Budgets(rubrique={"Charges Patronales": D(10)}))
     t = next(x for x in m["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
     assert t["m1"] == m["synthese"]["ms"]["m1"] == 1030  # N-1 avec ses propres exclusions
+
+
+def test_front_back_office_mensuel_et_annuel():
+    """Retours N2 : parts front / back office de l'effectif de fin de mois."""
+    cur = pd(L(1), L(2), L(3, act="Back Office"), L(4, act=""))
+    fb = mensuel(cur, None, REFS, Params())["synthese"]["front_back"]
+    assert (fb["front"], fb["back"], fb["total"]) == (2, 1, 4)
+    assert fb["front_pct"] == D("0.5") and fb["back_pct"] == D("0.25")
+    n = {1: pd(L(1)), 2: pd(L(1, act="Back Office"), L(2))}
+    fb = annuel(n, {}, 2, REFS, Params())["front_back"]
+    assert (fb["front"], fb["back"], fb["front_pct"]) == (1, 1, D("0.5"))
+    assert annuel({}, {}, 2, REFS, Params())["front_back"] is None

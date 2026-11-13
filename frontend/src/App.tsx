@@ -9,6 +9,7 @@ import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Reinitialiser from './pages/Reinitialiser'
 import ConnexionRapide from './pages/ConnexionRapide'
+import Correspondance from './pages/admin/Correspondance'
 import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
 import Referentiels from './pages/admin/Referentiels'
@@ -98,6 +99,14 @@ export default function App() {
           element={
             <RequireAuth perm="referentiel:write">
               <Referentiels />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/correspondance"
+          element={
+            <RequireAuth perm="referentiel:write">
+              <Correspondance />
             </RequireAuth>
           }
         />

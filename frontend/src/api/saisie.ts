@@ -159,10 +159,10 @@ export const creerLotSaisie = (brouillon_id: string, annee: number, mois: number
   api<Lot>('/donnees/lots', json({ brouillon_id, annee, mois, lignes }))
 
 /** `reprise` : réponse au refus 409 d'un fichier déjà en vérification avec des modifications enregistrées. */
-export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer') {
+export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer', periode?: { annee: number; mois: number }) {
   const fd = new FormData()
   fd.append('fichier', f)
-  return api<Lot>(reprise ? `/imports${qs({ reprise })}` : '/imports', { method: 'POST', body: fd })
+  return api<Lot>(reprise || periode ? `/imports${qs({ reprise, ...periode })}` : '/imports', { method: 'POST', body: fd })
 }
 
 export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)
@@ -171,14 +171,14 @@ export const lireAnomalies = (id: number, gravite?: string) =>
 export const lireLigne = (id: number, num: number) => api<LigneLot>(`/imports/${id}/lignes/${num}`)
 export const corrigerLigne = (id: number, num: number, valeurs: Record<string, string | null>) =>
   api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'PUT', body: JSON.stringify({ valeurs }) })
-export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string) =>
-  api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null }))
+export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string, activite?: string) =>
+  api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null, activite: activite ?? null }))
 export const retirerLigne = (id: number, num: number) => api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'DELETE' })
 
 /** Toutes les décisions de l'écran Vérification, enregistrées ensemble. */
 export interface Decisions {
   lignes: Record<number, Record<string, string | null>>
-  ajouts: { dimension: string; valeur: string; type_site: string | null }[]
+  ajouts: { dimension: string; valeur: string; type_site: string | null; activite?: string | null }[]
   retirees: number[]
   ignores: string[]
 }

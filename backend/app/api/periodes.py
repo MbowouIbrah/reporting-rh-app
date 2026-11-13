@@ -14,7 +14,7 @@ from app.imports.service import DIM_MODELS
 from app.kpi.moteur import ABSENCES, COMMISSION, PRIMES
 from app.models.auth import PerimetreRegle, UtilisateurPortee
 from app.models.donnees import Periode
-from app.models.referentiel import TYPES_SITE, RefAlias, Rubrique
+from app.models.referentiel import TYPES_SITE, Activite, RefAlias, Rubrique
 from app.repos import saisies
 from app.security import audit
 from app.security.deps import current_principal
@@ -147,7 +147,8 @@ class RefIn(BaseModel):
 def _valeur(dimension: str, r) -> dict:
     return {"id": r.id, "libelle": r.libelle, "actif": r.actif,
             **({"type_site": r.type_site} if dimension == "site" else {}),
-            **({"productif": r.productif} if dimension == "service" else {})}
+            **({"productif": r.productif} if dimension == "service" else {}),
+            **({"activite_id": r.activite_id} if dimension == "poste" else {})}
 
 
 @router.post("/referentiels/{dimension}", status_code=201)
@@ -219,6 +220,7 @@ class RefPatch(BaseModel):
     actif: bool | None = None
     type_site: str | None = None
     productif: bool | None = None
+    activite_id: int | None = None  # poste : activité ; null explicite = non classé
 
 
 @router.put("/referentiels/{dimension}/{rid}")
@@ -237,7 +239,14 @@ def modifier_referentiel(
         raise HTTPException(422, "Type de site invalide")
     if body.productif is not None and dimension != "service":
         raise HTTPException(422, "Seul un service peut être productif")
+    classe = dimension == "poste" and "activite_id" in body.model_fields_set
+    if "activite_id" in body.model_fields_set and dimension != "poste":
+        raise HTTPException(422, "Seul un poste a une activité")
+    if classe and body.activite_id is not None and db.get(Activite, body.activite_id) is None:
+        raise HTTPException(422, "Activité inconnue")
     avant = {"libelle": row.libelle, "actif": row.actif}
+    if dimension == "poste":
+        avant["activite_id"] = row.activite_id
     if dimension == "site":
         avant["type_site"] = row.type_site
     if dimension == "service":
@@ -275,6 +284,8 @@ def modifier_referentiel(
         row.type_site = body.type_site
     if body.productif is not None:
         row.productif = body.productif
+    if classe:
+        row.activite_id = body.activite_id
     if renomme:
         row.libelle = nouveau
         for r in [*regles, *portees]:
@@ -293,6 +304,8 @@ def modifier_referentiel(
         apres["type_site"] = row.type_site
     if dimension == "service":
         apres["productif"] = row.productif
+    if dimension == "poste":
+        apres["activite_id"] = row.activite_id
     audit.record(db, p.user_id, "update", f"ref_{dimension}", rid, avant, apres)
     db.commit()
     return {"id": rid, **apres}
