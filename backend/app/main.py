@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,8 +17,20 @@ from app.api.rapports import router as rapports_router
 from app.api.reglages import router as reglages_router
 from app.api.salaries import router as salaries_router
 from app.core.config import settings
+from app.imports import dossier
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Surveillance du dossier de paie : jamais lancée par les tests (ENV=test)."""
+    if settings.ENV != "test":
+        dossier.demarrer()
+    yield
+    dossier.arreter()
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.APP_NAME,
     docs_url=None if settings.ENV == "prod" else "/docs",
     redoc_url=None,

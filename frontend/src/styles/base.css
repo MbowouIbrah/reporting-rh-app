@@ -702,6 +702,13 @@ html, body { overscroll-behavior: none; }
 .saisie-cartes .carte .note { font-size: var(--fs-sm); margin: 0; }
 .saisie-cartes .filtres { margin: 0; }
 /* Pilotage du mois : CA, marge et budgets, sous les deux façons de saisir la paie */
+/* Dossier de paie : liste des fichiers déposés, au-dessus des deux façons de renseigner */
+.dossier-paie { margin-top: var(--sp-4); }
+.dossier-paie-entete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.dossier-paie-entete .saisie-sous-bandeau { margin: 0; }
+.dossier-paie .note { margin: 0 0 var(--sp-3); }
+.dossier-paie-mois { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.dossier-paie-mois input[type="number"] { width: 6em; }
 .saisie-sous-bandeau { margin: var(--sp-5) 0 0; font-size: var(--fs-base); font-weight: 800; color: var(--ink); }
 .pilotage-champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-3); }
 .pilotage-champs .champ { margin: 0; }

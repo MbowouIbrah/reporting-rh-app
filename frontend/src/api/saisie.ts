@@ -57,6 +57,8 @@ export interface Lot {
   nb_bloquants: number
   nb_avert: number
   stats: Record<string, unknown> | null
+  /** Envoi manuel ou fichier déposé dans le dossier de paie. */
+  origine?: 'manuel' | 'dossier'
 }
 
 export interface Changement {
@@ -164,6 +166,39 @@ export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer', p
   fd.append('fichier', f)
   return api<Lot>(reprise || periode ? `/imports${qs({ reprise, ...periode })}` : '/imports', { method: 'POST', body: fd })
 }
+
+export const lireLot = (id: number) => api<Lot>(`/imports/${id}`)
+
+/** État d'un fichier du dossier de paie : à analyser, en vérification, importé, annulé, mois à choisir, trop gros. */
+export type EtatFichier = 'a_traiter' | 'en_verification' | 'importe' | 'annule' | 'mois_introuvable' | 'trop_volumineux'
+
+export interface FichierDossier {
+  nom: string
+  taille: number
+  modifie_le: string
+  annee: number | null
+  mois: number | null
+  etat: EtatFichier
+  lot_id: number | null
+}
+
+/** `actif` faux : dossier de paie non configuré (IMPORT_DIR), seul l'envoi manuel reste possible. */
+export interface DossierPaie {
+  actif: boolean
+  fichiers: FichierDossier[]
+}
+
+export const useFichiersDossier = () =>
+  useQuery({
+    queryKey: ['saisie', 'dossier'],
+    queryFn: () => api<DossierPaie>('/imports/dossier'),
+    refetchOnMount: 'always',
+    retry: queryRetry,
+  })
+
+/** Analyse un fichier du dossier maintenant ; `periode` : mois choisi quand le nom du fichier n'en donne pas. */
+export const analyserFichierDossier = (nom: string, periode?: { annee: number; mois: number }) =>
+  api<Lot>(`/imports/dossier/${encodeURIComponent(nom)}${periode ? qs({ ...periode }) : ''}`, { method: 'POST' })
 
 export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)
 export const lireAnomalies = (id: number, gravite?: string) =>

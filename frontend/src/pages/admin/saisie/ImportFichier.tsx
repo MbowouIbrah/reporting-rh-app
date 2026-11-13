@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, queryRetry } from '../../../api/client'
-import { envoyerFichier, lireAnomalies, urlRapport, type Lot } from '../../../api/saisie'
+import { envoyerFichier, lireAnomalies, lireLot, urlRapport, type Lot } from '../../../api/saisie'
 import Etat from '../../../components/Etat'
 import { Bouton, ChoixFichier } from '../../../components/Kit'
 import { MOIS } from '../../../lib/format'
@@ -18,13 +18,15 @@ const MOIS_INTROUVABLE = /^Mois du fichier introuvable/
 
 interface Props {
   fichier: File
+  /** Lot déjà créé (fichier du dossier de paie) : il est ouvert sans renvoyer le fichier. */
+  lotId?: number
   onLot: (lot: Lot) => void
   onAutre: (f: File | undefined) => void
   onRetour: () => void
 }
 
 /** Analyse d'un fichier : prêt -> aperçu ; refusé -> erreurs à corriger dans Excel, rapport téléchargeable. */
-export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Props) {
+export default function ImportFichier({ fichier, lotId, onLot, onAutre, onRetour }: Props) {
   const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string; modifications?: number; moisAChoisir?: boolean }>({})
   // Choix fait pour ce fichier-là seulement : un autre fichier repose la question.
   const [reprise, setReprise] = useState<{ fichier: File; choix: 'reprendre' | 'recommencer' }>()
@@ -50,7 +52,8 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
   useEffect(() => {
     let actif = true
     setEtat({})
-    envoyerFichier(fichier, choix, mois)
+    const demande = lotId !== undefined ? lireLot(lotId) : envoyerFichier(fichier, choix, mois)
+    demande
       .then((lot) => (actif ? avancer(lot, () => actif) : undefined))
       .catch((e) => {
         if (!actif) return
@@ -60,7 +63,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
         setEtat({ erreur: deja ? 'Ce fichier a déjà été importé et enregistré.' : e instanceof Error ? e.message : 'Fichier illisible.' })
       })
     return () => { actif = false }
-  }, [fichier, choix, mois?.annee, mois?.mois, avancer])
+  }, [fichier, lotId, choix, mois?.annee, mois?.mois, avancer])
 
   const lot = etat.lot
   const anomalies = useQuery({

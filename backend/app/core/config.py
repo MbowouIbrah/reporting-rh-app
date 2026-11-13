@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_TLS: bool = True
 
+    # Dossier où la paie dépose BrutFinalMMAA.csv (lecture seule). Vide : surveillance coupée.
+    IMPORT_DIR: str = ""
+    IMPORT_SCAN_MINUTES: int = 30  # passage de secours si un avis du dossier est manqué
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def db_url(self) -> str:

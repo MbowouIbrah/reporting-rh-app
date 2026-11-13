@@ -54,6 +54,7 @@ CORRESPONDANCE_PAIE = {
     "Logement site déporté": ["LOGEMENT DEPLACE"],
     "Charges Patronales": ["CNPS PAT", "AT PAT", "ALLOC FAM", "CF PAT", "FNE"],
     "Assurance Maladie": ["ASS. MALADIE"],
+    "Frais de mission": ["DEPALCEMENT PRO", "RAPPEL DEPLAC. PRO"],  # orthographe exacte de l'export
 }
 DEBUT = date(2000, 1, 1)
 PARAMETRES_DEFAUT = {"jours_ouvres": "22", "budget_employe": "600000"}

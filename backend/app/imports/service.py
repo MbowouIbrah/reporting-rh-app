@@ -120,7 +120,7 @@ def lot_dict(lot: LotImport) -> dict:
         "valide_le": lot.valide_le.isoformat() if lot.valide_le else None,
         "annule_le": lot.annule_le.isoformat() if lot.annule_le else None,
         "nb_lignes": lot.nb_lignes, "nb_bloquants": lot.nb_bloquants, "nb_avert": lot.nb_avert,
-        "stats": lot.stats,
+        "stats": lot.stats, "origine": lot.origine,
     }
 
 
@@ -133,12 +133,14 @@ def _nb_modifications(db: Session, lot: LotImport) -> int:
         AuditEvent.action.in_(ACTIONS_MODIF))) or 0
 
 
-def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str | None = None,
-             annee: int | None = None, mois: int | None = None) -> LotImport:
+def analyser(db: Session, user_id: int | None, nom: str, contenu: bytes, reprise: str | None = None,
+             annee: int | None = None, mois: int | None = None, origine: str = "manuel",
+             chemin: str | None = None) -> LotImport:
     """Fichier déjà en vérification : avec des modifications enregistrées, `reprise` choisit de les
     reprendre (« reprendre ») ou de tout annuler (« recommencer ») ; sans modification, l'ancien lot
     est abandonné et le fichier analysé comme neuf.
-    Export de paie (.csv) : le mois est celui choisi (`annee`, `mois`), sinon celui du nom du fichier."""
+    Export de paie (.csv) : le mois est celui choisi (`annee`, `mois`), sinon celui du nom du fichier.
+    `origine` : 'manuel' (envoi) ou 'dossier' (dossier de paie, `user_id` vide, `chemin` = nom du fichier)."""
     sha = hashlib.sha256(contenu).hexdigest()
     lots = list(db.scalars(select(LotImport).where(LotImport.sha256 == sha).order_by(LotImport.id.desc())))
     valide = next((x for x in lots if x.statut == "valide"), None)
@@ -176,19 +178,22 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str |
             feuille = lire(contenu, entetes_reconnus(refs))
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
-    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs)
+    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs, origine, chemin)
 
 
-def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha: str,
-                     taille: int, refs: Refs | None = None) -> LotImport:
+def analyser_feuille(db: Session, user_id: int | None, nom: str, feuille: Feuille, sha: str,
+                     taille: int, refs: Refs | None = None, origine: str = "manuel",
+                     chemin: str | None = None) -> LotImport:
     lignes, anos, stats = valider(feuille, refs or charger_refs(db))
     lot = LotImport(fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,
-                    statut=_statut(anos), feuille=_feuille_json(feuille))
+                    statut=_statut(anos), feuille=_feuille_json(feuille),
+                    origine=origine, chemin=chemin[:500] if chemin else None)
     db.add(lot)
     db.flush()
     _ecrire(db, lot, lignes, anos, stats)
     audit.record(db, user_id, "import_analyse", "lot_import", lot.id, None,
-                 {"statut": lot.statut, "fichier": lot.fichier_nom, **(stats or {})})
+                 {"statut": lot.statut, "fichier": lot.fichier_nom, "origine": origine,
+                  **({"chemin": lot.chemin} if lot.chemin else {}), **(stats or {})})
     db.commit()
     return lot
 

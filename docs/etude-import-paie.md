@@ -47,6 +47,7 @@ Présent dans le fichier du mois = actif ce mois-là.
 | Logement site déporté | LOGEMENT DEPLACE |
 | Charges Patronales | CNPS PAT + AT PAT + ALLOC FAM + CF PAT + FNE |
 | Assurance Maladie | ASS. MALADIE |
+| Frais de mission | DEPALCEMENT PRO + RAPPEL DEPLAC. PRO |
 | Primes sur ventes, Primes sur résultats | aucune colonne évidente : vide |
 | Absences, Frais de mission, Carburant, Crédit téléphonique, Formation, TVA & Marge MAD | pas dans la paie : vide |
 

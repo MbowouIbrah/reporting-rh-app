@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.imports import service
+from app.imports import dossier, service
 from app.imports.lecture import MAX_OCTETS
 from app.models.imports import ImportAnomalie, LotImport
 from app.security.deps import current_principal
@@ -28,6 +28,27 @@ async def creer_lot(
     contenu = await fichier.read(MAX_OCTETS + 1)
     lot = service.analyser(db, p.user_id, fichier.filename or "import.xlsx", contenu, reprise,
                            annee, mois)
+    return service.lot_dict(lot)
+
+
+@router.get("/dossier")
+def fichiers_du_dossier(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Fichiers du dossier de paie et leur état. Le chemin du dossier n'est jamais renvoyé."""
+    authorize(p, "import:write")
+    return {"actif": dossier.lister_possible(), "fichiers": dossier.lister(db)}
+
+
+@router.post("/dossier/{nom}", status_code=201)
+def analyser_fichier_du_dossier(
+    nom: str, annee: int | None = Query(None, ge=2000, le=2100),
+    mois: int | None = Query(None, ge=1, le=12),
+    p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Analyse un fichier du dossier maintenant (mois choisi si son nom n'en donne pas)."""
+    authorize(p, "import:write")
+    lot = dossier.traiter(db, nom, annee, mois, auto=False, user_id=p.user_id)
+    if lot is None:
+        raise HTTPException(409, "Fichier en cours d'écriture : réessayer dans un instant")
     return service.lot_dict(lot)
 
 

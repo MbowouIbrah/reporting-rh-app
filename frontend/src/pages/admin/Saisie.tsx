@@ -17,13 +17,14 @@ import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } fro
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
 import GrilleSaisie, { lignesSelection } from './saisie/GrilleSaisie'
+import FichiersDossier from './saisie/FichiersDossier'
 import ImportFichier, { ACCEPT_IMPORT } from './saisie/ImportFichier'
 
 type Etape =
   | { e: 'depart' }
   | { e: 'choix' }
   | { e: 'grille'; lignes: Ligne[]; brouillonId: string }
-  | { e: 'fichier'; fichier: File }
+  | { e: 'fichier'; fichier: File; lotId?: number }
   | { e: 'apercu'; lot: Lot; depuis: 'grille' | 'fichier' }
   | { e: 'budgets' }
   | { e: 'donnees'; groupe?: Groupe }
@@ -61,6 +62,8 @@ export default function Saisie() {
 
   const surLot = useCallback((lot: Lot) => setEtape((et) => ({ e: 'apercu', lot, depuis: et.e === 'fichier' ? 'fichier' : 'grille' })), [])
   const choisirFichier = (f: File | undefined) => f && setEtape({ e: 'fichier', fichier: f })
+  // Fichier du dossier de paie : seul son nom compte, le lot est déjà créé côté serveur.
+  const ouvrirDuDossier = (nom: string, lotId: number) => setEtape({ e: 'fichier', fichier: new File([], nom), lotId })
   // Enregistré : retour sur la feuille DONNEES, qui confirme et propose d'annuler.
   const fini = (lot: Lot, enregistrees: number) => {
     if (etape.e === 'apercu' && etape.depuis === 'grille') effacerBrouillon(cle)
@@ -95,6 +98,7 @@ export default function Saisie() {
             <span className="note">Dernier mois saisi : {MOIS[derniere.data.mois - 1]} {derniere.data.annee} ({derniere.data.lignes} lignes)</span>
           )}
         </div>
+        <FichiersDossier onOuvrir={(nom, lotId) => garde(() => ouvrirDuDossier(nom, lotId))} />
         <div className="saisie-cartes saisie-cartes-depart">
           <Carte titre="Saisir dans l’application">
             <ol className="saisie-deux-temps">
@@ -201,7 +205,7 @@ export default function Saisie() {
   }
 
   if (etape.e === 'fichier') {
-    return <ImportFichier fichier={etape.fichier} onLot={surLot} onAutre={choisirFichier} onRetour={() => setEtape({ e: 'depart' })} />
+    return <ImportFichier fichier={etape.fichier} lotId={etape.lotId} onLot={surLot} onAutre={choisirFichier} onRetour={() => setEtape({ e: 'depart' })} />
   }
 
   if (etape.e === 'apercu') {
