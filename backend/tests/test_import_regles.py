@@ -326,22 +326,12 @@ def test_nouveau_matricule_dont_le_nom_existe_deja():
     assert not any(code == "NOM_SIMILAIRE" for *_, code in ens)
 
 
-def test_employe_sans_matricule_identifie_par_son_nom():
-    # nom nettoyé : retrouve la fiche existante ; inconnu : identifiant technique stable
-    ann = {"sm-abc": ("SM-ABC", "Awa Ngono")}
-    L, ens, _, _ = run([ligne(MATRICULE=None, Noms="  AWA  ngono ")], postes={"p"},
-                       noms_connus={"sm-abc": "awa ngono"}, annuaire=ann)
-    assert L[0].matricule == "SM-ABC" and not any(c == "MATRICULE" for _, c, _ in ens)
-    L1, _, _, _ = run([ligne(MATRICULE=None, Noms="Paul Biya")], postes={"p"})
-    L2, _, _, _ = run([ligne(MATRICULE=None, Noms="paul  BIYA")], postes={"p"})
-    assert L1[0].matricule.startswith("SM-") and L1[0].matricule == L2[0].matricule
-    # ni matricule ni nom : bloquant ; homonymes : bloquant
-    _, ens, _, _ = run([ligne(MATRICULE=None, Noms=None)], postes={"p"})
-    assert (2, "MATRICULE", "VALEUR_MANQUANTE") in ens
-    _, ens, _, _ = run([ligne(MATRICULE=None, Noms="Awa Ngono")], postes={"p"},
-                       noms_connus={"e1": "awa ngono", "e2": "awa ngono"},
-                       annuaire={"e1": ("E1", "Awa Ngono"), "e2": ("E2", "Awa Ngono")})
-    assert (2, "MATRICULE", "NOM_HOMONYME") in ens
+def test_matricule_obligatoire_mad_compris():
+    # Retours N2 (e) : plus d'identifiant provisoire, une ligne sans matricule bloque, même avec un nom.
+    for contrat in ("CDI", "MAD"):
+        L, ens, anos, _ = run([ligne(MATRICULE=None, Noms="Paul Biya", **{"Type Contrat": contrat})], postes={"p"})
+        assert (2, "MATRICULE", "VALEUR_MANQUANTE") in ens and L[0].matricule is None and L[0].bloquant
+        assert not _codes(anos, "SANS_MATRICULE")
 
 
 def test_lecture_des_nombres_mal_ecrits():
@@ -422,11 +412,10 @@ def test_brut_reel_different_de_la_somme():
     assert _codes(anos, "BRUT_REEL_ECART") == [(3, "Brut Réel")]
 
 
-def test_ligne_sans_montant_et_employe_sans_matricule():
-    rows = [ligne(Formation=10), ligne(MATRICULE="EMP002", Noms="C D"), ligne(MATRICULE=None, Noms="X Y", Bonus=5)]
+def test_ligne_sans_montant():
+    rows = [ligne(Formation=10), ligne(MATRICULE="EMP002", Noms="C D")]
     _, _, anos, _ = run(rows)
     assert [n for n, _ in _codes(anos, "LIGNE_SANS_MONTANT")] == [3]
-    assert _codes(anos, "SANS_MATRICULE") == [(4, "MATRICULE")]
 
 
 def test_ecart_signale_ne_sert_pas_de_base_au_mois_suivant():
