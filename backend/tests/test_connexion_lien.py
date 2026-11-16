@@ -43,10 +43,23 @@ def test_lien_ouvre_la_session_et_trace(db):
     assert db.scalar(select(AuditEvent).where(AuditEvent.action == "login_lien")).utilisateur_id == _user(db).id
 
 
-def test_lien_reutilisable_jusqua_expiration(db):
+def test_lien_a_usage_unique_et_mot_de_passe_a_choisir(db):
+    u = _user(db)
+    u.doit_changer_mdp = False
+    db.commit()
     jeton = _jeton(db)
-    assert _entrer(jeton)[1].status_code == 200
-    assert _entrer(jeton)[1].status_code == 200
+    r = _entrer(jeton)[1]
+    assert r.status_code == 200 and r.json()["doit_changer_mdp"] is True
+    r = _entrer(jeton)[1]
+    assert r.status_code == 410 and r.json()["detail"] == "Lien déjà utilisé"
+    db.expire_all()
+    assert db.scalar(select(LienConnexion)).nb_utilisations == 1
+
+
+def test_texte_du_mail_explique_l_usage_unique():
+    t = liens.texte_mail("https://x/connexion-rapide#jeton=abc", "a@b.c", 3)
+    assert "https://x/connexion-rapide#jeton=abc" in t and "qu'une seule fois" in t
+    assert "a@b.c" in t and "3 jours" in t and "mot de passe" in t
 
 
 def test_lien_refuse(db):
@@ -85,3 +98,5 @@ def test_console_cree_et_revoque(db, capsys):
     assert comptes.main(["revoquer-liens"], db=db) == 0
     assert "1 lien(s)" in capsys.readouterr().out
     assert _entrer(jeton)[1].status_code == 401
+    assert comptes.main(["lien", DRH, "--envoyer"], db=db) == 0
+    assert "Mail" in capsys.readouterr().out

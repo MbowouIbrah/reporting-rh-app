@@ -97,7 +97,12 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)) -> d
 @router.post("/lien")
 def connexion_par_lien(body: LienIn, response: Response, db: Session = Depends(get_db)) -> dict:
     """Connexion directe par lien (démo, invitation) : même session qu'une connexion normale."""
-    user = liens.utiliser(db, body.jeton)
+    try:
+        user = liens.utiliser(db, body.jeton)
+    except liens.LienDejaUtilise:
+        audit.record(db, None, "login_lien_echec", "utilisateur", apres={"motif": "deja_utilise"})
+        db.commit()
+        raise HTTPException(status_code=410, detail="Lien déjà utilisé") from None
     if user is None:
         audit.record(db, None, "login_lien_echec", "utilisateur")
         db.commit()

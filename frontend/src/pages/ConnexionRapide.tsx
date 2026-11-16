@@ -27,7 +27,9 @@ export default function ConnexionRapide() {
         setErreur(
           err instanceof ApiError && err.status === 401
             ? 'Ce lien est invalide ou a expiré.'
-            : err instanceof ApiError && err.status === 429
+            : err instanceof ApiError && err.status === 410
+              ? 'Ce lien a déjà servi : il ne marche qu’une fois. Connectez-vous avec votre adresse e-mail et votre mot de passe.'
+              : err instanceof ApiError && err.status === 429
               ? 'Trop d’essais. Réessayez dans une minute.'
               : messagePanne(err, 'Connexion impossible pour le moment. Réessayez.'),
         ),

@@ -45,6 +45,13 @@ test('lien refusé : message et retour à la connexion', async () => {
   expect(screen.getByRole('link', { name: 'Se connecter avec son mot de passe' })).toHaveAttribute('href', '/login')
 })
 
+test('lien déjà utilisé : il ne sert qu’une fois', async () => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ detail: 'Lien déjà utilisé' }), { status: 410 }))
+  rendu('/connexion-rapide#jeton=abc')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Ce lien a déjà servi')
+  expect(screen.getByRole('link', { name: 'Se connecter avec son mot de passe' })).toHaveAttribute('href', '/login')
+})
+
 test('lien sans jeton : aucun appel', async () => {
   const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 401 }))
   rendu('/connexion-rapide')

@@ -1,8 +1,9 @@
 """Liens de connexion directe (démo, invitation).
 
 Le jeton (32 octets aléatoires) n'existe que dans le lien envoyé ; la base garde son empreinte
-sha256 : une copie de la base ne permet pas de se connecter. Le lien sert jusqu'à expiration
-(un compte de démo est partagé) et se révoque à tout moment.
+sha256 : une copie de la base ne permet pas de se connecter. Retours N2 (5) : le lien ne sert qu'une
+fois (grillé dès la 1re connexion), la personne choisit alors son mot de passe ; il expire et se
+révoque à tout moment.
 """
 
 import hashlib
@@ -15,6 +16,10 @@ from sqlalchemy.orm import Session
 from app.models.auth import LienConnexion, Utilisateur
 
 JOURS_DEFAUT = 14
+
+
+class LienDejaUtilise(Exception):
+    """Le lien a déjà servi : la personne se connecte avec son e-mail et son mot de passe."""
 
 
 def _empreinte(jeton: str) -> str:
@@ -42,7 +47,9 @@ def creer(db: Session, user: Utilisateur, jours: int = JOURS_DEFAUT) -> str:
 
 
 def utiliser(db: Session, jeton: str) -> Utilisateur | None:
-    """Compte du lien s'il est valide (ni expiré, ni révoqué, compte actif), usage compté."""
+    """Compte du lien s'il est valide (ni expiré, ni révoqué, compte actif, jamais utilisé).
+    Usage compté ; le compte doit ensuite choisir son mot de passe.
+    Lève LienDejaUtilise si le lien a déjà servi."""
     if not jeton or len(jeton) > 200:
         return None
     lien = db.scalar(select(LienConnexion).where(LienConnexion.empreinte == _empreinte(jeton)))
@@ -52,9 +59,34 @@ def utiliser(db: Session, jeton: str) -> Utilisateur | None:
     user = db.get(Utilisateur, lien.utilisateur_id)
     if user is None or not user.actif:
         return None
+    if lien.nb_utilisations > 0:
+        raise LienDejaUtilise
     lien.nb_utilisations += 1
     lien.derniere_utilisation = maintenant
+    user.doit_changer_mdp = True
     return user
+
+
+def texte_mail(adresse: str, email: str, jours: int) -> str:
+    """Mail d'invitation : explique l'usage unique pour éviter « ça ne marche plus » au 2e clic."""
+    pluriel = "s" if jours > 1 else ""
+    return "\n".join([
+        "Bonjour,",
+        "",
+        "Un accès à l'application Reporting RH vous a été ouvert.",
+        "",
+        f"1. Cliquez sur ce lien personnel : {adresse}",
+        f"   Il ne fonctionne qu'une seule fois et expire dans {jours} jour{pluriel}.",
+        "2. Choisissez ensuite votre mot de passe (au moins 8 caractères).",
+        f"3. Les fois suivantes, connectez-vous avec votre adresse ({email})",
+        "   et ce mot de passe : le lien ne servira plus.",
+        "",
+        "Lien déjà utilisé ou expiré, mot de passe oublié : utilisez « Mot de passe oublié »",
+        "sur la page de connexion, ou demandez un nouveau lien à l'administrateur.",
+        "",
+        "Ne transférez pas ce message : le lien ouvre votre compte.",
+        "",
+    ])
 
 
 def revoquer(db: Session, user: Utilisateur | None = None) -> int:

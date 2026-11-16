@@ -19,6 +19,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import mail
 from app.api.admin import (
     PorteeIn,
     _check_droits,
@@ -175,7 +176,12 @@ def lien(db: Session, args: argparse.Namespace) -> None:
     jeton = liens.creer(db, u, args.jours)
     audit.record(db, None, "lien_creer", "utilisateur", u.id, apres={"jours": args.jours})
     db.commit()
-    print(liens.url(args.base or settings.APP_URL, jeton))
+    adresse = liens.url(args.base or settings.APP_URL, jeton)
+    print(adresse)
+    if args.envoyer:
+        envoye = mail.envoyer(u.email, "Votre accès à Reporting RH",
+                              liens.texte_mail(adresse, u.email, args.jours))
+        print(f"Mail envoyé à {u.email}" if envoye else "Mail non envoyé : SMTP_HOST non réglé")
 
 
 def revoquer_liens(db: Session, args: argparse.Namespace) -> None:
@@ -237,6 +243,7 @@ def _parser() -> argparse.ArgumentParser:
     sp.add_argument("email")
     sp.add_argument("--jours", type=int, default=liens.JOURS_DEFAUT, help="durée de validité")
     sp.add_argument("--base", help="adresse publique (défaut : APP_URL)")
+    sp.add_argument("--envoyer", action="store_true", help="envoie le mail d'invitation détaillé")
     sp.set_defaults(fn=lien)
 
     sp = sub.add_parser("revoquer-liens", help="coupe les liens actifs (d'un compte, ou tous)")
