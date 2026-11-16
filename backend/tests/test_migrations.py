@@ -297,3 +297,22 @@ def test_0027_origine_chemin_frais_de_mission_et_descente(tmp_path, monkeypatch)
         assert "depalcement pro" not in {r[0] for r in c.execute(text(
             "SELECT colonne_norm FROM correspondance_paie"))}
     command.upgrade(cfg, "head")
+
+
+def test_0029_notifications_tables_colonnes_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'd.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0028")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO utilisateur (email, nom, password_hash, actif, cree_le) "
+                       "VALUES ('a@exemple.invalid', 'A', 'x', 1, CURRENT_TIMESTAMP)"))
+    command.upgrade(cfg, "0029")
+    assert {"notification", "notification_envoi"} <= set(inspect(eng).get_table_names())
+    with eng.begin() as c:
+        assert c.execute(text("SELECT notif_mail, notif_mail_depuis FROM utilisateur")).one() == (0, None)
+    command.downgrade(cfg, "0028")
+    assert not {"notification", "notification_envoi"} & set(inspect(eng).get_table_names())
+    assert "notif_mail" not in {x["name"] for x in inspect(eng).get_columns("utilisateur")}
+    command.upgrade(cfg, "head")

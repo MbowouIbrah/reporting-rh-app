@@ -77,6 +77,7 @@ def _me(p: Principal) -> dict:
         "fonction": p.fonction,
         "permissions": sorted(a for a in ACTIONS if is_allowed(p, a)),
         "doit_changer_mdp": p.doit_changer_mdp,
+        "import_mode": settings.IMPORT_MODE,
     }
 
 

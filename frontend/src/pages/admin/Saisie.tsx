@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import { apresImport, usePilotage, type Groupe } from '../../api/pilotage'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
@@ -33,6 +34,9 @@ const suivant = (a: number, m: number) => (m === 12 ? [a + 1, 1] : [a, m + 1])
 
 export default function Saisie() {
   const qc = useQueryClient()
+  const { me } = useAuth()
+  // Mode « dossier » : les fichiers arrivent par le dossier de paie, le dépôt manuel disparaît du menu.
+  const depotManuel = me?.import_mode !== 'dossier'
   const derniere = useDernierePeriode()
   const auj = new Date()
   const [choixPeriode, setChoixPeriode] = useState<[number, number] | null>(null)
@@ -117,7 +121,7 @@ export default function Saisie() {
               )}
             </div>
           </Carte>
-          <Carte titre="Remplir un fichier Excel">
+          {depotManuel && <Carte titre="Remplir un fichier Excel">
             <ol className="saisie-deux-temps">
               <li><span>Téléchargez le modèle vide (sans la liste des employés).</span></li>
               <li>
@@ -135,7 +139,7 @@ export default function Saisie() {
               </a>
               <ChoixFichier libelle="Importer un fichier (.xlsx ou .csv)" variante="primaire" accept={ACCEPT_IMPORT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
             </div>
-          </Carte>
+          </Carte>}
         </div>
         <h3 className="saisie-sous-bandeau">{plusieurs ? 'DONNÉES DU MOIS' : `DONNÉES DE ${periode.toUpperCase()}`}</h3>
         {/* CA, marge, activité et budgets se rattachent à un seul mois : chaque carte ouvre sa page ; plusieurs mois, la raison remplace les cartes. */}

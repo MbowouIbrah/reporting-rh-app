@@ -9,6 +9,7 @@ import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Reinitialiser from './pages/Reinitialiser'
 import ConnexionRapide from './pages/ConnexionRapide'
+import Desabonnement from './pages/Desabonnement'
 import Correspondance from './pages/admin/Correspondance'
 import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
@@ -28,6 +29,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/reinitialiser" element={<Reinitialiser />} />
       <Route path="/connexion-rapide" element={<ConnexionRapide />} />
+      <Route path="/desabonnement" element={<Desabonnement />} />
       <Route path="/changer-mot-de-passe" element={<ChangerMotDePasse />} />
       <Route
         path="/rapport"

@@ -11,6 +11,7 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
+from app import notifications
 from app.imports import paie
 from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
@@ -1009,6 +1010,8 @@ def valider_lot(db: Session, user_id: int | None, lot_id: int, garder: set[Cle] 
         lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
         audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                      {"situations": 0, "montants": 0, "remplacees": 0, "ignorees": ignorees})
+        if commit:
+            notifications.lot_publie(db, lot)
         db.commit() if commit else db.flush()
         return lot
 
@@ -1149,6 +1152,8 @@ def valider_lot(db: Session, user_id: int | None, lot_id: int, garder: set[Cle] 
     audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                  {"situations": len(sits), "montants": len(montants),
                   "remplacees": len(a_remplacer), "ignorees": ignorees})
+    if commit:
+        notifications.lot_publie(db, lot)
     db.commit() if commit else db.flush()
     return lot
 

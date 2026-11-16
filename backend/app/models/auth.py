@@ -58,6 +58,10 @@ class Utilisateur(Base):
     fonction: Mapped[str] = mapped_column(String(200), default="", server_default="")  # sans effet
     # Mot de passe provisoire : tout est bloqué tant que la personne ne l'a pas changé.
     doit_changer_mdp: Mapped[bool] = mapped_column(Boolean, default=True, server_default=false())
+    # Option « Me prévenir aussi par e-mail » (coupée par défaut) et date d'abonnement.
+    notif_mail: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    notif_mail_depuis: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
     permissions: Mapped[list["UtilisateurPermission"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
     )

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from app import notifications
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.db.session import engine as moteur
@@ -194,6 +195,12 @@ def traiter(db: Session, nom: str, annee: int | None = None, mois: int | None = 
         LOG.exception("Analyse du fichier %s en échec", nom)
         return None
     LOG.info("Fichier %s analysé : lot %s (%s)", nom, lot.id, lot.statut)
+    try:
+        notifications.lot_recu(db, lot)
+        db.commit()
+    except Exception:
+        db.rollback()
+        LOG.exception("Notification du lot %s impossible", lot.id)
     try:
         lot = service.publier_si_auto(db, lot)
     except Exception:

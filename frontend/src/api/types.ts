@@ -71,6 +71,8 @@ export interface Me {
   fonction: string
   permissions: string[]
   doit_changer_mdp: boolean
+  /** « dossier » : les fichiers de paie arrivent par le dossier, plus de dépôt manuel. */
+  import_mode: 'depot' | 'dossier'
 }
 
 export interface Periode {

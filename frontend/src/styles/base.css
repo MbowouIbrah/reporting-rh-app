@@ -1156,6 +1156,26 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 .profil-role .badge { min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .profil-sortie { display: inline-flex; align-items: center; gap: 6px; padding-top: var(--sp-3); border-top: 1px solid var(--rule); width: 100%; text-decoration: none; font-weight: 600; }
 .profil-sortie:hover { text-decoration: underline; }
+.profil-option { display: flex; align-items: center; gap: var(--sp-2); padding-top: var(--sp-3); border-top: 1px solid var(--rule); cursor: pointer; }
+.profil-option input { margin: 0; accent-color: var(--red); }
+
+/* Cloche de notifications : bouton carré, pastille du nombre de non lues, liste déroulante */
+.cloche { position: relative; flex: none; }
+.cloche-bouton { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid transparent; border-radius: 0; background: none; color: var(--navy); cursor: pointer; transition: background var(--dur) var(--ease); }
+.cloche-bouton:hover, .cloche-bouton[aria-expanded='true'] { background: rgba(0, 0, 0, 0.05); }
+.cloche-bouton:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.cloche-compte { position: absolute; top: 2px; right: 0; min-width: 16px; padding: 0 4px; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+.cloche-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-menu); width: 360px; max-width: calc(100vw - 32px); max-height: 70vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--rule); box-shadow: var(--shadow-3); font-size: var(--fs-sm); color: var(--ink); }
+.cloche-entete { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); }
+.cloche-titre { font-weight: 700; color: var(--navy); }
+.cloche-liste { margin: 0; padding: 0; list-style: none; }
+.cloche-item { display: grid; gap: 2px; padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--rule); }
+.cloche-item:last-child { border-bottom: 0; }
+.cloche-item.non-lue { border-left: 3px solid var(--red); background: rgba(0, 0, 0, 0.03); }
+.cloche-item-titre { font-weight: 600; color: var(--navy); overflow-wrap: anywhere; }
+.cloche-item-texte { color: var(--ink); overflow-wrap: anywhere; }
+.cloche-item-pied { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); color: var(--muted); font-size: var(--fs-xs); }
+.cloche-vide { margin: 0; padding: var(--sp-4); color: var(--muted); }
 @media (max-width: 720px) { .topbar .profil { flex-basis: auto; margin-left: var(--sp-2); } .profil-barre-nom { max-width: 14ch; } }
 
 @media (min-width: 900px), print {
