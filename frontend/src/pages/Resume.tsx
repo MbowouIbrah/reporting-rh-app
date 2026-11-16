@@ -97,6 +97,7 @@ export default function Resume() {
     annee: f.filtres.annee,
     mois: f.filtres.mois,
     ref_annee: f.filtres.ref_annee,
+    departement: f.filtres.departement,
     service: f.filtres.service,
     site: f.filtres.site,
     type_site: f.filtres.type_site,
@@ -105,7 +106,7 @@ export default function Resume() {
     calendrier: f.filtres.calendrier,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
-  const filtre = !!(base && (base.service || base.site || base.type_site || base.activite || base.type_contrat))
+  const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat))
   const ann = useQuery({
     queryKey: ['annuel', base],
     queryFn: () => getAnnuel(base!),
