@@ -96,9 +96,11 @@ interface Plan {
   activitePoste: Record<string, string>
   /** « ligne|colonne » : cellule laissée vide, point accepté. */
   ignores: string[]
+  /** Valeur connue choisie pour chaque valeur rattachée, par « dimension|valeur ». */
+  rattache: Record<string, string>
 }
 
-const VIDE: Plan = { modifs: {}, choix: {}, typeSite: {}, activitePoste: {}, ignores: [] }
+const VIDE: Plan = { modifs: {}, choix: {}, typeSite: {}, activitePoste: {}, ignores: [], rattache: {} }
 
 function nombre(p: Plan) {
   return Object.keys(p.choix).length + p.ignores.length
@@ -111,6 +113,7 @@ function corps(p: Plan): Decisions {
   const ajouts = new Map<string, Decisions['ajouts'][number]>()
   const retirees = new Set<number>()
   const acceptes: string[] = []
+  const alias: NonNullable<Decisions['alias']> = []
   for (const { decision: d, ligne } of Object.values(p.choix)) {
     if (d.accepter) acceptes.push(d.accepter)
     if (d.valeurs) lignes[ligne] = { ...lignes[ligne], ...d.valeurs }
@@ -121,6 +124,12 @@ function corps(p: Plan): Decisions {
       ajouts.set(`${d.ajout.dimension}|${d.ajout.valeur}`, { ...d.ajout, type_site: typeSite, ...activite })
     }
     d.retirer?.forEach((n) => retirees.add(n))
+    const r = d.rattacher
+    const cible = r && p.rattache[`${r.dimension}|${r.valeur}`]
+    if (r && cible) {
+      alias.push({ dimension: r.dimension, valeur: r.valeur, cible })
+      for (const n of r.lignes) lignes[n] = { ...lignes[n], [r.colonne]: cible }
+    }
   }
   for (const [n, m] of Object.entries(p.modifs)) lignes[+n] = { ...lignes[+n], ...m }
   for (const i of p.ignores) {
@@ -128,7 +137,7 @@ function corps(p: Plan): Decisions {
     lignes[+n] = { ...lignes[+n], [col]: null }
   }
   for (const n of retirees) delete lignes[n]
-  return { lignes, ajouts: [...ajouts.values()], retirees: [...retirees], ignores: [...p.ignores, ...acceptes] }
+  return { lignes, ajouts: [...ajouts.values()], retirees: [...retirees], ignores: [...p.ignores, ...acceptes], alias }
 }
 
 /** Ce que le détail d'un point lit et change dans le plan commun. */
@@ -183,6 +192,7 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
   const occupe = enregistrer.isPending
   const sansType = envoi?.ajouts.some((a) => a.dimension === 'site' && !a.type_site) ?? false
   const sansActivite = envoi?.ajouts.some((a) => a.dimension === 'poste' && !a.activite) ?? false
+  const sansCible = Object.values(plan.choix).some(({ decision: { rattacher: r } }) => r && !plan.rattache[`${r.dimension}|${r.valeur}`])
   const edition: Edition = { plan, lignes: envoi?.lignes ?? {}, restants, occupe, setPlan, lectureSeule }
   const erreur = enregistrer.error ?? (envoi ? simulation.error : null)
   // Barre des corrections : dans le pied de l'écran quand il est fourni, sinon sous les volets.
@@ -196,7 +206,7 @@ export default function PointsAttention({ anomalies, lotId, onLot, onAttente, af
       {erreur && <span className="champ-erreur" role="alert">{erreur.message}</span>}
       {n > 0 && <Bouton variante="secondaire" className="bouton-annuler" disabled={occupe} onClick={() => setPlan(() => VIDE)}>{`Annuler (${n} modification${n > 1 ? 's' : ''})`}</Bouton>}
       {n > 0 && (
-        <Bouton disabled={occupe || sansType || sansActivite} onClick={() => enregistrer.mutate()}>
+        <Bouton disabled={occupe || sansType || sansActivite || sansCible} onClick={() => enregistrer.mutate()}>
           {occupe ? 'Enregistrement…' : 'Enregistrer'}
         </Bouton>
       )}
@@ -361,6 +371,8 @@ interface Decision {
   retirer?: number[]
   /** « ligne|colonne » : valeur du fichier gardée, point accepté sans rien changer. */
   accepter?: string
+  /** Valeur du fichier gardée comme autre nom d'une valeur connue, choisie dans une liste. */
+  rattacher?: { dimension: string; valeur: string; colonne: string; lignes: number[] }
   /** Valeurs posées sur d'autres lignes (toutes celles du même employé). */
   parLigne?: Record<number, Record<string, string | null>>
 }
@@ -485,13 +497,16 @@ function decisions(point: AnomalieLot): { question: string; choix: Decision[] } 
       ? [{ libelle: `Remplacer par « ${prop.proche} »`, parLigne: partout(lignes, { [col]: prop.proche }) }]
       : []
     const sansActivite = point.code === 'POSTE_SANS_ACTIVITE'
+    const dimension = prop?.dimension ?? liste.dimension
+    const rattacher: Decision[] = sansActivite ? [] : [{ libelle: `Rattacher « ${point.valeur} » à une valeur de la liste`,
+      rattacher: { dimension, valeur: point.valeur, colonne: col, lignes } }]
     const plusieurs = lignes.length > 1 ? ` (${lignes.length} lignes)` : ''
     return {
       question: sansActivite ? `Poste « ${point.valeur} » sans activité${plusieurs} : que faire ?`
         : `${col} « ${point.valeur} » absent de la liste des ${liste.pluriel}${plusieurs} : que faire ?`,
       choix: [{ libelle: sansActivite ? `Choisir l’activité du poste « ${point.valeur} »`
         : col === 'Poste' ? `Créer le poste « ${point.valeur} »` : `Ajouter « ${point.valeur} » à la liste des ${liste.pluriel}`,
-        ajout: { dimension: prop?.dimension ?? liste.dimension, valeur: point.valeur } }, ...remplacer, ...precedent],
+        ajout: { dimension, valeur: point.valeur } }, ...remplacer, ...rattacher, ...precedent],
     }
   }
   if (prop?.corrections?.length) {
@@ -548,6 +563,8 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
   const ignore = plan.ignores.includes(c)
   const nouveauSite = choisi?.decision.ajout?.dimension === 'site' ? choisi.decision.ajout.valeur : null
   const nouveauPoste = choisi?.decision.ajout?.dimension === 'poste' ? choisi.decision.ajout.valeur : null
+  const rattache = choisi?.decision.rattacher
+  const cleRattache = rattache ? `${rattache.dimension}|${rattache.valeur}` : ''
   const regle = !edition.restants.has(k) && choisi == null && !ignore
   // Choisir une solution annule « ignorer » sur la même cellule, et inversement.
   const choisir = (i: number) => setPlan((p) => ({
@@ -625,6 +642,17 @@ function DetailLigne({ lotId, num, cible, point, points, edition }: DetailProps)
                         onChange={(e) => setPlan((p) => ({ ...p, activitePoste: { ...p.activitePoste, [nouveauPoste]: e.target.value } }))}>
                         <option value="" disabled>Choisir…</option>
                         {ACTIVITES_POSTE.map((a) => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {rattache && (
+                    <label className="decision">
+                      <span>Valeur de la liste (reconnue d’office dans les prochains fichiers)</span>
+                      <select value={plan.rattache[cleRattache] ?? ''} disabled={occupe}
+                        onChange={(e) => setPlan((p) => ({ ...p, rattache: { ...p.rattache, [cleRattache]: e.target.value } }))}>
+                        <option value="" disabled>Choisir…</option>
+                        {(q.data!.choix?.[rattache.colonne] ?? []).filter((v) => v !== rattache.valeur)
+                          .map((v) => <option key={v} value={v}>{v}</option>)}
                       </select>
                     </label>
                   )}

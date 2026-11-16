@@ -391,7 +391,8 @@ def _controler(feuille: Feuille, refs: Refs, ignores):
 
 
 def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dict[int, dict[str, str | None]],
-                        ajouts: list[dict], retirees: list[int], ignores: list[str], simuler: bool):
+                        ajouts: list[dict], retirees: list[int], ignores: list[str], simuler: bool,
+                        alias: list[dict] | None = None):
     """Toutes les décisions de l'écran en une fois : valeurs ajoutées aux listes, lignes retirées, cellules
     corrigées, cellules ignorées. Simulation : renvoie les points restants sans rien écrire."""
     lot = _lot_modifiable(db, lot_id)
@@ -410,6 +411,7 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
         elif type_site not in TYPES_SITE and not simuler:
             raise HTTPException(422, "Type de site obligatoire : " + ", ".join(TYPES_SITE))
         tout.setdefault(dim, {})[valeur] = type_site
+    rattaches = [_verifier_alias(db, a) for a in alias or []]
     refs = _refs_du_lot(db, lot, tout)
     cols = colonnes(feuille.entetes, refs)
     texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
@@ -454,12 +456,39 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
               ignores=tous_ignores)
     for a in ajouts:
         traces.append(("import_ajout_referentiel", None, a))
+    for dim, valeur, cible in rattaches:
+        if not db.scalar(select(RefAlias.id).where(RefAlias.dimension == dim,
+                                                   RefAlias.alias_norm == norm(valeur))):
+            db.add(RefAlias(dimension=dim, alias_norm=norm(valeur), cible_id=cible.id))
+        traces.append(("import_rattachement", None,
+                       {"dimension": dim, "valeur": valeur, "cible": cible.libelle}))
     if ignores:
         traces.append(("import_ignore", None, {"cellules": ignores}))
     for action, avant, apres in traces:
         audit.record(db, user_id, action, "lot_import", lot.id, avant, apres)
     db.commit()
     return lot
+
+
+def _verifier_alias(db: Session, a: dict):
+    """« Rattacher à » : la valeur du fichier devient un autre nom d'une valeur connue de la liste ;
+    les prochains fichiers la reconnaissent d'office."""
+    dim, valeur, cible = a.get("dimension"), (a.get("valeur") or "").strip(), a.get("cible") or ""
+    if dim not in DIM_REFS or dim not in DIM_MODELS:
+        raise HTTPException(422, "Liste inconnue")
+    model = DIM_MODELS[dim]
+    c = db.scalar(select(model).where(model.libelle == cible))
+    if c is None:
+        raise HTTPException(422, f"« {cible} » n'est pas dans la liste")
+    if not valeur or norm(valeur) == norm(c.libelle):
+        raise HTTPException(422, "Valeur à rattacher vide ou identique")
+    if any(norm(v) == norm(valeur) for v in db.scalars(select(model.libelle))):
+        raise HTTPException(422, f"« {valeur} » est déjà dans la liste")
+    autre = db.scalar(select(RefAlias).where(RefAlias.dimension == dim,
+                                             RefAlias.alias_norm == norm(valeur)))
+    if autre is not None and autre.cible_id != c.id:
+        raise HTTPException(422, f"« {valeur} » est déjà rattaché à une autre valeur")
+    return dim, valeur, c
 
 
 def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,

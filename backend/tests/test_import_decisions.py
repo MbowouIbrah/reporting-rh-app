@@ -324,3 +324,25 @@ def test_mois_isole_ne_propose_pas_un_mois_ou_l_employe_a_deja_sa_ligne(make_cli
     lot = up(c, rows).json()
     iso = next(a for a in c.get(f"{API}/imports/{lot['id']}/anomalies").json() if a["code"] == "PERIODE_ISOLEE")
     assert iso["proposition"]["corrections"][0]["valeur"] == "Février"
+
+
+def test_rattacher_une_valeur_inconnue_a_une_valeur_connue(make_client, db):
+    """« Rattacher à » : la valeur du fichier devient un autre nom de « Douala » ; le fichier suivant passe."""
+    from app.models.referentiel import RefAlias
+    c = make_client(ADMIN)
+    lot = up(c, [ligne(Site="Dla")]).json()
+    u = f"{API}/imports/{lot['id']}/decisions"
+    mauvais = [{"dimension": "site", "valeur": "Dla", "cible": "Inconnu"},
+               {"dimension": "site", "valeur": "Douala", "cible": "Douala"},
+               {"dimension": "salaire", "valeur": "Dla", "cible": "Douala"}]
+    for a in mauvais:
+        assert c.post(u, json={"alias": [a]}).status_code == 422, a
+    alias = [{"dimension": "site", "valeur": "Dla", "cible": "Douala"}]
+    sim = c.post(u, json={"alias": alias, "lignes": {"2": {"Site": "Douala"}}, "simuler": True})
+    assert not any(a["code"] == "REFERENTIEL_INCONNU" for a in sim.json()["anomalies"])
+    assert db.scalar(select(RefAlias).where(RefAlias.alias_norm == "dla")) is None  # simulation : rien écrit
+    r = c.post(u, json={"alias": alias, "lignes": {"2": {"Site": "Douala"}}})
+    assert r.status_code == 200 and r.json()["statut"] == "pret", r.text
+    site = db.scalar(select(Site).where(Site.libelle == "Douala"))
+    assert db.scalar(select(RefAlias.cible_id).where(RefAlias.alias_norm == "dla")) == site.id
+    assert up(c, [ligne(Site="Dla", MATRICULE="E9")]).json()["statut"] == "pret"

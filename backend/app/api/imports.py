@@ -145,6 +145,7 @@ class DecisionsIn(BaseModel):
     ajouts: list[dict] = []  # {dimension, valeur, type_site, activite}
     retirees: list[int] = []
     ignores: list[str] = []  # "ligne|colonne" : avertissement accepté, cellule laissée vide
+    alias: list[dict] = []  # {dimension, valeur, cible} : valeur rattachée à une connue
     simuler: bool = False
 
 
@@ -155,7 +156,8 @@ def decisions(lot_id: int, corps: DecisionsIn, p: Principal = Depends(current_pr
     authorize(p, "import:write")
     _lot(db, lot_id)
     r = service.appliquer_decisions(db, p.user_id, lot_id, corps.lignes, corps.ajouts,
-                                    corps.retirees, corps.ignores, corps.simuler)
+                                    corps.retirees, corps.ignores, corps.simuler,
+                                    corps.alias)
     return {"anomalies": r} if corps.simuler else service.lot_dict(service.publier_si_auto(db, r))
 
 

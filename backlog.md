@@ -29,5 +29,6 @@ Règle : toute demande hors périmètre du cycle en cours est consignée ici et 
 | B-023 | 2026-11-02 | 12 | Objectifs : « répartir l'annuel » reste sur l'année civile (janvier → décembre) même quand les rapports sont en année fiscale ; répartir sur l'exercice si le client saisit ses objectifs par exercice (Q2.1) | 3 | Fait par défaut (2026-11-03) : choix civil / fiscal dans « Répartir un objectif annuel », proposé selon le calendrier des rapports ; reste sur mars en fiscal |
 | B-024 | 2026-11-05 | Réunion client | Graphiques mélangeant plusieurs informations (par exemple CA + effectif) : besoin compris, reporté car trop complexe (CA global, effectif par service ou site : granularités différentes) | À cadrer | À faire |
 | B-025 | 2026-11-16 | Retours N2 (2) | Export PowerPoint direct des graphes (python-pptx, nouvelle dépendance) ; pour l'instant Excel à graphiques natifs, copiables dans PowerPoint (`docs/etude-formats-export.md`) | 2 | À faire |
+| B-026 | 2026-11-16 | Retours N2 | Points d'attention : « Rattacher à une valeur de la liste » limité aux listes service, site, activité, poste et type de contrat ; à étendre aux départements, employés (matricule) et rubriques | 2 | À faire |
 
 - Filtre et regroupement par département dans les rapports (E7, `docs/etude-departements.md` § 4.7).

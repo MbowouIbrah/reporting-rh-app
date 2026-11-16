@@ -217,6 +217,8 @@ export interface Decisions {
   ajouts: { dimension: string; valeur: string; type_site: string | null; activite?: string | null }[]
   retirees: number[]
   ignores: string[]
+  /** Valeurs du fichier rattachées à une valeur connue de la liste (reconnues d'office ensuite). */
+  alias?: { dimension: string; valeur: string; cible: string }[]
 }
 export const appliquerDecisions = (id: number, d: Decisions) => api<Lot>(`/imports/${id}/decisions`, json(d))
 /** Points qui resteraient après ces décisions, sans rien enregistrer. */
