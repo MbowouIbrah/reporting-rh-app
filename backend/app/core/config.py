@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Dossier où la paie dépose BrutFinalMMAA.csv (lecture seule). Vide : surveillance coupée.
     IMPORT_DIR: str = ""
     IMPORT_SCAN_MINUTES: int = 30  # passage de secours si un avis du dossier est manqué
+    IMPORT_SCRUTATION_SECONDES: int = 0  # 0 = avis du système ; > 0 = relecture (partage réseau)
     # Dépôt manuel d'un fichier (depot) ou dossier surveillé (dossier : dépôt manuel masqué du menu)
     IMPORT_MODE: Literal["depot", "dossier"] = "depot"
 

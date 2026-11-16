@@ -53,6 +53,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
       IMPORT_DIR: /data/import
       IMPORT_SCAN_MINUTES: ${IMPORT_SCAN_MINUTES:-30}
+      IMPORT_MODE: ${IMPORT_MODE:-depot}
+      IMPORT_SCRUTATION_SECONDES: ${IMPORT_SCRUTATION_SECONDES:-0}
     # Dossier de dépôt de la paie, monté en lecture seule (voir .env.example).
     volumes:
       - ${IMPORT_DIR:-./import}:/data/import:ro

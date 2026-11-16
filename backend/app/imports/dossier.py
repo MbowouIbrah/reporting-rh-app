@@ -2,7 +2,8 @@
 
 L'analyse crée un lot « en vérification » : rien n'est visible tant que l'administrateur n'a pas validé
 (flux de validation inchangé). Le dossier n'est jamais modifié (lecture seule). Détection à l'événement
-(watchdog) et passage de secours périodique, car un partage réseau ne signale pas toujours les dépôts."""
+(watchdog) et passage de secours périodique. Un partage réseau ou un dossier monté dans Docker sous Windows ne
+transmet pas les avis du système : IMPORT_SCRUTATION_SECONDES > 0 relit alors le dossier à ce rythme."""
 
 import hashlib
 import logging
@@ -18,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 
 from app import notifications
 from app.core.config import settings
@@ -344,7 +346,8 @@ class Surveillance:
         if self._observer is not None:
             return
         try:
-            observer = Observer()
+            secondes = settings.IMPORT_SCRUTATION_SECONDES
+            observer = PollingObserver(timeout=secondes) if secondes > 0 else Observer()
             observer.schedule(_Avis(self._demander), str(self._racine), recursive=False)
             observer.daemon = True
             observer.start()

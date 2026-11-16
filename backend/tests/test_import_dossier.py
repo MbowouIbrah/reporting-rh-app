@@ -330,3 +330,15 @@ def test_publication_automatique_apres_le_dernier_probleme_regle(paie, db, make_
     r = make_client(ADMIN).post(f"/api/v1/imports/{lot.id}/referentiels",
                                 json={"dimension": "poste", "valeur": "Technicien", "activite": "Front office"})
     assert r.json()["statut"] == "valide"
+
+
+@pytest.mark.parametrize("secondes, relecture", [(0, False), (10, True)])
+def test_relecture_du_dossier_si_les_avis_ne_passent_pas(paie, monkeypatch, secondes, relecture):
+    from watchdog.observers.polling import PollingObserver
+    monkeypatch.setattr(settings, "IMPORT_SCRUTATION_SECONDES", secondes)
+    s = dossier.Surveillance(paie, None, 30)
+    s._lancer_observer()
+    try:
+        assert isinstance(s._observer, PollingObserver) is relecture
+    finally:
+        s._arreter_observer()
