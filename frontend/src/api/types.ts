@@ -9,6 +9,9 @@ export interface Budget {
   ecart_pct?: Val
 }
 
+/** Effectif de fin en front office et en back office, et leurs parts de l'effectif total. */
+export interface FrontBack { front: number; back: number; total: number; front_pct: Val; back_pct: Val }
+
 export interface Cell {
   m1: Val
   m: Val
@@ -135,6 +138,7 @@ export interface Mensuel {
     ca?: Val
     marge?: Val
     taux_marge?: Val
+    front_back?: FrontBack | null
   }
   a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
   /** Absent sans la permission marge:read. */
@@ -227,6 +231,7 @@ export interface Annuel {
   mois_fin: number | null
   annee_fin?: number | null
   effectif_fin: Cell
+  front_back?: FrontBack | null
   effectif_fin_contrat: Record<string, Cell & { part: Val }>
   effectif_moyen_mad: Cell
   part_mad: { m: Val; m1: Val }

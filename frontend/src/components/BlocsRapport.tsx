@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useState } from 'react'
-import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
+import type { Budget, Cell, CellPartiel, FrontBack, LigneActivite, Mensuel } from '../api/types'
 import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
@@ -426,7 +426,7 @@ const EnteteDetail = ({ libelle, lignes }: { libelle: string; lignes: number }) 
 const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
 
 /** 5. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
-export function AnalyseEffectifs({ d }: { d: Blocs }) {
+export function AnalyseEffectifs({ d, fb }: { d: Blocs; fb?: FrontBack | null }) {
   // Dernière colonne (ensemble) en tête ; aucune colonne sans indicateur
   const ind = d.d_contrat.indicateurs
   const cols = ind.length > 0 ? [ind[ind.length - 1], ...ind.slice(0, -1)] : []
@@ -442,6 +442,7 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
     </tr>
   )
   return (
+    <>
     <table className="dense aligne">
       <thead>
         <tr>
@@ -464,6 +465,18 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
         {ligne('Effectif fin de période', (i) => entier(i.fin), 'total')}
       </tbody>
     </table>
+    {fb && fb.total > 0 && <FrontBackLigne fb={fb} />}
+    </>
+  )
+}
+
+/** Ratio front / back office sur l'effectif de fin (une ligne sans activité ne compte dans aucune des deux parts). */
+export function FrontBackLigne({ fb }: { fb: FrontBack }) {
+  return (
+    <p className="front-back">
+      <strong>Front / Back office</strong> : {pct(fb.front_pct)} / {pct(fb.back_pct)}
+      <span className="note"> ({entier(fb.front)} front, {entier(fb.back)} back sur {entier(fb.total)} en fin de période)</span>
+    </p>
   )
 }
 

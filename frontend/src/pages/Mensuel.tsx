@@ -82,7 +82,7 @@ export function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour:
             panneaux: [
               [
                 { titre: '4. Répartition par nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
-                { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} /> },
+                { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} fb={d.synthese.front_back} /> },
               ],
             ],
           },
