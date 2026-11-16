@@ -340,6 +340,18 @@ def _front_back(pd: PeriodeData | None) -> dict | None:
             "front_pct": part(front), "back_pct": part(back)}
 
 
+def _avec_parts(blocs: list[dict], global_m: Decimal | None) -> list[dict]:
+    """Retours N2 (4, 6) : part de chaque activité dans l'effectif de son service ou site, et part
+    du service ou site dans l'effectif global (périmètre visible). Ratios sur l'effectif de la
+    période (fin de mois en mensuel, moyenne mensuelle en annuel)."""
+    for b in blocs:
+        e = b["effectif"]["m"]
+        b["part_globale"] = _ratio(e, global_m)
+        for a in b["activites"]:
+            a["part"] = _ratio(a["effectif"]["m"], e)
+    return blocs
+
+
 def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
             budgets: Budgets | None = None) -> dict:
     budgets = budgets or Budgets()
@@ -446,8 +458,22 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             return None
         return sum((pd.total(L) for L in pd.lignes if L.site == s and L.contrat == c), ZERO)
 
+    def site_act(pd, s, a):
+        if not pd:
+            return None, None
+        sel = [L for L in pd.lignes if L.site == s and L.activite == a]
+        return sum((pd.total(L) for L in sel), ZERO), len({L.salarie_id for L in sel})
+
+    def activites_site(s):
+        out = []
+        for a in refs.activites:
+            (ms0, e0), (ms1, e1) = site_act(cur, s, a), site_act(prev, s, a)
+            out.append({"activite": a, **cell(ms0, ms1), "effectif": cell_eff(e0, e1)})
+        return out
+
     c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
                "effectif": cell_eff(*sites_eff[s]),
+               "activites": activites_site(s),
                "effectif_contrat": {c: cell_eff(eff_site_contrat(cur, s, c),
                                                 eff_site_contrat(prev, s, c))
                                     for c in refs.contrats},
@@ -531,8 +557,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
-        "b_service_activite": b_service,
-        "c_site": c_site,
+        "b_service_activite": _avec_parts(b_service, Decimal(len(cur.ids))),
+        "c_site": _avec_parts(c_site, Decimal(len(cur.ids))),
         "c_site_total": c_site_total,
         "d_contrat": {"effectifs": d_eff, "indicateurs": d_indic,
                       "total": cell(Decimal(eff), None if eff1 is None else Decimal(eff1)),
@@ -615,6 +641,12 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                        for c in refs.contrats}
         c_site.append({"site": s, "ms": {**ms, **bud("site", s, ms["m"])},
                        "effectif": e,
+                       "activites": [
+                           {"activite": a,
+                            **cell_ms(lambda L, s=s, a=a: L.site == s and L.activite == a),
+                            "effectif": cell_eff(
+                                lambda L, s=s, a=a: L.site == s and L.activite == a)}
+                           for a in refs.activites],
                        "effectif_contrat": par_contrat,
                        "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.site == s and L.contrat == c)
                                       for c in refs.contrats}})
@@ -652,10 +684,11 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
          "ms": cell_ms(lambda L, c=c, a=a: L.contrat == c and L.activite == a),
          "effectif": cell_eff(lambda L, c=c, a=a: L.contrat == c and L.activite == a)}
         for c in refs.contrats for a in refs.activites]
+    global_m = cell_eff(lambda L: True)["m"]
     return {
         "a_type_charge": a_type,
-        "b_service_activite": b_service,
-        "c_site": c_site,
+        "b_service_activite": _avec_parts(b_service, global_m),
+        "c_site": _avec_parts(c_site, global_m),
         "c_site_total": {"ms": _somme([c["ms"] for c in c_site], budget=True),
                          "effectif": _somme([c["effectif"] for c in c_site])},
         "d_contrat": {"indicateurs": d_indic, "ventilation": ventilation,

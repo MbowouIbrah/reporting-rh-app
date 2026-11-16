@@ -174,3 +174,16 @@ test('TypesCharge liste les rubriques comptées sans groupe ; les hors total von
   const exclus = render(<TypesExclus d={blocs} lib={lib} />).container
   expect([...exclus.querySelectorAll('tbody tr.exclu th')].map((th) => th.textContent)).toEqual(['Bonus'])
 })
+
+test('parts d’effectif : colonnes masquées par défaut, % du site et % global au clic', () => {
+  const avecParts = {
+    c_site: [{ ...site('Douala'), part_globale: '0.6', activites: [{ activite: 'VN', ...cell, effectif: cell, part: '0.25' }] }],
+  } as unknown as Blocs
+  render(<Sites d={avecParts} lib={{ prec: 'M-1', cour: 'M' }} />)
+  expect(screen.queryByText('% global')).not.toBeInTheDocument()
+  expect(screen.getByRole('cell', { name: 'VN' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Parts d’effectif' }))
+  expect(screen.getByRole('columnheader', { name: '% du site' })).toBeInTheDocument()
+  expect(screen.getByText('25 %')).toBeInTheDocument()
+  expect(screen.getByText('60 %')).toBeInTheDocument()
+})

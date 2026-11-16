@@ -153,7 +153,10 @@ export interface Mensuel {
     service: string
     total: Cell & Budget
     effectif: Cell
-    activites: ({ activite: string; effectif: Cell } & Cell)[]
+    /** Part du service dans l'effectif global (ratio, retours N2). */
+    part_globale?: Val
+    /** part : part de l'activité dans l'effectif du service (ratio). */
+    activites: ({ activite: string; effectif: Cell; part?: Val } & Cell)[]
     /** Masse salariale et effectif du service par nature de contrat (CDI, CDD, MAD). */
     ms_contrat?: Record<string, Cell>
     effectif_contrat?: Record<string, Cell>
@@ -162,6 +165,9 @@ export interface Mensuel {
     site: string
     ms: Cell & Budget
     effectif: Cell
+    /** Ventilation du site par activité, comme les services (retours N2, point 6). */
+    activites?: ({ activite: string; effectif: Cell; part?: Val } & Cell)[]
+    part_globale?: Val
     /** Effectif du site par nature de contrat (CDI, CDD, MAD), dans l'ordre de la liste des contrats. */
     effectif_contrat?: Record<string, Cell>
     /** Masse salariale du site par nature de contrat, mêmes clés que effectif_contrat. */

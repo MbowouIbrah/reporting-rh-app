@@ -454,3 +454,23 @@ def test_front_back_office_mensuel_et_annuel():
     fb = annuel(n, {}, 2, REFS, Params())["front_back"]
     assert (fb["front"], fb["back"], fb["front_pct"]) == (1, 1, D("0.5"))
     assert annuel({}, {}, 2, REFS, Params())["front_back"] is None
+
+
+def test_parts_d_effectif_par_service_et_par_site():
+    """Retours N2 (4, 6) : % de chaque activité dans son service / site, % du service / site
+    dans l'effectif global ; les sites sont ventilés par activité comme les services."""
+    cur = pd(L(1, Brut_Réel=100), L(2, act="Back Office", Brut_Réel=50),
+             L(3, service="Commerce VN", site="Yaoundé", Brut_Réel=30),
+             L(4, service="Commerce VN", site="Yaoundé"))
+    m = mensuel(cur, None, REFS, Params())
+    sav = m["b_service_activite"][0]
+    assert sav["part_globale"] == D("0.5")
+    assert [a["part"] for a in sav["activites"]] == [D("0.5"), D("0.5")]
+    yde = m["c_site"][1]
+    assert yde["part_globale"] == D("0.5")
+    assert [(a["activite"], a["m"], a["part"]) for a in yde["activites"]] == [
+        ("Front office", D(30), D(1)), ("Back Office", D(0), D(0))]
+    a = annuel({1: cur}, {}, 1, REFS, Params())
+    assert a["c_site"][0]["part_globale"] == D("0.5")
+    assert a["c_site"][0]["activites"][1]["part"] == D("0.5")
+    assert a["b_service_activite"][1]["activites"][0]["part"] == D(1)

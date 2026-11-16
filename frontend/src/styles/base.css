@@ -392,6 +392,8 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
+.rapport-excel .panneau table.services tr.staff td.part { color: var(--navy); opacity: 1; }
+.parts-bascule { display: flex; justify-content: flex-end; margin-bottom: var(--sp-2); }
 /* Effectif sous un total : même bande que le total, sans trait entre les deux (modèle du tableau par site) */
 .rapport-excel .panneau table.dense tbody tr.total.staff:nth-child(n) > * { opacity: 1; font-weight: var(--fw-regular); }
 .rapport-excel .panneau table.dense tbody tr.total + tr.total.staff:nth-child(n) > * { border-top: 0; }
