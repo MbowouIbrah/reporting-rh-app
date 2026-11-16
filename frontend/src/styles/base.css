@@ -564,6 +564,7 @@ table.dense tr.sous-titre th { text-align: left; background: var(--gris-etiq, va
 table.dense.tab-global { table-layout: fixed; width: 100%; }
 table.dense.tab-global th:first-child, table.dense.tab-global td:first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
 table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:first-child) { width: calc(76% / 7); }
+@media (max-width: 899px) { table.dense.tab-global { min-width: 960px; } } /* téléphone : le tableau défile dans son cadre, les chiffres ne se chevauchent plus */
 
 /* Administration : feuille DONNEES, en-têtes Excel en casse mixte sur plusieurs lignes */
 .donnees-excel .panneau table.dense thead th { white-space: normal; vertical-align: middle; text-align: left; text-wrap: balance; }
@@ -588,7 +589,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 :is(.rapport-excel, .resume-excel) .filtres .filtres-fin .choix-salarie input { width: 100%; max-width: 320px; }
 .filtres .bouton-lien { flex: none; white-space: nowrap; }
 /* Colonnes ANNÉE à Noms figées au défilement horizontal */
-.donnees-excel { --f1: 62px; --f2: 96px; --f3: 104px; --f4: 190px; }
+.donnees-excel { --f1: 76px; --f2: 96px; --f3: 104px; --f4: 190px; }
 .donnees-excel table.dense .fige { position: sticky; z-index: 1; overflow: hidden; text-overflow: ellipsis; }
 .donnees-excel .panneau table.dense tbody td.fige { background: var(--surface); }
 .donnees-excel .panneau table.dense tbody tr:hover td.fige { background: var(--surface-hover); }
@@ -1425,7 +1426,7 @@ table.tableau-squelette td { height: 2.1em; }
 @media (min-width: 1360px) {
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport { flex-wrap: nowrap; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(label, .filtre) { flex: none; white-space: nowrap; }
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple { flex: 0 1 auto; min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple { flex: 0 1 auto; min-width: min-content; } /* le libellé ne passe jamais sous le suivant */
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple :is(select, input) { width: 100%; min-width: 72px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie { min-width: 0; }
 }
