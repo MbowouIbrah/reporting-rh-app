@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.exports import graphiques as graphes_xlsx
 from app.exports import xlsx
 from app.imports.regles import norm
 from app.kpi import chargement as ch
@@ -323,19 +324,28 @@ def annuel_export(
     type_contrat: str | None = Query(None, max_length=100),
     departement: str | None = Query(None, max_length=100),
     calendrier: Calendrier = "civil",
+    graphiques: bool = False,
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
+    """Classeur du rapport annuel ; `graphiques` : graphes d'évolution en graphiques Excel."""
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
                   activite, type_contrat, calendrier, departement)
     an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
-    audit.record(db, p.user_id, "export", "rapport_annuel", f"{an_fin}-{mois_fin:02d}", None,
+    entite = "graphes_annuels" if graphiques else "rapport_annuel"
+    audit.record(db, p.user_id, "export", entite, f"{an_fin}-{mois_fin:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
                   "type_contrat": type_contrat, "calendrier": calendrier,
                   "departement": departement})
     db.commit()
     suffixe = "-fiscal" if calendrier == "fiscal" else ""
+    if graphiques:
+        ref = ref_annee or annee - 1
+        def nom(a: int) -> str:
+            return f"{a}-{(a + 1) % 100:02d}" if calendrier == "fiscal" else str(a)
+        return _xlsx(graphes_xlsx.graphiques(res, nom(annee), nom(ref)),
+                     f"graphes-{annee}{suffixe}.xlsx")
     # libellé du cumul : dernier mois réellement cumulé, comme à l'écran
     return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier),
                  f"reporting-annuel-{annee}{suffixe}.xlsx")

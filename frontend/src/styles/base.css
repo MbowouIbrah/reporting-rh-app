@@ -394,6 +394,9 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
 .rapport-excel .panneau table.services tr.staff td.part { color: var(--navy); opacity: 1; }
 .parts-bascule { display: flex; justify-content: flex-end; margin-bottom: var(--sp-2); }
+.export-graphes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.export-graphes-aide { color: var(--muted); font-size: .85rem; }
+@media print { .export-graphes { display: none; } }
 /* Effectif sous un total : même bande que le total, sans trait entre les deux (modèle du tableau par site) */
 .rapport-excel .panneau table.dense tbody tr.total.staff:nth-child(n) > * { opacity: 1; font-weight: var(--fw-regular); }
 .rapport-excel .panneau table.dense tbody tr.total + tr.total.staff:nth-child(n) > * { border-top: 0; }

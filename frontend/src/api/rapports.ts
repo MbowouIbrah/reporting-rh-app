@@ -1,5 +1,5 @@
 import type { Calendrier } from '../lib/exercice'
-import { api } from './client'
+import { api, telecharger } from './client'
 import type { Annuel, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
 
 export interface FiltresPage {
@@ -47,6 +47,9 @@ export const getSalaries = (annee: number, calendrier?: Calendrier) =>
   api<Salarie[]>(`/rapports/salaries${qs({ annee, calendrier })}`)
 export const getMensuel = (f: FiltresPage) => api<Mensuel>(`/rapports/mensuel${qs({ ...f })}`)
 export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({ ...f })}`)
+/** Graphes d'évolution en classeur Excel : vrais graphiques liés à leurs données (retours N2, point 2). */
+export const exporterGraphes = (f: FiltresPage) =>
+  telecharger(`/rapports/annuel/export${qs({ ...f, graphiques: 'true' })}`, {}, `graphes-${f.annee}.xlsx`)
 export const getIndividuel = (annee: number, matricule: string, calendrier?: Calendrier) =>
   api<Individuel>(`/rapports/individuel${qs({ annee, matricule, calendrier })}`)
 

@@ -3,7 +3,8 @@ import { Fragment, type ReactNode, useCallback, useDeferredValue, useRef, useSta
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { getAnnuel } from '../api/rapports'
+import { exporterGraphes, getAnnuel } from '../api/rapports'
+import { Bouton } from '../components/Kit'
 import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
@@ -397,6 +398,7 @@ export default function Graphes() {
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
+      {f.filtres && <ExportGraphes filtres={f.filtres} />}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}
       {!rapport && (serie ? menu.length > 0 : premier && groupesSquelette.length > 0) && (
@@ -520,5 +522,24 @@ export default function Graphes() {
         </details>
       )}
     </section>
+  )
+}
+
+/** Export Excel des graphes : chaque graphe y est un vrai graphique Excel lié à son tableau ; copié dans
+ *  PowerPoint, il reste modifiable (clic droit > Modifier les données). */
+function ExportGraphes({ filtres }: { filtres: Parameters<typeof exporterGraphes>[0] }) {
+  const [etat, setEtat] = useState<'' | 'encours' | 'erreur'>('')
+  const lancer = () => {
+    setEtat('encours')
+    exporterGraphes(filtres).then(() => setEtat(''), () => setEtat('erreur'))
+  }
+  return (
+    <div className="export-graphes">
+      <Bouton variante="secondaire" onClick={lancer} disabled={etat === 'encours'}>
+        {etat === 'encours' ? 'Préparation…' : 'Graphes modifiables (Excel)'}
+      </Bouton>
+      <span className="export-graphes-aide">Copiez un graphe dans PowerPoint : il reste modifiable.</span>
+      {etat === 'erreur' && <span role="alert">Export impossible pour le moment. Réessayez.</span>}
+    </div>
   )
 }
