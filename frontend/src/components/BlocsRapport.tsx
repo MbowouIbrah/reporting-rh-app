@@ -399,8 +399,8 @@ function Repartition({ axe, blocs, general, lib, titre }: {
                     <Chiffres l={{ ms: a, effectif: a.effectif, part_masse: a.part_masse, part: a.part }} budget={sansBudget} />
                   </tr>
                   {o &&
-                    det.map(([c, x]) => (
-                      <tr key={c} className="contrat">
+                    det.map(([c, x], j) => (
+                      <tr key={c} className={`contrat${j % 2 ? ' alt' : ''}`}>
                         <th scope="row" className="libelle">{c}</th>
                         <Chiffres l={x} budget={sansBudget} />
                       </tr>
