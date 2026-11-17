@@ -276,8 +276,9 @@ interface BlocRep {
  *  masse et effectif côte à côte ; chaque activité se déplie par contrat, le nom du bloc déplie toutes ses activités ;
  *  un seul bloc ouvert à la fois (ouvrir un autre bloc replie le précédent) ;
  *  chaque bloc finit par son total, qui porte le budget. Activités et contrats à zéro masqués. */
-function Repartition({ axe, blocs, general, lib }: {
+function Repartition({ axe, blocs, general, lib, titre }: {
   axe: 'site' | 'service'
+  titre?: string
   blocs: BlocRep[]
   general?: { ms: Cell & Budget; effectif: Cell }
   lib: Libelles
@@ -291,6 +292,21 @@ function Repartition({ axe, blocs, general, lib }: {
   return (
     <table className={`dense repartition${ouvert ? '' : ' replie'}`}>
       <thead>
+        {titre && (
+          // Bandeau du panneau : titre et groupes de colonnes sur la même ligne bleue.
+          <tr className="groupes">
+            <th colSpan={2} className="groupes-titre">{titre}</th>
+            <th colSpan={5}>Masse salariale (FCFA)</th>
+            <th className="gouttiere" />
+            <th colSpan={4}>Effectif</th>
+            {avecBudget && (
+              <>
+                <th className="gouttiere" />
+                <th colSpan={3}>Budget</th>
+              </>
+            )}
+          </tr>
+        )}
         <tr>
           <th scope="col" className="libelle">{axe === 'site' ? 'Site' : 'Service'}</th>
           <th scope="col" className="libelle">Activité</th>
@@ -410,11 +426,12 @@ function Repartition({ axe, blocs, general, lib }: {
   )
 }
 
-export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
+export function ServicesActivites({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   return (
     <Repartition
       axe="service"
+      titre={titre}
       lib={lib}
       general={total && { ms: total, effectif: d.d_contrat.total }}
       blocs={d.b_service_activite.map((b) => ({
@@ -429,10 +446,11 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
   )
 }
 
-export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
+export function Sites({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
   return (
     <Repartition
       axe="site"
+      titre={titre}
       lib={lib}
       general={d.c_site_total}
       blocs={d.c_site.map((r) => ({

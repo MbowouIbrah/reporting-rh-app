@@ -6,6 +6,8 @@ import { Panneau } from './BlocsRapport'
 export interface PanneauSnap {
   titre: string
   contenu: ReactNode
+  /** Le contenu porte lui-même le titre (bandeau intégré au tableau). */
+  sansTitre?: boolean
 }
 
 /** Un écran : un ou plusieurs tableaux qui vont ensemble, côte à côte (colonnes en fr). */
@@ -153,13 +155,13 @@ export default function SnapSections({ sections, libelle = 'Tableaux du rapport'
               Array.isArray(pn) ? (
                 <div key={pn[0].titre} className="snap-colonne">
                   {pn.map((x) => (
-                    <Panneau key={x.titre} titre={x.titre}>
+                    <Panneau key={x.titre} titre={x.titre} sansTitre={x.sansTitre}>
                       {x.contenu}
                     </Panneau>
                   ))}
                 </div>
               ) : (
-                <Panneau key={pn.titre} titre={pn.titre}>
+                <Panneau key={pn.titre} titre={pn.titre} sansTitre={pn.sansTitre}>
                   {pn.contenu}
                 </Panneau>
               ),

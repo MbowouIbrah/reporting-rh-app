@@ -32,12 +32,12 @@ function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
           {
             id: 's-sites',
             titre: 'Répartition par site',
-            panneaux: [{ titre: '2. Répartition par site', contenu: <Sites d={d} lib={lib} /> }],
+            panneaux: [{ titre: '2. Répartition par site', sansTitre: true, contenu: <Sites d={d} lib={lib} titre="2. Répartition par site" /> }],
           },
           {
             id: 's-services',
             titre: 'Répartition par service et activité',
-            panneaux: [{ titre: '3. Répartition par service et activité', contenu: <ServicesActivites d={d} lib={lib} /> }],
+            panneaux: [{ titre: '3. Répartition par service et activité', sansTitre: true, contenu: <ServicesActivites d={d} lib={lib} titre="3. Répartition par service et activité" /> }],
           },
           {
             id: 's-contrats',

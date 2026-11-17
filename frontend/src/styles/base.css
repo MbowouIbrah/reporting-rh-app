@@ -408,6 +408,12 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition .gouttiere { width: 10px; min-width: 10px; padding: 0; background: #fff; border: 0; }
 .rapport-excel .panneau table.repartition thead th { background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); text-transform: uppercase; white-space: nowrap; }
 .rapport-excel .panneau table.repartition thead th.gouttiere { background: #fff; border: 0; }
+/* Bandeau bleu : titre du panneau et groupes de colonnes sur une seule ligne ; la ligne des intitulés se fige dessous */
+.rapport-excel .panneau table.repartition thead tr.groupes th:not(.gouttiere) { height: 34px; padding: 0 12px; background: var(--gris-section); color: var(--paper); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: left; border: 0; }
+.rapport-excel .panneau table.repartition thead tr.groupes th.groupes-titre { font-size: var(--fs-md); letter-spacing: .02em; padding-left: 16px; }
+.rapport-excel .panneau table.repartition.dense thead tr.groupes + tr th { top: 34px; }
+/* Gouttières : vides et nettes sur toute la hauteur (ni zèbre, ni filet) */
+.rapport-excel .panneau table.repartition :is(thead, tbody) tr > :is(th, td).gouttiere { width: 16px; min-width: 16px; padding: 0; background: #fff; border: 0; }
 .rapport-excel .panneau table.repartition tbody th.nom { position: static; vertical-align: top; min-width: 150px; text-align: left; font-weight: 700; color: var(--navy); background: var(--surface); border-right: 1px solid var(--rule); border-left: 3px solid transparent; }
 .rapport-excel .panneau table.repartition tbody th.nom.ouvert { border-left-color: var(--navy); }
 /* Chaque site / service se détache par un filet net au-dessus de son bloc */
