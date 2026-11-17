@@ -180,3 +180,11 @@ def test_graphes_en_vrais_graphiques_excel(make_client, charge):
     equip = load_workbook(BytesIO(get(make_client(EQUIP), "annuel/export", annee=2026, mois=2,
                                       graphiques="true").content))
     assert "Marge" not in equip.sheetnames  # marge réservée, comme à l'écran
+
+
+def test_graphes_choisis_seulement(charge):
+    """Seuls les graphes cochés à l'écran sont exportés, dans l'ordre du classeur."""
+    r = get(charge, "annuel/export", annee=2026, mois=2, graphiques="true", graphes="effectif,ca,inconnu")
+    assert load_workbook(BytesIO(r.content)).sheetnames == ["Effectif", "CA"]
+    assert get(charge, "annuel/export", annee=2026, mois=2, graphiques="true",
+               graphes="ms;drop").status_code == 422

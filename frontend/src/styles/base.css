@@ -401,9 +401,14 @@ table.dense td.num { text-align: right; }
 .part-badge.masse, .part-globale.masse { color: #1d4f91; background: #eef3fa; border-color: #c9d8ee; }
 .part-badge.effectif, .part-globale.effectif { color: #8a5a00; background: #fbf4e6; border-color: #ecd9b0; }
 .part-globale { display: block; width: max-content; margin-top: 4px; padding: 0 6px; font-size: 0.68rem; font-weight: var(--fw-regular); line-height: 1.5; border: 1px solid; }
-.export-graphes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-2); margin: var(--sp-2) 0; }
-.export-graphes-aide { color: var(--muted); font-size: .85rem; }
-@media print { .export-graphes { display: none; } }
+/* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
+.graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
+.graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
+.graphes-selection-aide { color: var(--muted); font-size: var(--fs-sm); }
+.graphe-choix { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.graphe-choix input { width: 16px; height: 16px; margin: 0; accent-color: var(--navy); cursor: pointer; }
+.graphes-excel .graphe.graphe-coche { outline: 2px solid var(--navy); outline-offset: -2px; }
+@media print { .graphes-selection { display: none; } }
 /* Effectif sous un total : même bande que le total, sans trait entre les deux (modèle du tableau par site) */
 .rapport-excel .panneau table.dense tbody tr.total.staff:nth-child(n) > * { opacity: 1; font-weight: var(--fw-regular); }
 .rapport-excel .panneau table.dense tbody tr.total + tr.total.staff:nth-child(n) > * { border-top: 0; }
@@ -1592,6 +1597,12 @@ table.tableau-squelette td { height: 2.1em; }
 .export-choix legend { padding: 0; margin-bottom: var(--sp-2); color: var(--muted); }
 .export-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--rule); }
 .export-choix label { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
+.export-types { display: grid; padding: 4px 0; }
+.export-type { display: grid; gap: 2px; width: 100%; padding: 10px var(--sp-4); border: 0; background: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+.export-type strong { color: var(--navy); }
+.export-type span { color: var(--muted); }
+.export-type:hover { background: rgba(0, 0, 0, 0.04); }
+.export-type:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
 
 /* Rapport PDF (route /rapport) : les pages l'une sous l'autre, hauteur naturelle, sans commandes */
 .rapport-pdf { width: 277mm; margin: 0 auto; padding: var(--sp-4) 0; background: var(--paper); min-height: 100dvh; }

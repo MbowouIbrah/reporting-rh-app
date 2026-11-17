@@ -33,6 +33,19 @@ test('sans droit nominatif, pas de partie Individuel', async () => {
   expect(screen.queryByRole('checkbox', { name: 'Individuel', hidden: true })).toBeNull()
 })
 
+test('page Graphes : deux choix ; Graphiques dynamiques ferme le menu et lance la sélection', async () => {
+  const graphiques = vi.fn()
+  monter(<ExportPdf onGraphiques={graphiques} />, [], () => ({}), '/graphes')
+  fireEvent.click(await screen.findByRole('button', { name: 'Exporter' }))
+  fireEvent.click(screen.getByRole('button', { name: /Résumé PDF/, hidden: true }))
+  expect(screen.getByRole('checkbox', { name: 'Graphes', hidden: true })).toBeChecked()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  fireEvent.click(screen.getByRole('button', { name: 'Exporter' }))
+  fireEvent.click(screen.getByRole('button', { name: /Graphiques dynamiques/, hidden: true }))
+  expect(graphiques).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('group', { name: 'Type d’export', hidden: true })).toBeNull()
+})
+
 test('aucun bouton sur l’administration', async () => {
   monter(<ExportPdf />, ['saisie:write'], () => ({}), '/admin')
   await new Promise((r) => setTimeout(r, 50))

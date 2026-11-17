@@ -316,6 +316,26 @@ test('Graphes : les groupes cochés s’affichent, choisir un groupe décoche le
   localStorage.clear()
 })
 
+test('Graphes : export des graphiques dynamiques, graphes cochés à l’écran puis bouton à droite du menu', async () => {
+  localStorage.clear()
+  URL.createObjectURL = vi.fn(() => 'blob:x')
+  URL.revokeObjectURL = vi.fn()
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  rendu(<Graphes />, '/graphes', ['report:read'])
+  await screen.findByText(/objectif de rémunération globale n’apparaît pas/i)
+  fireEvent.click(screen.getByRole('button', { name: 'Exporter' }))
+  fireEvent.click(screen.getByRole('button', { name: /Graphiques dynamiques/, hidden: true }))
+  const exporter = screen.getByRole('button', { name: 'Exporter 0 graphe' })
+  expect(exporter).toBeDisabled()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Salaire par mois (FCFA)' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Masse salariale mensuelle (FCFA)' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Exporter 2 graphes' }))
+  await waitFor(() => expect(screen.queryByRole('group', { name: 'Export des graphiques dynamiques' })).toBeNull())
+  const url = vi.mocked(fetch).mock.calls.map((c) => String(c[0])).find((u) => u.includes('graphiques=true'))!
+  expect(url).toContain('graphes=ms%2Csalaire')
+  expect(screen.queryByRole('checkbox', { name: 'Salaire par mois (FCFA)' })).toBeNull()
+})
+
 test('Résumé : au tout premier chargement, le squelette a les cases, les mois et la ligne TOTAL de la page', async () => {
   sessionStorage.clear()
   rendu(<Resume />, '/resume', ['report:read', 'marge:read'])

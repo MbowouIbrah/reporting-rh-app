@@ -52,6 +52,17 @@ GRAPHES: list[tuple[str, str, Callable[[dict], object], str | None, bool]] = [
 ]
 
 
+# Identifiant du graphe à l'écran (frontend `lib/groupesGraphes.ts`) → feuille du classeur.
+IDS_ECRAN = {
+    "ms": "Masse salariale", "effectif": "Effectif", "frais": "Frais de mission",
+    "remu": "Rémunération", "salaire": "Salaire", "primes": "Primes", "ventes": "Ventes",
+    "clients": "Clients", "or": "OR par productif", "ca": "CA", "marge": "Marge",
+    "commissions": "Commissions", "productivite": "Productivité", "factures": "Factures",
+    "absences": "Absences", "assurance": "Assurance", "formation": "Formation",
+    "logement": "Logement", "credit": "Téléphone", "carburant": "Carburant",
+}
+
+
 def _nombre(v):
     """Valeur numérique du graphe ; 'n/a' ou texte -> case vide."""
     v = _val(v)
@@ -93,7 +104,9 @@ def _feuille(wb: Workbook, nom: str, titre: str, mois: list[str],
     ws.add_chart(principal, f"{ws.cell(1, len(colonnes) + 3).column_letter}2")
 
 
-def graphiques(r: dict, nom_n: str, nom_n1: str) -> bytes:
+def graphiques(r: dict, nom_n: str, nom_n1: str, ids: list[str] | None = None) -> bytes:
+    """`ids` : graphes choisis à l'écran (identifiants de `IDS_ECRAN`) ; None = tous."""
+    voulus = None if ids is None else {IDS_ECRAN[i] for i in ids if i in IDS_ECRAN}
     serie_n = r.get("serie_n") or []
     serie_n1 = r.get("serie_n1") or []
     mois = [MOIS_COURTS[(m["mois"] - 1) % 12] for m in serie_n]
@@ -103,10 +116,12 @@ def graphiques(r: dict, nom_n: str, nom_n1: str) -> bytes:
     contrats = [c["contrat"] for c in (r.get("d_contrat") or {}).get("effectifs", [])]
     eff = [("Effectif total", [m.get("effectif") for m in serie_n])]
     eff += [(c, [(m.get("effectif_contrat") or {}).get(c) for m in serie_n]) for c in contrats]
-    if any(_rempli(col) for _, col in eff):
+    if (voulus is None or "Effectif" in voulus) and any(_rempli(col) for _, col in eff):
         _feuille(wb, "Effectif", "Effectif", mois, eff, True, None)
 
     for nom, titre, lire, cle_obj, courbe in GRAPHES:
+        if voulus is not None and nom not in voulus:
+            continue
         n = [_nombre(lire(m)) for m in serie_n]
         n1 = [_nombre(lire(serie_n1[i])) if i < len(serie_n1) else None
               for i in range(len(serie_n))]

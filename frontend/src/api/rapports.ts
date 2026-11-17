@@ -48,8 +48,8 @@ export const getSalaries = (annee: number, calendrier?: Calendrier) =>
 export const getMensuel = (f: FiltresPage) => api<Mensuel>(`/rapports/mensuel${qs({ ...f })}`)
 export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs({ ...f })}`)
 /** Graphes d'évolution en classeur Excel : vrais graphiques liés à leurs données (retours N2, point 2). */
-export const exporterGraphes = (f: FiltresPage) =>
-  telecharger(`/rapports/annuel/export${qs({ ...f, graphiques: 'true' })}`, {}, `graphes-${f.annee}.xlsx`)
+export const exporterGraphes = (f: FiltresPage, ids: string[]) =>
+  telecharger(`/rapports/annuel/export${qs({ ...f, graphiques: 'true', graphes: ids.join(',') })}`, {}, `graphes-${f.annee}.xlsx`)
 export const getIndividuel = (annee: number, matricule: string, calendrier?: Calendrier) =>
   api<Individuel>(`/rapports/individuel${qs({ annee, matricule, calendrier })}`)
 

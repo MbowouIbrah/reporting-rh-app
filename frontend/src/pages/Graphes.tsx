@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Fragment, type ReactNode, useCallback, useDeferredValue, useRef, useState } from 'react'
+import { createContext, Fragment, type ReactNode, useCallback, useContext, useDeferredValue, useRef, useState } from 'react'
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -79,12 +79,26 @@ const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as con
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v))
 
+/** Mode sélection de l'export « graphiques dynamiques » : graphes cochés, null hors de ce mode. */
+const Selection = createContext<{ coches: string[]; basculer: (id: string) => void } | null>(null)
+const ID_PAR_TITRE = Object.fromEntries(GRAPHES.map((g) => [g.titre, g.id]))
+
 function Carte({ titre, lecture, note, children }: { titre: string; lecture?: string; note?: string; children: ReactNode }) {
   // Rapport PDF : tout est monté d'emblée pour l'impression. À l'écran, chaque graphe se monte à son tour, squelette en attendant.
   const { zone, monte } = useMontageDiffere<HTMLElement>(useLocation().pathname.startsWith('/rapport'))
+  const selection = useContext(Selection)
+  const id = ID_PAR_TITRE[titre]
+  const coche = !!selection && selection.coches.includes(id)
   return (
-    <figure className="graphe" ref={zone} aria-busy={monte ? undefined : true}>
-      <figcaption>{titre}</figcaption>
+    <figure className={`graphe${coche ? ' graphe-coche' : ''}`} ref={zone} aria-busy={monte ? undefined : true}>
+      <figcaption>
+        {selection && id ? (
+          <label className="graphe-choix">
+            <input type="checkbox" checked={coche} onChange={() => selection.basculer(id)} />
+            {titre}
+          </label>
+        ) : titre}
+      </figcaption>
       {lecture && <p className="graphe-lecture">{lecture}</p>}
       <div className="graphe-zone">
         {monte && (
@@ -142,6 +156,10 @@ export default function Graphes() {
   const [noms, enregistrerNoms] = useNomsGroupes()
   const peutRenommer = usePeut('referentiel:write')
   const [personnalise, setPersonnalise] = useState(false)
+  // Export « graphiques dynamiques » : null = hors sélection ; sinon les graphes cochés
+  const [coches, setCoches] = useState<string[] | null>(null)
+  const [exportEtat, setExportEtat] = useState<'' | 'encours' | 'erreur'>('')
+  const basculer = useCallback((id: string) => setCoches((c) => (c && c.includes(id) ? c.filter((x) => x !== id) : [...(c ?? []), id])), [])
   // Titre du groupe visible, à côté du menu : écrit directement, sans redessiner les graphiques
   const titreActif = useRef<HTMLHeadingElement>(null)
   const surGroupeActif = useCallback((id: string) => {
@@ -386,6 +404,15 @@ export default function Graphes() {
       {g.graphes.map((id) => <Fragment key={id}>{rendu[id]?.()}</Fragment>)}
     </div>
   )
+  const exporterSelection = () => {
+    if (!f.filtres || !coches?.length) return
+    setExportEtat('encours')
+    // Le classeur suit l'ordre des graphes à l'écran (catalogue)
+    exporterGraphes(f.filtres, GRAPHES.map((g) => g.id).filter((id) => coches.includes(id))).then(
+      () => { setExportEtat(''); setCoches(null) },
+      () => setExportEtat('erreur'),
+    )
+  }
   const retablir = () => {
     setConfig(retablirOrigine(config))
   }
@@ -393,12 +420,12 @@ export default function Graphes() {
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
+    <Selection.Provider value={coches && !rapport ? { coches, basculer } : null}>
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
-      <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
+      <TitreRapport titre="GRAPHES D’ÉVOLUTION" onGraphiques={rapport ? undefined : () => { setCoches([]); setExportEtat('') }} />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
       )}
-      {f.filtres && <ExportGraphes filtres={f.filtres} />}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}
       {!rapport && (serie ? menu.length > 0 : premier && groupesSquelette.length > 0) && (
@@ -412,6 +439,16 @@ export default function Graphes() {
           />
           {serie && !enBascule && rendus.length > 1 && (
             <h2 ref={titreActif} className="graphes-groupe-titre graphes-tete-titre">{rendus[0].nom}</h2>
+          )}
+          {coches && (
+            <div className="graphes-selection" role="group" aria-label="Export des graphiques dynamiques">
+              {exportEtat === 'erreur' && <span role="alert">Export impossible pour le moment. Réessayez.</span>}
+              {coches.length === 0 && <span className="graphes-selection-aide">Cochez les graphes à exporter</span>}
+              <Bouton variante="lien" onClick={() => setCoches(null)}>Annuler</Bouton>
+              <Bouton disabled={coches.length === 0 || exportEtat === 'encours' || !f.filtres} onClick={exporterSelection}>
+                {exportEtat === 'encours' ? 'Préparation…' : `Exporter ${coches.length} graphe${coches.length > 1 ? 's' : ''}`}
+              </Bouton>
+            </div>
           )}
         </div>
       )}
@@ -522,24 +559,6 @@ export default function Graphes() {
         </details>
       )}
     </section>
-  )
-}
-
-/** Export Excel des graphes : chaque graphe y est un vrai graphique Excel lié à son tableau ; copié dans
- *  PowerPoint, il reste modifiable (clic droit > Modifier les données). */
-function ExportGraphes({ filtres }: { filtres: Parameters<typeof exporterGraphes>[0] }) {
-  const [etat, setEtat] = useState<'' | 'encours' | 'erreur'>('')
-  const lancer = () => {
-    setEtat('encours')
-    exporterGraphes(filtres).then(() => setEtat(''), () => setEtat('erreur'))
-  }
-  return (
-    <div className="export-graphes">
-      <Bouton variante="secondaire" onClick={lancer} disabled={etat === 'encours'}>
-        {etat === 'encours' ? 'Préparation…' : 'Graphes modifiables (Excel)'}
-      </Bouton>
-      <span className="export-graphes-aide">Copiez un graphe dans PowerPoint : il reste modifiable.</span>
-      {etat === 'erreur' && <span role="alert">Export impossible pour le moment. Réessayez.</span>}
-    </div>
+    </Selection.Provider>
   )
 }

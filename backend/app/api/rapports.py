@@ -325,10 +325,12 @@ def annuel_export(
     departement: str | None = Query(None, max_length=100),
     calendrier: Calendrier = "civil",
     graphiques: bool = False,
+    graphes: str | None = Query(None, max_length=400, pattern="^[a-z_,]*$"),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    """Classeur du rapport annuel ; `graphiques` : graphes d'évolution en graphiques Excel."""
+    """Classeur du rapport annuel ; `graphiques` : graphes d'évolution en graphiques Excel
+    (`graphes` : identifiants, séparés par des virgules, des graphes cochés ; absent = tous)."""
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
                   activite, type_contrat, calendrier, departement)
     an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
@@ -344,7 +346,8 @@ def annuel_export(
         ref = ref_annee or annee - 1
         def nom(a: int) -> str:
             return f"{a}-{(a + 1) % 100:02d}" if calendrier == "fiscal" else str(a)
-        return _xlsx(graphes_xlsx.graphiques(res, nom(annee), nom(ref)),
+        ids = graphes.split(",") if graphes else None
+        return _xlsx(graphes_xlsx.graphiques(res, nom(annee), nom(ref), ids),
                      f"graphes-{annee}{suffixe}.xlsx")
     # libellé du cumul : dernier mois réellement cumulé, comme à l'écran
     return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier),
