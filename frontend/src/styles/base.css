@@ -439,13 +439,14 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition button.deplier.deplier-bloc { display: block; width: 100%; text-align: left; }
 /* Tout replié : lecture simple, sans gras, un zèbre par site uniforme sur toute la ligne */
 .rapport-excel .panneau table.repartition tbody.bloc :is(th, td):not(.gouttiere) { font-weight: 400; background: #fff; }
-.rapport-excel .panneau table.repartition tbody.bloc tr.pair > :is(th, td):not(.gouttiere, .nom) { background: var(--rapport-zebre); }
+/* Zèbre global : chaque site (ou service) compte pour une ligne, toutes ses lignes ont la même teinte. */
+.rapport-excel .panneau table.repartition tbody.bloc:nth-of-type(even) :is(th, td):not(.gouttiere) { background: #f3f4f8; }
 .rapport-excel .panneau table.repartition tbody.bloc :is(th, td):not(.gouttiere) { border-top: 0; }
 .rapport-excel .panneau table.repartition tbody.bloc tr:first-child > :is(th, td):not(.gouttiere) { border-top: 1px solid var(--rule); }
 .rapport-excel .panneau table.repartition tbody.bloc :is(.part-badge, .part-globale, .part-globale b) { font-weight: 400; }
 /* Zone dépliée : zèbre propre aux lignes de contrat, teinte bleutée distincte du zèbre global. */
-.rapport-excel .panneau table.repartition tbody.bloc tr.contrat > :is(th, td):not(.gouttiere, .nom) { background: #f1f3f8; }
-.rapport-excel .panneau table.repartition tbody.bloc tr.contrat.alt > :is(th, td):not(.gouttiere, .nom) { background: #e7eaf2; }
+.rapport-excel .panneau table.repartition tbody.bloc tr.contrat > :is(th, td):not(.gouttiere, .nom) { background: #eaeef7; }
+.rapport-excel .panneau table.repartition tbody.bloc tr.contrat.alt > :is(th, td):not(.gouttiere, .nom) { background: #dfe5f1; }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
 .graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
 .graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
