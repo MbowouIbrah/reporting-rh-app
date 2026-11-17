@@ -98,10 +98,10 @@ def test_mensuel_bloc_avec_m_et_m1():
     prev = pd([ligne(1, productif=True, **{VENTES: 1})], [saisie("or", 40)])
     b = mensuel(cur, prev, REFS, Params())["activite"]
     assert [x["cle"] for x in b] == [
-        "ventes", "clients", "productivite", "or", "devis", "factures", "productifs",
-        "or_par_productif", "factures_par_productif"]
-    assert [x["libelle"] for x in b][:4] == [
-        "Nombre de ventes", "Nombre de clients", "Indice de productivité (moyenne)", "OR"]
+        "ventes", "clients", "ventes_par_client", "or", "devis", "factures", "transformation",
+        "productivite", "productifs", "or_par_productif", "factures_par_productif",
+        "ms_par_vente"]
+    assert [x["groupe"] for x in b][::3] == ["Commercial", "Atelier", "Atelier", "Productivité"]
     par = {x["cle"]: x for x in b}
     assert (par["ventes"]["m"], par["ventes"]["m1"], par["ventes"]["var"]) == (4, 1, 3)
     assert (par["or"]["m"], par["or"]["m1"]) == (100, 40)
@@ -457,7 +457,7 @@ def test_export_mensuel_feuille_activite(make_client, db):
     rows = list(wb["6 Activité"].values)
     assert rows[0][0] == "Indicateur" and rows[0][3:] == ("Variation", "Var. %")
     assert [r[0] for r in rows[1:]][:3] == [
-        "Nombre de ventes", "Nombre de clients", "Indice de productivité (moyenne)"]
+        "Nombre de ventes", "Nombre de clients", "Ventes par client"]
     assert next(r for r in rows if r[0] == "OR")[2] == 100
     assert "6 Activité" in feuilles(get(c, "annuel/export", annee=2026, mois=1)).sheetnames
 
@@ -777,3 +777,22 @@ def test_annuel_objectif_partiel_si_un_mois_de_reel_n_a_pas_d_objectif():
     assert r["lignes_ca_marge"]["ca"]["budget_partiel"] is True
     r = annuel({1: avec, 2: avec}, {}, 2, REFS, Params())
     assert not r["budget_partiel"] and "budget_partiel" not in r["lignes_ca_marge"]["ca"]
+
+
+def test_ratios_activite_et_realisation():
+    cur = pd([ligne(1, productif=True, **{VENTES: 4, CLIENTS: 2})],
+             [saisie("devis", 50), saisie("factures", 20)])
+    par = {x["cle"]: x for x in mensuel(cur, None, REFS, Params())["activite"]}
+    assert par["ventes_par_client"]["m"] == 2
+    assert par["transformation"]["m"] == D("0.4")
+    assert par["ms_par_vente"]["m"] == cur.ms / 4
+    assert "realisation" not in par["or"]
+
+
+def test_blocs_contrat_masse_et_effectif():
+    r = mensuel(pd([ligne(1, productif=True, **{VENTES: 1})]), None, REFS, Params())
+    blocs = r["d_contrat"]["blocs"]
+    assert [b["contrat"] for b in blocs] == list(dict.fromkeys(
+        v["contrat"] for v in r["d_contrat"]["ventilation"]))
+    for b in blocs:
+        assert {"total", "effectif", "activites", "part_globale", "part_masse_globale"} <= set(b)

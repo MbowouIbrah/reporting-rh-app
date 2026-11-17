@@ -86,6 +86,20 @@ Maquettes A à D comparées (`C:/tmp/maquettes-lignes/`) ; retenu : **D1 sobre**
 Décidé par défaut : une seule activité ouverte à la fois ; ligne TOTAL GÉNÉRAL en bas ; un ancien rapport
 sans ventilation par activité se réduit à son total.
 
+### i. Activité en 4e, répartition par nature de contrat (retour du 17/11)
+
+Besoin : tableau Activité trop simple, à placer avant la répartition par contrat ; la répartition par contrat
+doit suivre la structure des répartitions site / service (masse et effectif côte à côte).
+
+- Ordre : 1 global, 2 sites, 3 services, **4 Activité**, 5 Répartition par nature de contrat, 6 Analyse des effectifs.
+- Activité : indicateurs groupés par thème (Commercial, Atelier, Productivité, Coût RH), ratios ajoutés
+  (ventes par client, taux de transformation, masse salariale par vente), groupes « Réalisé » / « Objectif »
+  sur la ligne bleue, taux de réalisation avec jauge (calculé serveur : ventes / objectif).
+- Contrats : composant `Repartition` réutilisé (axe contrat) ; masse et effectif par activité, parts, total ;
+  calcul côté serveur (`d_contrat.blocs`). Ancien rapport sans `blocs` : ancien rendu conservé.
+
+Décidé par défaut : noms de feuilles de l'export xlsx inchangés.
+
 ## 4. Impacts et risques
 - Données : migration 0025 (4 services, 2 périmètres, DPS complété) ; descente = suppression si non utilisés.
 - Import : des fichiers qui passaient (sans matricule) seront refusés ; voulu par le client.

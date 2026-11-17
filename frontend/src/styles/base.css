@@ -1775,3 +1775,11 @@ body { padding-bottom: var(--bandeau-h, 0px); }
 .bandeau-connexion { position: fixed; inset: auto 0 0; z-index: calc(var(--z-sticky) + 20); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--sp-1) var(--sp-4); padding: var(--sp-2) var(--page-gutter); background: var(--red-soft); color: var(--red-deep); border-top: 1px solid var(--red-deep); font-size: var(--fs-sm); }
 @media print { .bandeau-connexion { display: none; } }
 .front-back { margin: 0 0 8px; font-size: var(--fs-sm); }
+
+/* 4. Activité : même structure que les répartitions (thème fusionné, zèbre par thème), taux de réalisation avec jauge. */
+.rapport-excel .panneau table.activite-tab tbody th.nom { min-width: 120px; }
+.rapport-excel .panneau table.activite-tab td.num.bon { color: var(--success); }
+.rapport-excel .panneau table.activite-tab .realisation { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.rapport-excel .panneau table.activite-tab .jauge { display: inline-block; width: 48px; height: 6px; background: var(--rule); }
+.rapport-excel .panneau table.activite-tab .jauge > span { display: block; height: 100%; background: var(--navy-2); }
+.rapport-excel .panneau table.activite-tab .jauge.atteint > span { background: var(--success); }

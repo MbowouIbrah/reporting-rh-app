@@ -199,14 +199,14 @@ test('Annuel : pas de bandeau de cumul au-dessus des tableaux', async () => {
 test('Annuel : bloc Activité masqué sans donnée, affiché avec la mention « partiel »', async () => {
   rendu(<Annuel />, '/annuel', ['report:read'])
   await screen.findByText('1. Reporting global')
-  expect(screen.queryByText('6. Activité')).toBeNull()
+  expect(screen.queryByText('4. Activité')).toBeNull()
   activiteAnnuel = [
     { cle: 'ventes', libelle: 'Ventes', ...cell('12'), partiel: true },
     { cle: 'productivite', libelle: 'Productivité', ...cell('1.5') },
   ]
   try {
     rendu(<Annuel />, '/annuel', ['report:read'])
-    expect(await screen.findByText('6. Activité')).toBeInTheDocument()
+    expect(await screen.findByText('4. Activité')).toBeInTheDocument()
     expect(screen.getByRole('rowheader', { name: /Ventes\s*partiel/ })).toBeInTheDocument()
     expect(screen.getByRole('rowheader', { name: 'Productivité' })).toBeInTheDocument()
   } finally {

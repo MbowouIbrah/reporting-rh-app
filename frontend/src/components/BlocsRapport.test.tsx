@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+﻿import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import type { Cell } from '../api/types'
-import { Activite, type Blocs, ServicesActivites, Sites, TypesCharge, TypesExclus } from './BlocsRapport'
+import { Activite, type Blocs, Contrats, ServicesActivites, Sites, TypesCharge, TypesExclus } from './BlocsRapport'
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
@@ -172,23 +172,50 @@ test('reporting global : mention « partiel » sur un budget de CA incomplet', (
   expect(cellsTr(screen.getByText("Chiffre d'affaires").closest('tr')!).at(-3)).toHaveTextContent('partiel')
 })
 
-test('Activité : colonnes Objectif, Écart et Écart % sur les lignes qui ont un objectif, grille à 7 colonnes', () => {
+test('Activité : thèmes fusionnés, colonnes Réalisé puis Objectif avec taux de réalisation', () => {
   const lignes = [
-    { cle: 'ventes', libelle: 'Ventes', ...cell, budget: '10', ecart: '2', ecart_pct: '0.2' },
-    { cle: 'productivite', libelle: 'Productivité', ...cell, budget: '3', ecart: '-0.5', ecart_pct: '-0.1667' },
-    { cle: 'devis', libelle: 'Devis', ...cell },
+    { cle: 'ventes', libelle: 'Ventes', groupe: 'Commercial', ...cell, budget: '10', ecart: '2', ecart_pct: '0.2', realisation: '1.2' },
+    { cle: 'productivite', libelle: 'Productivité', groupe: 'Productivité', ...cell, budget: '3', ecart: '-0.5', ecart_pct: '-0.1667', realisation: '0.8' },
+    { cle: 'devis', libelle: 'Devis', groupe: 'Atelier', ...cell },
+    { cle: 'transformation', libelle: 'Taux de transformation', groupe: 'Atelier', m1: '0.5', m: '0.75', var: '0.25', var_pct: '0.5' },
   ]
-  render(<Activite lignes={lignes} lib={lib} />)
-  expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Indicateur', 'M-1', 'M', 'Variation', 'Var. %', 'Objectif', 'Écart', 'Écart %'])
+  const { container } = render(<Activite lignes={lignes} lib={lib} titre="4. Activité" />)
+  expect(screen.getByText('Réalisé')).toBeInTheDocument()
+  expect(screen.getAllByRole('columnheader').map((th) => th.textContent).filter(Boolean)).toEqual(
+    ['4. Activité', 'Réalisé', 'Objectif', 'Thème', 'Indicateur', 'M-1', 'M', 'Écart', 'Écart %', 'Objectif', 'Écart', 'Réalisation'],
+  )
+  // Un tbody par thème, thème fusionné sur ses lignes.
+  expect(container.querySelectorAll('tbody.bloc')).toHaveLength(3)
+  expect(screen.getByRole('rowheader', { name: 'Atelier' })).toHaveAttribute('rowspan', '2')
   const ventes = cellsTr(screen.getByText('Ventes').closest('tr')!)
-  expect(ventes).toHaveLength(7)
-  expect(ventes.slice(-2).map((c) => c.className)).toEqual(['num bon', 'num bon'])
-  const prod = cellsTr(screen.getByText('Productivité').closest('tr')!)
-  expect(prod.slice(-2).map((c) => c.className)).toEqual(['num neg', 'num neg'])
-  // Sans objectif sur la ligne : cellules vides, pas de couleur.
-  const devis = cellsTr(screen.getByText('Devis').closest('tr')!)
-  expect(devis).toHaveLength(7)
-  expect(devis.slice(-3).map((c) => c.textContent)).toEqual(['—', '—', '—'])
+  expect(ventes.at(-2)!.className).toBe('num bon')
+  expect(ventes.at(-1)!.querySelector('.jauge.atteint')).not.toBeNull()
+  const prod = cellsTr(screen.getByText('Productivité', { selector: 'th.libelle' }).closest('tr')!)
+  expect(prod.at(-2)!.className).toBe('num neg')
+  expect(prod.at(-1)!.querySelector('.jauge:not(.atteint)')).not.toBeNull()
+  // Sans objectif : une cellule vide sur les trois colonnes.
+  expect(cellsTr(screen.getByText('Devis').closest('tr')!).at(-1)).toHaveAttribute('colspan', '3')
+  // Le taux de transformation s'affiche en pourcentage.
+  expect(screen.getByText('Taux de transformation').closest('tr')!.textContent).toMatch(/75\s*%/)
+})
+
+test('Contrats : structure de répartition, masse et effectif côte à côte, total par contrat', () => {
+  const c = (m: string) => ({ m1: m, m, var: '0', var_pct: '0' })
+  const total = { rubrique: 'TOTAL CHARGES', exclu: false, ...c('100') }
+  const d = {
+    a_type_charge: [total],
+    d_contrat: {
+      effectifs: [], indicateurs: [], ventilation: [], total: c('5'),
+      blocs: [{ contrat: 'CDI', total: c('100'), effectif: c('5'), part_globale: '1', part_masse_globale: '1',
+        activites: [{ activite: 'VN', ...c('100'), effectif: c('5'), part: '1', part_masse: '1' }] }],
+    },
+  } as unknown as Blocs
+  render(<Contrats d={d} lib={lib} titre="5. Répartition par nature de contrat" />)
+  expect(screen.getByText('Masse salariale (FCFA)')).toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: 'Contrat' })).toBeInTheDocument()
+  expect(screen.getByRole('rowheader', { name: 'Total contrat' })).toBeInTheDocument()
+  expect(screen.getByRole('rowheader', { name: 'TOTAL GÉNÉRAL' })).toBeInTheDocument()
+  expect(screen.queryByText('Budget')).toBeNull()
 })
 
 test('TypesCharge liste les rubriques comptées sans groupe ; les hors total vont dans TypesExclus', () => {

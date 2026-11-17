@@ -76,20 +76,20 @@ export function Contenu({ d, lib }: { d: MensuelData; lib: { prec: string; cour:
             titre: 'Répartition par service et activité',
             panneaux: [{ titre: '3. Répartition par service et activité', sansTitre: true, contenu: <ServicesActivites d={d} lib={lib} titre="3. Répartition par service et activité" /> }],
           },
+          // Masqué tant qu'aucune donnée d'activité n'existe (activite null).
+          ...(d.activite
+            ? [{ id: 's-activite', titre: 'Activité', panneaux: [{ titre: '4. Activité', sansTitre: true, contenu: <Activite lignes={d.activite} lib={lib} titre="4. Activité" /> }] }]
+            : []),
           {
             id: 's-contrats',
             titre: 'Répartition par type de contrat et effectif',
             panneaux: [
               [
-                { titre: '4. Répartition par nature de contrat', contenu: <Contrats d={d} lib={lib} /> },
-                { titre: '5. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} fb={d.synthese.front_back} /> },
+                { titre: '5. Répartition par nature de contrat', sansTitre: true, contenu: <Contrats d={d} lib={lib} titre="5. Répartition par nature de contrat" /> },
+                { titre: '6. Analyse des effectifs', contenu: <AnalyseEffectifs d={d} fb={d.synthese.front_back} /> },
               ],
             ],
           },
-          // Masqué tant qu'aucune donnée d'activité n'existe (activite null).
-          ...(d.activite
-            ? [{ id: 's-activite', titre: 'Activité', panneaux: [{ titre: '6. Activité', contenu: <Activite lignes={d.activite} lib={lib} /> }] }]
-            : []),
         ]}
       />
     </>

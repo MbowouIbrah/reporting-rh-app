@@ -23,7 +23,6 @@ export function Panneau({ titre, className, id, sansTitre, children }: { titre: 
 
 /** Bulle d'aide de la colonne : écart rapporté au budget, signé. */
 const LIB_BUDGET = ['Budget', 'Écart', '% Budget']
-const LIB_OBJECTIF = ['Objectif', 'Écart', 'Écart %']
 
 function Tete({ premiere, lib, budget, libBudget = LIB_BUDGET, bourrage = 0 }: {
   premiere: string; lib: Libelles; budget?: boolean; libBudget?: string[]; bourrage?: number
@@ -139,32 +138,96 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
 }
 
 // Indices et ratios : les décimales comptent (0,85 ne doit pas s'afficher « 1 »).
-const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif'])
+const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif', 'ventes_par_client'])
+const POURCENTAGES = new Set(['transformation'])
 
-// Lignes d'activité qui portent un objectif ; ce sont des résultats (le dépasser est bon).
-const AVEC_OBJECTIF = new Set(['ventes', 'clients', 'productivite', 'factures'])
+const formatActivite = (cle: string) => (RATIOS.has(cle) ? decimal2 : POURCENTAGES.has(cle) ? pct : fcfa)
 
-/** 6. Activité : ventes, clients, productivité, OR, devis, factures ; masqué par l'appelant quand `activite` est null.
- *  Les colonnes Objectif / Écart / Écart % occupent les trois dernières colonnes de la grille (plus de bourrage) dès que le serveur les envoie. */
-export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libelles }) {
-  const objectif = lignes.some((l) => 'budget' in l)
-  const bourrage = objectif ? 0 : COLONNES - 4
+/** Taux de réalisation de l'objectif, avec une jauge plafonnée à 100 % (atteint : vert). */
+const Realisation = ({ v }: { v?: Val }) => {
+  if (v == null || v === 'n/a') return <>{pct(v ?? null)}</>
+  const r = Number(v)
   return (
-    <table className="dense tab-global aligne">
-      <Tete premiere="Indicateur" lib={lib} budget={objectif} libBudget={LIB_OBJECTIF} bourrage={bourrage} />
-      <tbody>
-        {lignes.map((l) => (
-          <Ligne
-            key={l.cle}
-            label={l.libelle}
-            cell={l}
-            budget={objectif ? (AVEC_OBJECTIF.has(l.cle) ? l : true) : undefined}
-            sens="resultat"
-            format={RATIOS.has(l.cle) ? decimal2 : fcfa}
-            bourrage={bourrage}
-          />
-        ))}
-      </tbody>
+    <span className="realisation">
+      {pct(v)}
+      <span className={`jauge${r >= 1 ? ' atteint' : ''}`} aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(r, 1)) * 100}%` }} />
+      </span>
+    </span>
+  )
+}
+
+/** 4. Activité : indicateurs regroupés par thème (commercial, atelier, productivité, coût RH),
+ *  réalisé (N-1, N, écart) puis objectif et taux de réalisation ; masqué par l'appelant quand `activite` est null. */
+export function Activite({ lignes, lib, titre }: { lignes: LigneActivite[]; lib: Libelles; titre?: string }) {
+  const objectif = lignes.some((l) => 'budget' in l)
+  const groupes = [...new Set(lignes.map((l) => l.groupe ?? ''))].map((g) => ({ g, ls: lignes.filter((l) => (l.groupe ?? '') === g) }))
+  return (
+    <table className="dense repartition activite-tab">
+      <thead>
+        {titre && (
+          <tr className="groupes">
+            <th colSpan={2} className="groupes-titre">{titre}</th>
+            <th colSpan={4}>Réalisé</th>
+            {objectif && (
+              <>
+                <th className="gouttiere" />
+                <th colSpan={3}>Objectif</th>
+              </>
+            )}
+          </tr>
+        )}
+        <tr>
+          <th scope="col" className="libelle">Thème</th>
+          <th scope="col" className="libelle">Indicateur</th>
+          <th scope="col">{lib.prec}</th>
+          <th scope="col">{lib.cour}</th>
+          <th scope="col">Écart</th>
+          <th scope="col">Écart %</th>
+          {objectif && (
+            <>
+              <th className="gouttiere" />
+              <th scope="col">Objectif</th>
+              <th scope="col">Écart</th>
+              <th scope="col">Réalisation</th>
+            </>
+          )}
+        </tr>
+      </thead>
+      {groupes.map(({ g, ls }) => (
+        <tbody key={g} className="bloc">
+          {ls.map((l, i) => {
+            const f = formatActivite(l.cle)
+            const avecObj = l.budget !== undefined
+            return (
+              <tr key={l.cle}>
+                {i === 0 && (
+                  <th scope="rowgroup" rowSpan={ls.length} className="nom">{g}</th>
+                )}
+                <th scope="row" className="libelle">{l.libelle}{l.partiel && <Partiel />}</th>
+                <td className="num">{f(l.m1)}</td>
+                <td className="num">{f(l.m)}</td>
+                <td className={clsEcart(l.var)}>{f(l.var)}</td>
+                <td className={clsEcart(l.var_pct)}>{pct(l.var_pct)}</td>
+                {objectif && (
+                  <>
+                    <td className="gouttiere" aria-hidden="true" />
+                    {avecObj ? (
+                      <>
+                        <td className="num">{f(l.budget ?? null)}{l.budget_partiel && <Partiel />}</td>
+                        <td className={clsResultat(l.ecart ?? null)}>{f(l.ecart ?? null)}</td>
+                        <td className="num"><Realisation v={l.realisation} /></td>
+                      </>
+                    ) : (
+                      <td colSpan={3} />
+                    )}
+                  </>
+                )}
+              </tr>
+            )
+          })}
+        </tbody>
+      ))}
     </table>
   )
 }
@@ -263,6 +326,8 @@ const Chiffres = ({ l, budget }: { l: LigneRep; budget?: Budget | null }) => (
   </>
 )
 
+const AXES = { site: 'Site', service: 'Service', contrat: 'Contrat' }
+
 interface BlocRep {
   nom: string
   activites: Activites
@@ -277,7 +342,7 @@ interface BlocRep {
  *  un seul bloc ouvert à la fois (ouvrir un autre bloc replie le précédent) ;
  *  chaque bloc finit par son total, qui porte le budget. Activités et contrats à zéro masqués. */
 function Repartition({ axe, blocs, general, lib, titre }: {
-  axe: 'site' | 'service'
+  axe: 'site' | 'service' | 'contrat'
   titre?: string
   blocs: BlocRep[]
   general?: { ms: Cell & Budget; effectif: Cell }
@@ -308,7 +373,7 @@ function Repartition({ axe, blocs, general, lib, titre }: {
           </tr>
         )}
         <tr>
-          <th scope="col" className="libelle">{axe === 'site' ? 'Site' : 'Service'}</th>
+          <th scope="col" className="libelle">{AXES[axe]}</th>
           <th scope="col" className="libelle">Activité</th>
           <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.prec}</th>
           <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.cour}</th>
@@ -466,7 +531,7 @@ export function Sites({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: stri
   )
 }
 
-/** 5. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
+/** 6. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
 export function AnalyseEffectifs({ d, fb }: { d: Blocs; fb?: FrontBack | null }) {
   // Dernière colonne (ensemble) en tête ; aucune colonne sans indicateur
   const ind = d.d_contrat.indicateurs
@@ -521,10 +586,28 @@ export function FrontBackLigne({ fb }: { fb: FrontBack }) {
   )
 }
 
-/** 4. Nature de contrat × activité, présentée comme la répartition par service : contrat fusionné sur ses
- *  activités, une ligne Staff (effectif) sous chaque activité, puis total et effectif global. */
-export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
+/** 5. Nature de contrat × activité, même structure que la répartition par site : masse et effectif côte à côte,
+ *  un bloc par contrat, total du contrat puis TOTAL GÉNÉRAL. Anciens rapports sans blocs : ancien rendu. */
+export function Contrats({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
+  if (d.d_contrat.blocs) {
+    return (
+      <Repartition
+        axe="contrat"
+        titre={titre}
+        lib={lib}
+        general={total && { ms: total, effectif: d.d_contrat.total }}
+        blocs={d.d_contrat.blocs.map((b) => ({
+          nom: b.contrat,
+          activites: b.activites,
+          total: { ms: b.total, effectif: b.effectif },
+          budget: {},
+          partMasse: b.part_masse_globale,
+          partEffectif: b.part_globale,
+        }))}
+      />
+    )
+  }
   const contrats = [...new Set(d.d_contrat.ventilation.map((v) => v.contrat))]
   return (
     <table className="dense aligne double services">

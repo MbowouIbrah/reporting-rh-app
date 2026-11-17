@@ -26,7 +26,7 @@ export type CellPartiel = Cell & { partiel?: true }
 export type CellObjectif = CellPartiel & Budget & { budget_partiel?: true }
 
 /** Ligne du bloc ACTIVITÉ ; `activite` vaut null tant qu'aucune donnée d'activité n'existe. */
-export type LigneActivite = { cle: string; libelle: string } & CellObjectif
+export type LigneActivite = { cle: string; libelle: string; groupe?: string; realisation?: Val } & CellObjectif
 
 /** Objectifs d'un mois (null = non défini) ; `ca` et `marge` absents sans la permission marge:read. */
 export interface Objectifs {
@@ -191,6 +191,15 @@ export interface Mensuel {
     indicateurs: Indicateurs[]
     total: Cell
     ventilation: { contrat: string; activite: string; ms: Cell; effectif: Cell }[]
+    /** Un bloc par contrat (masse et effectif côte à côte, comme la répartition par site) ; absent des anciens rapports. */
+    blocs?: {
+      contrat: string
+      total: Cell
+      effectif: Cell
+      activites: (Cell & { activite: string; effectif: Cell; part?: Val; part_masse?: Val })[]
+      part_globale?: Val
+      part_masse_globale?: Val
+    }[]
   }
   controles: Controle[]
 }
