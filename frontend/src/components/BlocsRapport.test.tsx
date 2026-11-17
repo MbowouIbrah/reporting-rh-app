@@ -41,7 +41,7 @@ test('répartition par site : une ligne par activité, total du bloc, activités
   expect(douala.querySelector('tr.activite td.gouttiere')).not.toBeNull()
 })
 
-test('activité dépliée par contrat : contrats à zéro masqués, une seule ouverte à la fois', () => {
+test('activité dépliée par contrat : contrats à zéro masqués, ouvrir un autre site replie le précédent', () => {
   render(<Sites d={d} lib={lib} />)
   const vn = screen.getByRole('button', { name: 'Détail par contrat de VN (Douala)' })
   expect(vn).toHaveAttribute('aria-expanded', 'false')
@@ -59,6 +59,29 @@ test('activité dépliée par contrat : contrats à zéro masqués, une seule ou
   fireEvent.click(screen.getByRole('button', { name: 'Détail par contrat de VN (Yaoundé)' }))
   expect(vn).toHaveAttribute('aria-expanded', 'false')
   expect(screen.getAllByText('CDI')).toHaveLength(1)
+})
+
+test('clic sur le site : toutes ses activités dépliées, bordure gauche, un seul site ouvert', () => {
+  const deux = { c_site: [site('Douala'), site('Yaoundé')].map((s) => ({ ...s, activites: [s.activites[0], { ...s.activites[0], activite: 'VO' }] })) } as unknown as Blocs
+  const { container } = render(<Sites d={deux} lib={lib} />)
+  const douala = screen.getByRole('button', { name: 'Détail par contrat de toutes les activités (Douala)' })
+  fireEvent.click(douala)
+  expect(douala).toHaveAttribute('aria-expanded', 'true')
+  expect(douala.closest('th')).toHaveClass('ouvert')
+  expect(screen.getAllByText('CDI')).toHaveLength(2)
+  // replier une activité laisse l'autre ouverte
+  fireEvent.click(screen.getByRole('button', { name: 'Détail par contrat de VO (Douala)' }))
+  expect(screen.getAllByText('CDI')).toHaveLength(1)
+  expect(douala).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'Détail par contrat de toutes les activités (Yaoundé)' }))
+  expect(container.querySelectorAll('th.nom.ouvert')).toHaveLength(1)
+  expect(screen.getAllByText('CDI')).toHaveLength(2)
+  expect(screen.getByRole('button', { name: 'Détail par contrat de VN (Douala)' })).toHaveAttribute('aria-expanded', 'false')
+})
+
+test('en-tête de la répartition sur une seule ligne', () => {
+  const { container } = render(<Sites d={d} lib={lib} />)
+  expect(container.querySelectorAll('table.repartition thead tr')).toHaveLength(1)
 })
 
 test('répartition par site : ligne TOTAL GÉNÉRAL avec masse et effectif sur la même ligne', () => {

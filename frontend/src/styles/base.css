@@ -406,20 +406,21 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition tbody tr:hover :is(th, td) { background: inherit; }
 .rapport-excel .panneau table.repartition .masse { background: #f8f9fb; }
 .rapport-excel .panneau table.repartition .gouttiere { width: 10px; min-width: 10px; padding: 0; background: #fff; border: 0; }
-.rapport-excel .panneau table.repartition thead th { background: #eef0f6; color: var(--navy); font-size: 11.5px; text-transform: uppercase; }
+.rapport-excel .panneau table.repartition thead th { background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); text-transform: uppercase; white-space: nowrap; }
 .rapport-excel .panneau table.repartition thead th.gouttiere { background: #fff; border: 0; }
-.rapport-excel .panneau table.repartition tr.groupes th { text-transform: none; text-align: center; font-size: var(--fs-sm); color: #fff; border: 0; }
-.rapport-excel .panneau table.repartition tr.groupes th.vide { background: #fff; }
-.rapport-excel .panneau table.repartition tr.groupes th.groupe-masse { background: var(--navy-2); }
-.rapport-excel .panneau table.repartition tr.groupes th.groupe-effectif { background: #3c4366; }
-.rapport-excel .panneau table.repartition tr.groupes small { font-weight: 400; opacity: .7; }
-.rapport-excel .panneau table.repartition tbody th.nom { position: static; vertical-align: top; min-width: 150px; text-align: left; font-weight: 700; color: var(--navy); background: #eef0f6; border-right: 1px solid #c9ccd8; }
+.rapport-excel .panneau table.repartition tbody th.nom { position: static; vertical-align: top; min-width: 150px; text-align: left; font-weight: 700; color: var(--navy); background: var(--surface); border-right: 1px solid var(--rule); border-left: 3px solid transparent; }
+.rapport-excel .panneau table.repartition tbody th.nom.ouvert { border-left-color: var(--navy); }
+/* Chaque site / service se détache par un filet net au-dessus de son bloc */
+.rapport-excel .panneau table.repartition tbody.bloc tr:first-child > :is(th, td):not(.gouttiere) { border-top: 2px solid var(--rule-strong); }
+.rapport-excel .panneau table.repartition button.deplier-bloc { display: block; width: 100%; }
+.rapport-excel .panneau table.repartition button.deplier-bloc .nom-ligne { display: inline-flex; gap: 6px; align-items: baseline; }
+.rapport-excel .panneau table.repartition button.deplier-bloc:hover .nom-ligne { text-decoration: underline; }
 .rapport-excel .panneau table.repartition tbody th.libelle { position: static; text-align: left; }
 .rapport-excel .panneau table.repartition tr.activite :is(th, td) { font-weight: 600; color: var(--navy); }
 .rapport-excel .panneau table.repartition tr.contrat :is(th, td) { font-size: 12.5px; font-weight: 400; color: #6b7089; padding-block: 4px; }
 .rapport-excel .panneau table.repartition tr.contrat th.libelle { padding-left: 34px; }
 .rapport-excel .panneau table.repartition tr.contrat .part-badge { font-size: 11px; min-width: 52px; border-color: #e2e4ec; font-weight: 400; }
-.rapport-excel .panneau table.repartition tr.total-bloc :is(th, td):not(.nom, .gouttiere) { font-weight: 700; font-size: 14.5px; color: var(--navy); background: #e6e8f0; border-top: 1px solid #c9ccd8; }
+.rapport-excel .panneau table.repartition tr.total-bloc :is(th, td):not(.nom, .gouttiere) { font-weight: 700; color: var(--navy); background: #f3f4f8; border-top: 1px solid var(--rule); }
 .rapport-excel .panneau table.repartition tbody.general :is(th, td):not(.gouttiere) { font-weight: 700; font-size: 14.5px; color: #fff; background: var(--navy-2); }
 .rapport-excel .panneau table.repartition tbody.general .part-badge { color: var(--navy-2); }
 /* Spécificité au-dessus des lignes activité et total, qui fixent leur couleur. */

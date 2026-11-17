@@ -273,7 +273,8 @@ interface BlocRep {
 }
 
 /** 2 et 3. Répartition par site ou par service (remarque 3, maquette D1 sobre) : une ligne par activité,
- *  masse et effectif côte à côte ; chaque activité se déplie par contrat (une seule ouverte à la fois) ;
+ *  masse et effectif côte à côte ; chaque activité se déplie par contrat, le nom du bloc déplie toutes ses activités ;
+ *  un seul bloc ouvert à la fois (ouvrir un autre bloc replie le précédent) ;
  *  chaque bloc finit par son total, qui porte le budget. Activités et contrats à zéro masqués. */
 function Repartition({ axe, blocs, general, lib }: {
   axe: 'site' | 'service'
@@ -281,7 +282,8 @@ function Repartition({ axe, blocs, general, lib }: {
   general?: { ms: Cell & Budget; effectif: Cell }
   lib: Libelles
 }) {
-  const [ouvert, setOuvert] = useState<string | null>(null)
+  // Un seul site (ou service) déplié à la fois ; dans ce bloc, plusieurs activités peuvent être ouvertes.
+  const [ouvert, setOuvert] = useState<{ bloc: string; activites: string[] } | null>(null)
   const avecBudget = blocs.some((b) => b.budget.budget != null)
   const sansBudget = avecBudget ? null : undefined
   const plein = (x: { ms: Cell; effectif: Cell }) => !(vide(x.ms) && vide(x.effectif))
@@ -289,41 +291,23 @@ function Repartition({ axe, blocs, general, lib }: {
   return (
     <table className="dense repartition">
       <thead>
-        <tr className="groupes">
-          <th colSpan={2} className="vide" />
-          <th colSpan={5} className="groupe-masse">
-            Masse salariale <small>en FCFA</small>
-          </th>
-          <th className="gouttiere" />
-          <th colSpan={4} className="groupe-effectif">
-            Effectif <small>en personnes</small>
-          </th>
-          {avecBudget && (
-            <>
-              <th className="gouttiere" />
-              <th colSpan={3} className="groupe-masse">
-                Budget <small>masse salariale</small>
-              </th>
-            </>
-          )}
-        </tr>
         <tr>
-          <th scope="col">{axe === 'site' ? 'Site' : 'Service'}</th>
+          <th scope="col" className="libelle">{axe === 'site' ? 'Site' : 'Service'}</th>
           <th scope="col" className="libelle">Activité</th>
-          <th scope="col" className="masse">{lib.prec}</th>
-          <th scope="col" className="masse">{lib.cour}</th>
+          <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.prec}</th>
+          <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.cour}</th>
           <th scope="col" className="masse">Écart</th>
           <th scope="col" className="masse">Écart %</th>
           <th scope="col" className="masse">Part</th>
           <th className="gouttiere" />
-          <th scope="col">{lib.prec}</th>
-          <th scope="col">{lib.cour}</th>
+          <th scope="col" title="Effectif en personnes">Effectif {lib.prec}</th>
+          <th scope="col" title="Effectif en personnes">Effectif {lib.cour}</th>
           <th scope="col">Écart</th>
           <th scope="col">Part</th>
           {avecBudget && (
             <>
               <th className="gouttiere" />
-              <th scope="col">Budget</th>
+              <th scope="col" title="Budget de masse salariale">Budget</th>
               <th scope="col">Écart</th>
               <th scope="col">% Budget</th>
             </>
@@ -332,20 +316,49 @@ function Repartition({ axe, blocs, general, lib }: {
       </thead>
       {blocs.map((b) => {
         const acts = b.activites.filter((a) => plein({ ms: a, effectif: a.effectif }))
-        const cle = (a: Activites[number]) => `${b.nom}|${a.activite}`
-        const hauteur = acts.length + 1 + acts.reduce((n, a) => n + (ouvert === cle(a) ? contratsDe(a).length : 0), 0)
-        const nom = (
-          <th scope="rowgroup" rowSpan={hauteur} className="nom">
-            {b.nom}
+        const ouvertes = ouvert?.bloc === b.nom ? ouvert.activites : []
+        const estOuverte = (a: Activites[number]) => ouvertes.includes(a.activite)
+        const depliables = acts.filter((a) => contratsDe(a).length > 0).map((a) => a.activite)
+        const toutOuvert = depliables.length > 0 && depliables.every((x) => ouvertes.includes(x))
+        const basculer = (x: string) => {
+          const suite = ouvertes.includes(x) ? ouvertes.filter((y) => y !== x) : [...ouvertes, x]
+          setOuvert(suite.length ? { bloc: b.nom, activites: suite } : null)
+        }
+        const hauteur = acts.length + 1 + acts.reduce((n, a) => n + (estOuverte(a) ? contratsDe(a).length : 0), 0)
+        const parts = (
+          <>
             <PartGlobale v={b.partMasse} libelle="Masse globale" />
             <PartGlobale v={b.partEffectif} libelle="Effectif global" />
+          </>
+        )
+        const nom = (
+          <th scope="rowgroup" rowSpan={hauteur} className={`nom${ouvertes.length ? ' ouvert' : ''}`}>
+            {depliables.length > 0 ? (
+              <button
+                type="button"
+                className="deplier deplier-bloc"
+                aria-expanded={toutOuvert}
+                aria-label={`Détail par contrat de toutes les activités (${b.nom})`}
+                onClick={() => setOuvert(toutOuvert ? null : { bloc: b.nom, activites: depliables })}
+              >
+                <span className="nom-ligne">
+                  <span aria-hidden="true">{toutOuvert ? '▾' : '▸'}</span> {b.nom}
+                </span>
+                {parts}
+              </button>
+            ) : (
+              <>
+                {b.nom}
+                {parts}
+              </>
+            )}
           </th>
         )
         return (
-          <tbody key={b.nom} className="bloc">
+          <tbody key={b.nom} className={`bloc${ouvertes.length ? ' ouvert' : ''}`}>
             {acts.map((a, i) => {
               const det = contratsDe(a)
-              const o = ouvert === cle(a)
+              const o = estOuverte(a)
               return (
                 <Fragment key={a.activite}>
                   <tr className="activite">
@@ -357,7 +370,7 @@ function Repartition({ axe, blocs, general, lib }: {
                           className="deplier"
                           aria-expanded={o}
                           aria-label={`Détail par contrat de ${a.activite} (${b.nom})`}
-                          onClick={() => setOuvert(o ? null : cle(a))}
+                          onClick={() => basculer(a.activite)}
                         >
                           <span aria-hidden="true">{o ? '▾' : '▸'}</span> {a.activite}
                         </button>
