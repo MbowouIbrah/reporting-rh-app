@@ -175,15 +175,16 @@ test('TypesCharge liste les rubriques comptées sans groupe ; les hors total von
   expect([...exclus.querySelectorAll('tbody tr.exclu th')].map((th) => th.textContent)).toEqual(['Bonus'])
 })
 
-test('parts d’effectif : colonnes masquées par défaut, % du site et % global au clic', () => {
+test('parts : badges masse (activité) et effectif (Staff), parts globales sous le nom, sans bouton', () => {
   const avecParts = {
-    c_site: [{ ...site('Douala'), part_globale: '0.6', activites: [{ activite: 'VN', ...cell, effectif: cell, part: '0.25' }] }],
+    c_site: [{ ...site('Douala'), part_globale: '0.6', part_masse_globale: '0.7',
+      activites: [{ activite: 'VN', ...cell, effectif: cell, part: '0.25', part_masse: '0.4' }] }],
   } as unknown as Blocs
-  render(<Sites d={avecParts} lib={{ prec: 'M-1', cour: 'M' }} />)
-  expect(screen.queryByText('% global')).not.toBeInTheDocument()
-  expect(screen.getByRole('cell', { name: 'VN' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Parts d’effectif' }))
-  expect(screen.getByRole('columnheader', { name: '% du site' })).toBeInTheDocument()
-  expect(screen.getByText('25 %')).toBeInTheDocument()
-  expect(screen.getByText('60 %')).toBeInTheDocument()
+  const { container } = render(<Sites d={avecParts} lib={{ prec: 'M-1', cour: 'M' }} />)
+  expect(screen.queryByRole('button', { name: 'Parts d’effectif' })).not.toBeInTheDocument()
+  expect(container.querySelector('.part-badge.masse')).toHaveTextContent('40 %masse')
+  expect(container.querySelector('.part-badge.effectif')).toHaveTextContent('25 %effectif')
+  expect(container.querySelector('.part-globale.masse')).toHaveTextContent('70 % de la masse globale')
+  expect(container.querySelector('.part-globale.effectif')).toHaveTextContent('60 % de l’effectif global')
+  expect(screen.getAllByRole('columnheader')).toHaveLength(9)
 })

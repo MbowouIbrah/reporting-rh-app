@@ -392,8 +392,15 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services td.budget { vertical-align: middle; border-left: 1px solid var(--rule); }
 .rapport-excel .panneau table.services tr.debut-service > * { border-top: 1px solid var(--rule-strong); }
 .rapport-excel .panneau table.services tr.staff td { color: var(--muted); opacity: .6; }
-.rapport-excel .panneau table.services tr.staff td.part { color: var(--navy); opacity: 1; }
-.parts-bascule { display: flex; justify-content: flex-end; margin-bottom: var(--sp-2); }
+/* Parts en badges (retours N2, 4 et 6) : masse en bleu, effectif en ambre, même largeur, alignés à droite du libellé. */
+.rapport-excel .panneau table.services td.libelle-part { min-width: 15rem; }
+.rapport-excel .panneau table.services tr.staff td.libelle-part { opacity: 1; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.part-badge { float: right; margin-left: var(--sp-3); display: inline-flex; justify-content: space-between; width: 6.5rem; padding: 0 6px; font-size: 0.72rem; line-height: 1.5; border: 1px solid; font-variant-numeric: tabular-nums; }
+.part-badge b, .part-globale b { font-weight: 600; }
+.part-badge i { font-style: normal; opacity: .75; }
+.part-badge.masse, .part-globale.masse { color: #1d4f91; background: #eef3fa; border-color: #c9d8ee; }
+.part-badge.effectif, .part-globale.effectif { color: #8a5a00; background: #fbf4e6; border-color: #ecd9b0; }
+.part-globale { display: block; width: max-content; margin-top: 4px; padding: 0 6px; font-size: 0.68rem; font-weight: var(--fw-regular); line-height: 1.5; border: 1px solid; }
 .export-graphes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-2); margin: var(--sp-2) 0; }
 .export-graphes-aide { color: var(--muted); font-size: .85rem; }
 @media print { .export-graphes { display: none; } }
@@ -1247,6 +1254,10 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .rapport-excel table.dense.aligne :is(th, td):first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
   .rapport-excel table.dense.aligne.double :is(th, td):first-child { width: calc(24% - 76% / 7); }
   .rapport-excel table.dense.aligne .bourrage { width: auto; }
+  /* Répartition par site / service : colonne Activité assez large pour le libellé et son badge de part */
+  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:first-child { width: 11rem; }
+  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:nth-child(2) { width: 16rem; }
+  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:nth-child(n+3) { width: auto; }
 }
 @media (max-width: 1099px) { table.dense .bourrage { display: none; } }
 /* Suite signalée par une flèche animée sous le rail (contenu plus bas, section suivante, retour en haut) */

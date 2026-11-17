@@ -466,6 +466,11 @@ def test_parts_d_effectif_par_service_et_par_site():
     sav = m["b_service_activite"][0]
     assert sav["part_globale"] == D("0.5")
     assert [a["part"] for a in sav["activites"]] == [D("0.5"), D("0.5")]
+    # Parts de masse : SAV pèse 150 sur 180 (Brut_Réel), Front office 100 sur 150.
+    assert sav["part_masse_globale"] == D(150) / D(180)
+    assert sav["activites"][0]["part_masse"] == D(100) / D(150)
+    assert sum(x["part_masse_globale"] for x in m["c_site"]) == 1
+    assert {c: v["effectif"] for c, v in sav["parts_contrat"].items() if v["effectif"]} == {"CDI": D(1)}
     yde = m["c_site"][1]
     assert yde["part_globale"] == D("0.5")
     assert [(a["activite"], a["m"], a["part"]) for a in yde["activites"]] == [

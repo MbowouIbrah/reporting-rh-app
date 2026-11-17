@@ -341,14 +341,27 @@ def _front_back(pd: PeriodeData | None) -> dict | None:
 
 
 def _avec_parts(blocs: list[dict], global_m: Decimal | None) -> list[dict]:
-    """Retours N2 (4, 6) : part de chaque activité dans l'effectif de son service ou site, et part
-    du service ou site dans l'effectif global (périmètre visible). Ratios sur l'effectif de la
-    période (fin de mois en mensuel, moyenne mensuelle en annuel)."""
+    """Retours N2 (4, 6) : part de chaque activité dans l'effectif ET dans la masse salariale de son
+    service ou site, part du service ou site dans l'effectif et la masse globaux (périmètre vu),
+    et mêmes parts par nature de contrat. Comparer masse et effectif montre qui coûte plus par
+    personne. Effectif de la période (fin de mois en mensuel, moyenne mensuelle en annuel) ; masse
+    globale = somme des blocs affichés."""
+    def masse(b: dict):
+        return (b.get("total") or b.get("ms") or {}).get("m")
+
+    vals = [masse(b) for b in blocs if masse(b) is not None]
+    global_ms = sum(vals, ZERO) if vals else None
     for b in blocs:
-        e = b["effectif"]["m"]
+        e, ms = b["effectif"]["m"], masse(b)
         b["part_globale"] = _ratio(e, global_m)
+        b["part_masse_globale"] = _ratio(ms, global_ms)
         for a in b["activites"]:
             a["part"] = _ratio(a["effectif"]["m"], e)
+            a["part_masse"] = _ratio(a["m"], ms)
+        b["parts_contrat"] = {
+            c: {"masse": _ratio((b.get("ms_contrat") or {}).get(c, {}).get("m"), ms),
+                "effectif": _ratio(x["m"], e)}
+            for c, x in (b.get("effectif_contrat") or {}).items()}
     return blocs
 
 

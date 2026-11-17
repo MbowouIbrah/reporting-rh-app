@@ -1,6 +1,5 @@
 import { Fragment, type ReactNode, useState } from 'react'
 import type { Budget, Cell, CellPartiel, FrontBack, LigneActivite, Mensuel, Val } from '../api/types'
-import { Bouton } from './Kit'
 import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
@@ -214,24 +213,16 @@ const Budgets = ({ b, rowSpan }: { b: Budget; rowSpan?: number }) => (
   </>
 )
 
-/** Bouton « Parts d'effectif » : colonnes de parts masquées par défaut, affichables d'un clic (retours N2, point 4). */
-function BasculeParts({ parts, basculer }: { parts: boolean; basculer: () => void }) {
-  return (
-    <div className="parts-bascule">
-      <Bouton variante="secondaire" aria-pressed={parts} onClick={basculer}>
-        Parts d’effectif
-      </Bouton>
-    </div>
+/** Part en petit badge (retours N2, points 4 et 6) : part de masse (bleu) sur la ligne de l'activité, part
+ *  d'effectif (ambre) sur la ligne Staff, pour comparer les deux : une activité qui pèse plus en masse
+ *  qu'en effectif coûte plus par personne. Rien si la part est inconnue. */
+const Part = ({ v, de }: { v?: Val; de: 'masse' | 'effectif' }) =>
+  v == null ? null : (
+    <span className={`part-badge ${de === 'masse' ? 'masse' : 'effectif'}`}>
+      <b>{pct(v)}</b>
+      <i>{de}</i>
+    </span>
   )
-}
-
-/** En-têtes des colonnes de parts : part de l'activité dans le service (ou le site), part du service dans l'effectif global. */
-const TetesParts = ({ de }: { de: string }) => (
-  <>
-    <th scope="col">% du {de}</th>
-    <th scope="col">% global</th>
-  </>
-)
 
 /** 3. Répartition par service et activité, présentée comme l'onglet Excel : service fusionné sur ses activités,
  *  une ligne Staff (effectif) sous chaque activité, budget fusionné par service, puis total et effectif global.
@@ -239,10 +230,8 @@ const TetesParts = ({ de }: { de: string }) => (
 export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
   const [ouvert, setOuvert] = useState<string | null>(null)
-  const [parts, setParts] = useState(false)
   return (
     <>
-      <BasculeParts parts={parts} basculer={() => setParts(!parts)} />
       <table className="dense aligne double services">
         <thead>
           <tr>
@@ -255,7 +244,6 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
             <th scope="col">Budget</th>
             <th scope="col">Écart</th>
             <th scope="col">% Budget</th>
-            {parts && <TetesParts de="service" />}
           </tr>
         </thead>
         <tbody>
@@ -268,7 +256,8 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
               msContrat={b.ms_contrat}
               effectifContrat={b.effectif_contrat}
               partGlobale={b.part_globale}
-              parts={parts}
+              partMasseGlobale={b.part_masse_globale}
+              partsContrat={b.parts_contrat}
               bande={n % 2 === 1}
               ouvert={ouvert === b.service}
               basculer={() => setOuvert(ouvert === b.service ? null : b.service)}
@@ -281,7 +270,6 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
               <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
               <Valeurs c={total} />
               <Budgets b={total} />
-              {parts && <td colSpan={2} />}
             </tr>
           )}
         </tbody>
@@ -290,7 +278,6 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
             <th scope="row" colSpan={2}>Effectif global</th>
             <Valeurs c={d.d_contrat.total} />
             <td colSpan={3} />
-            {parts && <PartsTotal />}
           </tr>
         </tbody>
       </table>
@@ -298,25 +285,29 @@ export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
   )
 }
 
-/** Effectif global : 100 % par définition (le global est le périmètre visible). */
-const PartsTotal = () => (
-  <>
-    <td />
-    <td className="num">{pct('1')}</td>
-  </>
-)
+/** Part du service ou du site dans la masse ou l'effectif global, en badge sous son nom. */
+const PartGlobale = ({ v, de }: { v?: Val; de: 'masse' | 'effectif' }) =>
+  v == null ? null : (
+    <span className={`part-globale ${de}`}>
+      <b>{pct(v)}</b> {de === 'masse' ? 'de la masse globale' : 'de l’effectif global'}
+    </span>
+  )
+
+type PartsContrat = Record<string, { masse?: Val; effectif?: Val }>
 
 /** Bloc d'un service ou d'un site, même présentation des deux côtés (retours N2, point 6) : nom fusionné sur
- *  ses activités, une ligne Staff sous chaque activité, budget et part globale fusionnés sur le bloc.
+ *  ses activités, une ligne Staff sous chaque activité, budget fusionné sur le bloc ; parts
+ *  globales (masse, effectif) sous le nom, parts de l'activité et de chaque contrat en badges.
  *  Le damier alterne par bloc (bande), pas par ligne : les cellules fusionnées suivent leur bloc. */
-function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, partGlobale, parts, bande, ouvert, basculer }: {
+function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, partGlobale, partMasseGlobale, partsContrat, bande, ouvert, basculer }: {
   nom: string
   activites: Activites
   budget: Cell & Budget
   msContrat?: Record<string, Cell>
   effectifContrat?: Record<string, Cell>
   partGlobale?: Val
-  parts: boolean
+  partMasseGlobale?: Val
+  partsContrat?: PartsContrat
   bande: boolean
   ouvert: boolean
   basculer: () => void
@@ -326,7 +317,6 @@ function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, p
   const hauteur = activites.length * 2 + (ouvert ? 2 * contrats.length : 0)
   const clic = depliable ? basculer : undefined
   const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${bande ? 'bande' : ''}`.replace(/\s+/g, ' ').trim() || undefined
-  const vide = parts ? <td /> : null
   return (
     <>
       {activites.map((a, i) => (
@@ -341,22 +331,23 @@ function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, p
                 ) : (
                   nom
                 )}
+                <PartGlobale v={partMasseGlobale} de="masse" />
+                <PartGlobale v={partGlobale} de="effectif" />
               </th>
             )}
-            <td>{a.activite}</td>
+            <td className="libelle-part">
+              {a.activite}
+              <Part v={a.part_masse} de="masse" />
+            </td>
             <Valeurs c={a} />
             {i === 0 && <Budgets b={budget} rowSpan={hauteur} />}
-            {vide}
-            {i === 0 && parts && (
-              <td className="num" rowSpan={hauteur}>
-                {pct(partGlobale)}
-              </td>
-            )}
           </tr>
           <tr className={classe('staff')} onClick={clic}>
-            <td>Staff</td>
+            <td className="libelle-part">
+              Staff
+              <Part v={a.part} de="effectif" />
+            </td>
             <Valeurs c={a.effectif} />
-            {parts && <td className="num part">{pct(a.part)}</td>}
           </tr>
         </Fragment>
       ))}
@@ -365,14 +356,18 @@ function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, p
           <Fragment key={contrat}>
             <tr className={classe('detail-contrat')} onClick={clic}>
               {i === 0 && <EnteteDetail libelle="Détail par type de contrat" lignes={2 * contrats.length} />}
-              <td className="retrait">{contrat}</td>
+              <td className="retrait libelle-part">
+                {contrat}
+                <Part v={partsContrat?.[contrat]?.masse} de="masse" />
+              </td>
               <Valeurs c={msContrat?.[contrat] ?? VIDE} />
-              {vide}
             </tr>
             <tr className={classe('staff detail-contrat')} onClick={clic}>
-              <td className="retrait">Staff {contrat}</td>
+              <td className="retrait libelle-part">
+                Staff {contrat}
+                <Part v={partsContrat?.[contrat]?.effectif} de="effectif" />
+              </td>
               <Valeurs c={effectifContrat![contrat]} />
-              {vide}
             </tr>
           </Fragment>
         ))}
@@ -385,12 +380,10 @@ function BlocRepartition({ nom, activites, budget, msContrat, effectifContrat, p
  *  nature de contrat (masse salariale et Staff). Un seul site déplié à la fois. */
 export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
   const [ouvert, setOuvert] = useState<string | null>(null)
-  const [parts, setParts] = useState(false)
   // Données sans ventilation par activité (anciens rapports) : une seule ligne « Masse salariale ».
   const parActivite = d.c_site.some((r) => r.activites)
   return (
     <>
-      <BasculeParts parts={parts} basculer={() => setParts(!parts)} />
       <table className="dense aligne double services">
         <thead>
           <tr>
@@ -403,7 +396,6 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
             <th scope="col">Budget</th>
             <th scope="col">Écart</th>
             <th scope="col">% Budget</th>
-            {parts && <TetesParts de="site" />}
           </tr>
         </thead>
         <tbody>
@@ -416,7 +408,8 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
               msContrat={r.ms_contrat}
               effectifContrat={r.effectif_contrat}
               partGlobale={r.part_globale}
-              parts={parts}
+              partMasseGlobale={r.part_masse_globale}
+              partsContrat={r.parts_contrat}
               bande={n % 2 === 1}
               ouvert={ouvert === r.site}
               basculer={() => setOuvert(ouvert === r.site ? null : r.site)}
@@ -431,12 +424,10 @@ export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
                 <td>Masse salariale</td>
                 <Valeurs c={d.c_site_total.ms} />
                 <Budgets b={d.c_site_total.ms} rowSpan={2} />
-                {parts && <td colSpan={2} />}
               </tr>
               <tr className="total staff">
                 <td>Staff</td>
                 <Valeurs c={d.c_site_total.effectif} />
-                {parts && <PartsTotal />}
               </tr>
             </>
           )}
