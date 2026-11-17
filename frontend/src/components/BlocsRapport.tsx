@@ -289,7 +289,7 @@ function Repartition({ axe, blocs, general, lib }: {
   const plein = (x: { ms: Cell; effectif: Cell }) => !(vide(x.ms) && vide(x.effectif))
   const contratsDe = (a: Activites[number]) => Object.entries(a.contrats ?? {}).filter(([, x]) => plein(x))
   return (
-    <table className="dense repartition">
+    <table className={`dense repartition${ouvert ? '' : ' replie'}`}>
       <thead>
         <tr>
           <th scope="col" className="libelle">{axe === 'site' ? 'Site' : 'Service'}</th>

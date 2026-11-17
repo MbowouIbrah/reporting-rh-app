@@ -431,6 +431,11 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition button.deplier:focus-visible { outline: 2px solid var(--navy-2); outline-offset: 2px; }
 .rapport-excel .panneau table.repartition button.deplier span[aria-hidden="true"] { color: var(--muted); font-size: 11px; width: 10px; }
 .rapport-excel .panneau table.repartition button.deplier.deplier-bloc { display: block; width: 100%; text-align: left; }
+/* Tout replié : lecture simple, sans gras, un zèbre par site uniforme sur toute la ligne */
+.rapport-excel .panneau table.repartition.replie tbody.bloc :is(th, td):not(.gouttiere) { font-weight: 400; background: #fff; }
+.rapport-excel .panneau table.repartition.replie tbody.bloc:nth-of-type(even) :is(th, td):not(.gouttiere) { background: #f3f4f8; }
+.rapport-excel .panneau table.repartition.replie tbody.bloc tr:first-child > :is(th, td):not(.gouttiere) { border-top: 1px solid var(--rule); }
+.rapport-excel .panneau table.repartition.replie tbody.bloc :is(.part-badge, .part-globale, .part-globale b) { font-weight: 400; }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
 .graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
 .graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
