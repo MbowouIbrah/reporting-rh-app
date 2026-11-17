@@ -67,8 +67,18 @@ def test_filtres(admin):
     assert mats(matricule="E2") == [(1, "E2"), (2, "E2")]
     assert mats(matricule="e2") == [] and mats(matricule="E") == []  # égalité stricte
     vide = tableau(admin, annee=2025).json()
-    assert vide["lignes"] == [] and vide["filtres"]["annees"] == [2026]
+    assert vide["lignes"] == [] and vide["filtres"]["annees"] == [2025, 2026]  # la valeur choisie reste proposée
     assert tableau(admin, mois=13).status_code == 422
+
+
+def test_filtres_lies(admin):
+    # Chaque liste ne propose que des valeurs qui donnent des lignes avec les autres filtres choisis.
+    f = tableau(admin, mois=1, site="Yaoundé").json()["filtres"]
+    assert sorted(s["matricule"] for s in f["salaries"]) == ["E2", "E3"]
+    assert f["sites"] == ["Douala", "Yaoundé"]  # sa propre liste ne se restreint pas
+    assert f["mois"] == [1, 2]
+    assert sorted(s["matricule"] for s in tableau(admin, matricule="E4").json()["filtres"]["salaries"]) == ["E1", "E2", "E3", "E4"]
+    assert tableau(admin, matricule="E4").json()["filtres"]["mois"] == [2]
 
 
 def test_perimetre_applique_dans_le_depot(admin, db):

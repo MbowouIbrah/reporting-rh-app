@@ -286,7 +286,10 @@ def test_filtre_type_contrat(charge):
 def test_filtres_combinaisons(charge):
     f = get(charge, "filtres", annee=2026).json()
     combis = f["combinaisons"]
-    assert combis and all(len(c) == 7 for c in combis)
+    assert combis and all(len(c) == 8 for c in combis)  # 8e colonne : matricule (droit nominatif)
+    # Combinaisons du mois affiché seulement : E3 absent en février, E4 en janvier.
+    assert {c[7] for c in get(charge, "filtres", annee=2026, mois=1).json()["combinaisons"]} == {"E1", "E2", "E3"}
+    assert {c[7] for c in get(charge, "filtres", annee=2026, mois=2).json()["combinaisons"]} == {"E1", "E2", "E4"}
     assert sorted({c[0] for c in combis}) == f["departements"]
     assert sorted({c[1] for c in combis}) == f["services"]
     assert sorted({c[2] for c in combis}) == f["sites"]

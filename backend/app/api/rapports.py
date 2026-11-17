@@ -117,18 +117,31 @@ def _lignes_annee(db: Session, p: Principal, annee: int, calendrier: Calendrier 
 def filtres(
     annee: int = Query(ge=2000, le=2100),
     calendrier: Calendrier = "civil",
+    mois: int | None = Query(None, ge=1, le=12),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     authorize(p, "report:read")
-    lignes = list(_lignes_annee(db, p, annee, calendrier))
+    # Mensuel : combinaisons du seul mois affiché (une valeur de l'année peut manquer ce mois-là).
+    if mois is not None:
+        pd = ch.charger_periode(db, scope_for(db, p), annee, mois)
+        lignes = list(pd.lignes) if pd is not None else []
+    else:
+        lignes = list(_lignes_annee(db, p, annee, calendrier))
     dep = dict(db.execute(select(Service.libelle, Departement.libelle)
                           .join(Departement, Departement.id == Service.departement_id)).all())
     # Combinaisons présentes : le front n'offre, pour chaque filtre, que les valeurs compatibles
     # avec les autres filtres choisis (jamais d'option qui mène à un résultat vide).
+    # Avec le droit nominatif, le matricule ferme chaque combinaison : la liste « Employé » suit
+    # aussi les autres filtres.
+    mat: dict = {}
+    if is_allowed(p, "nominatif:read"):
+        ids = {L.salarie_id for L in lignes}
+        mat = dict(db.execute(select(Salarie.id, Salarie.matricule).where(Salarie.id.in_(ids)))
+                   .all()) if ids else {}
     combinaisons = sorted(
         {(dep.get(L.service, ""), L.service, L.site, L.type_site, L.activite or "", L.contrat,
-          L.poste or "")
+          L.poste or "") + ((mat.get(L.salarie_id, ""),) if mat else ())
          for L in lignes}
     )
     return {"combinaisons": [list(c) for c in combinaisons],

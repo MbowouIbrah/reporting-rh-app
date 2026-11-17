@@ -41,8 +41,8 @@ export const changerMotDePasse = (actuel: string, nouveau: string) =>
   api<Me>('/auth/changer-mot-de-passe', { method: 'POST', body: JSON.stringify({ actuel, nouveau }) })
 export const logout = () => api<void>('/auth/logout', { method: 'POST' })
 export const getPeriodes = () => api<Periode[]>('/rapports/periodes')
-export const getFiltres = (annee: number, calendrier?: Calendrier) =>
-  api<Filtres>(`/rapports/filtres${qs({ annee, calendrier })}`)
+export const getFiltres = (annee: number, calendrier?: Calendrier, mois?: number) =>
+  api<Filtres>(`/rapports/filtres${qs({ annee, calendrier, mois })}`)
 export const getSalaries = (annee: number, calendrier?: Calendrier) =>
   api<Salarie[]>(`/rapports/salaries${qs({ annee, calendrier })}`)
 export const getMensuel = (f: FiltresPage) => api<Mensuel>(`/rapports/mensuel${qs({ ...f })}`)

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { avecCascade, facettes, sansIncompatibles, useFiltres } from './useFiltres'
+import { avecCascade, compatibles, facettes, sansIncompatibles, useFiltres } from './useFiltres'
 
 const PERIODES = [{ annee: 2025, mois: 12 }, { annee: 2026, mois: 1 }, { annee: 2026, mois: 2 }]
 
@@ -93,4 +93,15 @@ test('un nouveau choix efface les filtres devenus incompatibles', () => {
   })
   expect(sansIncompatibles(COMBIS, { site: 'Douala' }, { service: 'Commerce VN' })).toEqual({ service: 'Commerce VN' })
   expect(sansIncompatibles(COMBIS, { site: 'Kribi' }, { service: undefined })).toEqual({ service: undefined })
+})
+
+test("filtres partagés venus d'une autre page : ceux sans correspondance sont écartés, dans l'ordre des filtres", () => {
+  expect(compatibles(COMBIS, { service: 'Commerce VN', site: 'Kribi' })).toEqual({ service: 'Commerce VN' })
+  expect(compatibles(COMBIS, { site: 'Kribi', type_contrat: 'CDD' })).toEqual({ site: 'Kribi', type_contrat: 'CDD' })
+  // Employé : 8e colonne quand la session a le droit nominatif, ignorée sinon.
+  const nominatives = COMBIS.map((c, i) => [...c, `E${i + 1}`])
+  expect(compatibles(nominatives, { site: 'Kribi', matricule: 'E1' })).toEqual({ site: 'Kribi' })
+  expect(compatibles(nominatives, { matricule: 'E3' })).toEqual({ matricule: 'E3' })
+  expect(facettes(nominatives, { site: 'Douala' }).matricule).toEqual(['E1', 'E3'])
+  expect(compatibles(COMBIS, { matricule: 'E9' })).toEqual({ matricule: 'E9' })
 })

@@ -110,3 +110,14 @@ Décidé par défaut : noms de feuilles de l'export xlsx inchangés.
 1. Winpart, Motul et Autofast sont bien des services (et non des sociétés à part dans la paie).
 2. L'autre DOP voit Equipment **et** Winpart (lecture de « motor plus tard, equipment, winpart »).
 3. Le contenu du périmètre Equipment (liste ci-dessus).
+
+### j. Aucun filtre sans résultat, sur toutes les pages (retour du 17/11)
+
+- Besoin : un filtre ne doit jamais mener à un tableau vide ; il reste toujours au moins une correspondance.
+- Existant : filtres liés (`combinaisons` de `/rapports/filtres`, `facettes`, `sansIncompatibles`). Trous : combinaisons sur toute l'année même en Mensuel, liste Employé non liée, filtres partagés venus d'une autre page ou d'une autre période jamais vérifiés, page Données sans filtres liés.
+- Choix :
+  - `/rapports/filtres?mois=` : en Mensuel, combinaisons du seul mois affiché ; avec le droit nominatif, 8e colonne matricule.
+  - `useFiltres` : `compatibles` écarte d'emblée (puis retire du partage) les filtres partagés sans correspondance, dans l'ordre des filtres (le plus général prime) ; liste Employé limitée aux employés compatibles (`garderSalaries`) sur Mensuel, Annuel, Graphes, Individuel.
+  - Données : `options_tableau` calcule chaque liste (année, mois, service, site, employé) avec les autres filtres appliqués, valeur choisie gardée ; si une combinaison donne malgré tout zéro ligne, le filtre le plus précis est retiré automatiquement (employé, site, service, mois, année).
+- Ratio front office / back office (résumé) : déjà livré, `_front_back` (moteur) et « Front / Back office : x % / y % » en « 6. Analyse des effectifs » (Mensuel, Annuel), voir §a.
+- Risques : aucun ; pas de migration. Une valeur passée par lien et absente des données reste affichée puis écartée.

@@ -126,7 +126,7 @@ const CorpsIndividuel = memo(
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
   const f = useFiltres({ avecMois: false, avecCalendrier: true })
-  const matricule = f.partage.matricule ?? ''
+  const matricule = f.filtres?.matricule ?? ''
   const setMatricule = (m: string) => f.set({ matricule: m })
   const annee = f.filtres?.annee
   const service = f.filtres?.service
@@ -223,7 +223,7 @@ export default function Individuel() {
           {f.postes.length > 0 && (
             <ChoixPoste valeur={poste ?? ''} postes={f.postes} onChange={(v) => f.set({ poste: v })} />
           )}
-          <ChoixEmploye salaries={salaries ?? []} valeur={matricule} onChange={setMatricule} />
+          <ChoixEmploye salaries={f.garderSalaries(salaries) ?? []} valeur={matricule} onChange={setMatricule} />
           <div className="filtres-actions">
             <BoutonReinitialiser
               actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee', 'calendrier', 'exercice'] as const).some((k) => f.partage[k])}

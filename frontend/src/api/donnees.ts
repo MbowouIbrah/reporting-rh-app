@@ -27,7 +27,7 @@ export interface Structure {
   /** Rubriques exclues du TOTAL, dans l'ordre des colonnes. */
   exclues: string[]
   /** Valeurs des filtres, limitées au périmètre ; employés triés par nom. */
-  filtres: { annees: number[]; services: string[]; sites: string[]; salaries: { matricule: string; nom: string }[] }
+  filtres: { annees: number[]; mois?: number[]; services: string[]; sites: string[]; salaries: { matricule: string; nom: string }[] }
 }
 
 export interface Tableau extends Structure {

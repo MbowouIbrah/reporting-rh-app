@@ -249,19 +249,35 @@ def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
     return out
 
 
-def options_tableau(db: Session, scope: Scope) -> dict:
-    """Valeurs proposées par les filtres du tableau, limitées au périmètre."""
-    base = _situations_tableau(scope, None, None, None, None, None).order_by(None)
+def options_tableau(db: Session, scope: Scope, choix: dict | None = None) -> dict:
+    """Valeurs proposées par les filtres du tableau, limitées au périmètre. Chaque liste ne garde
+    que les valeurs compatibles avec les autres filtres choisis (aucun choix ne mène à un tableau
+    vide) ; la valeur choisie reste proposée."""
+    c = {k: v for k, v in (choix or {}).items() if v not in (None, "")}
 
-    def distinctes(col) -> list:
-        vals = db.scalars(base.with_only_columns(col).distinct())
-        return sorted(v for v in vals if v is not None)
+    def base(sauf: str):
+        autres = {k: v for k, v in c.items() if k != sauf}
+        return _situations_tableau(scope, autres.get("annee"), autres.get("mois"),
+                                   autres.get("service"), autres.get("site"), None,
+                                   autres.get("matricule")).order_by(None)
 
-    salaries = db.execute(base.with_only_columns(Salarie.matricule, Salarie.nom).distinct()
-                          .order_by(Salarie.nom, Salarie.matricule))
-    return {"annees": distinctes(Periode.annee), "services": distinctes(Service.libelle),
-            "sites": distinctes(Site.libelle),
-            "salaries": [{"matricule": m, "nom": n} for m, n in salaries]}
+    def distinctes(cle: str, col) -> list:
+        vals = {v for v in db.scalars(base(cle).with_only_columns(col).distinct()) if v is not None}
+        if cle in c:
+            vals.add(c[cle])
+        return sorted(vals)
+
+    salaries = dict(db.execute(base("matricule").with_only_columns(Salarie.matricule, Salarie.nom)
+                               .distinct()).all())
+    if "matricule" in c and c["matricule"] not in salaries:
+        salaries.update(db.execute(select(Salarie.matricule, Salarie.nom)
+                                   .where(Salarie.matricule == c["matricule"])).all())
+    return {"annees": distinctes("annee", Periode.annee),
+            "mois": distinctes("mois", Periode.mois),
+            "services": distinctes("service", Service.libelle),
+            "sites": distinctes("site", Site.libelle),
+            "salaries": [{"matricule": m, "nom": n}
+                         for m, n in sorted(salaries.items(), key=lambda x: (x[1] or "", x[0]))]}
 
 
 def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
