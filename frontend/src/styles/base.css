@@ -429,7 +429,8 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition tbody tr td.num.nul { color: var(--muted); }
 .rapport-excel .panneau table.repartition button.deplier { all: unset; cursor: pointer; display: inline-flex; gap: 6px; align-items: baseline; }
 .rapport-excel .panneau table.repartition button.deplier:focus-visible { outline: 2px solid var(--navy-2); outline-offset: 2px; }
-.rapport-excel .panneau table.repartition button.deplier span { color: var(--muted); font-size: 11px; width: 10px; }
+.rapport-excel .panneau table.repartition button.deplier span[aria-hidden="true"] { color: var(--muted); font-size: 11px; width: 10px; }
+.rapport-excel .panneau table.repartition button.deplier.deplier-bloc { display: block; width: 100%; text-align: left; }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
 .graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
 .graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
