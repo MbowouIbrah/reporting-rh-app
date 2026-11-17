@@ -289,6 +289,8 @@ function Repartition({ axe, blocs, general, lib, titre }: {
   const sansBudget = avecBudget ? null : undefined
   const plein = (x: { ms: Cell; effectif: Cell }) => !(vide(x.ms) && vide(x.effectif))
   const contratsDe = (a: Activites[number]) => Object.entries(a.contrats ?? {}).filter(([, x]) => plein(x))
+  // Rang courant des lignes, pour un zèbre continu sur tout le tableau (comme les autres tableaux).
+  let rang = 0
   return (
     <table className={`dense repartition${ouvert ? '' : ' replie'}`}>
       <thead>
@@ -377,7 +379,7 @@ function Repartition({ axe, blocs, general, lib, titre }: {
               const o = estOuverte(a)
               return (
                 <Fragment key={a.activite}>
-                  <tr className="activite">
+                  <tr className={`activite${rang++ % 2 ? ' pair' : ''}`}>
                     {i === 0 && nom}
                     <th scope="row" className="libelle">
                       {det.length > 0 ? (
@@ -406,7 +408,7 @@ function Repartition({ axe, blocs, general, lib, titre }: {
                 </Fragment>
               )
             })}
-            <tr className="total-bloc">
+            <tr className={`total-bloc${rang++ % 2 ? ' pair' : ''}`}>
               {acts.length === 0 && nom}
               <th scope="row" className="libelle">Total {axe}</th>
               <Chiffres l={b.total} budget={avecBudget ? b.budget : undefined} />

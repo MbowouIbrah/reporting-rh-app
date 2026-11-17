@@ -31,7 +31,7 @@ const lib = { prec: 'M-1', cour: 'M' }
 test('répartition par site : une ligne par activité, total du bloc, activités à zéro masquées, plus de Staff', () => {
   const { container } = render(<Sites d={d} lib={lib} />)
   const douala = container.querySelectorAll('tbody.bloc')[0]
-  expect([...douala.querySelectorAll('tr')].map((tr) => tr.className)).toEqual(['activite', 'activite', 'total-bloc'])
+  expect([...douala.querySelectorAll('tr')].map((tr) => tr.className)).toEqual(['activite', 'activite pair', 'total-bloc'])
   expect(douala.querySelector('th.nom')).toHaveAttribute('rowspan', '3')
   expect(screen.getAllByText('Total site')).toHaveLength(2)
   expect(screen.queryByText('Vide')).toBeNull()

@@ -439,7 +439,8 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition button.deplier.deplier-bloc { display: block; width: 100%; text-align: left; }
 /* Tout replié : lecture simple, sans gras, un zèbre par site uniforme sur toute la ligne */
 .rapport-excel .panneau table.repartition.replie tbody.bloc :is(th, td):not(.gouttiere) { font-weight: 400; background: #fff; }
-.rapport-excel .panneau table.repartition.replie tbody.bloc:nth-of-type(even) :is(th, td):not(.gouttiere) { background: #f3f4f8; }
+.rapport-excel .panneau table.repartition.replie tbody.bloc tr.pair > :is(th, td):not(.gouttiere, .nom) { background: var(--rapport-zebre); }
+.rapport-excel .panneau table.repartition.replie tbody.bloc :is(th, td):not(.gouttiere) { border-top: 0; }
 .rapport-excel .panneau table.repartition.replie tbody.bloc tr:first-child > :is(th, td):not(.gouttiere) { border-top: 1px solid var(--rule); }
 .rapport-excel .panneau table.repartition.replie tbody.bloc :is(.part-badge, .part-globale, .part-globale b) { font-weight: 400; }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
