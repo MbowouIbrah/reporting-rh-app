@@ -34,7 +34,7 @@ MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août
 # Couleurs des jetons de l'application (frontend `styles/tokens.css`), mêmes rôles qu'à l'écran.
 DATA = {1: "3B5BDB", 2: "0C8599", 3: "E8590C", 4: "7048E8", 5: "2F9E44", 6: "6B7280"}
 ROUGE, ENCRE, GRIS, GRIS_N1 = "E3001B", "0E1126", "6B6F82", "9499AB"
-TRAIT, FOND = "E7E7EA", "F5F5F5"
+TRAIT, NUIT, PAPIER_2 = "E7E7EA", "1A1F3C", "FAFAFA"
 PT = 12700  # EMU par point
 
 # Formats (axe, cellule) : axe des montants en millions (« 0,5 M », « 45 M »), comme à l'écran.
@@ -151,8 +151,9 @@ def _habiller(g, titre: str, format_axe: str) -> None:
     g.title = Title(tx=Text(rich=RichText(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp),
                                                        r=[RegularTextRun(rPr=cp, t=titre)])])),
                     overlay=False)
-    g.width, g.height = 24, 12
-    g.legend.position = "b"
+    g.width = 22
+    g.legend.position = "t"
+    g.legend.overlay = False
     g.legend.txPr = _riche(900, GRIS)
     g.graphical_properties = GraphicalProperties(ln=LineProperties(solidFill=TRAIT, w=PT))
     for axe in (g.x_axis, g.y_axis):
@@ -166,25 +167,68 @@ def _habiller(g, titre: str, format_axe: str) -> None:
     g.y_axis.numFmt = NumFmt(formatCode=format_axe, sourceLinked=False)
 
 
-def _tableau(ws, mois: list[str], colonnes: list[tuple[str, list]], format_cellule: str) -> None:
-    ws.append(["Mois"] + [e for e, _ in colonnes])
-    bord = Border(bottom=Side(style="thin", color="CFD0D8"))
-    for c in ws[1]:
-        c.font = Font(bold=True, color=ENCRE)
-        c.fill = PatternFill("solid", fgColor=FOND)
-        c.border = bord
-        c.alignment = Alignment(horizontal="left" if c.column == 1 else "right")
+ENTETE = 5  # ligne des intitulés du tableau ; le graphe s'aligne dessus
+LIGNE_PT = 24  # hauteur des lignes du tableau (points)
+UNITES = {"fcfa": "Montants en FCFA", "entier": "Nombres", "decimal": "Valeurs"}
+
+
+def _tableau(ws, titre: str, sous_titre: str, mois: list[str], colonnes: list[tuple[str, list]],
+             format_cellule: str) -> None:
+    """En-tête de page (repère rouge, titre, sous-titre) puis tableau : intitulés sur fond
+    bleu nuit, lignes alternées, filets clairs, chiffres alignés à droite."""
+    ws.sheet_view.showGridLines = False
+    ws["A1"] = "REPORTING RH"
+    ws["A1"].font = Font(bold=True, size=9, color=ROUGE)
+    ws["A2"] = titre
+    ws["A2"].font = Font(bold=True, size=16, color=ENCRE)
+    ws["A3"] = sous_titre
+    ws["A3"].font = Font(size=10, color=GRIS)
+    ws.row_dimensions[2].height = 26
+    filet = Side(style="thin", color=TRAIT)
+    entetes = ["Mois"] + [e for e, _ in colonnes]
+    for j, v in enumerate(entetes, start=1):
+        c = ws.cell(ENTETE, j, v)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor=NUIT)
+        c.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center",
+                                indent=1)
+    ws.row_dimensions[ENTETE].height = LIGNE_PT
     for i, m in enumerate(mois):
-        ws.append([m] + [col[i] for _, col in colonnes])
-        for c in ws[ws.max_row][1:]:
-            c.number_format = format_cellule
-    ws.column_dimensions["A"].width = 10
-    for i in range(2, len(colonnes) + 2):
-        ws.column_dimensions[ws.cell(1, i).column_letter].width = 18
+        ligne = ENTETE + 1 + i
+        ws.row_dimensions[ligne].height = LIGNE_PT
+        for j, v in enumerate([m] + [col[i] for _, col in colonnes], start=1):
+            c = ws.cell(ligne, j, v)
+            c.font = Font(color=ENCRE, bold=j == 1)
+            c.border = Border(bottom=filet)
+            c.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center",
+                                    indent=1)
+            if i % 2:
+                c.fill = PatternFill("solid", fgColor=PAPIER_2)
+            if j > 1:
+                c.number_format = format_cellule
+    ws.column_dimensions["A"].width = 11
+    for j in range(2, len(entetes) + 1):
+        ws.column_dimensions[ws.cell(1, j).column_letter].width = 16
+    ws.column_dimensions[ws.cell(1, len(entetes) + 1).column_letter].width = 3
     # Impression : tableau et graphe sur une seule page paysage
     ws.page_setup.orientation = "landscape"
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = ws.page_setup.fitToHeight = 1
+
+
+def _poser(ws, g, nb_mois: int, nb_colonnes: int) -> None:
+    """Graphe à droite du tableau, haut aligné sur les intitulés, même hauteur que le tableau."""
+    g.height = (nb_mois + 1) * LIGNE_PT * 2.54 / 72
+    ws.add_chart(g, f"{ws.cell(1, nb_colonnes + 3).column_letter}{ENTETE}")
+
+
+def _sous_titre(unite: str, colonnes: list[tuple[str, list]], avec_n1: bool, avec_obj: bool) -> str:
+    morceaux = [UNITES[unite], f"Année {colonnes[0][0]}"]
+    if avec_n1:
+        morceaux[-1] += f" comparée à {colonnes[1][0]}"
+    if avec_obj:
+        morceaux.append("objectif mensuel")
+    return " · ".join(morceaux)
 
 
 def _feuille(wb: Workbook, spec: tuple, mois: list[str], colonnes: list[tuple[str, list]],
@@ -192,13 +236,14 @@ def _feuille(wb: Workbook, spec: tuple, mois: list[str], colonnes: list[tuple[st
     _, nom, titre, _, _, forme, teinte, style_n1, unite = spec
     ws = wb.create_sheet(nom[:31])
     format_axe, format_cellule = FORMATS[unite]
-    _tableau(ws, mois, colonnes, format_cellule)
-    n = len(mois) + 1
-    cats = Reference(ws, min_col=1, min_row=2, max_row=n)
+    _tableau(ws, nom, _sous_titre(unite, colonnes, avec_n1, avec_obj), mois, colonnes,
+             format_cellule)
+    n = ENTETE + len(mois)
+    cats = Reference(ws, min_col=1, min_row=ENTETE + 1, max_row=n)
     couleur = DATA[teinte]
 
     def col(i: int) -> Reference:
-        return Reference(ws, min_col=i, min_row=1, max_row=n)
+        return Reference(ws, min_col=i, min_row=ENTETE, max_row=n)
 
     # Année N : aire, barres ou courbe, comme à l'écran
     if forme == "aire":
@@ -239,28 +284,30 @@ def _feuille(wb: Workbook, spec: tuple, mois: list[str], colonnes: list[tuple[st
     _habiller(g, titre, format_axe)
     if forme == "aire":
         g.legend.legendEntry = [LegendEntry(idx=1, delete=True)]
-    ws.add_chart(g, f"{ws.cell(1, len(colonnes) + 3).column_letter}2")
+    _poser(ws, g, len(mois), len(colonnes))
 
 
-def _feuille_effectif(wb: Workbook, mois: list[str], total: list,
+def _feuille_effectif(wb: Workbook, nom_n: str, mois: list[str], total: list,
                       contrats: list[tuple[str, list]]) -> None:
     """Une courbe par type de contrat, valeur inscrite sur chaque point, comme à l'écran ;
     l'effectif total reste dans le tableau (seule courbe s'il n'y a aucun contrat)."""
     ws = wb.create_sheet("Effectif")
     colonnes = contrats + [("Effectif total", total)]
-    _tableau(ws, mois, colonnes, "#,##0")
-    n = len(mois) + 1
+    _tableau(ws, "Effectif", f"Effectif par type de contrat · Année {nom_n}", mois, colonnes,
+             "#,##0")
+    n = ENTETE + len(mois)
     g = LineChart()
     for i in range(len(contrats) or 1):
-        g.add_data(Reference(ws, min_col=2 + i, min_row=1, max_row=n), titles_from_data=True)
+        g.add_data(Reference(ws, min_col=2 + i, min_row=ENTETE, max_row=n),
+                   titles_from_data=True)
         s = g.series[-1]
         _serie_trait(s, DATA[1 + i % 5], 2.5, points=True, rayon=6)
         s.dLbls = DataLabelList(showVal=True, showSerName=False, showCatName=False,
                                 showLegendKey=False, showPercent=False, dLblPos="t")
         s.dLbls.txPr = _riche(800, ENCRE)
-    g.set_categories(Reference(ws, min_col=1, min_row=2, max_row=n))
+    g.set_categories(Reference(ws, min_col=1, min_row=ENTETE + 1, max_row=n))
     _habiller(g, "Effectif", FORMATS["entier"][0])
-    ws.add_chart(g, f"{ws.cell(1, len(colonnes) + 3).column_letter}2")
+    _poser(ws, g, len(mois), len(colonnes))
 
 
 def graphiques(r: dict, nom_n: str, nom_n1: str, ids: list[str] | None = None) -> bytes:
@@ -281,7 +328,7 @@ def graphiques(r: dict, nom_n: str, nom_n1: str, ids: list[str] | None = None) -
             par_contrat = [(c, [(m.get("effectif_contrat") or {}).get(c) for m in serie_n])
                            for c in contrats]
             if _rempli(total) or any(_rempli(col) for _, col in par_contrat):
-                _feuille_effectif(wb, mois, total, par_contrat)
+                _feuille_effectif(wb, nom_n, mois, total, par_contrat)
             continue
         n = [_nombre(lire(m)) for m in serie_n]
         n1 = [_nombre(lire(serie_n1[i])) if i < len(serie_n1) else None

@@ -173,8 +173,8 @@ def test_graphes_en_vrais_graphiques_excel(make_client, charge):
     assert "graphes-2026.xlsx" in r.headers["content-disposition"]
     wb = load_workbook(BytesIO(r.content))
     ws = wb["Masse salariale"]
-    assert [c.value for c in ws[1]][:2] == ["Mois", "2026"]
-    assert D(str(ws["B2"].value)) == D(ecran["serie_n"][0]["ms"])
+    assert [c.value for c in ws[5]][:2] == ["Mois", "2026"]
+    assert D(str(ws["B6"].value)) == D(ecran["serie_n"][0]["ms"])
     assert len(ws._charts) == 1 and "Effectif" in wb.sheetnames
     assert "Marge" in wb.sheetnames
     equip = load_workbook(BytesIO(get(make_client(EQUIP), "annuel/export", annee=2026, mois=2,
