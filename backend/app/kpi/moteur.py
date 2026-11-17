@@ -340,6 +340,34 @@ def _front_back(pd: PeriodeData | None) -> dict | None:
             "front_pct": part(front), "back_pct": part(back)}
 
 
+def _agreger_contrats(pds: list[PeriodeData] | None, axe: str) -> dict | None:
+    """(service ou site, activité, contrat) -> (masse cumulée, effectif moyen) sur les périodes
+    données, en une seule passe sur les lignes ; None sans période (N-1 absent)."""
+    if not pds:
+        return None
+    ms: dict = defaultdict(lambda: ZERO)
+    eff: dict = defaultdict(int)
+    for pd in pds:
+        ids: dict = defaultdict(set)
+        for L in pd.lignes:
+            k = (getattr(L, axe), L.activite, L.contrat)
+            ms[k] += pd.total(L)
+            ids[k].add(L.salarie_id)
+        for k, v in ids.items():
+            eff[k] += len(v)
+    return {k: (ms[k], Decimal(eff[k]) / len(pds)) for k in ms}
+
+
+def _contrats_activite(agg: dict | None, agg1: dict | None, cle: str, activite: str,
+                       contrats) -> dict:
+    """Retours N2 (remarque 3) : détail d'une activité d'un service ou d'un site par nature de
+    contrat, masse et effectif côte à côte (replié sous la ligne de l'activité)."""
+    def v(g, c, i):
+        return None if g is None else g.get((cle, activite, c), (ZERO, ZERO))[i]
+    return {c: {"ms": cell(v(agg, c, 0), v(agg1, c, 0)),
+                "effectif": cell(v(agg, c, 1), v(agg1, c, 1))} for c in contrats}
+
+
 def _avec_parts(blocs: list[dict], global_m: Decimal | None) -> list[dict]:
     """Retours N2 (4, 6) : part de chaque activité dans l'effectif ET dans la masse salariale de son
     service ou site, part du service ou site dans l'effectif et la masse globaux (périmètre vu),
@@ -358,6 +386,9 @@ def _avec_parts(blocs: list[dict], global_m: Decimal | None) -> list[dict]:
         for a in b["activites"]:
             a["part"] = _ratio(a["effectif"]["m"], e)
             a["part_masse"] = _ratio(a["m"], ms)
+            for x in (a.get("contrats") or {}).values():
+                x["part_masse"] = _ratio(x["ms"]["m"], a["m"])
+                x["part"] = _ratio(x["effectif"]["m"], a["effectif"]["m"])
         b["parts_contrat"] = {
             c: {"masse": _ratio((b.get("ms_contrat") or {}).get(c, {}).get("m"), ms),
                 "effectif": _ratio(x["m"], e)}
@@ -429,6 +460,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     def total(pd, L):
         return pd.total(L)
 
+    agg_s = _agreger_contrats([cur], "service")
+    agg_s1 = _agreger_contrats(prev and [prev], "service")
     b_service = []
     for s in refs.services:
         sub = PeriodeData(tuple(L for L in cur.lignes if L.service == s), cur.exclues)
@@ -443,7 +476,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                 {"activite": n, **c, "effectif": cell(
                     Decimal(len({L.salarie_id for L in sub.lignes if L.activite == n})),
                     Decimal(len({L.salarie_id for L in sub1.lignes if L.activite == n}))
-                    if sub1 else None)}
+                    if sub1 else None),
+                 "contrats": _contrats_activite(agg_s, agg_s1, s, n, refs.contrats)}
                 for n, c in _cells(sub, sub1, refs.activites, lambda L: L.activite, total)],
             "ms_contrat": dict(_cells(sub, sub1, refs.contrats, lambda L: L.contrat, total)),
             "effectif_contrat": {c: cell(
@@ -477,11 +511,14 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         sel = [L for L in pd.lignes if L.site == s and L.activite == a]
         return sum((pd.total(L) for L in sel), ZERO), len({L.salarie_id for L in sel})
 
+    agg_t, agg_t1 = _agreger_contrats([cur], "site"), _agreger_contrats(prev and [prev], "site")
+
     def activites_site(s):
         out = []
         for a in refs.activites:
             (ms0, e0), (ms1, e1) = site_act(cur, s, a), site_act(prev, s, a)
-            out.append({"activite": a, **cell(ms0, ms1), "effectif": cell_eff(e0, e1)})
+            out.append({"activite": a, **cell(ms0, ms1), "effectif": cell_eff(e0, e1),
+                        "contrats": _contrats_activite(agg_t, agg_t1, s, a, refs.contrats)})
         return out
 
     c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
@@ -629,6 +666,9 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                    **cell(ms_n, ms_n1),
                    **bud("rubrique", "TOTAL CHARGES", ms_n)})
 
+    pds, pds1 = [n[m] for m in ok], [n1[m] for m in ok1]
+    agg_s, agg_s1 = _agreger_contrats(pds, "service"), _agreger_contrats(pds1, "service")
+    agg_t, agg_t1 = _agreger_contrats(pds, "site"), _agreger_contrats(pds1, "site")
     b_service = []
     for s in refs.services:
         tot = cell_ms(lambda L, s=s: L.service == s)
@@ -638,7 +678,8 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
             "effectif": cell_eff(lambda L, s=s: L.service == s),
             "activites": [
                 {"activite": a, **cell_ms(lambda L, s=s, a=a: L.service == s and L.activite == a),
-                 "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a)}
+                 "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a),
+                 "contrats": _contrats_activite(agg_s, agg_s1, s, a, refs.contrats)}
                 for a in refs.activites],
             "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.service == s and L.contrat == c)
                            for c in refs.contrats},
@@ -658,7 +699,8 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                            {"activite": a,
                             **cell_ms(lambda L, s=s, a=a: L.site == s and L.activite == a),
                             "effectif": cell_eff(
-                                lambda L, s=s, a=a: L.site == s and L.activite == a)}
+                                lambda L, s=s, a=a: L.site == s and L.activite == a),
+                            "contrats": _contrats_activite(agg_t, agg_t1, s, a, refs.contrats)}
                            for a in refs.activites],
                        "effectif_contrat": par_contrat,
                        "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.site == s and L.contrat == c)

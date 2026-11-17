@@ -117,6 +117,9 @@ export interface Indicateurs {
   taux_absenteisme: Val
 }
 
+/** Détail d'une activité par contrat (remarque 3) : parts dans l'activité. */
+export interface LigneContrat { ms: Cell; effectif: Cell; part_masse?: Val; part?: Val }
+
 export interface Mensuel {
   synthese: {
     ms: Cell & { budget: Val; ecart: Val; ecart_pct: Val }
@@ -161,7 +164,7 @@ export interface Mensuel {
     part_masse_globale?: Val
     parts_contrat?: Record<string, { masse?: Val; effectif?: Val }>
     /** part : part de l'activité dans l'effectif du service (ratio). */
-    activites: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val } & Cell)[]
+    activites: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val; contrats?: Record<string, LigneContrat> } & Cell)[]
     /** Masse salariale et effectif du service par nature de contrat (CDI, CDD, MAD). */
     ms_contrat?: Record<string, Cell>
     effectif_contrat?: Record<string, Cell>
@@ -171,7 +174,7 @@ export interface Mensuel {
     ms: Cell & Budget
     effectif: Cell
     /** Ventilation du site par activité, comme les services (retours N2, point 6). */
-    activites?: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val } & Cell)[]
+    activites?: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val; contrats?: Record<string, LigneContrat> } & Cell)[]
     part_globale?: Val
     /** Part du bloc dans la masse salariale globale, et parts de chaque contrat dans le bloc (ratios). */
     part_masse_globale?: Val

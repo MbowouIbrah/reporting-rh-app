@@ -395,12 +395,40 @@ table.dense td.num { text-align: right; }
 /* Parts en badges (retours N2, 4 et 6) : masse en bleu, effectif en ambre, même largeur, alignés à droite du libellé. */
 .rapport-excel .panneau table.services td.libelle-part { min-width: 15rem; }
 .rapport-excel .panneau table.services tr.staff td.libelle-part { opacity: 1; color: color-mix(in srgb, var(--muted) 60%, transparent); }
-.part-badge { float: right; margin-left: var(--sp-3); display: inline-flex; justify-content: space-between; width: 6.5rem; padding: 0 6px; font-size: 0.72rem; line-height: 1.5; border: 1px solid; font-variant-numeric: tabular-nums; }
-.part-badge b, .part-globale b { font-weight: 600; }
-.part-badge i { font-style: normal; opacity: .75; }
-.part-badge.masse, .part-globale.masse { color: #1d4f91; background: #eef3fa; border-color: #c9d8ee; }
-.part-badge.effectif, .part-globale.effectif { color: #8a5a00; background: #fbf4e6; border-color: #ecd9b0; }
-.part-globale { display: block; width: max-content; margin-top: 4px; padding: 0 6px; font-size: 0.68rem; font-weight: var(--fw-regular); line-height: 1.5; border: 1px solid; }
+/* Répartition par site / service (maquette D1 sobre) : masse et effectif côte à côte, une gouttière blanche entre les groupes,
+   badges de part neutres, seul rouge pour les baisses ; trois niveaux de lecture (total, activité, contrat). */
+.part-badge { display: inline-block; min-width: 58px; padding: 0 6px; text-align: right; font-size: 11.5px; font-weight: 600; line-height: 1.5; color: var(--navy-2); background: #fff; border: 1px solid #c9ccd8; font-variant-numeric: tabular-nums; }
+.part-globale { display: flex; justify-content: space-between; gap: 8px; width: 150px; margin-top: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--navy-2); background: #fff; border: 1px solid #c9ccd8; }
+.part-globale span { font-weight: 400; }
+.part-globale b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rapport-excel .panneau table.repartition { border-collapse: separate; border-spacing: 0; }
+.rapport-excel .panneau table.repartition :is(th, td) { background: #fff; }
+.rapport-excel .panneau table.repartition tbody tr:hover :is(th, td) { background: inherit; }
+.rapport-excel .panneau table.repartition .masse { background: #f8f9fb; }
+.rapport-excel .panneau table.repartition .gouttiere { width: 10px; min-width: 10px; padding: 0; background: #fff; border: 0; }
+.rapport-excel .panneau table.repartition thead th { background: #eef0f6; color: var(--navy); font-size: 11.5px; text-transform: uppercase; }
+.rapport-excel .panneau table.repartition thead th.gouttiere { background: #fff; border: 0; }
+.rapport-excel .panneau table.repartition tr.groupes th { text-transform: none; text-align: center; font-size: var(--fs-sm); color: #fff; border: 0; }
+.rapport-excel .panneau table.repartition tr.groupes th.vide { background: #fff; }
+.rapport-excel .panneau table.repartition tr.groupes th.groupe-masse { background: var(--navy-2); }
+.rapport-excel .panneau table.repartition tr.groupes th.groupe-effectif { background: #3c4366; }
+.rapport-excel .panneau table.repartition tr.groupes small { font-weight: 400; opacity: .7; }
+.rapport-excel .panneau table.repartition tbody th.nom { position: static; vertical-align: top; min-width: 150px; text-align: left; font-weight: 700; color: var(--navy); background: #eef0f6; border-right: 1px solid #c9ccd8; }
+.rapport-excel .panneau table.repartition tbody th.libelle { position: static; text-align: left; }
+.rapport-excel .panneau table.repartition tr.activite :is(th, td) { font-weight: 600; color: var(--navy); }
+.rapport-excel .panneau table.repartition tr.contrat :is(th, td) { font-size: 12.5px; font-weight: 400; color: #6b7089; padding-block: 4px; }
+.rapport-excel .panneau table.repartition tr.contrat th.libelle { padding-left: 34px; }
+.rapport-excel .panneau table.repartition tr.contrat .part-badge { font-size: 11px; min-width: 52px; border-color: #e2e4ec; font-weight: 400; }
+.rapport-excel .panneau table.repartition tr.total-bloc :is(th, td):not(.nom, .gouttiere) { font-weight: 700; font-size: 14.5px; color: var(--navy); background: #e6e8f0; border-top: 1px solid #c9ccd8; }
+.rapport-excel .panneau table.repartition tbody.general :is(th, td):not(.gouttiere) { font-weight: 700; font-size: 14.5px; color: #fff; background: var(--navy-2); }
+.rapport-excel .panneau table.repartition tbody.general .part-badge { color: var(--navy-2); }
+/* Spécificité au-dessus des lignes activité et total, qui fixent leur couleur. */
+.rapport-excel .panneau table.repartition tbody tr td.num.neg { color: var(--red); }
+.rapport-excel .panneau table.repartition tbody.general tr td.num.neg { color: #ffb3bb; }
+.rapport-excel .panneau table.repartition tbody tr td.num.nul { color: var(--muted); }
+.rapport-excel .panneau table.repartition button.deplier { all: unset; cursor: pointer; display: inline-flex; gap: 6px; align-items: baseline; }
+.rapport-excel .panneau table.repartition button.deplier:focus-visible { outline: 2px solid var(--navy-2); outline-offset: 2px; }
+.rapport-excel .panneau table.repartition button.deplier span { color: var(--muted); font-size: 11px; width: 10px; }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
 .graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
 .graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
@@ -1245,7 +1273,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   /* Sections Mensuel/Annuel : hauteur naturelle des lignes un cran plus basse (les tableaux s'étirent ensuite
      sur la section), pour que les plus longs tiennent sans défilement */
   .rapport-excel .snap-section table.dense th, .rapport-excel .snap-section table.dense td { padding-block: calc(var(--ligne-pad) - .25rem); }
-  /* Répartition par service (deux lignes par activité, comme l'Excel) : lignes resserrées pour tenir sur un écran */
+  /* Nature de contrat (deux lignes par activité, comme l'Excel) : lignes resserrées pour tenir sur un écran */
   .rapport-excel .snap-section table.services tbody th, .rapport-excel .snap-section table.services tbody td { padding-block: 0; line-height: 1.25; }
   .rapport-excel .snap-section table.services tr.staff td { padding-block: 0; font-size: var(--fs-xs); line-height: 1.15; }
   /* Mensuel, Annuel : chaque section remplit l'écran, les lignes se partagent la hauteur
@@ -1259,10 +1287,6 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .rapport-excel table.dense.aligne :is(th, td):first-child { width: 24%; overflow: hidden; text-overflow: ellipsis; }
   .rapport-excel table.dense.aligne.double :is(th, td):first-child { width: calc(24% - 76% / 7); }
   .rapport-excel table.dense.aligne .bourrage { width: auto; }
-  /* Répartition par site / service : colonne Activité assez large pour le libellé et son badge de part */
-  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:first-child { width: 11rem; }
-  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:nth-child(2) { width: 16rem; }
-  .rapport-excel table.dense.aligne.double:has(.part-badge) thead th:nth-child(n+3) { width: auto; }
 }
 @media (max-width: 1099px) { table.dense .bourrage { display: none; } }
 /* Suite signalée par une flèche animée sous le rail (contenu plus bas, section suivante, retour en haut) */

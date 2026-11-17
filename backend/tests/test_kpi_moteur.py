@@ -479,3 +479,21 @@ def test_parts_d_effectif_par_service_et_par_site():
     assert a["c_site"][0]["part_globale"] == D("0.5")
     assert a["c_site"][0]["activites"][1]["part"] == D("0.5")
     assert a["b_service_activite"][1]["activites"][0]["part"] == D(1)
+
+
+def test_detail_par_contrat_de_chaque_activite():
+    """Remarque 3 : chaque activité d'un service / site se déplie par contrat
+    (masse, effectif, parts dans l'activité), en mensuel comme en annuel."""
+    cur = pd(L(1, Brut_Réel=100), L(2, ctr="CDD", Brut_Réel=50),
+             L(3, act="Back Office", Brut_Réel=30))
+    prev = pd(L(1, Brut_Réel=80))
+    m = mensuel(cur, prev, REFS, Params())
+    fo = m["b_service_activite"][0]["activites"][0]["contrats"]
+    assert (fo["CDI"]["ms"]["m"], fo["CDI"]["ms"]["m1"]) == (D(100), D(80))
+    assert fo["CDD"]["effectif"]["m"] == 1 and fo["CDD"]["part_masse"] == D(50) / D(150)
+    assert fo["CDI"]["part"] == D("0.5") and fo["MAD"]["ms"]["m"] == 0
+    site = m["c_site"][0]["activites"][1]["contrats"]
+    assert site["CDI"]["ms"]["m"] == D(30) and site["CDI"]["part"] == 1
+    a = annuel({1: cur, 2: cur}, {1: prev}, 2, REFS, Params())
+    fo = a["b_service_activite"][0]["activites"][0]["contrats"]
+    assert fo["CDI"]["ms"]["m"] == D(200) and fo["CDD"]["effectif"]["m"] == 1

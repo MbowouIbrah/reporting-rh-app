@@ -6,7 +6,8 @@ const NF2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 })
 
 /** Séparateur de milliers : espace insécable pleine largeur (l'espace fine de fr-FR colle les groupes à l'écran). */
 export const SEP = '\u00a0'
-const espacer = (s: string) => s.replace(/[\u202f\u00a0]/g, SEP)
+/** \u00ab -0 \u00bb (valeur n\u00e9gative arrondie \u00e0 z\u00e9ro) s'affiche \u00ab 0 \u00bb. */
+const espacer = (s: string) => s.replace(/[\u202f\u00a0]/g, SEP).replace(/^-(?=0(,0+)?$)/, '')
 
 export const MOIS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',

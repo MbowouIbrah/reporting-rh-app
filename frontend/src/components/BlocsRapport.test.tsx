@@ -5,77 +5,90 @@ import { Activite, type Blocs, ServicesActivites, Sites, TypesCharge, TypesExclu
 
 const cell: Cell = { m1: '10', m: '12', var: '2', var_pct: '0.2' }
 
+const eff = { m: '5', m1: '4', var: '1', var_pct: '0.25' }
+const zero = { m: '0', m1: '0', var: '0', var_pct: null }
+
 const site = (nom: string) => ({
   site: nom,
   ms: cell,
-  effectif: { m: '5', m1: '4', var: '1', var_pct: '0.25' },
-  effectif_contrat: {
-    CDI: { m: '3', m1: '3', var: '0', var_pct: '0' },
-    CDD: { m: '1', m1: '1', var: '0', var_pct: '0' },
-    MAD: { m: '1', m1: '0', var: '1', var_pct: null },
-  },
-  ms_contrat: {
-    CDI: { m: '700', m1: '600', var: '100', var_pct: '0.1667' },
-    CDD: { m: '200', m1: '200', var: '0', var_pct: '0' },
-    MAD: { m: '100', m1: '0', var: '100', var_pct: null },
-  },
+  effectif: eff,
+  activites: [
+    {
+      activite: 'VN', ...cell, effectif: eff,
+      contrats: {
+        CDI: { ms: { m: '700', m1: '600', var: '100', var_pct: '0.1667' }, effectif: { m: '3', m1: '2', var: '1', var_pct: '0.5' } },
+        CDD: { ms: zero, effectif: zero },
+      },
+    },
+    { activite: 'APV', ...cell, effectif: eff },
+    { activite: 'Vide', ...zero, effectif: zero },
+  ],
 })
 
 const d = { c_site: [site('Douala'), site('Yaoundé')] } as unknown as Blocs
+const lib = { prec: 'M-1', cour: 'M' }
 
-test('détail d’un site : replié par défaut, se déplie au clic en masse salariale et Staff par contrat', () => {
-  render(<Sites d={d} lib={{ prec: 'M-1', cour: 'M' }} />)
-  const bouton = screen.getByRole('button', { name: 'Détail par contrat de Douala' })
-  expect(bouton).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.queryByText('CDI')).toBeNull()
-
-  fireEvent.click(bouton)
-  expect(bouton).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByText('CDI').closest('tr')).toHaveTextContent(/600.*700/)
-  expect(screen.getByText('Staff CDI').closest('tr')).toHaveTextContent('33')
-  expect(screen.getByText('Staff MAD').closest('tr')).toHaveTextContent('01')
-
-  fireEvent.click(bouton.closest('tr')!.cells[1])
-  expect(bouton).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.queryByText('CDI')).toBeNull()
+test('répartition par site : une ligne par activité, total du bloc, activités à zéro masquées, plus de Staff', () => {
+  const { container } = render(<Sites d={d} lib={lib} />)
+  const douala = container.querySelectorAll('tbody.bloc')[0]
+  expect([...douala.querySelectorAll('tr')].map((tr) => tr.className)).toEqual(['activite', 'activite', 'total-bloc'])
+  expect(douala.querySelector('th.nom')).toHaveAttribute('rowspan', '3')
+  expect(screen.getAllByText('Total site')).toHaveLength(2)
+  expect(screen.queryByText('Vide')).toBeNull()
+  expect(screen.queryByText(/Staff/)).toBeNull()
+  // masse (5 colonnes), gouttière, effectif (4 colonnes)
+  expect(douala.querySelector('tr.activite')!.querySelectorAll('td')).toHaveLength(10)
+  expect(douala.querySelector('tr.activite td.gouttiere')).not.toBeNull()
 })
 
-test('un seul site déplié à la fois', () => {
-  render(<Sites d={d} lib={{ prec: 'M-1', cour: 'M' }} />)
-  const douala = screen.getByRole('button', { name: 'Détail par contrat de Douala' })
-  const yaounde = screen.getByRole('button', { name: 'Détail par contrat de Yaoundé' })
-  fireEvent.click(douala)
-  fireEvent.click(yaounde)
-  expect(douala).toHaveAttribute('aria-expanded', 'false')
-  expect(yaounde).toHaveAttribute('aria-expanded', 'true')
+test('activité dépliée par contrat : contrats à zéro masqués, une seule ouverte à la fois', () => {
+  render(<Sites d={d} lib={lib} />)
+  const vn = screen.getByRole('button', { name: 'Détail par contrat de VN (Douala)' })
+  expect(vn).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByText('CDI')).toBeNull()
+  expect(screen.queryByRole('button', { name: /de APV/ })).toBeNull()
+
+  fireEvent.click(vn)
+  expect(vn).toHaveAttribute('aria-expanded', 'true')
+  const cdi = screen.getByText('CDI').closest('tr')!
+  expect(cdi).toHaveClass('contrat')
+  expect(cdi).toHaveTextContent(/600.*700.*100/)
+  expect(screen.queryByText('CDD')).toBeNull()
+  expect(vn.closest('tbody')!.querySelector('th.nom')).toHaveAttribute('rowspan', '4')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Détail par contrat de VN (Yaoundé)' }))
+  expect(vn).toHaveAttribute('aria-expanded', 'false')
   expect(screen.getAllByText('CDI')).toHaveLength(1)
 })
 
-test('répartition par site : ligne TOTAL GÉNÉRAL en masse salariale et Staff', () => {
+test('répartition par site : ligne TOTAL GÉNÉRAL avec masse et effectif sur la même ligne', () => {
   const avecTotal = { ...d, c_site_total: { ms: { m1: '20', m: '24', var: '4', var_pct: '0.2' }, effectif: { m: '10', m1: '8', var: '2', var_pct: '0.25' } } } as unknown as Blocs
-  render(<Sites d={avecTotal} lib={{ prec: 'M-1', cour: 'M' }} />)
-  const total = screen.getByText('TOTAL GÉNÉRAL').closest('tr')!
-  expect(total).toHaveTextContent(/Masse salariale.*20.*24/)
-  expect(total.nextElementSibling).toHaveTextContent(/Staff.*8.*10/)
+  render(<Sites d={avecTotal} lib={lib} />)
+  expect(screen.getByText('TOTAL GÉNÉRAL').closest('tr')).toHaveTextContent(/20.*24.*8.*10/)
 })
 
-test('répartition par service : dépliage par contrat', () => {
+test('écart nul en gris, baisse en rouge', () => {
+  const baisse = { c_site: [{ site: 'Douala', ms: { m1: '12', m: '10', var: '-2', var_pct: '-0.1667' }, effectif: { m: '4', m1: '4', var: '0', var_pct: '0' } }] } as unknown as Blocs
+  const { container } = render(<Sites d={baisse} lib={lib} />)
+  const tds = container.querySelectorAll('tr.total-bloc td')
+  expect(tds[2]).toHaveClass('neg')
+  expect(tds[8]).toHaveClass('nul')
+})
+
+test('répartition par service : activité dépliée par contrat, Total service', () => {
   const svc = {
     a_type_charge: [],
     d_contrat: { total: cell },
     b_service_activite: [{
       service: 'SAV PL', total: cell, effectif: cell,
-      activites: [{ activite: 'Atelier', ...cell, effectif: cell }],
-      ms_contrat: { CDI: { m: '700', m1: '600', var: '100', var_pct: '0.1667' } },
-      effectif_contrat: { CDI: { m: '3', m1: '2', var: '1', var_pct: '0.5' } },
+      activites: [{ activite: 'Atelier', ...cell, effectif: cell,
+        contrats: { CDI: { ms: { m: '700', m1: '600', var: '100', var_pct: '0.1667' }, effectif: { m: '3', m1: '2', var: '1', var_pct: '0.5' } } } }],
     }],
   } as unknown as Blocs
-  render(<ServicesActivites d={svc} lib={{ prec: 'M-1', cour: 'M' }} />)
-  const bouton = screen.getByRole('button', { name: 'Détail par contrat de SAV PL' })
-  expect(screen.queryByText('Staff CDI')).toBeNull()
-  fireEvent.click(bouton)
-  expect(screen.getByText('CDI').closest('tr')).toHaveTextContent(/600.*700/)
-  expect(screen.getByText('Staff CDI').closest('tr')).toHaveTextContent(/2.*3/)
+  render(<ServicesActivites d={svc} lib={lib} />)
+  expect(screen.getByText('Total service')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Détail par contrat de Atelier (SAV PL)' }))
+  expect(screen.getByText('CDI').closest('tr')).toHaveTextContent(/600.*700.*2.*3/)
 })
 
 test('reporting global : CA et marge sous le TOTAL GÉNÉRAL, budget vide, absents sans le droit', () => {
@@ -104,7 +117,6 @@ test('Activité : lignes de l’activité, mention « partiel » seulement sur l
   expect(screen.getByText(/2,25/)).toBeInTheDocument()
 })
 
-const lib = { prec: 'M-1', cour: 'M' }
 const cellsTr = (tr: Element) => [...tr.querySelectorAll('td')]
 
 test('écart d’un résultat (CA, marge) : dépasser l’objectif est bon, rester dessous est mauvais', () => {
@@ -175,16 +187,14 @@ test('TypesCharge liste les rubriques comptées sans groupe ; les hors total von
   expect([...exclus.querySelectorAll('tbody tr.exclu th')].map((th) => th.textContent)).toEqual(['Bonus'])
 })
 
-test('parts : badges masse (activité) et effectif (Staff), parts globales sous le nom, sans bouton', () => {
+test('parts : badges neutres dans les colonnes Part, parts globales sous le nom', () => {
   const avecParts = {
     c_site: [{ ...site('Douala'), part_globale: '0.6', part_masse_globale: '0.7',
       activites: [{ activite: 'VN', ...cell, effectif: cell, part: '0.25', part_masse: '0.4' }] }],
   } as unknown as Blocs
-  const { container } = render(<Sites d={avecParts} lib={{ prec: 'M-1', cour: 'M' }} />)
-  expect(screen.queryByRole('button', { name: 'Parts d’effectif' })).not.toBeInTheDocument()
-  expect(container.querySelector('.part-badge.masse')).toHaveTextContent('40 %masse')
-  expect(container.querySelector('.part-badge.effectif')).toHaveTextContent('25 %effectif')
-  expect(container.querySelector('.part-globale.masse')).toHaveTextContent('70 % de la masse globale')
-  expect(container.querySelector('.part-globale.effectif')).toHaveTextContent('60 % de l’effectif global')
-  expect(screen.getAllByRole('columnheader')).toHaveLength(9)
+  const { container } = render(<Sites d={avecParts} lib={lib} />)
+  expect([...container.querySelectorAll('tr.activite .part-badge')].map((b) => b.textContent?.replace(/\s/g, ' '))).toEqual(['40 %', '25 %'])
+  const globales = [...container.querySelectorAll('.part-globale')].map((b) => b.textContent?.replace(/\s/g, ' '))
+  expect(globales).toEqual(['Masse globale 70 %', 'Effectif global 60 %'])
+  expect(container.querySelectorAll('thead th[scope="col"]')).toHaveLength(11)
 })

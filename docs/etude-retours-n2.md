@@ -73,6 +73,19 @@ Choix : Excel + PowerPoint natifs + « Copier les données ». Le front envoie l
 type barres ou courbe, unité) ; le serveur les met en forme sans recalculer ni lire de données. Taille bornée.
 Google Sheets / Slides, LibreOffice : ouvrent les mêmes fichiers (pas de format en plus).
 
+### h. Lignes de la répartition par site et par service (remarque 3, maquette D1 sobre)
+
+Avant : deux lignes par activité (masse, puis Staff), badges répétés, colonnes vides, « -0 », contrats à 0 affichés.
+Maquettes A à D comparées (`C:/tmp/maquettes-lignes/`) ; retenu : **D1 sobre**.
+
+- Une ligne par activité : masse (N-1, N, écart, écart %, part) et effectif (N-1, N, écart, part) côte à côte.
+- Détail par contrat replié sous chaque activité (serveur : `contrats` par activité, parts dans l'activité).
+- Total site / service en fin de bloc ; il porte le budget (pas de colonnes vides sur les activités).
+- Activités et contrats tout à 0 masqués ; « -0 » ne s'affiche plus ; écart nul en gris, baisse en rouge.
+
+Décidé par défaut : une seule activité ouverte à la fois ; ligne TOTAL GÉNÉRAL en bas ; un ancien rapport
+sans ventilation par activité se réduit à son total.
+
 ## 4. Impacts et risques
 - Données : migration 0025 (4 services, 2 périmètres, DPS complété) ; descente = suppression si non utilisés.
 - Import : des fichiers qui passaient (sans matricule) seront refusés ; voulu par le client.
