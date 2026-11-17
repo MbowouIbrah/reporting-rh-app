@@ -397,14 +397,14 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.services tr.staff td.libelle-part { opacity: 1; color: color-mix(in srgb, var(--muted) 60%, transparent); }
 /* Répartition par site / service (maquette D1 sobre) : masse et effectif côte à côte, une gouttière blanche entre les groupes,
    badges de part neutres, seul rouge pour les baisses ; trois niveaux de lecture (total, activité, contrat). */
-.part-badge { display: inline-block; min-width: 58px; padding: 0 6px; text-align: right; font-size: 11.5px; font-weight: 600; line-height: 1.5; color: var(--navy-2); background: #fff; border: 1px solid #c9ccd8; font-variant-numeric: tabular-nums; }
-.part-globale { display: flex; justify-content: space-between; gap: 8px; width: 150px; margin-top: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--navy-2); background: #fff; border: 1px solid #c9ccd8; }
+.part-badge { display: inline-block; min-width: 58px; padding: 0 6px; text-align: right; font-size: 11.5px; font-weight: 600; line-height: 1.5; color: var(--navy-2); background: #fff; border: 1px solid var(--rule-strong); font-variant-numeric: tabular-nums; }
+.part-globale { display: flex; justify-content: space-between; gap: 8px; width: 150px; margin-top: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; line-height: 1.6; color: var(--navy-2); background: #fff; border: 1px solid var(--rule-strong); }
 .part-globale span { font-weight: 400; }
 .part-globale b { font-weight: 600; font-variant-numeric: tabular-nums; }
 .rapport-excel .panneau table.repartition { border-collapse: separate; border-spacing: 0; }
 .rapport-excel .panneau table.repartition :is(th, td) { background: #fff; }
 .rapport-excel .panneau table.repartition tbody tr:hover :is(th, td) { background: inherit; }
-.rapport-excel .panneau table.repartition .masse { background: #f8f9fb; }
+.rapport-excel .panneau table.repartition .masse { background: var(--rapport-zebre); }
 .rapport-excel .panneau table.repartition .gouttiere { width: 10px; min-width: 10px; padding: 0; background: #fff; border: 0; }
 .rapport-excel .panneau table.repartition thead th { background: var(--gris-etiq); color: var(--navy); font-size: var(--fs-xs); text-transform: uppercase; white-space: nowrap; }
 .rapport-excel .panneau table.repartition thead th.gouttiere { background: #fff; border: 0; }
@@ -423,10 +423,10 @@ table.dense td.num { text-align: right; }
 .rapport-excel .panneau table.repartition button.deplier-bloc:hover .nom-ligne { text-decoration: underline; }
 .rapport-excel .panneau table.repartition tbody th.libelle { position: static; text-align: left; }
 .rapport-excel .panneau table.repartition tr.activite :is(th, td) { font-weight: 600; color: var(--navy); }
-.rapport-excel .panneau table.repartition tr.contrat :is(th, td) { font-size: 12.5px; font-weight: 400; color: #6b7089; padding-block: 4px; }
+.rapport-excel .panneau table.repartition tr.contrat :is(th, td) { font-size: 12.5px; font-weight: 400; color: var(--muted); padding-block: 4px; }
 .rapport-excel .panneau table.repartition tr.contrat th.libelle { padding-left: 34px; }
-.rapport-excel .panneau table.repartition tr.contrat .part-badge { font-size: 11px; min-width: 52px; border-color: #e2e4ec; font-weight: 400; }
-.rapport-excel .panneau table.repartition tr.total-bloc :is(th, td):not(.nom, .gouttiere) { font-weight: 700; color: var(--navy); background: #f3f4f8; border-top: 1px solid var(--rule); }
+.rapport-excel .panneau table.repartition tr.contrat .part-badge { font-size: 11px; min-width: 52px; border-color: var(--rule); font-weight: 400; }
+.rapport-excel .panneau table.repartition tr.total-bloc :is(th, td):not(.nom, .gouttiere) { font-weight: 700; color: var(--navy); background: var(--rapport-groupe); border-top: 1px solid var(--rule); }
 .rapport-excel .panneau table.repartition tbody.general :is(th, td):not(.gouttiere) { font-weight: 700; font-size: 14.5px; color: #fff; background: var(--navy-2); }
 .rapport-excel .panneau table.repartition tbody.general .part-badge { color: var(--navy-2); }
 /* Spécificité au-dessus des lignes activité et total, qui fixent leur couleur. */
@@ -440,13 +440,13 @@ table.dense td.num { text-align: right; }
 /* Tout replié : lecture simple, sans gras, un zèbre par site uniforme sur toute la ligne */
 .rapport-excel .panneau table.repartition tbody.bloc :is(th, td):not(.gouttiere) { font-weight: 400; background: #fff; }
 /* Zèbre global : chaque site (ou service) compte pour une ligne, toutes ses lignes ont la même teinte. */
-.rapport-excel .panneau table.repartition tbody.bloc:nth-of-type(even) :is(th, td):not(.gouttiere) { background: #f3f4f8; }
+.rapport-excel .panneau table.repartition tbody.bloc:nth-of-type(even) :is(th, td):not(.gouttiere) { background: var(--rapport-zebre); }
 .rapport-excel .panneau table.repartition tbody.bloc :is(th, td):not(.gouttiere) { border-top: 0; }
 .rapport-excel .panneau table.repartition tbody.bloc tr:first-child > :is(th, td):not(.gouttiere) { border-top: 1px solid var(--rule); }
 .rapport-excel .panneau table.repartition tbody.bloc :is(.part-badge, .part-globale, .part-globale b) { font-weight: 400; }
-/* Zone dépliée : zèbre propre aux lignes de contrat, teinte bleutée distincte du zèbre global. */
-.rapport-excel .panneau table.repartition tbody.bloc tr.contrat > :is(th, td):not(.gouttiere, .nom) { background: #eaeef7; }
-.rapport-excel .panneau table.repartition tbody.bloc tr.contrat.alt > :is(th, td):not(.gouttiere, .nom) { background: #dfe5f1; }
+/* Zone dépliée : zèbre propre aux lignes de contrat, teintes des autres tableaux (en-tête, groupe). */
+.rapport-excel .panneau table.repartition tbody.bloc tr.contrat > :is(th, td):not(.gouttiere, .nom) { background: var(--rapport-entete); }
+.rapport-excel .panneau table.repartition tbody.bloc tr.contrat.alt > :is(th, td):not(.gouttiere, .nom) { background: var(--rapport-groupe); }
 /* Export « graphiques dynamiques » : cases sur les graphes, actions à droite de la ligne du menu des groupes */
 .graphes-tete:has(.graphes-selection) { flex-wrap: wrap; }
 .graphes-selection { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); }
