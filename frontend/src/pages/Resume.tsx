@@ -133,6 +133,7 @@ export default function Resume() {
   const indispo = (titre: string) => (
     <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
   )
+  const fb = a?.front_back && a.front_back.total > 0 ? a.front_back : null
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
   // Dernier mois saisi avec sa vraie année (en fiscal, l'exercice 2025-26 finit en 2026).
   const finN = f.filtres && a?.mois_fin ? (a.annee_fin ?? f.filtres.annee) : undefined
@@ -216,9 +217,17 @@ export default function Resume() {
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
               libelle2={`Évolution par rapport à ${moisFin} ${finN1}`}
-              detail={parContrat(a.effectif_fin_contrat, dec)}
+              detail={[
+                ...parContrat(a.effectif_fin_contrat, dec),
+                ...(fb ? [
+                  ['Front office (productif)', `${dec(String(fb.front))} · ${pct(fb.front_pct)}`],
+                  ['Back office (administratif)', `${dec(String(fb.back))} · ${pct(fb.back_pct)}`],
+                ] as Detail : []),
+              ]}
             >
               <Variation v={a.effectif_fin.var_pct} vs="" />
+              {/* Productif / administratif : part de l'effectif de fin en front et en back office. */}
+              {fb && <span className="ratio-fb">Front office {pct(fb.front_pct)} · Back office {pct(fb.back_pct)}</span>}
             </Case>
             {sansCaEff && indispo('CA par salarié')}
             {aCa && !sansCaEff && (

@@ -299,6 +299,7 @@ table.dense td.num { text-align: right; }
 .cases .case .variation.neg > [aria-hidden] { color: var(--red-deep); }
 .cases .case .second { text-align: right; font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
 .cases .case .second-libelle { font-size: var(--fs-sm); color: var(--muted); }
+.cases .case .ratio-fb { font-size: var(--fs-sm); color: var(--muted); border-top: 1px dotted var(--rule); padding-top: 2px; margin-top: 2px; }
 /* Bulle de détail au survol : chiffres exacts, même lecture que les bulles des graphiques. */
 .cases .case { position: relative; }
 .bulle-case { position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none; display: grid; gap: 2px; min-width: 240px; padding: 6px 10px; border-radius: 0; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); font-size: var(--fs-xs); color: var(--ink); opacity: 0; visibility: hidden; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), opacity 150ms ease, visibility 0s linear 150ms; }
@@ -1252,6 +1253,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .resume-excel .cases .case .second-libelle { grid-row: 2; grid-column: 1 / -1; padding-right: 5.5em; }
   /* Ligne secondaire en petit : le libellé d'évolution reste entier à côté de sa valeur */
   .resume-excel .cases .case :is(.second-libelle, .variation, .second, .note) { font-size: var(--fs-xs); }
+  .resume-excel .cases .case .ratio-fb { grid-row: 3; grid-column: 1 / -1; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* Tenue à l'écran (>= 1100 px), reprise de Suivi de formation : la taille racine suit la fenêtre
