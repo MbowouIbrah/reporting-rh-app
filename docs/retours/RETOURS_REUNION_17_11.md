@@ -15,7 +15,7 @@ Notes recopiées et numérotées. Analyse et choix : `docs/etude-retours-reunion
 
 ## Résumé
 - [x] R8 Renommer le Résumé en « Budget réalisé ». (L1)
-- [ ] R9 Front office / back office sur le CA, la marge, la masse salariale et les KPI par type de contrat. (L4)
+- [x] R9 Front office / back office sur le CA, la marge, la masse salariale et les KPI par type de contrat. (L4)
 
 ## Graphiques
 - Aucun retour.

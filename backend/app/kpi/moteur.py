@@ -350,14 +350,24 @@ def _front_back(pd: PeriodeData | None) -> dict | None:
     if pd is None:
         return None
 
-    def compte(mot: str) -> int:
-        return len({L.salarie_id for L in pd.lignes if mot in (L.activite or "").lower()})
+    def compte(mot: str, contrat: str | None = None) -> int:
+        return len({L.salarie_id for L in pd.lignes if _est(L, mot)
+                    and (contrat is None or L.contrat == contrat)})
 
     total = len({L.salarie_id for L in pd.lignes})
     front, back = compte("front"), compte("back")
     part = (lambda x: Decimal(x) / total) if total else (lambda x: None)
+    # R9 (réunion du 17/11) : la même répartition pour chaque nature de contrat.
+    par_contrat = {c: {"front": compte("front", c), "back": compte("back", c)}
+                   for c in sorted({L.contrat for L in pd.lignes if L.contrat})}
     return {"front": front, "back": back, "total": total,
-            "front_pct": part(front), "back_pct": part(back)}
+            "front_pct": part(front), "back_pct": part(back), "par_contrat": par_contrat}
+
+
+def _est(L: Ligne, mot: str) -> bool:
+    """Ligne en front (mot « front ») ou en back office (« back ») ; sans activité : ni l'un ni
+    l'autre."""
+    return mot in (L.activite or "").lower()
 
 
 def _agreger_contrats(pds: list[PeriodeData] | None, axe: str) -> dict | None:
@@ -925,6 +935,15 @@ def annuel(
     def cumul_rub(nom: str) -> Decimal | None:
         return sum((n[m].rubrique(nom) for m in ok), ZERO) if nb else None
 
+    # R9 (réunion du 17/11) : masse salariale cumulée en front et en back office ; CA et marge par
+    # employé front office = cumul / effectif moyen front office des mois de paie (C2).
+    def ms_fb(mot: str) -> Decimal:
+        return sum((n[m].total(L) for m in ok for L in n[m].lignes if _est(L, mot)), ZERO)
+
+    ms_front, ms_back = (ms_fb("front"), ms_fb("back")) if nb else (None, None)
+    eff_front = (Decimal(sum(len({L.salarie_id for L in n[m].lignes if _est(L, "front")})
+                             for m in ok)) / nb) if nb else None
+
     return {
         **blocs,
         "serie_n": serie(n, objectifs_n),
@@ -969,6 +988,11 @@ def annuel(
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
         "front_back": _front_back(fin),
+        "ms_front_back": {"front": ms_front, "back": ms_back, "front_pct": ratio(ms_front, c),
+                          "back_pct": ratio(ms_back, c)} if nb else None,
+        "effectif_moyen_front": eff_front,
+        "ca_par_front": ratio(ca_ytd, eff_front),
+        "marge_par_front": ratio(marge_ytd, eff_front),
         "effectif_fin_contrat": {ct: avec_part(eff_fin(lambda L, ct=ct: L.contrat == ct),
                                                eff_fin_total) for ct in refs.contrats},
         # Part des MAD dans l'effectif : moyennes sur les mois de paie saisis (QUESTIONS_CLIENT C1)

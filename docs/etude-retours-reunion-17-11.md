@@ -91,6 +91,11 @@ Menu, titre de page, onglet du navigateur, export PDF et aide : « Budget réali
 ### R9 Front / back office dans Budget réalisé
 Le calcul serveur existant (`_front_back`, par activité de la ligne) est étendu à la masse salariale, au CA, à la marge et à l'effectif par type de contrat. Une ligne sans activité n'entre dans aucune des deux parts (règle actuelle). Variantes : barre bicolore sous la valeur (A) ou deux chiffres « FO / BO » sous la valeur (B).
 
+**Retenu (réponse du 17/11 : « comme l'effectif, en troisième ligne »)** : même modèle que la carte Effectif global.
+- Masse salariale : 3e ligne « Front office x % · Back office y % », montants au survol.
+- CA et marge : un CA ne se répartit pas par personne ; la 3e ligne donne le montant par employé front office (réponse client C2 : cumul des mois saisis / effectif moyen FO des mois de paie). Visible seulement avec le droit « marge ».
+- Effectif par contrat : au survol de l'Effectif global, chaque contrat porte « · FO x · BO y ».
+
 ### R10 à R13 Répartition des charges
 - **Une page** « Répartition des charges » remplace Mensuel et Annuel ; la période de la barre de filtres décide du mois, du cumul ou de l'année. `/mensuel` et `/annuel` redirigent vers la nouvelle page avec la bonne période.
 - **Niveau 1** : une rangée de cartes, une par type de charge (Salaires, Primes, Avantages et frais, Charges sociales… = familles actuelles), avec montant, comparaison, écart et écart %. Plus la carte « Total ».

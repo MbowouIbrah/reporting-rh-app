@@ -10,7 +10,11 @@ export interface Budget {
 }
 
 /** Effectif de fin en front office et en back office, et leurs parts de l'effectif total. */
-export interface FrontBack { front: number; back: number; total: number; front_pct: Val; back_pct: Val }
+export interface FrontBack {
+  front: number; back: number; total: number; front_pct: Val; back_pct: Val
+  /** R9 : répartition de chaque nature de contrat. */
+  par_contrat?: Record<string, { front: number; back: number }>
+}
 
 export interface Cell {
   m1: Val
@@ -266,6 +270,12 @@ export interface Annuel {
   ms_contrat: Record<string, Cell & { part: Val }>
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
+  /** R9 : masse salariale cumulée en front et en back office, et leurs parts. */
+  ms_front_back?: { front: Val; back: Val; front_pct: Val; back_pct: Val } | null
+  effectif_moyen_front?: Val
+  /** R9 (C2) : CA et marge par employé front office ; absents sans le droit « marge ». */
+  ca_par_front?: Val
+  marge_par_front?: Val
   a_type_charge: Mensuel['a_type_charge']
   lignes_ca_marge?: Mensuel['lignes_ca_marge']
   frais_mission?: Mensuel['frais_mission']

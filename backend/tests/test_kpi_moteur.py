@@ -456,6 +456,25 @@ def test_front_back_office_mensuel_et_annuel():
     assert annuel({}, {}, 2, REFS, Params())["front_back"] is None
 
 
+def test_front_back_office_masse_ca_marge_et_contrats():
+    """R9 (réunion du 17/11) : front / back office sur la masse salariale (cumul), le CA et la marge
+    par employé front office (C2 : effectif moyen front office) et l'effectif par contrat."""
+    n = {1: pd(L(1, Brut_Réel=600), L(2, act="Back Office", ctr="CDD", Brut_Réel=400),
+               ca=1000, marge=300),
+         2: pd(L(1, Brut_Réel=600), L(3, Brut_Réel=200),
+               L(2, act="Back Office", ctr="CDD", Brut_Réel=400), ca=2000, marge=600)}
+    r = annuel(n, {}, 2, REFS, Params())
+    ms = r["ms_front_back"]
+    assert (ms["front"], ms["back"]) == (1400, 800)
+    assert ms["front_pct"] == D(1400) / D(2200) and ms["back_pct"] == D(800) / D(2200)
+    assert r["effectif_moyen_front"] == D("1.5")
+    assert r["ca_par_front"] == 2000 and r["marge_par_front"] == 600
+    pc = r["front_back"]["par_contrat"]
+    assert pc["CDI"] == {"front": 2, "back": 0} and pc["CDD"] == {"front": 0, "back": 1}
+    vide = annuel({}, {}, 2, REFS, Params())
+    assert vide["ms_front_back"] is None and vide["ca_par_front"] is None
+
+
 def test_parts_d_effectif_par_service_et_par_site():
     """Retours N2 (4, 6) : % de chaque activité dans son service / site, % du service / site
     dans l'effectif global ; les sites sont ventilés par activité comme les services."""
