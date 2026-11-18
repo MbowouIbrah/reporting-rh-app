@@ -4,17 +4,15 @@ import type { Annuel as AnnuelData } from '../api/types'
 import { Activite, AnalyseEffectifs, Contrats, RapportSquelette, ServicesActivites, Sites, TypesCharge, TypesExclus } from '../components/BlocsRapport'
 import SnapSections from '../components/SnapSections'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
-import { libelleExercice } from '../lib/exercice'
 import { TitreRapport } from '../components/ExportPdf'
 
 function Contenu({ d, f }: { d: AnnuelData; f: FiltresPage }) {
-  const { annee, calendrier } = f
-  const lib = { prec: libelleComparaison(f, 'annee'), cour: libelleExercice(annee, calendrier) }
+  const lib = { prec: libelleComparaison(f, 'annee'), cour: libelleCourant(f) }
   return (
     <>
       <SnapSections
@@ -77,12 +75,12 @@ export default function Annuel() {
     <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier && gab ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="REPORTING ANNUEL" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} derniere={f.periode?.derniere} onChange={f.set} />
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {premier && !gab && f.filtres && (
         <RapportSquelette
-          lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: libelleExercice(f.filtres.annee, f.filtres.calendrier) }}
+          lib={{ prec: libelleComparaison(f.filtres, 'annee'), cour: libelleCourant(f.filtres) }}
         />
       )}
       {q.error && !premier && <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />}

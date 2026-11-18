@@ -144,14 +144,20 @@ def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
 
 
 def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None,
-           calendrier: str = "civil") -> bytes:
-    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul."""
+           calendrier: str = "civil", debut: int | None = None, cmp: str = "") -> bytes:
+    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul ; `debut` : vrai mois
+    de début (None : début de l'exercice) ; `cmp` : comparaison choisie (api/rapports.py)."""
     wb = Workbook()
     fiscal = calendrier == "fiscal"
-    debut = f"d'{MOIS[ex.DEBUT_FISCAL - 1]} {annee}" if fiscal else "de janvier"
     fin = ex.fin_cumul(annee, mois, calendrier)[0]
+    if debut is None:
+        de = f"d'{MOIS[ex.DEBUT_FISCAL - 1]} {annee}" if fiscal else "de janvier"
+        periode = f"Cumul {de} à {MOIS[mois - 1]} {fin}"
+    else:
+        an_debut = ex.fin_cumul(annee, debut, calendrier)[0]
+        periode = f"De {MOIS[debut - 1]} {an_debut} à {MOIS[mois - 1]} {fin}"
     lignes = [
-        ["Période", f"Cumul {debut} à {MOIS[mois - 1]} {fin}"],
+        ["Période", periode],
         ["Moyenne mensuelle", r["moyenne_mensuelle"]["m"]],
         ["Mois saisis", r["cumul_ytd"]["nb_mois"]],
     ]
@@ -162,5 +168,6 @@ def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None,
     def nom(a: int) -> str:
         return f"{a}-{(a + 1) % 100:02d}" if fiscal else str(a)
     _feuille(wb, "Synthèse", ["Indicateur", nom(annee)], lignes)
-    _blocs(wb, r, nom(ref), nom(annee))
+    prec = {"prec": "Période précédente", "aucune": "Sans comparaison"}.get(cmp, nom(ref))
+    _blocs(wb, r, prec, nom(annee))
     return _sortie(wb)

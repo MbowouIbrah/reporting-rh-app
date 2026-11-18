@@ -1,5 +1,6 @@
 from dataclasses import replace
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
@@ -173,6 +174,8 @@ def salaries(
 # R4 : un filtre peut porter plusieurs valeurs, séparées par « | » dans le même paramètre.
 MAX_MULTI = 4000
 TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
+# Comparaison du rapport annuel : vide = même période d'un autre exercice (ref_annee)
+Comparaison = Literal["", "prec", "aucune"]
 
 
 def _liste(v: str | None) -> frozenset[str] | None:
@@ -284,9 +287,11 @@ def mensuel_export(
 
 def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
             matricule=None, activite=None, type_contrat=None,
-            calendrier: Calendrier = "civil", departement=None) -> dict:
+            calendrier: Calendrier = "civil", departement=None, debut=None, cmp="") -> dict:
     """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
-    l'exercice). Le moteur reçoit des rangs 1 à 12 (kpi/exercice.py)."""
+    l'exercice) ; `debut` : vrai mois de début (None : début de l'exercice). `cmp` : vide = même
+    période de `ref_annee`, `prec` = les mêmes nombre de mois juste avant, `aucune`. Le moteur
+    reçoit des rangs 1 à 12 (kpi/exercice.py)."""
     authorize(p, "report:read")
     service, site, type_site, poste, activite, type_contrat, departement = map(
         _liste, (service, site, type_site, poste, activite, type_contrat, departement))
@@ -294,16 +299,22 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
             "activite": activite, "type_contrat": type_contrat}
 
-    def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
+    def pds(mois_reels) -> dict[int, moteur.PeriodeData]:
         out = {}
-        for r, (y, m) in enumerate(ex.mois_exercice(a, calendrier), 1):
+        for r, (y, m) in mois_reels:
             pd = ch.filtrer(ch.charger_periode(db, scope, y, m), service, site, **crit)
             if pd is not None:
                 out[r] = pd
         return out
 
+    def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
+        return pds(enumerate(ex.mois_exercice(a, calendrier), 1))
+
     reels = ex.mois_exercice(annee, calendrier)
     fin = 12 if mois is None else ex.rang(mois, calendrier)
+    d = 1 if debut is None else ex.rang(debut, calendrier)
+    if d > fin:
+        raise HTTPException(422, "Le début de la période est après sa fin")
     ref = ref_annee or annee - 1
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
@@ -314,7 +325,16 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     params_mois = {r: _params(db, crit, *reels[r - 1]) for r in n}
     params_fin = params_mois.get(fin) or _params(db, crit, *reels[fin - 1])
     refs = ch.charger_refs(db, type_site, scope)
-    res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois)
+    comparaison = None
+    if cmp == "aucune":
+        comparaison = {}
+    elif cmp == "prec":
+        # les fin - d + 1 mois juste avant le début, rangés sur les mois de la période
+        y, m = reels[d - 1]
+        k = y * 12 + m - 1 - (fin - d + 1)
+        comparaison = pds((d + i, ((k + i) // 12, (k + i) % 12 + 1)) for i in range(fin - d + 1))
+    res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois, d,
+                        comparaison)
     return _sortie(p, ex.en_mois_reels(res, annee, ref, calendrier))
 
 
@@ -332,11 +352,13 @@ def annuel(
     type_contrat: str | None = Query(None, max_length=MAX_MULTI),
     departement: str | None = Query(None, max_length=MAX_MULTI),
     calendrier: Calendrier = "civil",
+    debut: int | None = Query(None, ge=1, le=12),
+    cmp: Comparaison = "",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite, type_contrat, calendrier, departement)
+                   activite, type_contrat, calendrier, departement, debut, cmp)
 
 
 @router.get("/annuel/export")
@@ -353,6 +375,8 @@ def annuel_export(
     type_contrat: str | None = Query(None, max_length=MAX_MULTI),
     departement: str | None = Query(None, max_length=MAX_MULTI),
     calendrier: Calendrier = "civil",
+    debut: int | None = Query(None, ge=1, le=12),
+    cmp: Comparaison = "",
     graphiques: bool = False,
     graphes: str | None = Query(None, max_length=400, pattern="^[a-z_,]*$"),
     p: Principal = Depends(current_principal),
@@ -361,14 +385,14 @@ def annuel_export(
     """Classeur du rapport annuel ; `graphiques` : graphes d'évolution en graphiques Excel
     (`graphes` : identifiants, séparés par des virgules, des graphes cochés ; absent = tous)."""
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                  activite, type_contrat, calendrier, departement)
+                  activite, type_contrat, calendrier, departement, debut, cmp)
     an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
     entite = "graphes_annuels" if graphiques else "rapport_annuel"
     audit.record(db, p.user_id, "export", entite, f"{an_fin}-{mois_fin:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
                   "type_contrat": type_contrat, "calendrier": calendrier,
-                  "departement": departement})
+                  "departement": departement, "debut": debut, "cmp": cmp})
     db.commit()
     suffixe = "-fiscal" if calendrier == "fiscal" else ""
     if graphiques:
@@ -379,7 +403,8 @@ def annuel_export(
         return _xlsx(graphes_xlsx.graphiques(res, nom(annee), nom(ref), ids),
                      f"graphes-{annee}{suffixe}.xlsx")
     # libellé du cumul : dernier mois réellement cumulé, comme à l'écran
-    return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier),
+    return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier,
+                            debut, cmp),
                  f"reporting-annuel-{annee}{suffixe}.xlsx")
 
 

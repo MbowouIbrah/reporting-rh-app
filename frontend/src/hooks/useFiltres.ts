@@ -7,6 +7,7 @@ import { type FiltresPage, getFiltres, getPeriodes } from '../api/rapports'
 import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { type Calendrier, DEBUT_FISCAL, exerciceDe } from '../lib/exercice'
+import { bornes, lireCmp, lireVue, moisDeRang, rang } from '../lib/periode'
 import {
   abonnerPartage,
   CLES_PARTAGEES,
@@ -27,6 +28,9 @@ export function avecCascade(patch: Patch, actuel: Partage): Patch {
   // La comparaison annuelle est une année civile ou un exercice, selon le calendrier.
   if ((change('annee') || change('calendrier') || change('exercice')) && !('cmp_annee' in p)) p.cmp_annee = undefined
   if ((change('annee') || change('mois')) && !('cmp_periode' in p)) p.cmp_periode = undefined
+  // Mois choisis dans le menu Période : propres à un exercice.
+  for (const k of ['fin', 'debut'] as const)
+    if ((change('annee') || change('calendrier') || change('exercice')) && !(k in p)) p[k] = undefined
   return p
 }
 
@@ -165,7 +169,20 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     retry: queryRetry,
   })
 
+  // Pages annuelles (R6) : bornes du raccourci choisi dans le menu Période, en rangs de l'exercice.
+  const vue = lireVue(p.vue)
+  const cmp = lireCmp(p.cmp)
+  const rangDe = (v: string | undefined) => {
+    const m = Number(v)
+    return Number.isInteger(m) && m >= 1 && m <= 12 ? rang(m, calendrier) : undefined
+  }
+  const rangDerniere = rang(moisDefaut, calendrier)
+  const periode = comparaison === 'annee'
+    ? { vue, cmp, derniere: rangDerniere, bornes: bornes(vue, rangDerniere, rangDe(p.fin), rangDe(p.debut)) }
+    : null
+
   const ref = (() => {
+    if (comparaison === 'annee' && cmp) return {}
     if (comparaison === 'annee' && p.cmp_annee) return { ref_annee: Number(p.cmp_annee) }
     const m = comparaison === 'periode' ? /^(\d{4})-(\d{1,2})$/.exec(p.cmp_periode ?? '') : null
     return m ? { ref_annee: Number(m[1]), ref_mois: Number(m[2]) } : {}
@@ -187,7 +204,12 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
 
   const filtres: FiltresPage | null = annee === undefined ? null : {
     annee,
-    mois,
+    mois: periode ? moisDeRang(periode.bornes.fin, calendrier) : mois,
+    ...(periode && {
+      debut: periode.bornes.debut > 1 ? moisDeRang(periode.bornes.debut, calendrier) : undefined,
+      cmp: periode.cmp || undefined,
+      vue: periode.vue,
+    }),
     departement: choix.departement,
     service: choix.service,
     site: choix.site,
@@ -216,6 +238,8 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     partage: p,
     periodes: periodes.data ?? [],
     calendrier,
+    /** Pages annuelles : raccourci, comparaison et bornes (rangs) de la période affichée. */
+    periode,
     annees: [...new Set(periodes.data?.map((x) => exerciceDe(x.annee, x.mois, calendrier)))],
     // Filtre « Département » proposé seulement quand le périmètre en couvre plusieurs.
     departements: (options.data?.departements?.length ?? 0) > 1

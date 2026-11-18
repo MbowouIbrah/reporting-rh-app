@@ -806,11 +806,18 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 def annuel(
     n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
     budgets: dict[int, Budgets] | None = None, params_mois: dict[int, Params] | None = None,
+    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None,
 ) -> dict:
-    """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul. `budgets` et
+    """n, n1 : mois -> données de l'année N et N-1. Cumul des mois `debut` à `mois`. `budgets` et
     `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
-    défaut)."""
-    refs = _contrats_vus(refs, *n.values(), *n1.values())
+    défaut). `comparaison` : données comparées au cumul, rangées sur les mois de N (période
+    précédente ; vide : aucune comparaison) ; absent : les mêmes mois de N-1. Les séries mensuelles
+    restent les deux années entières."""
+    refs = _contrats_vus(refs, *n.values(), *n1.values(), *(comparaison or {}).values())
+    n_tout, n1_tout = n, n1
+    n = {m: pd for m, pd in n_tout.items() if m >= debut}
+    n1 = comparaison if comparaison is not None else {
+        m: pd for m, pd in n1_tout.items() if m >= debut}
 
     def par_contrat(pd: PeriodeData) -> dict[str, int]:
         return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
@@ -872,9 +879,9 @@ def annuel(
     ok1 = avec_donnees(n1, mois)
     s_n = ms_service(n, ok)
     s_n1 = ms_service(n1, ok1)
-    complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
+    complet1 = sum((n1_tout[m].ms for m in avec_donnees(n1_tout)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
-    objectifs_n = {m: _objectifs(n.get(m), (budgets or {}).get(m, Budgets()),
+    objectifs_n = {m: _objectifs(n_tout.get(m), (budgets or {}).get(m, Budgets()),
                                  (params_mois or {}).get(m, params)) for m in range(1, 13)}
 
     manque: set[str] = set()
@@ -946,8 +953,8 @@ def annuel(
 
     return {
         **blocs,
-        "serie_n": serie(n, objectifs_n),
-        "serie_n1": serie(n1),
+        "serie_n": serie(n_tout, objectifs_n),
+        "serie_n1": serie(n1_tout),
         "cumul_ytd": {**cell(c if nb else None, c1 if nb1 else None), "nb_mois": nb,
                       "nb_mois_n1": nb1},
         "moyenne_mensuelle": cell(moy, moy1),
@@ -1005,7 +1012,7 @@ def annuel(
         "ms_contrat": {ct: avec_part(cell(ms_contrat(n, ok, ct), ms_contrat(n1, ok1, ct)),
                                      ms_total) for ct in refs.contrats},
         "ca_par_effectif": cell(ratio(ca_ytd, eff["m"]), ratio(ca1, eff["m1"])),
-        "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
+        "cumul_annee_n1": complet1 if avec_donnees(n1_tout) else None,
         "par_service": [
             {"service": s, **cell(s_n.get(s, ZERO) if nb else None,
                                   s_n1.get(s, ZERO) if nb1 else None),

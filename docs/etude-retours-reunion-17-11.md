@@ -65,6 +65,13 @@ Options :
 - Serveur : chaque dimension accepte une liste de valeurs ; filtre de périmètre toujours appliqué dans la couche dépôt (inchangé).
 - Variantes en maquette : barre en ligne (A) ou panneau de filtres repliable (B).
 - Réalisé (R4, composant `MultiChoix`) : les valeurs voyagent jointes par « | » dans le même paramètre (lien et partage entre pages inchangés) ; le serveur les découpe une seule fois à l'entrée. Comportement à la manière d'Excel : toutes les cases cochées par défaut (= tous), une ligne « Tout sélectionner » en tête de liste, case à gauche comme une valeur, texte qui devient « Tout désélectionner » quand tout est coché, case à moitié cochée si une partie seulement l'est (agit sur les seules valeurs affichées quand on recherche), compteur « n sur N » ; fermer le panneau sans aucune case cochée remet le filtre à tous. Un nouveau choix réduit une sélection multiple aux seules valeurs encore possibles.
+- Réalisé (R6, variante A) sur les pages annuelles (Budget réalisé, Graphes, Annuel) ; Mensuel garde son filtre jusqu'à son remplacement (L5).
+  - Existant : le serveur ne savait faire qu'un cumul « début d'exercice → mois choisi », comparé à la même fenêtre d'un autre exercice.
+  - **Période** : menu à raccourcis. Mois (un mois), Trimestre (3 mois du trimestre de l'exercice), Cumul de l'exercice (défaut : début → dernier mois saisi, comportement d'avant), Année (exercice entier), De… à… (deux mois du même exercice). Une période reste dans un exercice : le moteur travaille sur les rangs 1 à 12, et une plage à cheval doublerait les séries mensuelles.
+  - **Exercice civil / fiscal** : réglage dans le menu Période, plus un filtre à part.
+  - **Comparer à** : Même période N-1 (défaut), Même période d'un autre exercice, Période précédente (les mêmes nombre de mois juste avant le début, quitte à changer d'exercice), Aucune comparaison. « Objectif » n'est pas repris : les objectifs ont déjà leur colonne (Budget réalisé) et leurs courbes (Graphes) ; un choix de plus qui ne change rien prêterait à confusion.
+  - Serveur : `/annuel` et son export prennent `debut` (vrai mois, défaut : début d'exercice) et `cmp` (`prec`, `aucune`, vide = même période de `ref_annee`). Le moteur cumule les rangs `debut` à `mois` ; les séries mensuelles (graphes) restent les deux exercices entiers.
+  - Lien partagé : clés `vue`, `debut`, `fin`, `cmp` ; anciens liens (année, mois, cmp_annee) toujours valides.
 
 ### R5 Sites
 Référentiels : la liste des sites est rangée en trois groupes (Sites principaux, Agences, Sites déportés), chacun avec son nombre ; l'ajout demande le type. Rapports : le filtre « Type de site » existe déjà.

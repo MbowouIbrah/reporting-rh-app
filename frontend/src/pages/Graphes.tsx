@@ -7,7 +7,7 @@ import { exporterGraphes, getAnnuel } from '../api/rapports'
 import { Bouton } from '../components/Kit'
 import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
 import { useMontageDiffere } from '../hooks/useMontageDiffere'
 import { useFiltres } from '../hooks/useFiltres'
@@ -250,7 +250,7 @@ export default function Graphes() {
     )
   }
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
-  const avecN1 = !!n1?.some((m) => m.remuneration != null)
+  const avecN1 = f.filtres?.cmp !== 'aucune' && !!n1?.some((m) => m.remuneration != null)
   const aVentes = !!serie?.some((m) => m.ventes != null)
   const aClients = !!serie?.some((m) => m.clients != null)
   const aOr = !!serie?.some((m) => m.orProd != null)
@@ -261,7 +261,7 @@ export default function Graphes() {
   const aObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => !!serie?.some((m) => m[k] != null)
   const lectObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => (aObj(k) ? ' ; en pointillés rouges, l’objectif' : '')
   const serieN = annee === undefined ? '' : libelleExercice(annee, f.filtres?.calendrier)
-  const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
+  const serieN1 = f.filtres ? libelleExercice(f.filtres.ref_annee ?? f.filtres.annee - 1, f.filtres.calendrier) : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
   // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
@@ -424,7 +424,7 @@ export default function Graphes() {
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" onGraphiques={rapport ? undefined : () => { setCoches([]); setExportEtat('') }} />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} derniere={f.periode?.derniere} onChange={f.set} />
       )}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}

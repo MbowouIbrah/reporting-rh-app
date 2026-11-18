@@ -6,13 +6,14 @@ import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode, { bornesDe, libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
-import { libelleExercice, ordreMois, type Calendrier } from '../lib/exercice'
+import { ordreMois, type Calendrier } from '../lib/exercice'
+import { periodePrecedente } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -104,6 +105,8 @@ export default function Resume() {
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
     calendrier: f.filtres.calendrier,
+    debut: f.filtres.debut,
+    cmp: f.filtres.cmp,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
   const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat))
@@ -116,7 +119,7 @@ export default function Resume() {
   const [premier, relais] = useAttente(ann.isLoading)
   const [maj, relaisMaj] = useAttente(ann.isPlaceholderData)
   const gab = useGabarit('annuel', ann.data, !ann.isPlaceholderData)
-  const an = f.filtres ? libelleExercice(f.filtres.annee, f.filtres.calendrier) : ''
+  const an = f.filtres ? libelleCourant(f.filtres) : ''
   const n1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const erreur = premier ? null : ann.error
   const peutCa = usePeut('marge:read')
@@ -147,7 +150,10 @@ export default function Resume() {
   const ecart = f.filtres ? f.filtres.annee - (f.filtres.ref_annee ?? f.filtres.annee - 1) : 1
   const moisFin = finN && a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
   const finAn = finN ? `${finN}` : an
-  const finN1 = finN ? `${finN - ecart}` : n1
+  // Fin de la période comparée : même mois de l'exercice comparé, ou fin de la période précédente.
+  const prec = f.filtres?.cmp === 'prec' ? periodePrecedente(f.filtres.annee, bornesDe(f.filtres), f.filtres.calendrier ?? 'civil').fin : null
+  const finCmp = f.filtres?.cmp === 'aucune' ? n1 : prec ? `${MOIS_COURTS[prec.mois - 1]} ${prec.annee}` : finN ? `${moisFin} ${finN - ecart}` : n1
+  const parRapport = (x: string) => (f.filtres?.cmp === 'aucune' ? n1 : `Évolution par rapport à ${x}`)
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -158,7 +164,7 @@ export default function Resume() {
       <BulleCases>
       <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} derniere={f.periode?.derniere} onChange={f.set} />
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
@@ -169,18 +175,18 @@ export default function Resume() {
           <div className="cases">
             {sansCa && indispo('Chiffre d’affaires')}
             {aCa && !sansCa && (
-              <Case titre="Chiffre d’affaires" partiel={a.lignes_ca_marge?.ca.partiel} valeur={compact(a.ca_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={[...comparaison(a.ca_cumul, an, n1), ...parFront('CA', a.ca_par_front)]}>
+              <Case titre="Chiffre d’affaires" partiel={a.lignes_ca_marge?.ca.partiel} valeur={compact(a.ca_ytd)} libelle2={parRapport(n1)} detail={[...comparaison(a.ca_cumul, an, n1), ...parFront('CA', a.ca_par_front)]}>
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
                 {ligneFront(a.ca_par_front)}
               </Case>
             )}
-            <Case titre="Commissions" valeur={compact(a.commissions_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.commissions_cumul, an, n1)}>
+            <Case titre="Commissions" valeur={compact(a.commissions_ytd)} libelle2={parRapport(n1)} detail={comparaison(a.commissions_cumul, an, n1)}>
               <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
             <Case
               titre="Masse salariale"
               valeur={compact(a.cumul_ytd.m)}
-              libelle2={`Évolution par rapport à ${n1}`}
+              libelle2={parRapport(n1)}
               detail={[
                 ...parContrat(a.ms_contrat, exact),
                 ...(msFb ? [
@@ -199,10 +205,10 @@ export default function Resume() {
                 ['Effectif moyen total', dec(a.effectif_moyen.m)],
                 [`Part des MAD ${n1}`, taux(a.part_mad.m1)],
                 [`MAD globaux ${moisFin} ${finAn}`, dec(a.mad_fin.m)],
-                [`MAD globaux ${moisFin} ${finN1}`, dec(a.mad_fin.m1)],
+                [`MAD globaux ${finCmp}`, dec(a.mad_fin.m1)],
                 ['MAD sites déportés', dec(a.mad_deportes_fin.m)],
                 ['Part des MAD globaux', taux(a.mad_deportes_fin.part)],
-                [`MAD sites déportés ${moisFin} ${finN1}`, dec(a.mad_deportes_fin.m1)],
+                [`MAD sites déportés ${finCmp}`, dec(a.mad_deportes_fin.m1)],
               ]}
             >
               <span className="second">
@@ -229,11 +235,11 @@ export default function Resume() {
                 {ligneFront(a.marge_par_front)}
               </Case>
             )}
-            <Case titre="Primes de productivité" valeur={compact(a.primes_ytd)} libelle2={`Évolution par rapport à ${n1}`} detail={comparaison(a.primes_cumul, an, n1)}>
+            <Case titre="Primes de productivité" valeur={compact(a.primes_ytd)} libelle2={parRapport(n1)} detail={comparaison(a.primes_cumul, an, n1)}>
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
-              libelle2={`Évolution par rapport à ${moisFin} ${finN1}`}
+              libelle2={parRapport(finCmp)}
               detail={[
                 // R9 : chaque contrat avec sa répartition front / back office.
                 ...parContrat(a.effectif_fin_contrat, dec).map(([c, v]): [string, string] => {
@@ -252,7 +258,7 @@ export default function Resume() {
             </Case>
             {sansCaEff && indispo('CA par salarié')}
             {aCa && !sansCaEff && (
-              <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={`Évolution par rapport à ${n1}`}
+              <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={parRapport(n1)}
                 detail={[
                   ...comparaison(a.ca_par_effectif, an, n1),
                   ['CA cumulé', exact(a.ca_ytd)],

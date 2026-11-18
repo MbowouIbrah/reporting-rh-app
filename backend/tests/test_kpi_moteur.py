@@ -176,6 +176,23 @@ def test_annuel_cumul_moyenne_nb_mois_et_marge_ytd():
     assert r2["cumul_ytd"]["m"] == 300 and r2["marge_ytd"] == 200 and r2["nb_mois_ca"] == 1
 
 
+def test_annuel_periode_debut_fin_et_comparaison():
+    # R6 : cumul des mois 3 à 4 ; séries entières ; comparaison libre (période précédente, aucune)
+    n = {1: pd(L(1, Brut_Réel=100)), 3: pd(L(1, Brut_Réel=200), ca=10), 4: pd(L(2, Brut_Réel=300))}
+    n1 = {3: pd(L(1, Brut_Réel=20)), 4: pd(L(1, Brut_Réel=30))}
+    r = annuel(n, n1, 4, REFS, Params(), debut=3)
+    assert r["cumul_ytd"]["m"] == 500 and r["cumul_ytd"]["nb_mois"] == 2
+    assert r["cumul_ytd"]["m1"] == 50 and r["ca_ytd"] == 10
+    assert r["serie_n"][0]["ms"] == 100 and r["cumul_annee_n1"] == 50
+    assert r["effectif_moyen"]["m"] == 1 and r["mois_fin"] == 4
+    prec = {3: pd(L(1, Brut_Réel=7)), 4: pd(L(1, Brut_Réel=8), ca=4)}
+    r = annuel(n, n1, 4, REFS, Params(), debut=3, comparaison=prec)
+    assert r["cumul_ytd"]["m1"] == 15 and r["lignes_ca_marge"]["ca"]["m1"] == 4
+    assert r["serie_n1"][2]["ms"] == 20  # la série reste N-1
+    r = annuel(n, n1, 4, REFS, Params(), debut=3, comparaison={})
+    assert r["cumul_ytd"]["m1"] is None and r["effectif_fin"]["m1"] is None
+
+
 def test_annuel_blocs_coherents_avec_le_cumul():
     n = {1: pd(L(1, Brut_Réel=100), L(2, Brut_Réel=40, site="Yaoundé", ctr="CDD", Absences_nb=3)),
          2: pd(L(1, Brut_Réel=200), L(3, Brut_Réel=60, service="Commerce VN"))}

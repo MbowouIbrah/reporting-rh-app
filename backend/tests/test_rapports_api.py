@@ -154,6 +154,21 @@ def test_annuel_global(charge):
     assert r["cumul_ytd"]["m1"] is None
 
 
+def test_annuel_periode_et_comparaison(charge):
+    # R6 : février seul, comparé à janvier (période précédente) ou à rien
+    jan = D(get(charge, "annuel", annee=2026, mois=1).json()["cumul_ytd"]["m"])
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2).json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") - jan and r["cumul_ytd"]["nb_mois"] == 1
+    assert len(r["serie_n"]) == 12 and r["serie_n"][0]["ms"] is not None
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2, cmp="prec").json()
+    assert D(r["cumul_ytd"]["m1"]) == jan and r["cumul_ytd"]["nb_mois_n1"] == 1
+    r = get(charge, "annuel", annee=2026, mois=2, cmp="aucune").json()
+    assert r["cumul_ytd"]["m1"] is None
+    assert get(charge, "annuel", annee=2026, debut=3, mois=2).status_code == 422
+    assert get(charge, "annuel", annee=2026, mois=2, cmp="objectif").status_code == 422
+    assert get(charge, "annuel/export", annee=2026, debut=2, mois=2, cmp="prec").status_code == 200
+
+
 def test_individuel_nominatif_et_journal(charge, make_client, db):
     assert get(make_client(EQUIP), "individuel", annee=2026, matricule="E1").status_code == 403
     assert get(make_client(VN), "individuel", annee=2026, matricule="E2").status_code == 403
