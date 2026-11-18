@@ -1104,32 +1104,18 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 /* Parcours de saisie */
 .saisie-etapes li.active .saisie-etape-num { background: var(--red); border-color: var(--red); }
 
-/* Connexion (reprise de cfaoacademy) : photo sombre, formes animées, barre du haut, carte en verre */
+/* Connexion : aplat navy à motif discret (R1), barre du haut, carte en verre */
 /* Tient dans la hauteur de l'écran : les espacements verticaux suivent la hauteur (dvh) */
 .login-page { position: relative; isolation: isolate; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
-.login-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.login-bg-photo { position: absolute; inset: 0; background-size: cover; background-position: center 22%; }
-.login-bg-vignette { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14, 17, 38, 0.28), rgba(14, 17, 38, 0.42)), radial-gradient(ellipse at 50% 40%, rgba(14, 17, 38, 0.08) 0%, rgba(14, 17, 38, 0.55) 100%); }
-.login-particles { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; }
-.login-particle { position: absolute; top: var(--p-top); left: var(--p-left); width: var(--p-size); height: var(--p-size); background: rgba(227, 0, 27, var(--p-opacity)); transform: rotate(45deg); }
-.login-particle--round { border-radius: 50%; }
+.login-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: var(--navy); }
+.login-bg-motif { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; }
+.login-motif-trait { stroke: #3d4470; stroke-width: 1; fill: none; }
+.login-motif-point { fill: #3d4470; }
+.login-motif-ligne { stroke: #2a3157; stroke-width: 2; fill: none; }
+.login-bg-bande { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--red); }
 @media (prefers-reduced-motion: no-preference) {
-  .login-particle { animation: login-particle-float var(--p-dur) ease-in-out var(--p-delay) infinite; }
-  .login-particle--round { animation-name: login-particle-float-round; }
   .login-card--glass { animation: login-card-in 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) 0.08s both; }
   .login-form-track { transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1); }
-}
-@keyframes login-particle-float {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(45deg); opacity: 1; }
-  25% { transform: translate3d(calc(var(--p-drift-x) * 0.6), calc(var(--p-drift-y) * -0.5), 0) rotate(calc(45deg + var(--p-spin))); opacity: 0.82; }
-  50% { transform: translate3d(var(--p-drift-x), calc(var(--p-drift-y) * -1), 0) rotate(calc(45deg - var(--p-spin))); opacity: 0.58; }
-  75% { transform: translate3d(calc(var(--p-drift-x) * -0.4), calc(var(--p-drift-y) * -0.45), 0) rotate(calc(45deg + var(--p-spin) * 0.5)); opacity: 0.78; }
-}
-@keyframes login-particle-float-round {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
-  25% { transform: translate3d(calc(var(--p-drift-x) * 0.6), calc(var(--p-drift-y) * -0.5), 0) scale(1.08); opacity: 0.85; }
-  50% { transform: translate3d(var(--p-drift-x), calc(var(--p-drift-y) * -1), 0) scale(0.92); opacity: 0.6; }
-  75% { transform: translate3d(calc(var(--p-drift-x) * -0.4), calc(var(--p-drift-y) * -0.45), 0) scale(1.04); opacity: 0.8; }
 }
 @keyframes login-card-in { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: none; } }
 
