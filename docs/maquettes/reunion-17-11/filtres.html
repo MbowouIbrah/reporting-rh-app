@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette filtres (R4, R6) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .resume-titre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
+  .resume-titre .chips-ligne { padding: 0; min-height: 0; }
+  .bloc-filtre { border-bottom: 1px solid var(--rule); }
+  .bloc-filtre > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); min-height: 44px; padding: 0 var(--sp-2); font-weight: var(--fw-bold); color: var(--navy); font-size: var(--fs-md); }
+  .bloc-filtre > summary::-webkit-details-marker { display: none; }
+  .bloc-filtre > summary:hover { background: var(--surface-hover); }
+  .bloc-filtre > summary .etat { font-weight: var(--fw-regular); color: var(--muted); font-size: var(--fs-sm); margin-left: auto; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bloc-filtre > summary::after { content: '▾'; color: var(--muted-2); font-size: 11px; }
+  .bloc-filtre[open] > summary::after { content: '▴'; color: var(--red); }
+  .bloc-filtre > .contenu { padding: var(--sp-1) var(--sp-2) var(--sp-3); }
+  #panneauB .dd-ligne { padding: 6px var(--sp-2); }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Filtres (R4, R6) · données fictives</span>
+  <span class="espace"></span>
+  <div class="onglets" role="tablist" aria-label="Variantes" style="margin:0">
+    <button class="onglet" role="tab" id="ongA" aria-selected="true" data-var="A">Variante A</button>
+    <button class="onglet" role="tab" id="ongB" aria-selected="false" data-var="B">Variante B</button>
+  </div>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante" id="bandeau-variante" aria-live="polite"></section>
+
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+    <nav aria-label="Rapports">
+      <a class="active" href="budget-realise.html">Budget réalisé</a>
+      <a href="#">Graphes</a>
+      <a href="charges.html">Répartition des charges</a>
+      <a href="#">Individuel</a>
+      <a href="sites-admin.html">Administration</a>
+    </nav>
+    <div class="user"><span>responsable.rh@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
+  </div></header>
+
+  <main class="page">
+    <!-- Variante A : barre en ligne -->
+    <section id="varA">
+      <div class="entete-page"><h2>Budget réalisé</h2><p class="muted">Exercice 2026 · comparaison en FCFA</p></div>
+      <div class="filtres" id="barreA">
+        <div class="champ"><span>Période</span>
+          <div class="dd" data-dd><button type="button" class="dd-btn" data-act="ouvrir" aria-haspopup="true"><span class="dd-val" data-resume="periode"></span></button>
+            <div class="dd-menu large" data-hote="periode" data-pref="A"></div></div></div>
+        <div class="champ"><span>Comparer à</span>
+          <div class="dd" data-dd><button type="button" class="dd-btn" data-act="ouvrir" aria-haspopup="true"><span class="dd-val" data-resume="comp"></span></button>
+            <div class="dd-menu" data-hote="comp" data-pref="A"></div></div></div>
+        <span class="separateur-v" aria-hidden="true"></span>
+        <div id="multisA" style="display:contents"></div>
+      </div>
+      <div class="chips-ligne">
+        <span class="micro">Choix actifs</span>
+        <span class="chips" data-chips></span>
+        <button type="button" class="bouton bouton-lien" data-act="reset">Réinitialiser</button>
+      </div>
+    </section>
+
+    <!-- Variante B : panneau de filtres -->
+    <section id="varB" hidden>
+      <div class="entete-page"><h2>Budget réalisé</h2><p class="muted">Exercice 2026 · comparaison en FCFA</p>
+        <button type="button" class="bouton bouton-secondaire" data-act="ouvrirPanneau" style="margin-left:auto" aria-controls="panneauB"><span data-compte>Filtres (3)</span></button>
+      </div>
+      <div class="resume-titre">
+        <div class="chips-ligne"><span class="chips" data-chips-b></span>
+          <button type="button" class="bouton bouton-lien" data-act="reset">Réinitialiser</button></div>
+      </div>
+    </section>
+
+    <p class="note-maq">Zone de contenu de la page (cases, tableaux) : elle se recalcule avec les choix ci-dessus. Les choix sont communs aux deux variantes : changer de variante garde la sélection.</p>
+  </main>
+</div>
+
+<div class="voile" id="voileB" data-act="fermerPanneau"></div>
+<aside class="tiroir" id="panneauB" role="dialog" aria-label="Panneau de filtres" aria-hidden="true" style="width:min(420px,96vw)">
+  <div class="tiroir-entete"><div><h3>Filtres</h3><p class="muted" style="font-size:var(--fs-sm);margin-top:4px">Les choix s'appliquent tout de suite</p></div>
+    <button type="button" class="bouton bouton-secondaire petit" data-act="fermerPanneau" aria-label="Fermer le panneau">Fermer ×</button></div>
+  <div class="tiroir-corps" id="corpsB" style="flex:1">
+    <details class="bloc-filtre" open><summary>Période <span class="etat" data-resume="periode"></span></summary><div class="contenu" data-hote="periode" data-pref="B"></div></details>
+    <details class="bloc-filtre"><summary>Comparer à <span class="etat" data-resume="comp"></span></summary><div class="contenu" data-hote="comp" data-pref="B"></div></details>
+    <div id="multisB"></div>
+  </div>
+  <div class="tiroir-pied"><button type="button" class="bouton bouton-lien" data-act="reset">Réinitialiser</button>
+    <button type="button" class="bouton bouton-primaire" data-act="fermerPanneau">Voir les résultats</button></div>
+</aside>
+
+<script>
+const VARIANTES = {
+  A: { nom: 'barre en ligne',
+       pour: 'Tout est visible et à un clic ; on voit d\'un coup d\'œil la période et la comparaison.',
+       contre: 'Prend de la place en haut de page et passe sur deux lignes avec cinq filtres de structure.' },
+  B: { nom: 'panneau de filtres',
+       pour: 'Page très dégagée ; autant de filtres qu\'on veut sans encombrer l\'écran ; le résumé en puces reste lisible.',
+       contre: 'Un clic de plus pour changer un filtre ; les réglages sont cachés tant que le panneau est fermé.' }
+};
+const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const COURT = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const MODES = [['mois','Mois'],['trimestre','Trimestre'],['cumul','Cumul de l\'exercice'],['annee','Année'],['plage','De… à…']];
+const COMP = ['Même période N-1','Période précédente','Objectif','Aucune comparaison'];
+const DIMS = {
+  site: { lib: 'Site', pl: 'sites', tous: 'Tous les sites', vals: ['Douala','Yaoundé','Kribi','Garoua','Limbé'] },
+  service: { lib: 'Service', pl: 'services', tous: 'Tous les services', vals: ['Commerce Pièces','SAV PL','SAV Engins','Sites Déportés','Pneumatique','Administration'] },
+  activite: { lib: 'Activité', pl: 'activités', tous: 'Toutes les activités', vals: ['Vente de véhicules','Pièces de rechange','Après-vente','Location','Support'] },
+  contrat: { lib: 'Type de contrat', pl: 'contrats', tous: 'Tous les types', vals: ['CDI','CDD','MAD','Stagiaire'] },
+  marque: { lib: 'Marque', pl: 'marques', tous: 'Toutes les marques', vals: ['HINO','JCB','KING LONG','LOVOL','Renault Trucks','Toyota Material Handling'] }
+};
+const defaut = () => ({ mode: 'mois', m: 9, a: 2026, dm: 6, da: 2026, comp: 0,
+  sel: { site: [], service: [], activite: [], contrat: [], marque: [] } });
+const etat = defaut();
+etat.sel.site = ['Douala','Kribi'];
+etat.sel.service = ['Commerce Pièces','SAV PL','SAV Engins'];
+etat.sel.marque = ['HINO'];
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* ---------- Construction des menus (une fois, pour chaque variante) ---------- */
+function htmlPeriode(p) {
+  const radios = MODES.map(([k, l]) => `<label class="dd-ligne"><input type="radio" name="mode-${p}" data-mode="${k}"> ${l}</label>`).join('');
+  const opMois = MOIS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  const opAn = [2024, 2025, 2026].map(a => `<option value="${a}">${a}</option>`).join('');
+  const sel = (c, o, lbl) => `<select data-champ="${c}" aria-label="${lbl}">${o}</select>`;
+  return `<div class="dd-titre">Raccourcis</div>${radios}<hr class="dd-sep">
+  <div class="periode-champs">
+    <div data-vis="mois trimestre cumul"><span class="lib">Mois</span>${sel('m', opMois, 'Mois')}${sel('a', opAn, 'Année')}</div>
+    <div data-vis="annee"><span class="lib">Année</span>${sel('a', opAn, 'Année')}</div>
+    <div data-vis="plage"><span class="lib">Du</span>${sel('dm', opMois, 'Mois de début')}${sel('da', opAn, 'Année de début')}</div>
+    <div data-vis="plage"><span class="lib">Au</span>${sel('m', opMois, 'Mois de fin')}${sel('a', opAn, 'Année de fin')}</div>
+  </div><p class="periode-note" data-note></p>`;
+}
+function htmlComp(p) {
+  return COMP.map((l, i) => `<label class="dd-ligne"><input type="radio" name="comp-${p}" data-comp="${i}"> ${l}${i === 0 ? ' <span class="muted">(par défaut)</span>' : ''}</label>`).join('');
+}
+function htmlMulti(dim) {
+  const d = DIMS[dim];
+  return `<div class="multi"><input type="search" placeholder="Rechercher un ${d.lib.toLowerCase()}…" data-recherche aria-label="Rechercher dans ${d.lib}">
+    <div class="multi-act"><span class="muted" style="font-size:var(--fs-xs)" data-compte-dim="${dim}"></span><span>
+    <button type="button" class="bouton bouton-lien" data-act="tout" data-dim="${dim}">Tout</button>
+    <button type="button" class="bouton bouton-lien" data-act="aucun" data-dim="${dim}">Aucun</button></span></div>
+    <div class="multi-liste">${d.vals.map(v => `<label class="dd-ligne"><input type="checkbox" data-dim="${dim}" value="${esc(v)}"> ${esc(v)}</label>`).join('')}</div></div>`;
+}
+function construire() {
+  $$('[data-hote="periode"]').forEach(h => h.innerHTML = htmlPeriode(h.dataset.pref));
+  $$('[data-hote="comp"]').forEach(h => h.innerHTML = htmlComp(h.dataset.pref));
+  const cles = Object.keys(DIMS);
+  $('#multisA').innerHTML = cles.map((k, i) => `<div class="champ"><span>${DIMS[k].lib}</span>
+    <div class="dd${i >= 3 ? ' droite' : ''}" data-dd><button type="button" class="dd-btn" data-act="ouvrir" aria-haspopup="true"><span class="dd-val" data-resume="${k}"></span></button>
+    <div class="dd-menu">${htmlMulti(k)}</div></div></div>`).join('');
+  $('#multisB').innerHTML = cles.map(k => `<details class="bloc-filtre"><summary>${DIMS[k].lib} <span class="etat" data-resume="${k}"></span></summary><div class="contenu">${htmlMulti(k)}</div></details>`).join('');
+}
+
+/* ---------- Résumés ---------- */
+function resumePeriode() {
+  const e = etat;
+  switch (e.mode) {
+    case 'mois': return `Mois · ${MOIS[e.m]} ${e.a}`;
+    case 'trimestre': return `Trimestre · T${Math.floor(e.m / 3) + 1} ${e.a}`;
+    case 'cumul': return `Cumul de l'exercice · janv. à ${COURT[e.m]} ${e.a}`;
+    case 'annee': return `Année · ${e.a}`;
+    default: return `De ${COURT[e.dm]} ${e.da} à ${COURT[e.m]} ${e.a}`;
+  }
+}
+function notePeriode() {
+  const e = etat;
+  if (e.mode === 'trimestre') { const t = Math.floor(e.m / 3); return `Trimestre ${t + 1} : de ${MOIS[t * 3]} à ${MOIS[t * 3 + 2]} ${e.a}`; }
+  if (e.mode === 'cumul') return `Du 1er janvier à fin ${MOIS[e.m]} ${e.a}`;
+  if (e.mode === 'annee') return `Du 1er janvier au 31 décembre ${e.a}`;
+  if (e.mode === 'plage') return (e.da * 12 + e.dm) > (e.a * 12 + e.m) ? 'Attention : la date de début est après la date de fin' : 'Toutes les périodes restent comparables';
+  return 'Un mois complet';
+}
+function resumeDim(k) {
+  const s = etat.sel[k], d = DIMS[k];
+  if (s.length === 0 || s.length === d.vals.length) return d.tous;
+  if (s.length <= 2) return s.join(', ');
+  return `${s.length} ${d.pl}`;
+}
+const nbActifs = () => Object.values(etat.sel).filter(s => s.length > 0).length;
+const estDefaut = () => JSON.stringify(etat) === JSON.stringify(Object.assign(defaut(), {}));
+
+/* ---------- Mise à jour de l'affichage ---------- */
+function sync() {
+  $$('[data-resume="periode"]').forEach(n => n.textContent = resumePeriode());
+  $$('[data-resume="comp"]').forEach(n => n.textContent = COMP[etat.comp]);
+  Object.keys(DIMS).forEach(k => $$(`[data-resume="${k}"]`).forEach(n => n.textContent = resumeDim(k)));
+  $$('input[data-mode]').forEach(i => i.checked = i.dataset.mode === etat.mode);
+  $$('input[data-comp]').forEach(i => i.checked = +i.dataset.comp === etat.comp);
+  $$('input[data-dim]').forEach(i => i.checked = etat.sel[i.dataset.dim].includes(i.value));
+  $$('select[data-champ]').forEach(s => s.value = etat[s.dataset.champ]);
+  $$('[data-vis]').forEach(n => n.style.display = n.dataset.vis.split(' ').includes(etat.mode) ? 'flex' : 'none');
+  $$('[data-note]').forEach(n => n.textContent = notePeriode());
+  Object.keys(DIMS).forEach(k => $$(`[data-compte-dim="${k}"]`).forEach(n => n.textContent = `${etat.sel[k].length} sur ${DIMS[k].vals.length} choisis`));
+  const puces = [];
+  Object.keys(DIMS).forEach(k => etat.sel[k].forEach(v => puces.push(
+    `<span class="puce"><span class="lib">${DIMS[k].lib} :</span> ${esc(v)}<button type="button" data-act="retirer" data-dim="${k}" data-val="${esc(v)}" aria-label="Retirer ${esc(v)}">×</button></span>`)));
+  if (etat.comp !== 0) puces.push(`<span class="puce"><span class="lib">Comparer à :</span> ${COMP[etat.comp]}<button type="button" data-act="retirerComp" aria-label="Revenir à la comparaison par défaut">×</button></span>`);
+  const aucune = '<span class="muted" style="font-size:var(--fs-sm)">Aucun filtre de structure : toutes les données du périmètre.</span>';
+  $('[data-chips]').innerHTML = puces.join('') || aucune;
+  const fixes = `<span class="puce fixe"><span class="lib">Période :</span> ${resumePeriode().replace(' · ', ' · ')}</span><span class="puce fixe"><span class="lib">Comparé à :</span> ${COMP[etat.comp]}</span>`;
+  $('[data-chips-b]').innerHTML = fixes + Object.keys(DIMS).flatMap(k => etat.sel[k].map(v =>
+    `<span class="puce"><span class="lib">${DIMS[k].lib} :</span> ${esc(v)}<button type="button" data-act="retirer" data-dim="${k}" data-val="${esc(v)}" aria-label="Retirer ${esc(v)}">×</button></span>`)).join('');
+  $('[data-compte]').textContent = `Filtres (${nbActifs()})`;
+  const vide = estDefaut();
+  $$('[data-act="reset"]').forEach(b => { b.disabled = vide; b.title = vide ? 'Rien à réinitialiser' : 'Revenir aux réglages par défaut'; });
+}
+
+/* ---------- Interactions ---------- */
+function fermerMenus(sauf) { $$('.dd.ouvert').forEach(d => { if (d !== sauf) d.classList.remove('ouvert'); }); }
+function panneau(ouvert) {
+  $('#panneauB').classList.toggle('ouvert', ouvert);
+  $('#voileB').classList.toggle('ouvert', ouvert);
+  $('#panneauB').setAttribute('aria-hidden', String(!ouvert));
+}
+document.addEventListener('click', e => {
+  const dd = e.target.closest('.dd');
+  if (!dd) fermerMenus(null);
+  const t = e.target.closest('[data-act]');
+  if (!t || t.disabled) return;
+  const act = t.dataset.act;
+  if (act === 'ouvrir') { const d = t.closest('.dd'); fermerMenus(d); d.classList.toggle('ouvert'); return; }
+  if (act === 'tout') etat.sel[t.dataset.dim] = [...DIMS[t.dataset.dim].vals];
+  if (act === 'aucun') etat.sel[t.dataset.dim] = [];
+  if (act === 'retirer') etat.sel[t.dataset.dim] = etat.sel[t.dataset.dim].filter(v => v !== t.dataset.val);
+  if (act === 'retirerComp') etat.comp = 0;
+  if (act === 'reset') Object.assign(etat, defaut());
+  if (act === 'ouvrirPanneau') { panneau(true); return; }
+  if (act === 'fermerPanneau') { panneau(false); return; }
+  sync();
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.matches('input[data-mode]')) etat.mode = t.dataset.mode;
+  else if (t.matches('input[data-comp]')) { etat.comp = +t.dataset.comp; fermerMenus(null); }
+  else if (t.matches('input[data-dim]')) {
+    const s = etat.sel[t.dataset.dim];
+    etat.sel[t.dataset.dim] = t.checked ? [...s, t.value] : s.filter(v => v !== t.value);
+    etat.sel[t.dataset.dim].sort((a, b) => DIMS[t.dataset.dim].vals.indexOf(a) - DIMS[t.dataset.dim].vals.indexOf(b));
+  } else if (t.matches('select[data-champ]')) etat[t.dataset.champ] = +t.value;
+  else return;
+  sync();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (!t.matches('input[data-recherche]')) return;
+  const q = t.value.trim().toLowerCase();
+  $$('.dd-ligne', t.closest('.multi')).forEach(l => l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { fermerMenus(null); panneau(false); } });
+
+/* ---------- Variantes ---------- */
+function variante(k) {
+  $('#varA').hidden = k !== 'A'; $('#varB').hidden = k !== 'B';
+  fermerMenus(null); panneau(false);
+  $$('.onglet[data-var]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.var === k)));
+  const v = VARIANTES[k];
+  $('#bandeau-variante').innerHTML = `<h2>Variante ${k} — ${v.nom}</h2><ul><li class="pour">${v.pour}</li><li class="contre">${v.contre}</li></ul>`;
+}
+$$('.onglet[data-var]').forEach(b => b.addEventListener('click', () => variante(b.dataset.var)));
+construire(); sync(); variante('A');
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Sites par type (R5) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .groupe-titre { display: flex; align-items: baseline; gap: var(--sp-3); }
+  .nombre { display: inline-block; min-width: 24px; padding: 0 8px; background: var(--navy); color: var(--paper); font-size: var(--fs-xs); font-weight: var(--fw-bold); text-align: center; line-height: 20px; }
+  .vide { padding: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); }
+  .formulaire-ajout { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: end; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--rule-strong); background: var(--surface); }
+  .formulaire-ajout .champ-form { min-width: 200px; }
+  table.dense select { height: 30px; min-width: 160px; }
+  .aide-type { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 var(--sp-3); max-width: 90ch; }
+  .toast { margin-bottom: var(--sp-3); }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Référentiels › Sites (R5) · données fictives</span>
+  <span class="espace"></span>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante">
+  <h2>Variante unique — sites rangés en trois groupes</h2>
+  <ul>
+    <li class="pour">On voit tout de suite combien il y a de sites principaux, d'agences et de sites déportés ; changer le type d'un site le déplace de groupe.</li>
+    <li class="contre">Trois petits tableaux au lieu d'un seul : un peu plus haut à l'écran.</li>
+  </ul>
+</section>
+
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+    <nav aria-label="Rapports">
+      <a href="budget-realise.html">Budget réalisé</a>
+      <a href="#">Graphes</a>
+      <a href="charges.html">Répartition des charges</a>
+      <a href="#">Individuel</a>
+      <a class="active" href="sites-admin.html">Administration</a>
+    </nav>
+    <div class="user"><span>admin@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
+  </div></header>
+
+  <main class="page">
+    <div class="entete-page"><h2>Référentiels</h2><p class="muted">Administration</p></div>
+    <div class="onglets" role="tablist" aria-label="Référentiels">
+      <button class="onglet" type="button" role="tab" aria-selected="true">Sites</button>
+      <button class="onglet" type="button" role="tab" aria-selected="false">Services</button>
+      <button class="onglet" type="button" role="tab" aria-selected="false">Activités</button>
+      <button class="onglet" type="button" role="tab" aria-selected="false">Marques</button>
+    </div>
+    <p class="aide-type">Le type d'un site décide de son groupe dans les rapports et du filtre « Type de site ». Changer le type d'une ligne le déplace tout de suite dans le bon groupe.</p>
+    <div id="retour" class="toast"></div>
+    <div id="groupes"></div>
+
+    <h3 style="margin:var(--sp-4) 0 var(--sp-2);font-size:var(--fs-base)">Ajouter un site</h3>
+    <form class="formulaire-ajout" id="formSite" autocomplete="off">
+      <label class="champ-form">Nom du site<input type="text" id="nomSite" placeholder="Ex. : Bafoussam" maxlength="40"></label>
+      <label class="champ-form">Code<input type="text" id="codeSite" placeholder="Ex. : BFS" maxlength="6" style="width:100px"></label>
+      <label class="champ-form">Type
+        <select id="typeSite"><option value="principal">Site principal</option><option value="agence" selected>Agence</option><option value="deporte">Site déporté</option></select></label>
+      <button type="submit" class="bouton bouton-primaire">Ajouter le site</button>
+    </form>
+  </main>
+</div>
+
+<script>
+const TYPES = { principal: 'Sites principaux', agence: 'Agences', deporte: 'Sites déportés' };
+const UN = { principal: 'Site principal', agence: 'Agence', deporte: 'Site déporté' };
+const sites = [
+  { n: 'Douala', c: 'DLA', t: 'principal', e: 268 }, { n: 'Yaoundé', c: 'YDE', t: 'principal', e: 142 },
+  { n: 'Garoua', c: 'GOU', t: 'agence', e: 38 }, { n: 'Limbé', c: 'LBE', t: 'agence', e: 29 }, { n: 'Kribi', c: 'KRI', t: 'deporte', e: 57 }
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+function rendre() {
+  $('groupes').innerHTML = Object.keys(TYPES).map(t => {
+    const liste = sites.filter(s => s.t === t);
+    const corps = liste.length === 0 ? '<p class="vide">Aucun site dans ce groupe.</p>' :
+      `<div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Site</th><th class="gauche">Code</th><th>Effectif</th><th class="gauche">Type</th></tr></thead><tbody>${
+        liste.map(s => `<tr><th scope="row">${esc(s.n)}</th><td>${esc(s.c)}</td><td class="num">${s.e}</td>
+          <td><select data-site="${esc(s.n)}" aria-label="Type de ${esc(s.n)}">${Object.keys(UN).map(k => `<option value="${k}"${k === s.t ? ' selected' : ''}>${UN[k]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>`;
+    return `<section class="panneau" aria-label="${TYPES[t]}"><h3><span class="groupe-titre">${TYPES[t]} <span class="nombre" title="${liste.length} site(s)">${liste.length}</span></span></h3>${corps}</section>`;
+  }).join('');
+}
+function message(t, ok) { $('retour').innerHTML = `<div class="alerte-info${ok === false ? ' neutre' : ''}" role="status">${t}</div>`; }
+$('groupes').addEventListener('change', e => {
+  const s = e.target.closest('select[data-site]'); if (!s) return;
+  const site = sites.find(x => x.n === s.dataset.site); site.t = s.value; rendre();
+  message(`Le site « ${esc(site.n)} » passe dans « ${TYPES[site.t]} ».`);
+});
+$('formSite').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = $('nomSite').value.trim(), c = $('codeSite').value.trim().toUpperCase();
+  if (!n) { message('Saisir le nom du site avant d\'ajouter.', false); return; }
+  if (sites.some(s => s.n.toLowerCase() === n.toLowerCase())) { message(`Le site « ${esc(n)} » existe déjà.`, false); return; }
+  sites.push({ n, c: c || n.slice(0, 3).toUpperCase(), t: $('typeSite').value, e: 0 });
+  $('nomSite').value = ''; $('codeSite').value = ''; rendre();
+  message(`Site « ${esc(n)} » ajouté dans « ${TYPES[$('typeSite').value]} ».`);
+});
+rendre();
+</script>
+</body>
+</html>

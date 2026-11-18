@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Budget réalisé (R8, R9) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .periode-fixe { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); padding: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-3); background: var(--surface); border: 1px solid var(--rule-strong); font-size: var(--fs-sm); color: var(--navy-2); }
+  .periode-fixe b { color: var(--navy); }
+  .legendes { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin: 0 0 var(--sp-2); }
+  .case .valeur-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+  .detail-fb { display: grid; grid-template-columns: auto auto; gap: 2px var(--sp-4); }
+  .detail-fb span:nth-child(odd) { color: var(--muted-2); }
+  .bar-cellule { display: flex; align-items: center; gap: var(--sp-2); justify-content: flex-end; }
+  .bar-cellule .barre-fb { width: 120px; }
+  td .fb-texte { color: var(--muted); font-size: var(--fs-xs); }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Budget réalisé (R8, R9) · données fictives</span>
+  <span class="espace"></span>
+  <div class="onglets" role="tablist" aria-label="Variantes" style="margin:0">
+    <button class="onglet" role="tab" aria-selected="true" data-var="A">Variante A</button>
+    <button class="onglet" role="tab" aria-selected="false" data-var="B">Variante B</button>
+  </div>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante" id="bandeau-variante" aria-live="polite"></section>
+
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+    <nav aria-label="Rapports">
+      <a class="active" href="budget-realise.html">Budget réalisé</a>
+      <a href="#">Graphes</a>
+      <a href="charges.html">Répartition des charges</a>
+      <a href="#">Individuel</a>
+      <a href="sites-admin.html">Administration</a>
+    </nav>
+    <div class="user"><span>responsable.rh@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
+  </div></header>
+
+  <main class="page">
+    <div class="entete-page"><h2>Budget réalisé</h2><p class="muted">Anciennement « Résumé des indicateurs » · le menu n'a plus Mensuel ni Annuel</p></div>
+    <div class="periode-fixe">
+      <span>Période : <b>octobre 2026</b></span><span>Comparée à : <b>même période N-1</b></span><span>Périmètre : <b>tous les sites</b></span>
+      <a href="filtres.html" style="margin-left:auto;color:var(--navy);font-weight:var(--fw-bold)">Barre de filtres : voir la maquette filtres</a>
+    </div>
+    <p class="legendes" id="legendeFB"></p>
+    <div class="cases" id="cases"></div>
+
+    <section class="panneau" aria-label="Effectif par type de contrat">
+      <h3>Effectif par type de contrat <span class="micro">Octobre 2026 · front office et back office</span></h3>
+      <div class="panneau-corps" id="tableContrats"></div>
+      <p class="panneau-note">Une personne sans activité n'entre ni dans le front office ni dans le back office (règle actuelle) : 0 personne dans ce cas ce mois-ci.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+const VARIANTES = {
+  A: { nom: 'barre bicolore sous la valeur',
+       pour: 'Lecture immédiate de la proportion sans lire de chiffre ; prend peu de hauteur.',
+       contre: 'Pas de montant séparé : le détail exact n\'apparaît qu\'au survol ; la barre est fine sur les petits écrans.' },
+  B: { nom: 'deux montants sous la valeur',
+       pour: 'Les montants front office et back office sont lisibles tout de suite, sans effort.',
+       contre: 'Plus de texte dans chaque case ; la proportion n\'est pas visible d\'un coup d\'œil.' }
+};
+const NBSP = ' ';
+const ent = n => String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+const pct1 = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NBSP + '%';
+const dec = (v, d) => v.toFixed(d).replace('.', ',');
+const court = n => n >= 1e9 ? dec(n / 1e9, 1) + NBSP + 'Md' : dec(n / 1e6, 0) + NBSP + 'M';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+/* kind : 'montant' ou 'effectif'. n, n1 : valeurs ; fo : part front office (valeur) ; le reste est le back office. */
+const KPI = [
+  { lib: 'Chiffre d\'affaires', kind: 'montant', n: 2143870000, n1: 2058120000, fo: 1243444600 },
+  { lib: 'Marge', kind: 'montant', n: 438920000, n1: 421300000, fo: 272130400 },
+  { lib: 'Masse salariale', kind: 'montant', n: 963796800, n1: 932631200, fo: 530088240 },
+  { lib: 'Effectif global', kind: 'effectif', n: 534, n1: 521, fo: 310 },
+  { lib: 'CDI', kind: 'effectif', n: 412, n1: 405, fo: 236 },
+  { lib: 'CDD', kind: 'effectif', n: 78, n1: 82, fo: 52 },
+  { lib: 'MAD (mise à disposition)', kind: 'effectif', n: 31, n1: 24, fo: 17 },
+  { lib: 'Stagiaires', kind: 'effectif', n: 13, n1: 10, fo: 5 }
+];
+const CONTRATS = KPI.slice(4);
+let variante = 'A';
+
+const fmtVal = (k, v) => k.kind === 'montant' ? ent(v) : ent(v);
+function partFO(k) { const p = Math.round(k.fo / k.n * 100); return [p, 100 - p]; }
+
+function htmlCase(k) {
+  const bo = k.n - k.fo, [pf, pb] = partFO(k), v = (k.n - k.n1) / k.n1 * 100, neg = v < 0;
+  const unite = k.kind === 'montant' ? 'FCFA' : 'personnes';
+  const fmtX = x => k.kind === 'montant' ? ent(x) + NBSP + 'FCFA' : ent(x) + ' personnes';
+  const bulle = `<span class="bulle" role="tooltip"><span class="detail-fb"><span>Front office</span><span>${fmtX(k.fo)} (${pf}${NBSP}%)</span><span>Back office</span><span>${fmtX(bo)} (${pb}${NBSP}%)</span></span></span>`;
+  let fb;
+  if (variante === 'A') {
+    fb = `<div class="fo-bo infobulle" tabindex="0" aria-label="Front office ${pf} %, back office ${pb} %">
+      <div class="barre-fb" role="img" aria-label="Front office ${pf} %, back office ${pb} %"><span class="fo" style="width:${pf}%"></span><span class="bo" style="width:${pb}%"></span></div>
+      <div class="texte-fb"><span class="repere">FO <b>${pf}${NBSP}%</b> · BO <b>${pb}${NBSP}%</b></span></div>${bulle}</div>`;
+  } else {
+    const aff = k.kind === 'montant' ? court : (x => ent(x));
+    fb = `<div class="fo-bo infobulle" tabindex="0">
+      <div class="texte-fb"><span class="repere">Front office <b>${aff(k.fo)}</b> · Back office <b>${aff(bo)}</b></span></div>${bulle}</div>`;
+  }
+  return `<div class="case"><span class="lib">${esc(k.lib)}</span>
+    <strong>${ent(k.n)}</strong><span class="devise" style="text-align:right">${unite}</span>
+    <span class="variation${neg ? ' neg' : ''}"><span class="fleche" aria-hidden="true">${neg ? '▼' : '▲'}</span> ${pct1(v)} vs N-1</span>${fb}</div>`;
+}
+function htmlContrats() {
+  const lig = CONTRATS.map(k => {
+    const bo = k.n - k.fo, [pf, pb] = partFO(k), e = k.n - k.n1;
+    const rep = variante === 'A'
+      ? `<div class="bar-cellule"><div class="barre-fb" role="img" aria-label="Front office ${pf} %, back office ${pb} %"><span class="fo" style="width:${pf}%"></span><span class="bo" style="width:${pb}%"></span></div><span class="fb-texte">${pf}${NBSP}% / ${pb}${NBSP}%</span></div>`
+      : `<span class="fb-texte">FO ${pf}${NBSP}% · BO ${pb}${NBSP}%</span>`;
+    return `<tr><th scope="row">${esc(k.lib)}</th><td class="num">${ent(k.n1)}</td><td class="num">${ent(k.n)}</td><td class="num ${e > 0 ? 'pos' : e < 0 ? 'neg' : 'nul'}">${e === 0 ? '0' : (e > 0 ? '+' : '−') + ent(e)}</td>
+      <td class="num bord-g">${ent(k.fo)}</td><td class="num">${ent(bo)}</td><td class="num">${rep}</td></tr>`;
+  }).join('');
+  const g = KPI[3], gbo = g.n - g.fo, [gp, gq] = partFO(g), ge = g.n - g.n1;
+  const repT = variante === 'A'
+    ? `<div class="bar-cellule"><div class="barre-fb"><span class="fo" style="width:${gp}%"></span><span class="bo" style="width:${gq}%"></span></div><span class="fb-texte">${gp}${NBSP}% / ${gq}${NBSP}%</span></div>`
+    : `<span class="fb-texte">FO ${gp}${NBSP}% · BO ${gq}${NBSP}%</span>`;
+  return `<table class="dense"><thead><tr class="sur-entete"><th></th><th colspan="3">Effectif</th><th colspan="3">Répartition de l'effectif N</th></tr>
+    <tr><th class="gauche">Type de contrat</th><th>N-1</th><th>N</th><th>Écart</th><th>Front office</th><th>Back office</th><th>Part FO / BO</th></tr></thead>
+    <tbody>${lig}<tr class="total"><th scope="row">Effectif global</th><td class="num">${ent(g.n1)}</td><td class="num">${ent(g.n)}</td><td class="num ${ge > 0 ? 'pos' : 'neg'}">${ge > 0 ? '+' : '−'}${ent(ge)}</td>
+      <td class="num bord-g">${ent(g.fo)}</td><td class="num">${ent(gbo)}</td><td class="num">${repT}</td></tr></tbody></table>`;
+}
+function rendre() {
+  $('legendeFB').innerHTML = variante === 'A'
+    ? '<span class="legende"><i style="background:var(--navy-3)"></i>Front office (FO)</span><span class="legende"><i style="background:var(--muted-2)"></i>Back office (BO)</span><span class="legende">Survoler une case pour voir les montants exacts</span>'
+    : '<span class="legende">Md = milliard, M = million de FCFA · survoler pour voir les montants exacts et les parts</span>';
+  $('cases').innerHTML = KPI.map(htmlCase).join('');
+  $('tableContrats').innerHTML = htmlContrats();
+}
+const $ = id => document.getElementById(id);
+function choisir(k) {
+  variante = k;
+  document.querySelectorAll('.onglet[data-var]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.var === k)));
+  const v = VARIANTES[k];
+  $('bandeau-variante').innerHTML = `<h2>Variante ${k} — ${v.nom}</h2><ul><li class="pour">${v.pour}</li><li class="contre">${v.contre}</li></ul>`;
+  rendre();
+}
+document.querySelectorAll('.onglet[data-var]').forEach(b => b.addEventListener('click', () => choisir(b.dataset.var)));
+choisir('A');
+</script>
+</body>
+</html>

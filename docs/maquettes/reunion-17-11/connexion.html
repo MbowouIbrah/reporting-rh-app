@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Connexion (R1) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .ecran { position: relative; min-height: 560px; display: flex; border: 1px solid var(--rule-strong); overflow: hidden; background: var(--paper); }
+  .ecran .zone-carte { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; padding: var(--sp-6) var(--sp-4); }
+  .carte-connexion { width: 100%; max-width: 400px; background: var(--paper); border: 1px solid var(--rule-strong); padding: var(--sp-6) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-4); }
+  .carte-connexion img { height: 44px; width: auto; align-self: flex-start; }
+  .carte-connexion h2 { font-size: var(--fs-xl); margin: 0; color: var(--navy); }
+  .carte-connexion p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+  .carte-connexion form { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .carte-connexion .bouton { width: 100%; justify-content: center; }
+  .lien { background: none; border: 0; padding: 0; font: inherit; font-size: var(--fs-sm); color: var(--info); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: flex-start; user-select: none; }
+  .lien:hover { color: var(--navy); }
+  .lien:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .erreur-form { color: var(--error); font-size: var(--fs-sm); margin: 0; min-height: 1.2em; }
+  .retour-form { padding: var(--sp-2) var(--sp-3); background: var(--info-soft); color: var(--info); font-size: var(--fs-sm); border-left: 3px solid var(--info); }
+  .masque { display: none !important; }
+
+  /* A : aplat navy + motif discret */
+  .var-A { background: var(--navy); justify-content: center; }
+  .var-A .motif { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; }
+
+  /* B : photo à gauche, formulaire à droite sur blanc */
+  .var-B .photo { flex: 1 1 50%; background: var(--navy) url('../../../frontend/public/images/fond.webp') center / cover no-repeat; min-height: 560px; }
+  .var-B .zone-carte { flex: 1 1 50%; background: var(--paper); }
+  .var-B .carte-connexion { border: 0; padding-left: 0; padding-right: 0; }
+
+  /* C : fond blanc cassé, bande rouge, grille fine */
+  .var-C { background: var(--paper-2); justify-content: flex-start; }
+  .var-C .bande { position: absolute; top: 0; bottom: 0; left: 15%; width: 14px; background: var(--red); }
+  .var-C .grille { position: absolute; inset: 0; background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px); background-size: 32px 32px; opacity: .6; }
+  .var-C .zone-carte { margin-left: calc(15% + 14px); flex: 1; justify-content: center; }
+
+  @media (max-width: 1100px) { .var-B .photo { flex-basis: 40%; } .var-C .bande { left: 8%; } .var-C .zone-carte { margin-left: calc(8% + 14px); } }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Connexion (R1) · données fictives</span>
+  <span class="espace"></span>
+  <div class="onglets" role="tablist" aria-label="Variantes" style="margin:0">
+    <button class="onglet" role="tab" aria-selected="true" data-var="A">Variante A</button>
+    <button class="onglet" role="tab" aria-selected="false" data-var="B">Variante B</button>
+    <button class="onglet" role="tab" aria-selected="false" data-var="C">Variante C</button>
+  </div>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante" id="bandeau-variante" aria-live="polite"></section>
+
+<div class="cadre">
+  <div class="ecran var-A" id="ecran">
+    <svg class="motif" id="motifA" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 560">
+      <defs><pattern id="pt" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M0 60 L60 0" stroke="#3d4470" stroke-width="1" fill="none"/><circle cx="30" cy="30" r="1.5" fill="#3d4470"/></pattern></defs>
+      <rect width="1200" height="560" fill="url(#pt)"/>
+      <path d="M0 470 L400 470 L460 410 L1200 410" stroke="#2a3157" stroke-width="2" fill="none"/>
+      <rect x="0" y="548" width="1200" height="12" fill="#e3001b"/>
+    </svg>
+    <div class="photo masque" id="photoB" aria-hidden="true"></div>
+    <div class="bande masque" id="bandeC" aria-hidden="true"></div>
+    <div class="grille masque" id="grilleC" aria-hidden="true"></div>
+
+    <div class="zone-carte" id="zoneCarte">
+      <div class="carte-connexion">
+        <img src="../../../frontend/public/images/cfao_logo.png" alt="CFAO">
+        <div id="vueConnexion">
+          <h2>Connexion</h2>
+          <p style="margin:var(--sp-1) 0 var(--sp-4)">Reporting RH : accès réservé aux équipes CFAO.</p>
+          <form id="formConnexion" novalidate>
+            <label class="champ-form">Adresse e-mail<input type="email" id="email" autocomplete="username" placeholder="prenom.nom@cfao.com"></label>
+            <label class="champ-form">Mot de passe<input type="password" id="mdp" autocomplete="current-password"></label>
+            <p class="erreur-form" id="erreurConnexion" role="alert"></p>
+            <button type="submit" class="bouton bouton-primaire">Se connecter</button>
+          </form>
+          <button type="button" class="lien" id="versOubli" style="margin-top:var(--sp-3)">Mot de passe oublié ?</button>
+        </div>
+        <div id="vueOubli" class="masque">
+          <h2>Mot de passe oublié</h2>
+          <p style="margin:var(--sp-1) 0 var(--sp-4)">Saisir votre adresse e-mail : un lien pour choisir un nouveau mot de passe vous sera envoyé.</p>
+          <form id="formOubli" novalidate>
+            <label class="champ-form">Adresse e-mail<input type="email" id="emailOubli" autocomplete="username" placeholder="prenom.nom@cfao.com"></label>
+            <p class="erreur-form" id="erreurOubli" role="alert"></p>
+            <div id="retourOubli"></div>
+            <button type="submit" class="bouton bouton-primaire">Envoyer le lien</button>
+          </form>
+          <button type="button" class="lien" id="versConnexion" style="margin-top:var(--sp-3)">← Retour à la connexion</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const VARIANTES = {
+  A: { nom: 'aplat navy avec motif discret',
+       pour: 'Sobre et proche de l\'application ; le logo et la carte blanche ressortent bien.',
+       contre: 'Le motif est très discret : peu de personnalité, ressemble à un écran de connexion classique.' },
+  B: { nom: 'photo à gauche, formulaire à droite',
+       pour: 'Donne tout de suite l\'image de l\'entreprise ; le formulaire reste sur fond blanc très lisible.',
+       contre: 'Dépend de la qualité de la photo ; à partir d\'une largeur étroite, la photo doit être réduite ou masquée.' },
+  C: { nom: 'fond clair, bande rouge CFAO et grille fine',
+       pour: 'Identité CFAO forte grâce à la bande rouge ; très léger, aucune image à charger.',
+       contre: 'Le rouge est réservé aux alertes dans le reste de l\'application : à utiliser ici avec mesure.' }
+};
+const $ = id => document.getElementById(id);
+const masquer = (id, oui) => $(id).classList.toggle('masque', oui);
+function choisir(k) {
+  document.querySelectorAll('.onglet[data-var]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.var === k)));
+  $('ecran').className = 'ecran var-' + k;
+  masquer('motifA', k !== 'A'); masquer('photoB', k !== 'B'); masquer('bandeC', k !== 'C'); masquer('grilleC', k !== 'C');
+  const v = VARIANTES[k];
+  $('bandeau-variante').innerHTML = `<h2>Variante ${k} — ${v.nom}</h2><ul><li class="pour">${v.pour}</li><li class="contre">${v.contre}</li></ul>`;
+}
+document.querySelectorAll('.onglet[data-var]').forEach(b => b.addEventListener('click', () => choisir(b.dataset.var)));
+const mailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+$('versOubli').addEventListener('click', () => { masquer('vueConnexion', true); masquer('vueOubli', false); $('emailOubli').value = $('email').value; $('emailOubli').focus(); });
+$('versConnexion').addEventListener('click', () => { masquer('vueOubli', true); masquer('vueConnexion', false); $('retourOubli').innerHTML = ''; $('erreurOubli').textContent = ''; $('email').focus(); });
+$('formConnexion').addEventListener('submit', e => {
+  e.preventDefault();
+  const m = $('email').value.trim(), p = $('mdp').value;
+  $('erreurConnexion').textContent = !mailOk(m) ? 'Saisir une adresse e-mail valide.' : !p ? 'Saisir le mot de passe.' : 'Maquette : aucune connexion réelle n\'est faite ici.';
+});
+$('formOubli').addEventListener('submit', e => {
+  e.preventDefault();
+  const m = $('emailOubli').value.trim();
+  $('retourOubli').innerHTML = '';
+  if (!mailOk(m)) { $('erreurOubli').textContent = 'Saisir une adresse e-mail valide.'; return; }
+  $('erreurOubli').textContent = '';
+  $('retourOubli').innerHTML = `<div class="retour-form" role="status">Si l'adresse ${m.replace(/&/g, '&amp;').replace(/</g, '&lt;')} existe, un lien vient d'être envoyé.</div>`;
+});
+choisir('A');
+</script>
+</body>
+</html>

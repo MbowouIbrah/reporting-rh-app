@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Marques (R3, R14) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .periode-fixe { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); padding: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-3); background: var(--surface); border: 1px solid var(--rule-strong); font-size: var(--fs-sm); color: var(--navy-2); }
+  .periode-fixe b { color: var(--navy); }
+  .cases.trois { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cases.trois .case:nth-child(3n) { border-right: 0; }
+  .cases.trois .case:nth-child(4n) { border-right: 1px solid var(--rule); }
+  .cases.trois .case { border-bottom: 0; }
+  .separation { margin: var(--sp-6) 0 var(--sp-3); padding-top: var(--sp-3); border-top: 2px solid var(--navy-3); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-4); }
+  .separation h2 { font-size: var(--fs-xl); }
+  .sous-onglets { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); flex-wrap: wrap; }
+  .deux-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3); align-items: start; }
+  .formulaire-ajout { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: end; padding: var(--sp-3); border-top: 1px solid var(--rule); background: var(--paper-2); }
+  .formulaire-ajout .champ-form { flex: 1; min-width: 180px; }
+  .toast { margin: 0 0 var(--sp-3); }
+  table.dense select { height: 30px; min-width: 190px; }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Marques (R3, R14) · données fictives</span>
+  <span class="espace"></span>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante">
+  <h2>Variante unique — même format que la répartition par site</h2>
+  <ul>
+    <li class="pour">Rien de nouveau à apprendre : les colonnes et la ligne Total sont celles des autres répartitions ; « Non rattaché » montre ce qui manque.</li>
+    <li class="contre">Tant que le client n'a pas fourni les marques, la ligne « Non rattaché » porte presque tout.</li>
+  </ul>
+</section>
+
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+    <nav aria-label="Rapports">
+      <a class="active" href="budget-realise.html">Budget réalisé</a>
+      <a href="#">Graphes</a>
+      <a href="charges.html">Répartition des charges</a>
+      <a href="#">Individuel</a>
+      <a href="sites-admin.html">Administration</a>
+    </nav>
+    <div class="user"><span>responsable.rh@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
+  </div></header>
+
+  <main class="page">
+    <div class="entete-page"><h2>Budget réalisé</h2><p class="muted">Extrait : case KPI et tableau « Répartition par marque »</p></div>
+    <div class="periode-fixe">
+      <span>Période : <b>octobre 2026</b></span><span>Comparée à : <b>même période N-1</b></span><span>Marque : <b>toutes les marques</b></span>
+    </div>
+
+    <div class="cases trois" id="casesMarque"></div>
+
+    <section class="panneau" aria-label="Répartition par marque">
+      <h3>Répartition par marque <span class="micro">Octobre 2026 · masse salariale en FCFA</span></h3>
+      <div class="panneau-corps" id="tableMarque"></div>
+      <p class="panneau-note">« Non rattaché » : personnes dont l'activité n'a pas de marque par défaut et dont la ligne du fichier n'a pas de colonne Marque.</p>
+    </section>
+
+    <div class="separation"><h2>Référentiels › Marques</h2><p class="muted">Extrait de l'écran d'administration</p></div>
+    <div class="sous-onglets onglets" role="tablist" aria-label="Référentiels">
+      <button class="onglet" type="button" role="tab" aria-selected="false">Sites</button>
+      <button class="onglet" type="button" role="tab" aria-selected="false">Services</button>
+      <button class="onglet" type="button" role="tab" aria-selected="false">Activités</button>
+      <button class="onglet" type="button" role="tab" aria-selected="true">Marques</button>
+    </div>
+    <div id="retour" class="toast"></div>
+    <div class="deux-col">
+      <section class="panneau" aria-label="Liste des marques" style="margin:0">
+        <h3>Marques <span class="micro" id="nbMarques"></span></h3>
+        <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Marque</th><th>Activités rattachées</th><th>Employés</th></tr></thead><tbody id="listeMarques"></tbody></table></div>
+        <form class="formulaire-ajout" id="formMarque" autocomplete="off">
+          <label class="champ-form">Nouvelle marque<input type="text" id="nomMarque" placeholder="Ex. : Mitsubishi Fuso" maxlength="40"></label>
+          <button type="submit" class="bouton bouton-primaire">Ajouter la marque</button>
+        </form>
+      </section>
+      <section class="panneau" aria-label="Marque par défaut des activités" style="margin:0">
+        <h3>Marque par défaut d'une activité <span class="micro">utilisée si le fichier n'a pas de colonne Marque</span></h3>
+        <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Activité</th><th class="gauche">Marque par défaut</th></tr></thead><tbody id="listeActivites"></tbody></table></div>
+        <p class="panneau-note">Si le fichier de paie contient une colonne « Marque », elle prime sur la marque par défaut.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const NBSP = ' ';
+const ent = n => String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+const mt = n => (n < 0 ? '−' : '') + ent(n);
+const ec = n => n === 0 ? '0' : (n > 0 ? '+' : '−') + ent(n);
+const fp = (n, n1) => { if (!n1) return '—'; const v = (n - n1) / n1 * 100; return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NBSP + '%'; };
+const part = v => v.toFixed(1).replace('.', ',') + NBSP + '%';
+const cl = n => n > 0 ? 'pos' : n < 0 ? 'neg' : 'nul';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const $ = id => document.getElementById(id);
+
+const MASSE_N = 963796800, MASSE_N1 = 932631200;
+// [nom, part masse N (%), part masse N-1 (%), effectif N-1, effectif N] ; la ligne « Non rattaché » reçoit le reste
+const M = [['HINO', 31, 32, 160, 163], ['JCB', 14, 14, 72, 74], ['KING LONG', 9, 9, 45, 47], ['LOVOL', 11, 10, 55, 57],
+  ['Renault Trucks', 17, 17, 88, 90], ['Toyota Material Handling', 8, 8, 42, 43], ['Non rattaché', 10, 10, 59, 60]];
+function repartir(tot, idx) { let reste = tot; return M.map((m, i) => { if (i === M.length - 1) return reste; const v = Math.round(tot * m[idx] / 100); reste -= v; return v; }); }
+const vN = repartir(MASSE_N, 1), v1 = repartir(MASSE_N1, 2);
+
+function htmlCases() {
+  const i = 0, p = vN[i] / MASSE_N * 100, p1 = v1[i] / MASSE_N1 * 100, d = p - p1;
+  const nr = vN[M.length - 1] / MASSE_N * 100;
+  return `<div class="case"><span class="lib">Marque principale</span><strong>${esc(M[i][0])}</strong>
+      <span class="devise" style="text-align:right">${part(p)} de la masse salariale · ${mt(vN[i])} FCFA</span>
+      <span class="variation ${d < 0 ? 'neg' : ''}"><span class="fleche" aria-hidden="true">${d < 0 ? '▼' : '▲'}</span> ${(d > 0 ? '+' : '−') + Math.abs(d).toFixed(1).replace('.', ',')} point vs N-1</span></div>
+    <div class="case"><span class="lib">Marques actives</span><strong>6</strong><span class="devise" style="text-align:right">sur 6 marques du référentiel</span>
+      <span class="variation">Effectif rattaché : <b>474</b> sur 534</span></div>
+    <div class="case"><span class="lib">Part non rattachée</span><strong>${part(nr)}</strong><span class="devise" style="text-align:right">de la masse salariale</span>
+      <span class="variation">60 personnes sans marque</span></div>`;
+}
+function htmlTable() {
+  const lignes = M.map((m, i) => {
+    const e = vN[i] - v1[i], ee = m[4] - m[3];
+    return `<tr${m[0] === 'Non rattaché' ? ' class="exclu"' : ''}><th scope="row">${esc(m[0])}</th>
+      <td class="num">${mt(v1[i])}</td><td class="num">${mt(vN[i])}</td><td class="num ${cl(e)}">${ec(e)}</td><td class="num ${cl(e)}">${fp(vN[i], v1[i])}</td><td class="num">${part(vN[i] / MASSE_N * 100)}</td>
+      <td class="num bord-g">${ent(m[3])}</td><td class="num">${ent(m[4])}</td><td class="num ${cl(ee)}">${ec(ee)}</td></tr>`;
+  }).join('');
+  const e1 = M.reduce((s, m) => s + m[3], 0), eN = M.reduce((s, m) => s + m[4], 0);
+  const e = MASSE_N - MASSE_N1;
+  return `<table class="dense"><thead><tr class="sur-entete"><th></th><th colspan="5">Masse salariale (FCFA)</th><th colspan="3">Effectif</th></tr>
+    <tr><th class="gauche">Marque</th><th>Masse N-1</th><th>Masse N</th><th>Écart</th><th>Écart %</th><th>Part</th><th>Effectif N-1</th><th>Effectif N</th><th>Écart</th></tr></thead>
+    <tbody>${lignes}<tr class="total"><th scope="row">Total</th><td class="num">${mt(MASSE_N1)}</td><td class="num">${mt(MASSE_N)}</td><td class="num ${cl(e)}">${ec(e)}</td><td class="num ${cl(e)}">${fp(MASSE_N, MASSE_N1)}</td><td class="num">${part(100)}</td>
+      <td class="num">${ent(e1)}</td><td class="num">${ent(eN)}</td><td class="num ${cl(eN - e1)}">${ec(eN - e1)}</td></tr></tbody></table>`;
+}
+
+/* ---------- Référentiels › Marques ---------- */
+const marques = [['HINO', 2, 163], ['JCB', 1, 74], ['KING LONG', 1, 47], ['LOVOL', 1, 57], ['Renault Trucks', 2, 90], ['Toyota Material Handling', 1, 43]].map(([n, a, e]) => ({ n, a, e }));
+const activites = [['Vente de véhicules', 'HINO'], ['Pièces de rechange', 'Renault Trucks'], ['Après-vente poids lourds', 'HINO'], ['Après-vente engins', 'JCB'],
+  ['Pneumatique', ''], ['Administration', '']].map(([n, m]) => ({ n, m }));
+function htmlReferentiel() {
+  $('nbMarques').textContent = marques.length + (marques.length > 1 ? ' marques' : ' marque');
+  $('listeMarques').innerHTML = marques.map(m => `<tr><th scope="row">${esc(m.n)}</th><td class="num">${m.a}</td><td class="num">${m.e}</td></tr>`).join('');
+  const opt = v => `<option value="">— Aucune (non rattaché) —</option>` + marques.map(m => `<option value="${esc(m.n)}"${m.n === v ? ' selected' : ''}>${esc(m.n)}</option>`).join('');
+  $('listeActivites').innerHTML = activites.map((a, i) => `<tr><th scope="row">${esc(a.n)}</th><td><select data-act="${i}" aria-label="Marque par défaut de ${esc(a.n)}">${opt(a.m)}</select></td></tr>`).join('');
+}
+function message(t) { $('retour').innerHTML = `<div class="alerte-info" role="status">${t}</div>`; }
+$('formMarque').addEventListener('submit', e => {
+  e.preventDefault();
+  const nom = $('nomMarque').value.trim();
+  if (!nom) { message('Saisir le nom de la marque avant d\'ajouter.'); return; }
+  if (marques.some(m => m.n.toLowerCase() === nom.toLowerCase())) { message(`La marque « ${esc(nom)} » existe déjà.`); return; }
+  marques.push({ n: nom, a: 0, e: 0 });
+  $('nomMarque').value = '';
+  htmlReferentiel();
+  message(`Marque « ${esc(nom)} » ajoutée. Elle peut maintenant être choisie comme marque par défaut d'une activité.`);
+});
+$('listeActivites').addEventListener('change', e => {
+  const s = e.target.closest('select[data-act]'); if (!s) return;
+  const a = activites[+s.dataset.act]; a.m = s.value;
+  marques.forEach(m => m.a = activites.filter(x => x.m === m.n).length);
+  htmlReferentiel();
+  message(s.value ? `Marque par défaut de « ${esc(a.n)} » : ${esc(s.value)}.` : `« ${esc(a.n)} » n'a plus de marque par défaut : ses lignes seront « Non rattaché ».`);
+});
+$('casesMarque').innerHTML = htmlCases();
+$('tableMarque').innerHTML = htmlTable();
+htmlReferentiel();
+</script>
+</body>
+</html>

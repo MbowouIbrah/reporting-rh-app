@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Répartition des charges (R10 à R13) — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .periode-fixe { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); padding: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-3); background: var(--surface); border: 1px solid var(--rule-strong); font-size: var(--fs-sm); color: var(--navy-2); }
+  .periode-fixe b { color: var(--navy); }
+  .periode-fixe a { margin-left: auto; color: var(--navy); font-weight: var(--fw-bold); }
+  .cartes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-4); }
+  .carte-charge { display: grid; gap: 2px; align-content: start; text-align: left; font: inherit; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0; color: var(--ink); min-height: 150px; }
+  .carte-charge:hover { background: var(--info-soft); border-color: var(--navy-3); }
+  .carte-charge[aria-pressed='true'] { background: var(--info-soft); border-color: var(--navy); box-shadow: inset 0 -4px 0 var(--red); }
+  .carte-charge .nom { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--muted); }
+  .carte-charge .montant { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--navy); padding-top: 4px; }
+  .carte-charge .devise { font-size: var(--fs-xs); color: var(--muted); }
+  .carte-charge .ligne { font-size: var(--fs-sm); color: var(--muted); display: flex; justify-content: space-between; gap: var(--sp-2); }
+  .carte-charge .ecart { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+  .carte-charge .indice { margin-top: var(--sp-1); padding-top: var(--sp-1); border-top: 1px dotted var(--rule-strong); font-size: var(--fs-xs); color: var(--navy-3); font-weight: var(--fw-medium); }
+  .carte-charge.total { background: var(--paper-3); }
+  .carte-charge.total .nom { color: var(--navy); }
+  .fil { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3); font-size: var(--fs-md); }
+  .fil .sep { color: var(--muted-2); padding: 0 2px; }
+  .fil button { background: none; border: 0; padding: 4px 8px; font: inherit; font-weight: var(--fw-bold); color: var(--info); text-decoration: underline; border-radius: var(--radius); }
+  .fil button:hover { background: var(--surface-hover); }
+  .fil .courant { font-weight: var(--fw-bold); color: var(--navy); padding: 4px 8px; }
+  .indication { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
+  .section-niv { margin-bottom: var(--sp-3); }
+  .masque { padding: var(--sp-4); display: grid; gap: var(--sp-2); }
+  @media (max-width: 1250px) { .cartes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Répartition des charges (R10 à R13) · données fictives</span>
+  <span class="espace"></span>
+  <div class="onglets" role="tablist" aria-label="Variantes" style="margin:0">
+    <button class="onglet" role="tab" aria-selected="true" data-var="A">Variante A</button>
+    <button class="onglet" role="tab" aria-selected="false" data-var="B">Variante B</button>
+    <button class="onglet" role="tab" aria-selected="false" data-var="C">Variante C</button>
+  </div>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante" id="bandeau-variante" aria-live="polite"></section>
+
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+    <nav aria-label="Rapports">
+      <a href="budget-realise.html">Budget réalisé</a>
+      <a href="#">Graphes</a>
+      <a class="active" href="charges.html">Répartition des charges</a>
+      <a href="#">Individuel</a>
+      <a href="sites-admin.html">Administration</a>
+    </nav>
+    <div class="user"><span>responsable.rh@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
+  </div></header>
+
+  <main class="page">
+    <div class="entete-page"><h2>Répartition des charges</h2><p class="muted">Un seul écran pour le mois, le cumul ou l'année, selon la période choisie</p></div>
+    <div class="periode-fixe">
+      <span>Période : <b>octobre 2026</b></span><span>Comparée à : <b>même période N-1 (octobre 2025)</b></span><span>Périmètre : <b>tous les sites</b></span>
+      <a href="filtres.html">Barre de filtres : voir la maquette filtres</a>
+    </div>
+    <div id="fil"></div>
+    <div id="niv1"></div>
+    <div id="niv2"></div>
+    <div id="niv3"></div>
+  </main>
+</div>
+
+<div class="voile" id="voile"></div>
+<aside class="tiroir" id="tiroir" role="dialog" aria-label="Personnes concernées" aria-hidden="true">
+  <div class="tiroir-entete"><div id="tiroirTitre"></div>
+    <button type="button" class="bouton bouton-secondaire petit" id="tiroirFermer" aria-label="Fermer le panneau">Fermer ×</button></div>
+  <div class="tiroir-corps" id="tiroirCorps"></div>
+</aside>
+
+<script>
+const VARIANTES = {
+  A: { nom: 'détail sous les cartes',
+       pour: 'Tout reste dans la page : on garde les cartes sous les yeux et on change de charge en un clic.',
+       contre: 'La page s\'allonge ; la liste des personnes s\'ajoute en bas et oblige à faire défiler.' },
+  B: { nom: 'personnes en panneau latéral',
+       pour: 'Les noms sont isolés dans un tiroir : plus facile à protéger, à fermer et à ne pas montrer par mégarde.',
+       contre: 'Le tiroir masque une partie de la page ; un panneau de plus à apprendre.' },
+  C: { nom: 'fil d\'Ariane',
+       pour: 'Une seule chose à l\'écran à la fois ; chemin clair « Charges › Primes › Primes sur ventes » et retour en un clic.',
+       contre: 'On perd la vue d\'ensemble des cartes dès qu\'on descend ; plus de clics pour passer d\'une charge à l\'autre.' }
+};
+
+/* ---------- Données fictives (octobre 2026 / octobre 2025), en FCFA ---------- */
+const FAM = [
+  { id: 'sal', nom: 'Salaires', rub: [['Salaire brut garantie', 412380500, 396215000], ['Heures supplémentaires', 38640200, 41205800]] },
+  { id: 'pri', nom: 'Primes', rub: [['Primes sur ventes', 96250000, 84730000], ['Primes sur résultats', 54800000, 58900000], ['Bonus', 31400000, 27650000],
+      ['Productivité Ateliers', 22915600, 19880400], ['Commission', 41320000, 38410000], ['Primes exceptionnelles', 12600000, 18250000]] },
+  { id: 'ava', nom: 'Avantages et frais', rub: [['Frais de mission', 28450000, 25120000], ['Logement site déporté', 17800000, 17800000],
+      ['Carburant véhicule service', 21340500, 23680000], ['Crédit téléphonique', 6920000, 6450000]] },
+  { id: 'soc', nom: 'Charges sociales', rub: [['Charges Patronales', 152640000, 146380000], ['Assurance Maladie', 18930000, 18100000], ['Formation', 7410000, 9860000]] }
+];
+const NB_PERS = { 'Salaire brut garantie': 521, 'Heures supplémentaires': 96, 'Primes sur ventes': 42, 'Primes sur résultats': 38, 'Bonus': 27, 'Productivité Ateliers': 64,
+  'Commission': 31, 'Primes exceptionnelles': 15, 'Frais de mission': 58, 'Logement site déporté': 23, 'Carburant véhicule service': 47, 'Crédit téléphonique': 112,
+  'Charges Patronales': 521, 'Assurance Maladie': 498, 'Formation': 74 };
+const REPARTS = {
+  site: { nom: 'Par site', col: 'Site', items: [['Douala', 38, 39], ['Yaoundé', 27, 27], ['Kribi', 12, 11], ['Garoua', 14, 14], ['Limbé', 9, 9]] },
+  service: { nom: 'Par service et activité', col: 'Service', sub: 'Activité', items: [['Commerce Pièces', 18, 19, 'Pièces de rechange'], ['SAV PL', 27, 27, 'Après-vente'],
+      ['SAV Engins', 16, 15, 'Après-vente'], ['Sites Déportés', 11, 10, 'Après-vente'], ['Pneumatique', 9, 10, 'Pièces de rechange'], ['Administration', 19, 19, 'Support']] },
+  contrat: { nom: 'Par nature de contrat', col: 'Nature de contrat', items: [['CDI', 78, 79], ['CDD', 12, 12], ['MAD', 8, 7], ['Stagiaire', 2, 2]] },
+  marque: { nom: 'Par marque', col: 'Marque', items: [['HINO', 31, 32], ['JCB', 14, 14], ['KING LONG', 9, 9], ['LOVOL', 11, 10], ['Renault Trucks', 17, 17], ['Toyota Material Handling', 8, 8], ['Non rattaché', 10, 10]] }
+};
+const PERS = [['M00418','Mbarga Étienne','Commerce Pièces','Douala'],['M00127','Nguemo Aurélie','SAV PL','Douala'],['M00356','Tchoumi Boris','SAV Engins','Yaoundé'],
+  ['M00582','Fotso Clarisse','Commerce Pièces','Yaoundé'],['M00203','Ateba Roland','Sites Déportés','Kribi'],['M00671','Ndongo Sylvie','Pneumatique','Garoua'],
+  ['M00094','Kamga Patrick','SAV PL','Douala'],['M00449','Essomba Nadège','Administration','Limbé'],['M00315','Biyong Hervé','SAV Engins','Douala'],['M00738','Mvondo Carine','Commerce Pièces','Garoua']];
+const POIDS = [9, 8.2, 7.4, 6.8, 6.1, 5.5, 5, 4.6, 4.2, 3.9];
+const FACT1 = [0.93, 1.08, 0.97, 1.04, 0.88, 1.12, 0.95, 1.0, 1.06, 0.91];
+
+/* ---------- Formats français ---------- */
+const NBSP = ' ';
+const ent = n => String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+const mt = n => (n < 0 ? '−' : '') + ent(n);
+const ec = n => n === 0 ? '0' : (n > 0 ? '+' : '−') + ent(n);
+const pc = (n, n1) => n1 === 0 ? null : (n - n1) / n1 * 100;
+const fp = v => v === null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NBSP + '%';
+const part = v => v.toFixed(1).replace('.', ',') + NBSP + '%';
+const cl = n => n > 0 ? 'pos' : n < 0 ? 'neg' : 'nul';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+const somme = (rub, i) => rub.reduce((s, r) => s + r[i], 0);
+FAM.forEach(f => { f.n = somme(f.rub, 1); f.n1 = somme(f.rub, 2); });
+const TOTAL = { id: 'tot', nom: 'Total', n: FAM.reduce((s, f) => s + f.n, 0), n1: FAM.reduce((s, f) => s + f.n1, 0) };
+
+/* ---------- État ---------- */
+const st = { v: 'A', fam: null, rub: null, onglet: 'site', sansDroit: false };
+const $ = id => document.getElementById(id);
+const ligneComp = (n, n1) => `<td class="num">${mt(n1)}</td><td class="num">${mt(n)}</td><td class="num ${cl(n - n1)}">${ec(n - n1)}</td><td class="num ${cl(n - n1)}">${fp(pc(n, n1))}</td>`;
+
+/* ---------- Niveau 1 : cartes ---------- */
+function html1() {
+  const carte = (f, tot) => `<button type="button" class="carte-charge${tot ? ' total' : ''}" data-fam="${f.id}" aria-pressed="${st.fam === f.id}">
+    <span class="nom">${esc(f.nom)}${tot ? ' des charges' : ''}</span>
+    <span class="montant">${mt(f.n)}</span><span class="devise">FCFA</span>
+    <span class="ligne"><span>N-1 : ${mt(f.n1)}</span></span>
+    <span class="ligne ecart ${cl(f.n - f.n1)}"><span>${ec(f.n - f.n1)}</span><span>${fp(pc(f.n, f.n1))}</span></span>
+    <span class="indice">Cliquer pour le détail ›</span></button>`;
+  return `<div class="cartes">${FAM.map(f => carte(f, false)).join('')}${carte(TOTAL, true)}</div>`;
+}
+
+/* ---------- Niveau 2 : tableau des rubriques puis répartitions ---------- */
+function repartir(items, tot, idx) { // idx : 1 = N, 2 = N-1 (poids en colonnes 1 et 2)
+  let reste = tot; const out = items.map((it, i) => {
+    if (i === items.length - 1) return reste;
+    const v = Math.round(tot * it[idx] / 100); reste -= v; return v;
+  });
+  return out;
+}
+function html2() {
+  if (!st.fam) return '';
+  if (st.fam === 'tot') {
+    const lignes = FAM.map(f => `<tr class="depliable" data-fam="${f.id}" tabindex="0"><th scope="row"><span class="chev">›</span>${esc(f.nom)}</th>${ligneComp(f.n, f.n1)}</tr>`).join('');
+    return `<section class="section-niv"><div class="panneau"><h3>Total des charges, par type de charge <span class="micro">Octobre 2026</span></h3>
+      <p class="indication" style="padding:8px 12px 0">Cliquer sur une ligne pour ouvrir le détail du type de charge.</p>
+      <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Type de charge</th><th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th></tr></thead>
+      <tbody>${lignes}<tr class="total"><th scope="row">Total</th>${ligneComp(TOTAL.n, TOTAL.n1)}</tr></tbody></table></div></div></section>`;
+  }
+  const f = FAM.find(x => x.id === st.fam);
+  const lignes = f.rub.map((r, i) => `<tr class="depliable${st.rub === i ? ' actif' : ''}" data-rub="${i}" tabindex="0"><th scope="row"><span class="chev">›</span>${esc(r[0])}</th>${ligneComp(r[1], r[2])}</tr>`).join('');
+  const tableRub = `<div class="panneau"><h3>${esc(f.nom)} : détail par rubrique <span class="micro">Octobre 2026 · FCFA</span></h3>
+    <p class="indication" style="padding:8px 12px 0">Cliquer sur une ligne pour voir les personnes concernées.</p>
+    <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Rubrique</th><th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th></tr></thead>
+    <tbody>${lignes}<tr class="total"><th scope="row">Total ${esc(f.nom)}</th>${ligneComp(f.n, f.n1)}</tr></tbody></table></div></div>`;
+  return `<section class="section-niv">${tableRub}</section>`;
+}
+function htmlRepart() {
+  if (!st.fam || st.fam === 'tot') return '';
+  const f = FAM.find(x => x.id === st.fam), R = REPARTS[st.onglet];
+  const vN = repartir(R.items, f.n, 1), v1 = repartir(R.items, f.n1, 2);
+  const lignes = R.items.map((it, i) => `<tr${it[0] === 'Non rattaché' ? ' class="exclu"' : ''}><th scope="row">${esc(it[0])}</th>${R.sub ? `<td>${esc(it[3])}</td>` : ''}${ligneComp(vN[i], v1[i])}<td class="num">${part(vN[i] / f.n * 100)}</td></tr>`).join('');
+  const onglets = Object.entries(REPARTS).map(([k, r]) => `<button type="button" class="onglet" role="tab" data-onglet="${k}" aria-selected="${st.onglet === k}">${r.nom}</button>`).join('');
+  return `<section class="section-niv"><h3 style="margin:var(--sp-3) 0 var(--sp-2);font-size:var(--fs-base)">Répartition de « ${esc(f.nom)} »</h3><div class="onglets" role="tablist">${onglets}</div>
+    <div class="panneau"><div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">${R.col}</th>${R.sub ? `<th class="gauche">${R.sub}</th>` : ''}<th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th><th>Part</th></tr></thead>
+    <tbody>${lignes}<tr class="total"><th scope="row">Total</th>${R.sub ? '<td></td>' : ''}${ligneComp(f.n, f.n1)}<td class="num">${part(100)}</td></tr></tbody></table></div></div></section>`;
+}
+
+/* ---------- Niveau 3 : personnes ---------- */
+function html3(dansTiroir) {
+  if (st.fam === null || st.fam === 'tot' || st.rub === null) return '';
+  const f = FAM.find(x => x.id === st.fam), r = f.rub[st.rub], nbp = NB_PERS[r[0]];
+  const titre = `<h3>${esc(r[0])} : personnes concernées</h3><p class="muted" style="font-size:var(--fs-sm);margin-top:4px">${esc(f.nom)} · octobre 2026 · FCFA</p>`;
+  const note = `<p class="panneau-note">Visible avec le droit nominatif ; sans ce droit : ${nbp} personnes, sans nom.</p>`;
+  let corps;
+  if (st.sansDroit) {
+    corps = `<div class="masque"><div class="alerte-info neutre"><b>${nbp} personnes</b> ont un montant sur cette ligne. Les noms, matricules et montants individuels ne sont pas affichés sans le droit nominatif.</div>
+      <table class="dense"><thead><tr><th class="gauche">Ligne</th><th>N-1</th><th>N</th><th>Écart</th></tr></thead><tbody><tr class="total"><th scope="row">Total (${nbp} personnes)</th><td class="num">${mt(r[2])}</td><td class="num">${mt(r[1])}</td><td class="num ${cl(r[1] - r[2])}">${ec(r[1] - r[2])}</td></tr></tbody></table></div>`;
+  } else {
+    const lim = Math.min(10, nbp);
+    const n = PERS.slice(0, lim).map((p, i) => Math.round(r[1] * POIDS[i] / 100));
+    const n1 = n.map((v, i) => Math.round(v * FACT1[i] * (r[2] / r[1])));
+    const sN = n.reduce((a, b) => a + b, 0), s1 = n1.reduce((a, b) => a + b, 0);
+    const lignes = PERS.slice(0, lim).map((p, i) => `<tr><td>${p[0]}</td><th scope="row">${p[1]}</th><td>${p[2]}</td><td>${p[3]}</td><td class="num">${mt(n1[i])}</td><td class="num">${mt(n[i])}</td><td class="num ${cl(n[i] - n1[i])}">${ec(n[i] - n1[i])}</td></tr>`).join('');
+    const autres = nbp > lim ? `<tr class="exclu"><td colspan="4">Autres personnes (${nbp - lim})</td><td class="num">${mt(r[2] - s1)}</td><td class="num">${mt(r[1] - sN)}</td><td class="num">${ec((r[1] - sN) - (r[2] - s1))}</td></tr>` : '';
+    corps = `<div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Matricule</th><th class="gauche">Nom</th><th class="gauche">Service</th><th class="gauche">Site</th><th>N-1</th><th>N</th><th>Écart</th></tr></thead>
+      <tbody>${lignes}${autres}<tr class="total"><td colspan="4">Total (${nbp} personnes)</td><td class="num">${mt(r[2])}</td><td class="num">${mt(r[1])}</td><td class="num ${cl(r[1] - r[2])}">${ec(r[1] - r[2])}</td></tr></tbody></table></div>`;
+  }
+  if (dansTiroir) return { titre, corps: `${corps}${note}` };
+  return `<section class="section-niv" id="blocPersonnes"><div class="panneau"><h3><span>${esc(r[0])} : personnes concernées <span class="micro">${esc(f.nom)} · octobre 2026</span></span></h3>${corps}${note}</div></section>`;
+}
+
+/* ---------- Fil d'Ariane (variante C) ---------- */
+function htmlFil() {
+  if (st.v !== 'C' || !st.fam) return '';
+  const f = st.fam === 'tot' ? { nom: 'Total' } : FAM.find(x => x.id === st.fam);
+  const seg = [];
+  seg.push(st.fam ? '<button type="button" data-fil="0">Charges</button>' : '<span class="courant">Charges</span>');
+  if (st.rub === null) seg.push(`<span class="courant">${esc(f.nom)}</span>`);
+  else { seg.push(`<button type="button" data-fil="1">${esc(f.nom)}</button>`); seg.push(`<span class="courant">${esc(f.rub[st.rub][0])}</span>`); }
+  return `<nav class="fil" aria-label="Fil d'Ariane">${seg.join('<span class="sep" aria-hidden="true">›</span>')}</nav>`;
+}
+
+/* ---------- Rendu ---------- */
+function rendre() {
+  const C = st.v === 'C';
+  $('fil').innerHTML = htmlFil();
+  $('niv1').innerHTML = (C && st.fam) ? '' : html1();
+  let n2 = '', n3 = '';
+  if (C && st.rub !== null) n3 = html3(false);
+  else if (C) n2 = html2() + htmlRepart();
+  else { n2 = html2(); if (st.v === 'A') n3 = html3(false); n2 += htmlRepart(); }
+  $('niv2').innerHTML = n2;
+  $('niv3').innerHTML = n3;
+  // Variante A : la liste des personnes suit le tableau des rubriques, avant la répartition
+  if (st.v === 'A' && n3) { const t = document.querySelector('#niv2 .section-niv'); if (t) t.after($('blocPersonnes')); }
+  const tiroir = st.v === 'B' && st.rub !== null && st.fam !== 'tot';
+  if (tiroir) { const h = html3(true); $('tiroirTitre').innerHTML = h.titre; $('tiroirCorps').innerHTML = h.corps; }
+  $('tiroir').classList.toggle('ouvert', tiroir); $('voile').classList.toggle('ouvert', tiroir);
+  $('tiroir').setAttribute('aria-hidden', String(!tiroir));
+}
+function variante(k) {
+  st.v = k;
+  document.querySelectorAll('.onglet[data-var]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.var === k)));
+  const v = VARIANTES[k];
+  $('bandeau-variante').innerHTML = `<h2>Variante ${k} — ${v.nom}</h2><ul><li class="pour">${v.pour}</li><li class="contre">${v.contre}</li></ul>
+    <label class="coche option" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sansDroit"${st.sansDroit ? ' checked' : ''}> Option de la maquette : voir la page comme un compte sans le droit nominatif</label>`;
+  $('sansDroit').addEventListener('change', e => { st.sansDroit = e.target.checked; rendre(); });
+  rendre();
+}
+function fermerTiroir() { st.rub = null; rendre(); }
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const v = t.closest('[data-var]'); if (v) { variante(v.dataset.var); return; }
+  const c = t.closest('[data-fam]');
+  if (c) { st.fam = c.dataset.fam; st.rub = null; rendre(); if (st.v !== 'C') document.getElementById('niv2').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+  const r = t.closest('tr[data-rub]'); if (r) { st.rub = +r.dataset.rub; rendre(); const b = $('blocPersonnes'); if (b) b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
+  const o = t.closest('[data-onglet]'); if (o) { st.onglet = o.dataset.onglet; rendre(); return; }
+  const f = t.closest('[data-fil]'); if (f) { if (f.dataset.fil === '0') { st.fam = null; st.rub = null; } else st.rub = null; rendre(); return; }
+  if (t.closest('#tiroirFermer') || t.id === 'voile') fermerTiroir();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && st.v === 'B' && st.rub !== null) fermerTiroir();
+  if (e.key === 'Enter' && e.target.matches('tr.depliable')) e.target.click();
+});
+variante('A');
+</script>
+</body>
+</html>
