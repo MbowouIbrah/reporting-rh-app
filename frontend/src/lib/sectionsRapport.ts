@@ -1,6 +1,6 @@
 /** Parties du rapport exportables en PDF, dans l'ordre des onglets. */
 export const SECTIONS_RAPPORT = [
-  { id: 'resume', libelle: 'Résumé', route: '/resume' },
+  { id: 'resume', libelle: 'Budget réalisé', route: '/resume' },
   { id: 'graphes', libelle: 'Graphes', route: '/graphes' },
   { id: 'annuel', libelle: 'Annuel', route: '/annuel' },
   { id: 'mensuel', libelle: 'Mensuel', route: '/mensuel' },

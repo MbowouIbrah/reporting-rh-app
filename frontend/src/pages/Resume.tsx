@@ -149,7 +149,7 @@ export default function Resume() {
   return (
     <section className={`page-ecran page-etroite resume-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}${premier ? ' chargement' : ''}`} aria-busy={maj || premier || undefined}>
       <BulleCases>
-      <TitreRapport titre="RÉSUMÉ DES INDICATEURS" />
+      <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} onChange={f.set} />
       )}

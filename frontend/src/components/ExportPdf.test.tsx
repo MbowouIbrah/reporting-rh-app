@@ -17,7 +17,7 @@ test('la page courante est cochée ; Tout le rapport ouvre toutes les parties av
   // Droits chargés (/auth/me) : la partie Individuel apparaît
   await screen.findByRole('checkbox', { name: 'Individuel', hidden: true })
   expect(screen.getByRole('checkbox', { name: 'Annuel', hidden: true })).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: 'Résumé', hidden: true })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'Budget réalisé', hidden: true })).not.toBeChecked()
   fireEvent.click(screen.getByRole('button', { name: 'Tout le rapport', hidden: true }))
   fireEvent.click(screen.getByRole('button', { name: 'Exporter', hidden: true }))
   const url = String(ouvrir.mock.calls[0][0])
@@ -37,7 +37,7 @@ test('page Graphes : deux choix ; Graphiques dynamiques ferme le menu et lance l
   const graphiques = vi.fn()
   monter(<ExportPdf onGraphiques={graphiques} />, [], () => ({}), '/graphes')
   fireEvent.click(await screen.findByRole('button', { name: 'Exporter' }))
-  fireEvent.click(screen.getByRole('button', { name: /Résumé PDF/, hidden: true }))
+  fireEvent.click(screen.getByRole('button', { name: /Budget réalisé PDF/, hidden: true }))
   expect(screen.getByRole('checkbox', { name: 'Graphes', hidden: true })).toBeChecked()
   fireEvent.keyDown(document, { key: 'Escape' })
   fireEvent.click(screen.getByRole('button', { name: 'Exporter' }))

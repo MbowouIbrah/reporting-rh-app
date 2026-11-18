@@ -11,7 +11,7 @@ import LienPage from './LienPage'
 import MenuProfil from './MenuProfil'
 
 const ONGLETS = [
-  { to: '/resume', label: 'Résumé', Icone: LayoutDashboard },
+  { to: '/resume', label: 'Budget réalisé', Icone: LayoutDashboard },
   { to: '/graphes', label: 'Graphes', Icone: BarChart3 },
   { to: '/annuel', label: 'Annuel', Icone: CalendarRange },
   { to: '/mensuel', label: 'Mensuel', Icone: CalendarDays },

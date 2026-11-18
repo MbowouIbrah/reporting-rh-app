@@ -51,6 +51,7 @@ export default function App() {
         }
       >
         <Route path="/resume" element={<Resume />} />
+        <Route path="/budget-realise" element={<Resume />} />
         <Route path="/mensuel" element={<Mensuel />} />
         <Route path="/annuel" element={<Annuel />} />
         <Route

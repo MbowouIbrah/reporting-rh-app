@@ -102,7 +102,7 @@ export default function ExportPdf({ onGraphiques }: { onGraphiques?: () => void 
             <span>Excel : chaque graphe reste modifiable, même collé dans PowerPoint.</span>
           </button>
           <button type="button" className="export-type" onClick={() => setEtape('pdf')}>
-            <strong>Résumé PDF</strong>
+            <strong>Budget réalisé PDF</strong>
             <span>Les parties du rapport choisies, prêtes à imprimer.</span>
           </button>
         </div>
