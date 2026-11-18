@@ -26,6 +26,8 @@ const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
 const majs = (perimetres: number, comptes: number) =>
   `${[perimetres || !comptes ? pluriel(perimetres, 'périmètre') : '', comptes ? pluriel(comptes, 'compte') : ''].filter(Boolean).join(' et ')} mis à jour.`
 
+const GROUPE_SITE: Record<string, string> = { principal: 'Sites principaux', agence: 'Agences', deporte: 'Sites déportés' }
+
 interface Apercu {
   pour: string
   nb: number | null
@@ -102,6 +104,13 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
   if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
   if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
   const valeurs = q.data?.valeurs ?? []
+  // R5 : sites rangés par type (principal, agences, déportés) ; changer le type déplace la ligne de groupe.
+  const groupes: [string | null, ValeurRef[]][] = sites
+    ? TYPES_SITE.map((t) => {
+        const liste = valeurs.filter((v) => (v.type_site ?? 'principal') === t)
+        return [`${GROUPE_SITE[t]} (${liste.length})`, liste]
+      })
+    : [[null, valeurs]]
 
   return (
     <Panneau titre={titre}>
@@ -132,7 +141,13 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
             <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
           </thead>
           <tbody>
-            {valeurs.map((v) => (
+            {groupes.map(([titreGroupe, liste]) => [
+              titreGroupe && (
+                <tr key={titreGroupe} className="sous-titre">
+                  <th scope="rowgroup" colSpan={colonnes.length}>{titreGroupe}</th>
+                </tr>
+              ),
+              ...liste.map((v) => (
               <tr key={v.id}>
                 <th scope="row">
                   {renommage?.id === v.id ? (
@@ -212,7 +227,8 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                   </Bouton>
                 </td>
               </tr>
-            ))}
+              )),
+            ])}
           </tbody>
         </table>
       )}

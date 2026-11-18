@@ -201,3 +201,15 @@ test('service : le département se choisit, « Non rattaché » le retire', asyn
   await waitFor(() => expect(ecritures(appels)).toHaveLength(2))
   expect(ecritures(appels)[1].body).toEqual({ departement_id: null })
 })
+
+test('R5 : sites rangés par type, avec le nombre de sites de chaque groupe', async () => {
+  monter(page, PERMS, servir)
+  const sites = within(await screen.findByRole('region', { name: 'Sites' }))
+  await sites.findByRole('row', { name: /Douala/ })
+  const lignes = sites.getAllByRole('row').map((r) => r.textContent ?? '')
+  const i = (t: string) => lignes.findIndex((l) => l.startsWith(t))
+  expect(i('Sites principaux (1)')).toBeGreaterThan(-1)
+  expect(i('Agences (1)')).toBeGreaterThan(i('Yaoundé'))
+  expect(i('Douala')).toBeGreaterThan(i('Agences (1)'))
+  expect(i('Sites déportés (0)')).toBeGreaterThan(i('Douala'))
+})
