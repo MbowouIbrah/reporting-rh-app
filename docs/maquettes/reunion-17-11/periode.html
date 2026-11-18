@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette filtres période</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .zone { max-width: 1100px; margin: var(--sp-5) auto; padding: 0 16px; }
+  .zone .filtres { align-items: flex-end; }
+  .dd-btn { min-width: 220px; }
+  .cal { width: 260px; padding: var(--sp-2); }
+  .cal-tete { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+  .cal-tete .bouton { height: 28px; width: 28px; padding: 0; justify-content: center; }
+  .cal-annee { flex: 1; height: 28px; border: 1px solid var(--rule); background: var(--surface); font: inherit; font-weight: var(--fw-bold); color: var(--navy); cursor: pointer; }
+  .cal-annee:hover { border-color: var(--navy); }
+  .cal-annee.sel { background: var(--navy); color: #fff; }
+  .cal-grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+  .cal-grille button { height: 30px; border: 1px solid var(--rule); background: var(--surface); font: inherit; font-size: var(--fs-sm); color: var(--navy); cursor: pointer; padding: 0 6px; }
+  .cal-grille button:hover:not(:disabled) { border-color: var(--navy); }
+  .cal-grille button.dans, .cal-grille button.apercu { background: #e7eaf2; }
+  .cal-grille button.apercu { border-style: dashed; }
+  .cal-grille button.sel { background: var(--navy); color: #fff; font-weight: var(--fw-bold); }
+  .cal-grille button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+  .cal-pied { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .cal-choix { flex: 1; margin: 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.35; min-height: 2.7em; display: flex; align-items: center; }
+  .cal-choix strong { color: var(--navy); }
+  .cal-pied .bouton { height: 30px; font-size: var(--fs-sm); }
+  .fl { align-self: flex-end; height: 40px; display: flex; align-items: center; color: var(--muted); font-size: 20px; }
+  .resultat { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--rule); background: var(--surface); }
+  .resultat strong { color: var(--navy); }
+  .resultat p { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-sm); }
+  .essais { margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--muted); }
+  .essais li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in">
+  <span><strong>Maquette</strong> · Filtres Période et Comparer à · données fictives (janv. 2023 → oct. 2026)</span>
+  <span class="espace"></span>
+  <a href="index.html">← Sommaire</a>
+</div></div>
+<section class="maq-variante">
+  <h2>Calendrier des mois (retenu)</h2>
+  <ul>
+    <li class="pour">Un seul calendrier : un mois = comparaison mensuelle ; deux mois = une période, même à cheval sur deux années (ex. avril 2025 → mars 2026 pour un exercice fiscal) ; clic sur l’année en haut = comparaison annuelle. Un 2e clic désélectionne.</li>
+    <li class="pour">Rien ne change tant qu’on n’a pas cliqué sur OK ; Échap ou un clic à côté annule.</li>
+  </ul>
+</section>
+
+<div class="zone">
+  <div class="filtres" id="barre"></div>
+  <div class="resultat" id="resultat" aria-live="polite"></div>
+  <ul class="essais">
+    <li>Ouvrez « Période », cliquez l’année en haut, puis OK : comparaison annuelle, « Comparer à » passe aux mêmes mois de l’année d’avant.</li>
+    <li>Cliquez un mois, puis OK : comparaison mensuelle. Cliquez un 2e mois (◀ ▶ pour changer d’année entre les deux), puis OK : une période.</li>
+    <li>Un 2e clic sur un mois ou sur l’année déjà choisis les désélectionne.</li>
+  </ul>
+</div>
+
+<script>
+const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const COURT = ['Janv.','Févr.','Mars','Avr.','Mai','Juin','Juil.','Août','Sept.','Oct.','Nov.','Déc.'];
+const DEB = 2023 * 12, FIN = 2026 * 12 + 9; // janv. 2023 → oct. 2026
+const an = (i) => Math.floor(i / 12), mo = (i) => i % 12;
+const cap = (t) => t[0].toUpperCase() + t.slice(1);
+const nom = (i) => `${cap(MOIS[mo(i)])} ${an(i)}`;
+
+// Sélection : { type: 'mois' | 'plage' | 'annee', d, f } (indices de mois)
+const mois = (i) => ({ type: 'mois', d: i, f: i });
+function plage(a, b) {
+  const d = Math.min(a, b), f = Math.max(a, b);
+  const annee = mo(d) === 0 && an(d) === an(f) && (mo(f) === 11 || f === FIN);
+  return { type: annee ? 'annee' : 'plage', d, f };
+}
+const anneeEntiere = (Y) => plage(Math.max(Y * 12, DEB), Math.min(Y * 12 + 11, FIN));
+// Libellé : toujours la période en entier
+function libelle(s) {
+  if (s.d === s.f) return nom(s.d);
+  if (an(s.d) === an(s.f)) return `${cap(MOIS[mo(s.d)])} → ${MOIS[mo(s.f)]} ${an(s.f)}`;
+  return `${nom(s.d)} → ${MOIS[mo(s.f)]} ${an(s.f)}`;
+}
+// Comparaison par défaut : mois d'avant, ou mêmes mois de l'année d'avant
+const defautCmp = (s) => (s.type === 'mois' ? mois(s.d - 1) : { type: s.type, d: s.d - 12, f: s.f - 12 });
+
+const S = { p: mois(FIN), c: null, ouvert: null, brouillon: null, vueY: null };
+S.c = defautCmp(S.p);
+
+function filtre(k, titre) {
+  const ouvert = S.ouvert === k, b = ouvert ? S.brouillon : S[k];
+  let menu = '';
+  if (ouvert) {
+    const Y = S.vueY;
+    const cases = Array.from({ length: 12 }, (_, j) => {
+      const i = Y * 12 + j, hors = i < DEB || i > FIN;
+      const cls = !b ? '' : i === b.d || i === b.f ? 'sel' : i > b.d && i < b.f ? 'dans' : '';
+      return `<button data-m="${i}" class="${cls}" aria-pressed="${cls === 'sel'}" ${hors ? 'disabled' : ''}>${COURT[j]}</button>`;
+    }).join('');
+    const anSel = !!b && b.type === 'annee' && an(b.d) === Y;
+    const aide = !b ? 'Cliquez l’année ou un mois.'
+      : b.type === 'mois' ? `<span><strong>${nom(b.d)}</strong> · un 2e mois pour une période</span>`
+      : `<span><strong>${libelle(b)}</strong></span>`;
+    menu = `<div class="dd-menu cal" role="dialog" aria-label="${titre}">
+      <div class="cal-tete">
+        <button class="bouton bouton-secondaire" data-nav="-1" ${Y <= an(DEB) ? 'disabled' : ''} aria-label="Année précédente">◀</button>
+        <button class="cal-annee ${anSel ? 'sel' : ''}" data-annee aria-pressed="${anSel}" title="Toute l’année ${Y}">${Y}</button>
+        <button class="bouton bouton-secondaire" data-nav="1" ${Y >= an(FIN) ? 'disabled' : ''} aria-label="Année suivante">▶</button>
+      </div>
+      <div class="cal-grille" id="grille">${cases}</div>
+      <div class="cal-pied">
+        <p class="cal-choix">${aide}</p>
+        <button class="bouton bouton-primaire" data-ok ${b ? '' : 'disabled'}>OK</button>
+      </div></div>`;
+  }
+  return `<div class="champ"><span>${titre}</span><div class="dd ${ouvert ? 'ouvert' : ''}">
+    <button class="dd-btn" data-ouvrir="${k}" aria-haspopup="true" aria-expanded="${ouvert}"><span class="dd-val">${libelle(S[k])}</span></button>${menu}</div></div>`;
+}
+
+const $ = (q) => document.querySelector(q);
+const TYPE = { annee: 'annuelle', mois: 'mensuelle', plage: 'sur une période' };
+function rendre() {
+  $('#barre').innerHTML = `${filtre('p', 'Période')}<span class="fl" aria-hidden="true">↔</span>${filtre('c', 'Comparer à')}`;
+  const np = S.p.f - S.p.d + 1, nc = S.c.f - S.c.d + 1;
+  let note = 'La comparaison se règle seule sur la période précédente ; on peut la changer.';
+  if (np !== nc) note = `Attention : ${np} mois d’un côté, ${nc} de l’autre.`;
+  else if (S.p.type === 'annee' && np < 12) note = 'Année en cours : comparée sur les mêmes mois de chaque côté.';
+  $('#resultat').innerHTML = `Comparaison ${TYPE[S.p.type]} : <strong>${libelle(S.p)}</strong> comparé à <strong>${libelle(S.c)}</strong><p>${note}</p>`;
+}
+const fermer = () => { S.ouvert = null; S.brouillon = null; };
+// Clic sur un mois : sélectionne, ou désélectionne s'il l'était déjà
+function cliqueMois(b, i) {
+  if (!b || b.type === 'annee') return mois(i);
+  if (b.type === 'mois') return b.d === i ? null : plage(b.d, i);
+  if (i === b.d) return mois(b.f);
+  if (i === b.f) return mois(b.d);
+  return mois(i);
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t) { if (S.ouvert && !e.target.closest('.dd')) { fermer(); rendre(); } return; }
+  const d = t.dataset, k = S.ouvert;
+  if (d.ouvrir) {
+    if (S.ouvert === d.ouvrir) fermer();
+    else { fermer(); S.ouvert = d.ouvrir; S.brouillon = { ...S[d.ouvrir] }; S.vueY = an(S.brouillon.f); }
+  }
+  else if (d.nav) S.vueY += Number(d.nav);
+  else if (d.m) S.brouillon = cliqueMois(S.brouillon, Number(d.m));
+  else if (d.annee !== undefined) {
+    const b = S.brouillon, deja = b && b.type === 'annee' && an(b.d) === S.vueY;
+    S.brouillon = deja ? null : anneeEntiere(S.vueY);
+  }
+  else if (d.ok !== undefined) { if (!S.brouillon) return; S[k] = S.brouillon; if (k === 'p') S.c = defautCmp(S.p); fermer(); }
+  else return;
+  rendre();
+});
+// Aperçu de la période au survol, après le 1er clic
+document.addEventListener('mouseover', (e) => {
+  const g = e.target.closest('#grille');
+  const a = S.brouillon && S.brouillon.type === 'mois' ? S.brouillon.d : null;
+  if (!g || a === null) return;
+  const h = e.target.closest('button[data-m]'), x = h ? Number(h.dataset.m) : null;
+  g.querySelectorAll('button[data-m]').forEach((b) => {
+    const i = Number(b.dataset.m);
+    b.classList.toggle('apercu', x !== null && !b.disabled && i !== a && i >= Math.min(a, x) && i <= Math.max(a, x));
+  });
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.ouvert) { fermer(); rendre(); } });
+rendre();
+</script>
+</body>
+</html>
