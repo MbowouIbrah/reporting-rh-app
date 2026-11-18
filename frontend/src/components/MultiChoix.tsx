@@ -3,8 +3,10 @@ import { valeurs } from '../hooks/useFiltres'
 
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-/** Filtre à sélection multiple (R4) : cases à cocher, recherche dans les longues listes.
- *  Valeur : choix séparés par « | » ; vide : tous. */
+/** Filtre à sélection multiple (R4), à la manière d'Excel : toutes les cases cochées par défaut (= tous),
+ *  Tout sélectionner / Tout désélectionner, recherche dans les longues listes.
+ *  Valeur : choix séparés par « | » ; vide : tous. Aucune case cochée n'est qu'un état de saisie :
+ *  à la fermeture, le filtre revient à tous. */
 export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true }: {
   libelle: string
   /** Résumé au-delà de deux choix : « 3 sites ». */
@@ -21,7 +23,17 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   const bouton = useRef<HTMLButtonElement>(null)
   const [ouvert, setOuvert] = useState(false)
   const [saisie, setSaisie] = useState('')
+  const [aucun, setAucun] = useState(false)
   const choisis = valeurs(valeur)
+  // cases cochées : toutes quand le filtre vaut « tous »
+  const coches = aucun ? [] : choisis.length ? choisis : options
+
+  useEffect(() => {
+    if (!ouvert && aucun) {
+      setAucun(false)
+      onChange('')
+    }
+  }, [ouvert, aucun, onChange])
 
   useEffect(() => {
     if (!ouvert) return
@@ -32,18 +44,26 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
     return () => document.removeEventListener('mousedown', dehors)
   }, [ouvert])
 
-  const resume = choisis.length === 0 ? tous
+  const resume = aucun ? 'Aucun'
+    : choisis.length === 0 ? tous
     : choisis.length <= 2 ? choisis.map(nomOption).join(', ')
     : `${choisis.length} ${pluriel}`
   const t = plier(saisie.trim())
   const visibles = t ? options.filter((o) => plier(nomOption(o)).includes(t)) : options
+  const appliquer = (s: Set<string>) => {
+    const garde = options.filter((x) => s.has(x)) // ordre des options : valeur stable (partage, lien)
+    if (!garde.length) return setAucun(true)
+    setAucun(false)
+    onChange(garde.length === options.length ? '' : garde.join('|'))
+  }
   const basculer = (o: string) => {
-    const s = new Set(choisis)
+    const s = new Set(coches)
     if (s.has(o)) s.delete(o)
     else s.add(o)
-    // ordre des options, pour une valeur stable (partage, lien)
-    onChange(options.filter((x) => s.has(x)).concat(choisis.filter((x) => s.has(x) && !options.includes(x))).join('|'))
+    appliquer(s)
   }
+  const tousVisibles = visibles.every((o) => coches.includes(o))
+  const aucunVisible = !visibles.some((o) => coches.includes(o))
 
   return (
     <div
@@ -88,16 +108,21 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
             />
           )}
           <div className="multi-actions">
-            <span>{choisis.length ? `${choisis.length} sur ${options.length}` : tous}</span>
-            <button type="button" className="bouton-lien" disabled={!choisis.length} onClick={() => onChange('')}>
-              Tout effacer
+            <button type="button" className="bouton-lien" disabled={!visibles.length || tousVisibles} onClick={() => appliquer(new Set([...coches, ...visibles]))}>
+              Tout sélectionner
+            </button>
+            <button type="button" className="bouton-lien" disabled={aucunVisible} onClick={() => appliquer(new Set(coches.filter((o) => !visibles.includes(o))))}>
+              Tout désélectionner
             </button>
           </div>
+          <p className="multi-compte" aria-live="polite">
+            {aucun ? 'Cochez au moins une valeur' : `${coches.length} sur ${options.length}`}
+          </p>
           <div className="multi-liste">
             {visibles.length === 0 && <p className="choix-vide">Aucun résultat</p>}
             {visibles.map((o) => (
               <label key={o}>
-                <input type="checkbox" checked={choisis.includes(o)} onChange={() => basculer(o)} />
+                <input type="checkbox" checked={coches.includes(o)} onChange={() => basculer(o)} />
                 {nomOption(o)}
               </label>
             ))}
