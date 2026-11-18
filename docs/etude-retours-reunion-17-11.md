@@ -98,6 +98,12 @@ Le calcul serveur existant (`_front_back`, par activité de la ligne) est étend
 - **Niveau 3** : clic sur une ligne de charge → liste des personnes qui ont un montant sur cette ligne (matricule, nom, service, site, montant, comparaison). Seulement pour les comptes qui ont le droit nominatif ; les autres voient le nombre de personnes, sans nom.
 - Variantes : détail dans la page sous les cartes (A), panneau latéral pour les personnes (B), navigation par fil d'Ariane (C).
 
+### Variantes retenues (18/11)
+- Filtres : **A**, barre en ligne.
+- Répartition des charges : **B**, détail sous les cartes et liste des personnes dans un tiroir latéral.
+- Front / back office dans Budget réalisé : ni A ni B. On reprend la ligne déjà utilisée dans la carte Effectif global (3e ligne en pourcentage, détail au survol), pour rester cohérent.
+- Connexion : **A**, aplat navy avec motif discret.
+
 ## 4. Impacts
 - **Données** : migration (table `marque`, colonne `marque_id` sur activité et sur la ligne importée). Montants inchangés (NUMERIC).
 - **API** : filtres en liste (compatibilité gardée : une seule valeur reste acceptée) ; nouvelle route « personnes d'une charge » (droit nominatif vérifié au serveur, périmètre dans la couche dépôt).
