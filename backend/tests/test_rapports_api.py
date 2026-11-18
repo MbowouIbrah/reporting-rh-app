@@ -229,11 +229,11 @@ def test_annuel_export_periode_au_calendrier(charge):
         "content-disposition"]
     wb = load_workbook(io.BytesIO(r.content))
     valeurs = [c for row in wb["Synthèse"].iter_rows(values_only=True) for c in row]
-    assert "Avril 2025 → mars 2026" in valeurs and "Avril 2024 → mars 2025" in valeurs
+    assert "Avr. 2025 → mars 2026" in valeurs and "Avr. 2024 → mars 2025" in valeurs
     r = get(charge, "annuel/export", du="2026-01", au="2026-10")
     valeurs = [c for row in load_workbook(io.BytesIO(r.content))["Synthèse"].iter_rows(
         values_only=True) for c in row]
-    assert "Janvier → octobre 2026" in valeurs and "Janvier → octobre 2025" in valeurs
+    assert "Janv. → oct. 2026" in valeurs and "Janv. → oct. 2025" in valeurs
     g = get(charge, "annuel/export", du="2026-01", au="2026-02", graphiques=True)
     assert g.status_code == 200 and "graphes-2026-01_2026-02.xlsx" in g.headers[
         "content-disposition"]

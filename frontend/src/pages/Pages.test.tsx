@@ -112,7 +112,7 @@ test('Résumé : effectif global de fin, évolution et répartition par contrat 
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()
   const tuile = (await screen.findByText('Effectif global', { selector: '.micro' })).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Jan 2026/)
+  expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Janv\. 2026/)
   fireEvent.mouseEnter(tuile)
   expect(bulle()).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
   expect(bulle()).not.toHaveTextContent(/Effectif fin/)

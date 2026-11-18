@@ -6,11 +6,11 @@ import {
 const OCT_26 = indice(2026, 10)
 const JANV_23 = indice(2023, 1)
 
-test('libellés toujours complets', () => {
-  expect(libelle(mois(OCT_26))).toBe('Octobre 2026')
-  expect(libelle(plage(indice(2025, 1), indice(2025, 12)))).toBe('Janvier → décembre 2025')
-  expect(libelle(plage(indice(2026, 1), OCT_26, OCT_26))).toBe('Janvier → octobre 2026')
-  expect(libelle(plage(indice(2025, 4), indice(2026, 3)))).toBe('Avril 2025 → mars 2026')
+test('libellés abrégés comme le calendrier', () => {
+  expect(libelle(mois(OCT_26))).toBe('Oct. 2026')
+  expect(libelle(plage(indice(2025, 1), indice(2025, 12)))).toBe('Janv. → déc. 2025')
+  expect(libelle(plage(indice(2026, 1), OCT_26, OCT_26))).toBe('Janv. → oct. 2026')
+  expect(libelle(plage(indice(2025, 4), indice(2026, 3)))).toBe('Avr. 2025 → mars 2026')
 })
 
 test('année : janvier à décembre, ou janvier au dernier mois disponible', () => {
@@ -26,8 +26,8 @@ test('année : janvier à décembre, ou janvier au dernier mois disponible', () 
 test('comparaison par défaut : mois d\'avant, ou mêmes mois un an avant', () => {
   expect(defautCmp(mois(OCT_26))).toEqual(mois(indice(2026, 9)))
   expect(defautCmp(mois(indice(2026, 1)))).toEqual(mois(indice(2025, 12)))
-  expect(libelle(defautCmp(plage(indice(2026, 1), OCT_26, OCT_26)))).toBe('Janvier → octobre 2025')
-  expect(libelle(defautCmp(plage(indice(2025, 4), indice(2026, 3))))).toBe('Avril 2024 → mars 2025')
+  expect(libelle(defautCmp(plage(indice(2026, 1), OCT_26, OCT_26)))).toBe('Janv. → oct. 2025')
+  expect(libelle(defautCmp(plage(indice(2025, 4), indice(2026, 3))))).toBe('Avr. 2024 → mars 2025')
 })
 
 test('clics sur les mois : sélection, plage, désélection', () => {

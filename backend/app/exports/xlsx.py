@@ -12,6 +12,9 @@ from app.kpi import exercice as ex
 
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
         "septembre", "octobre", "novembre", "décembre"]
+# Abréviations de l'écran (calendrier, filtres, en-têtes de colonnes).
+MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.",
+               "nov.", "déc."]
 CELL = ("m1", "m", "var", "var_pct")
 BUDGET = ("budget", "ecart", "ecart_pct")
 TOTAL = "TOTAL CHARGES"
@@ -144,15 +147,15 @@ def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
 
 
 def libelle_periode(du: str, au: str) -> str:
-    """Période « AAAA-MM » -> « Avril 2025 → mars 2026 », « Janvier → octobre 2026 », ou le mois
-    seul (« Octobre 2026 »)."""
+    """Période « AAAA-MM » -> « Avr. 2025 → mars 2026 », « Janv. → oct. 2026 », ou le mois
+    seul (« Oct. 2026 »)."""
     (ad, md), (aa, ma) = (int(du[:4]), int(du[5:7])), (int(au[:4]), int(au[5:7]))
-    debut = f"{MOIS[md - 1].capitalize()} {ad}"
+    debut = f"{MOIS_COURTS[md - 1].capitalize()} {ad}"
     if (ad, md) == (aa, ma):
         return debut
     if ad == aa:
-        return f"{MOIS[md - 1].capitalize()} → {MOIS[ma - 1]} {aa}"
-    return f"{debut} → {MOIS[ma - 1]} {aa}"
+        return f"{MOIS_COURTS[md - 1].capitalize()} → {MOIS_COURTS[ma - 1]} {aa}"
+    return f"{debut} → {MOIS_COURTS[ma - 1]} {aa}"
 
 
 def annuel_periode(r: dict, periode: str, comparee: str) -> bytes:

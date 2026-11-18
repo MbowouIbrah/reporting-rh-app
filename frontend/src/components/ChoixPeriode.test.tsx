@@ -19,9 +19,9 @@ function Banc({ depart, longueur, modele, moisSeul }: { depart: Sel; longueur?: 
 const ouvrir = () => fireEvent.click(screen.getByRole('button', { name: /Période/ }))
 const mois2026 = (nom: string) => screen.getByRole('button', { name: `${nom} 2026` })
 
-test('le bouton dit la période en toutes lettres ; rien ne s\'applique avant OK', () => {
+test('le bouton dit la période en abrégé ; rien ne s\'applique avant OK', () => {
   render(<Banc depart={mois(indice(2026, 10))} />)
-  expect(screen.getByRole('button', { name: 'Période Octobre 2026' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('button', { name: 'Période Oct. 2026' })).toHaveAttribute('aria-expanded', 'false')
   ouvrir()
   expect(screen.getByRole('dialog', { name: 'Période' })).toBeInTheDocument()
   expect(mois2026('octobre')).toHaveAttribute('aria-pressed', 'true')

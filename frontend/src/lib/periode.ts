@@ -1,5 +1,5 @@
 import { type Calendrier, DEBUT_FISCAL, exerciceDe, ordreMois } from './exercice'
-import { MOIS } from './format'
+import { MOIS_COURTS } from './format'
 
 /**
  * Période choisie dans le calendrier des pages annuelles (R6) : un mois, une plage de mois (même à
@@ -20,9 +20,9 @@ export const anneeDe = (i: number) => Math.floor(i / 12)
 export const moisDe = (i: number) => (i % 12) + 1
 
 /** Mois du calendrier, en abréviations de la grille. */
-export const MOIS_GRILLE = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.']
+export const MOIS_GRILLE = MOIS_COURTS
 
-const nomMois = (i: number) => MOIS[moisDe(i) - 1].toLowerCase()
+const nomMois = (i: number) => MOIS_COURTS[moisDe(i) - 1].toLowerCase()
 const cap = (t: string) => t[0].toUpperCase() + t.slice(1)
 const nom = (i: number) => `${cap(nomMois(i))} ${anneeDe(i)}`
 
@@ -44,7 +44,7 @@ export const anneeEntiere = (Y: number, min: number, max: number) =>
 /** Nombre de mois de la période. */
 export const longueur = (s: Sel) => s.f - s.d + 1
 
-/** Libellé toujours complet : « Octobre 2026 », « Janvier → décembre 2025 », « Avril 2025 → mars 2026 ». */
+/** Libellé abrégé : « Oct. 2026 », « Janv. → déc. 2025 », « Avr. 2025 → mars 2026 ». */
 export function libelle(s: Sel) {
   if (s.d === s.f) return nom(s.d)
   if (anneeDe(s.d) === anneeDe(s.f)) return `${cap(nomMois(s.d))} → ${nomMois(s.f)} ${anneeDe(s.f)}`
