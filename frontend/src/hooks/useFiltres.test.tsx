@@ -38,35 +38,56 @@ test('un filtre choisi sur une page vaut pour les autres ; une nouvelle année r
   expect(mensuel.result.current.filtres?.ref_annee).toBeUndefined()
 })
 
-test('un lien qui porte des filtres les impose dès le premier rendu', async () => {
-  const { result } = renderHook(() => useFiltres({ comparaison: 'annee' }), {
-    wrapper: enveloppe('/?annee=2025&cmp_annee=2026'),
+test('pages annuelles : sans choix, le dernier mois comparé au mois d\'avant', async () => {
+  const { result } = renderHook(() => useFiltres({ avecMois: false, comparaison: 'annee' }), { wrapper: enveloppe() })
+  await waitFor(() => expect(result.current.filtres).toMatchObject({
+    annee: 2026, mois: 2, du: '2026-02', au: '2026-02', cmp_du: '2026-01', cmp_au: '2026-01',
+  }))
+  expect(result.current.periode).toMatchObject({ min: 2025 * 12 + 11, max: 2026 * 12 + 1 })
+})
+
+test('un lien qui porte la période et la comparaison les impose dès le premier rendu', async () => {
+  const { result } = renderHook(() => useFiltres({ avecMois: false, comparaison: 'annee' }), {
+    wrapper: enveloppe('/?periode=2025-04..2026-03&comparee=2024-04..2025-03'),
   })
-  await waitFor(() => expect(result.current.filtres).toMatchObject({ annee: 2025, mois: 12, ref_annee: 2026 }))
+  await waitFor(() => expect(result.current.filtres).toMatchObject({
+    annee: 2025, mois: 3, du: '2025-04', au: '2026-03', cmp_du: '2024-04', cmp_au: '2025-03',
+  }))
+  expect(result.current.calendrier).toBe('fiscal')
+  // une comparaison qui n'a pas la même longueur est écartée au profit du défaut
+  act(() => result.current.set({ comparee: '2025-01' }))
+  expect(result.current.filtres).toMatchObject({ cmp_du: '2024-04', cmp_au: '2025-03' })
 })
 
-test("changer de calendrier ou d'exercice remet la comparaison annuelle à zéro, sans toucher au mois", () => {
-  const actuel = { annee: '2026', mois: '2', cmp_annee: '2025', cmp_periode: '2025-12', service: 'SAV PL' }
-  expect(avecCascade({ calendrier: 'fiscal' }, actuel)).toEqual({ calendrier: 'fiscal', cmp_annee: undefined })
-  expect(avecCascade({ exercice: 2024 }, actuel)).toEqual({ exercice: 2024, cmp_annee: undefined })
-  expect(avecCascade({ calendrier: 'fiscal' }, { ...actuel, calendrier: 'fiscal' })).toEqual({ calendrier: 'fiscal' })
+test('anciens liens : année, vue et mois traduits en période, puis anciennes clés retirées', async () => {
+  const { result } = renderHook(() => useFiltres({ avecMois: false, comparaison: 'annee' }), {
+    wrapper: enveloppe('/?annee=2025&vue=mois&fin=3&cmp_annee=2024'),
+  })
+  await waitFor(() => expect(result.current.filtres).toMatchObject({ du: '2025-03', au: '2025-03', cmp_du: '2025-02' }))
+  await waitFor(() => expect(result.current.partage.vue).toBeUndefined())
+  expect(result.current.partage).toMatchObject({ periode: '2025-03' })
+  expect(result.current.partage.cmp_annee).toBeUndefined()
 })
 
-test("en fiscal : années d'exercice, exercice et mois par défaut", async () => {
+test('une nouvelle période remet la comparaison à son défaut ; une nouvelle année, le mois et la comparaison mensuelle', () => {
+  const actuel = { annee: '2026', mois: '2', periode: '2026-02', comparee: '2025-02', cmp_periode: '2025-12', service: 'SAV PL' }
+  expect(avecCascade({ periode: '2026-01' }, actuel)).toEqual({ periode: '2026-01', comparee: undefined })
+  expect(avecCascade({ periode: '2026-02' }, actuel)).toEqual({ periode: '2026-02' })
+  expect(avecCascade({ periode: '2026-01', comparee: '2025-01' }, actuel)).toEqual({ periode: '2026-01', comparee: '2025-01' })
+  expect(avecCascade({ annee: 2025 }, actuel)).toEqual({ annee: 2025, mois: undefined, cmp_periode: undefined })
+})
+
+test("exercice fiscal : une période avril → mars donne l'exercice, le calendrier fiscal et les années d'exercice", async () => {
   const { result } = renderHook(() => useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true }), {
-    wrapper: enveloppe('/?calendrier=fiscal'),
+    wrapper: enveloppe('/?periode=2025-04..2026-03'),
   })
-  await waitFor(() => expect(result.current.filtres).toMatchObject({ annee: 2025, mois: 2, calendrier: 'fiscal' }))
+  await waitFor(() => expect(result.current.filtres).toMatchObject({ annee: 2025, mois: 3, calendrier: 'fiscal' }))
   expect(result.current.calendrier).toBe('fiscal')
   expect(result.current.annees).toEqual([2025])
   // une page sans calendrier reste civile
   const civil = renderHook(() => useFiltres({ comparaison: 'periode' }), { wrapper: enveloppe() })
   await waitFor(() => expect(civil.result.current.filtres).toMatchObject({ annee: 2026, mois: 2 }))
   expect(civil.result.current.filtres?.calendrier).toBeUndefined()
-  // choisir un exercice ne change pas l'année civile de Mensuel
-  act(() => result.current.set({ annee: 2024 }))
-  expect(result.current.filtres).toMatchObject({ annee: 2024, mois: 3 })
-  expect(civil.result.current.filtres).toMatchObject({ annee: 2026, mois: 2 })
 })
 
 // [service, site, type de site, activité, contrat, poste]

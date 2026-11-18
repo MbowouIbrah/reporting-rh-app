@@ -6,14 +6,14 @@ import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { bornesDe, libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
+import FiltresPeriode, { libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
 import { ordreMois, type Calendrier } from '../lib/exercice'
-import { periodePrecedente } from '../lib/periode'
+import { anneeDe, indice, lireMois, moisDe } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -97,16 +97,16 @@ export default function Resume() {
   const base = f.filtres && {
     annee: f.filtres.annee,
     mois: f.filtres.mois,
-    ref_annee: f.filtres.ref_annee,
+    du: f.filtres.du,
+    au: f.filtres.au,
+    cmp_du: f.filtres.cmp_du,
+    cmp_au: f.filtres.cmp_au,
     departement: f.filtres.departement,
     service: f.filtres.service,
     site: f.filtres.site,
     type_site: f.filtres.type_site,
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
-    calendrier: f.filtres.calendrier,
-    debut: f.filtres.debut,
-    cmp: f.filtres.cmp,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
   const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat))
@@ -147,13 +147,14 @@ export default function Resume() {
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
   // Dernier mois saisi avec sa vraie année (en fiscal, l'exercice 2025-26 finit en 2026).
   const finN = f.filtres && a?.mois_fin ? (a.annee_fin ?? f.filtres.annee) : undefined
-  const ecart = f.filtres ? f.filtres.annee - (f.filtres.ref_annee ?? f.filtres.annee - 1) : 1
   const moisFin = finN && a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
   const finAn = finN ? `${finN}` : an
-  // Fin de la période comparée : même mois de l'exercice comparé, ou fin de la période précédente.
-  const prec = f.filtres?.cmp === 'prec' ? periodePrecedente(f.filtres.annee, bornesDe(f.filtres), f.filtres.calendrier ?? 'civil').fin : null
-  const finCmp = f.filtres?.cmp === 'aucune' ? n1 : prec ? `${MOIS_COURTS[prec.mois - 1]} ${prec.annee}` : finN ? `${moisFin} ${finN - ecart}` : n1
-  const parRapport = (x: string) => (f.filtres?.cmp === 'aucune' ? n1 : `Évolution par rapport à ${x}`)
+  // Fin de la période comparée : le dernier mois saisi, décalé comme la comparaison l'est de la période.
+  const du = lireMois(f.filtres?.du)
+  const cmpDu = lireMois(f.filtres?.cmp_du)
+  const iFinCmp = finN && a?.mois_fin && du !== null && cmpDu !== null ? indice(finN, a.mois_fin) + cmpDu - du : null
+  const finCmp = iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
+  const parRapport = (x: string) => `Évolution par rapport à ${x}`
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -164,7 +165,7 @@ export default function Resume() {
       <BulleCases>
       <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} derniere={f.periode?.derniere} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} onChange={f.set} />
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}

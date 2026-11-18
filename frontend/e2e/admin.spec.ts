@@ -70,8 +70,9 @@ test('lecteur de périmètre : pas d’administration', async ({ page }) => {
 test('export PDF mensuel : le rapport s’ouvre avec les filtres de l’écran', async ({ page }) => {
   await connecter(page, courriel('admin'))
   await page.getByRole('link', { name: 'Mensuel' }).click()
-  await page.getByRole('combobox', { name: 'Période' }).click()
-  await page.getByRole('option').filter({ hasText: 'Janvier' }).filter({ hasText: '2026' }).click()
+  await page.getByRole('button', { name: /^Période/ }).click()
+  await page.getByRole('button', { name: 'janvier 2026' }).click()
+  await page.getByRole('button', { name: 'OK' }).click()
   await page.getByRole('button', { name: 'Exporter en PDF' }).click()
   const [rapport] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Exporter', exact: true }).click()])
   await expect(rapport).toHaveURL(/\/rapport\?(?=.*annee=2026)(?=.*mois=1(&|$))(?=.*sections=mensuel(&|$))/)

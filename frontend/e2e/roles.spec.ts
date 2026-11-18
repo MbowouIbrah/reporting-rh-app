@@ -49,8 +49,9 @@ test('directeur commercial VN : seul son service', async ({ page }) => {
 test('filtres partagés entre pages', async ({ page }) => {
   await connecter(page, courriel('admin'))
   await page.getByRole('link', { name: 'Mensuel' }).click()
-  await page.getByRole('combobox', { name: 'Période' }).click()
-  await page.getByRole('option').filter({ hasText: 'Janvier' }).filter({ hasText: '2026' }).click()
+  await page.getByRole('button', { name: /^Période/ }).click()
+  await page.getByRole('button', { name: 'janvier 2026' }).click()
+  await page.getByRole('button', { name: 'OK' }).click()
   await expect(page).toHaveURL(/mois=1/)
   const service = () => page.getByRole('combobox', { name: 'Service' })
   const libelle = (await service().locator('option').nth(1).textContent())!
@@ -60,7 +61,7 @@ test('filtres partagés entre pages', async ({ page }) => {
   await expect(service()).toHaveValue(libelle)
   await page.getByRole('link', { name: 'Mensuel' }).click()
   await expect(service()).toHaveValue(libelle)
-  await expect(page.getByRole('combobox', { name: 'Période' })).toContainText(/Janvier\s*2026/)
+  await expect(page.getByRole('button', { name: /^Période/ })).toContainText(/Janvier\s*2026/)
 })
 
 test('access token supprimé : rattrapé par le refresh', async ({ page, context }) => {

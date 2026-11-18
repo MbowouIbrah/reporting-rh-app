@@ -111,8 +111,8 @@ test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
 test('Résumé : effectif global de fin, évolution et répartition par contrat en bulle', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()
-  const tuile = (await screen.findByText('Évolution par rapport à Fév 2025')).closest('.tuile')!
-  expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Fév 2025/)
+  const tuile = (await screen.findByText('Effectif global', { selector: '.micro' })).closest('.tuile')!
+  expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Jan 2026/)
   fireEvent.mouseEnter(tuile)
   expect(bulle()).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
   expect(bulle()).not.toHaveTextContent(/Effectif fin/)

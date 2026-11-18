@@ -1,86 +1,146 @@
-import { type Calendrier, DEBUT_FISCAL, libelleExercice, ordreMois } from './exercice'
-import { MOIS, MOIS_COURTS } from './format'
+import { type Calendrier, DEBUT_FISCAL, exerciceDe, ordreMois } from './exercice'
+import { MOIS } from './format'
 
-/** Raccourcis du menu « Période » des pages annuelles (R6, variante A). Une période reste dans un exercice. */
-export type Vue = 'mois' | 'trimestre' | 'cumul' | 'annee' | 'plage'
-export const VUES: { vue: Vue; libelle: string }[] = [
-  { vue: 'mois', libelle: 'Mois' },
-  { vue: 'trimestre', libelle: 'Trimestre' },
-  { vue: 'cumul', libelle: "Cumul de l'exercice" },
-  { vue: 'annee', libelle: 'Année' },
-  { vue: 'plage', libelle: 'De… à…' },
-]
-export const lireVue = (v: string | undefined): Vue => VUES.find((x) => x.vue === v)?.vue ?? 'cumul'
+/**
+ * Période choisie dans le calendrier des pages annuelles (R6) : un mois, une plage de mois (même à
+ * cheval sur deux années) ou une année. Les mois sont des indices : année * 12 + (mois - 1).
+ */
+export type TypeSel = 'mois' | 'plage' | 'annee'
+export interface Sel { type: TypeSel; d: number; f: number }
 
-/** Comparaison : vide = même période d'un autre exercice (N-1 par défaut), période précédente, aucune. */
-export type Cmp = '' | 'prec' | 'aucune'
-export const lireCmp = (v: string | undefined): Cmp => (v === 'prec' || v === 'aucune' ? v : '')
+/** Période et comparaison affichées, avec les mois disponibles (indices) : bornes du calendrier. */
+export interface PeriodeChoisie { sel: Sel; cmp: Sel; min: number; max: number }
 
-/** Rang (1 à 12) d'un vrai mois dans l'exercice, et l'inverse. */
-export const rang = (mois: number, cal: Calendrier) => ordreMois(cal).indexOf(mois) + 1
-export const moisDeRang = (r: number, cal: Calendrier) => ordreMois(cal)[r - 1]
-/** Vraie année d'un mois de l'exercice `annee` (en fiscal, janvier à mars tombent l'année d'après). */
-export const anneeReelle = (annee: number, mois: number, cal: Calendrier) =>
-  cal === 'fiscal' && mois < DEBUT_FISCAL ? annee + 1 : annee
+/** Plus longue période acceptée par le serveur. */
+export const MAX_MOIS = 12
 
-/** Bornes d'une période, en rangs de l'exercice. */
-export interface Bornes { debut: number; fin: number }
+export const indice = (annee: number, mois: number) => annee * 12 + mois - 1
+export const anneeDe = (i: number) => Math.floor(i / 12)
+/** Numéro du mois (1 à 12). */
+export const moisDe = (i: number) => (i % 12) + 1
 
-/** Bornes du raccourci choisi. `derniere` : rang du dernier mois saisi (12 pour un exercice fini) ;
- *  `fin`, `debut` : rangs choisis dans le menu (absents : valeurs par défaut). */
-export function bornes(vue: Vue, derniere: number, fin?: number, debut?: number): Bornes {
-  const f = Math.min(Math.max(fin ?? derniere, 1), 12)
-  switch (vue) {
+/** Mois du calendrier, en abréviations de la grille. */
+export const MOIS_GRILLE = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.']
+
+const nomMois = (i: number) => MOIS[moisDe(i) - 1].toLowerCase()
+const cap = (t: string) => t[0].toUpperCase() + t.slice(1)
+const nom = (i: number) => `${cap(nomMois(i))} ${anneeDe(i)}`
+
+export const mois = (i: number): Sel => ({ type: 'mois', d: i, f: i })
+
+/** Plage entre deux mois (dans n'importe quel ordre). Janvier → décembre d'une même année, ou
+ *  janvier → dernier mois disponible `max` de cette année, vaut « année ». */
+export function plage(a: number, b: number, max?: number): Sel {
+  const d = Math.min(a, b)
+  const f = Math.max(a, b)
+  const annee = moisDe(d) === 1 && anneeDe(d) === anneeDe(f) && (moisDe(f) === 12 || f === max)
+  return { type: annee ? 'annee' : 'plage', d, f }
+}
+
+/** L'année `Y` entière, bornée aux mois disponibles. */
+export const anneeEntiere = (Y: number, min: number, max: number) =>
+  plage(Math.max(Y * 12, min), Math.min(Y * 12 + 11, max), max)
+
+/** Nombre de mois de la période. */
+export const longueur = (s: Sel) => s.f - s.d + 1
+
+/** Libellé toujours complet : « Octobre 2026 », « Janvier → décembre 2025 », « Avril 2025 → mars 2026 ». */
+export function libelle(s: Sel) {
+  if (s.d === s.f) return nom(s.d)
+  if (anneeDe(s.d) === anneeDe(s.f)) return `${cap(nomMois(s.d))} → ${nomMois(s.f)} ${anneeDe(s.f)}`
+  return `${nom(s.d)} → ${nomMois(s.f)} ${anneeDe(s.f)}`
+}
+
+/** Comparaison par défaut : le mois d'avant, ou les mêmes mois de l'année d'avant. */
+export const defautCmp = (s: Sel): Sel => (s.type === 'mois' ? mois(s.d - 1) : { type: s.type, d: s.d - 12, f: s.f - 12 })
+
+/** Clic sur un mois : le sélectionne, forme une plage avec le mois déjà choisi, ou le désélectionne (null). */
+export function cliqueMois(b: Sel | null, i: number, max?: number): Sel | null {
+  if (!b || b.type === 'annee') return mois(i)
+  if (b.type === 'mois') return b.d === i ? null : plage(b.d, i, max)
+  if (i === b.d) return mois(b.f)
+  if (i === b.f) return mois(b.d)
+  return mois(i)
+}
+
+/** Texte d'URL : « 2026-10 » pour un mois, « 2025-04..2026-03 » sinon. */
+export const texteMois = (i: number) => `${anneeDe(i)}-${String(moisDe(i)).padStart(2, '0')}`
+export const versTexte = (s: Sel) => (s.d === s.f ? texteMois(s.d) : `${texteMois(s.d)}..${texteMois(s.f)}`)
+
+/** Indice d'un mois « AAAA-MM », ou null. */
+export function lireMois(t: string | undefined): number | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(t ?? '')
+  const n = m ? Number(m[2]) : 0
+  return m && n >= 1 && n <= 12 ? indice(Number(m[1]), n) : null
+}
+
+/** Relit un texte d'URL ; null s'il est absent, illisible, à l'envers ou de plus de 12 mois. */
+export function lireTexte(t: string | undefined, max?: number): Sel | null {
+  const [a, b = a, reste] = (t ?? '').split('..')
+  if (!t || reste !== undefined) return null
+  const d = lireMois(a)
+  const f = lireMois(b)
+  if (d === null || f === null || f < d || f - d + 1 > MAX_MOIS) return null
+  return d === f ? mois(d) : plage(d, f, max)
+}
+
+/** Exercice de base de la période (comme le serveur) : janvier si elle tient dans une année civile,
+ *  sinon 12 mois à partir de son premier mois. */
+export function exerciceBase(s: Sel) {
+  return { annee: anneeDe(s.d), depart: anneeDe(s.d) === anneeDe(s.f) ? 1 : moisDe(s.d) }
+}
+
+/** « 2026 » pour un exercice qui commence en janvier, « 2025-26 » sinon ; `decalage` en années. */
+export function libelleExercicePeriode(s: Sel, decalage = 0) {
+  const { annee, depart } = exerciceBase(s)
+  const a = annee + decalage
+  return depart === 1 ? `${a}` : `${a}-${String((a + 1) % 100).padStart(2, '0')}`
+}
+
+/** Calendrier des listes liées à la période : fiscal pour un exercice qui commence en avril. */
+export const calendrierDe = (s: Sel): Calendrier =>
+  moisDe(s.d) === DEBUT_FISCAL && anneeDe(s.d) !== anneeDe(s.f) ? 'fiscal' : 'civil'
+
+/** Anciennes clés d'URL des pages annuelles, relues une fois pour fabriquer la période. */
+export interface AnciensFiltres {
+  annee?: string
+  exercice?: string
+  calendrier?: string
+  vue?: string
+  debut?: string
+  fin?: string
+}
+
+/** Période équivalente aux anciens filtres (cumul de l'exercice par défaut, mois, trimestre, année, plage). */
+export function migrer(p: AnciensFiltres, derniere: { annee: number; mois: number }, max: number): Sel | null {
+  if (!(p.annee || p.exercice || p.vue || p.debut || p.fin)) return null
+  const cal: Calendrier = p.calendrier === 'fiscal' ? 'fiscal' : 'civil'
+  const exDerniere = exerciceDe(derniere.annee, derniere.mois, cal)
+  const ex = Number(cal === 'fiscal' ? p.exercice : p.annee) || exDerniere
+  const ordre = ordreMois(cal)
+  const depart = indice(ex, ordre[0])
+  const rangDe = (v: string | undefined) => {
+    const m = Number(v)
+    return Number.isInteger(m) && m >= 1 && m <= 12 ? ordre.indexOf(m) + 1 : undefined
+  }
+  const rangDerniere = ex === exDerniere ? ordre.indexOf(derniere.mois) + 1 : 12
+  const fin = Math.min(Math.max(rangDe(p.fin) ?? rangDerniere, 1), 12)
+  let debut = 1
+  let dernier = fin
+  switch (p.vue) {
     case 'mois':
-      return { debut: f, fin: f }
-    case 'trimestre': {
-      const q = Math.ceil(f / 3)
-      return { debut: 3 * q - 2, fin: 3 * q }
-    }
+      debut = fin
+      break
+    case 'trimestre':
+      debut = 3 * Math.ceil(fin / 3) - 2
+      dernier = debut + 2
+      break
     case 'annee':
-      return { debut: 1, fin: 12 }
+      dernier = 12
+      break
     case 'plage':
-      return { debut: Math.min(Math.max(debut ?? 1, 1), f), fin: f }
-    default:
-      return { debut: 1, fin: f }
+      debut = Math.min(Math.max(rangDe(p.debut) ?? 1, 1), fin)
+      break
   }
-}
-
-const court = (m: number) => MOIS_COURTS[m - 1]
-
-/** « Mars 2026 », « Avr → juin 2026 », « Nov 2026 → fév 2027 », « Exercice 2026-27 ». */
-export function libelleBornes(annee: number, b: Bornes, cal: Calendrier) {
-  const md = moisDeRang(b.debut, cal)
-  const mf = moisDeRang(b.fin, cal)
-  const ad = anneeReelle(annee, md, cal)
-  const af = anneeReelle(annee, mf, cal)
-  if (b.debut === b.fin) return `${MOIS[mf - 1]} ${af}`
-  if (b.debut === 1 && b.fin === 12) return cal === 'fiscal' ? `Exercice ${libelleExercice(annee, cal)}` : `Année ${annee}`
-  const fin = `${court(mf).toLowerCase()} ${af}`
-  return ad === af ? `${court(md)} → ${fin}` : `${court(md)} ${ad} → ${fin}`
-}
-
-/** En-tête court d'une colonne : l'exercice pour un cumul ou une année (comme avant), la période sinon. */
-export const libelleColonne = (annee: number, vue: Vue, b: Bornes, cal: Calendrier) =>
-  vue === 'cumul' || vue === 'annee' ? libelleExercice(annee, cal) : libelleBornes(annee, b, cal)
-
-/** Vrais mois (année, mois) de la période précédente : les mêmes nombre de mois juste avant le début. */
-export function periodePrecedente(annee: number, b: Bornes, cal: Calendrier) {
-  const md = moisDeRang(b.debut, cal)
-  const k = anneeReelle(annee, md, cal) * 12 + md - 1 - (b.fin - b.debut + 1)
-  const n = b.fin - b.debut
-  const mois = (i: number) => ({ annee: Math.floor((k + i) / 12), mois: ((k + i) % 12) + 1 })
-  return { debut: mois(0), fin: mois(n) }
-}
-
-/** Libellé de la période comparée (colonnes, évolutions). */
-export function libelleComparee(annee: number, vue: Vue, b: Bornes, cal: Calendrier, cmp: Cmp, refAnnee?: number) {
-  if (cmp === 'aucune') return 'Sans comparaison'
-  if (cmp === 'prec') {
-    const { debut: d, fin: f } = periodePrecedente(annee, b, cal)
-    if (d.annee === f.annee && d.mois === f.mois) return `${MOIS[f.mois - 1]} ${f.annee}`
-    const fin = `${court(f.mois).toLowerCase()} ${f.annee}`
-    return d.annee === f.annee ? `${court(d.mois)} → ${fin}` : `${court(d.mois)} ${d.annee} → ${fin}`
-  }
-  return libelleColonne(refAnnee ?? annee - 1, vue, b, cal)
+  return debut === dernier ? mois(depart + debut - 1) : plage(depart + debut - 1, depart + dernier - 1, max)
 }

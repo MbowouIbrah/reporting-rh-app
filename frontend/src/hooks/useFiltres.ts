@@ -7,7 +7,9 @@ import { type FiltresPage, getFiltres, getPeriodes } from '../api/rapports'
 import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { type Calendrier, DEBUT_FISCAL, exerciceDe } from '../lib/exercice'
-import { bornes, lireCmp, lireVue, moisDeRang, rang } from '../lib/periode'
+import {
+  anneeDe, calendrierDe, defautCmp, indice, longueur, lireTexte, migrer, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
+} from '../lib/periode'
 import {
   abonnerPartage,
   CLES_PARTAGEES,
@@ -20,17 +22,14 @@ import {
 const STALE = 5 * 60 * 1000
 
 /** Une nouvelle année remet à zéro le mois et les comparaisons ; un nouveau mois, la période comparée.
- *  Un nouveau calendrier remet aussi l'année : « 2026 » n'a pas le même sens en civil et en fiscal. */
+ *  Un nouveau calendrier remet aussi l'année : « 2026 » n'a pas le même sens en civil et en fiscal.
+ *  Une nouvelle période (pages annuelles) remet la comparaison à sa valeur par défaut. */
 export function avecCascade(patch: Patch, actuel: Partage): Patch {
   const p = { ...patch }
-  const change = (k: 'annee' | 'mois' | 'calendrier' | 'exercice') => k in p && String(p[k] ?? '') !== (actuel[k] ?? '')
+  const change = (k: 'annee' | 'mois' | 'calendrier' | 'exercice' | 'periode') => k in p && String(p[k] ?? '') !== (actuel[k] ?? '')
   if (change('annee') && !('mois' in p)) p.mois = undefined
-  // La comparaison annuelle est une année civile ou un exercice, selon le calendrier.
-  if ((change('annee') || change('calendrier') || change('exercice')) && !('cmp_annee' in p)) p.cmp_annee = undefined
   if ((change('annee') || change('mois')) && !('cmp_periode' in p)) p.cmp_periode = undefined
-  // Mois choisis dans le menu Période : propres à un exercice.
-  for (const k of ['fin', 'debut'] as const)
-    if ((change('annee') || change('calendrier') || change('exercice')) && !(k in p)) p[k] = undefined
+  if (change('periode') && !('comparee' in p)) p.comparee = undefined
   return p
 }
 
@@ -128,7 +127,7 @@ export function sansIncompatibles(combis: string[][], actuel: Choix, patch: Patc
 interface Options {
   /** La page affiche un sélecteur de mois ; sinon le mois partagé est ignoré (dernier mois saisi). */
   avecMois?: boolean
-  /** Comparaison choisie : une année (annuel) ou une période AAAA-MM (mensuel). Défaut : N-1 ou M-1. */
+  /** Comparaison choisie : une période (annuel) ou un mois AAAA-MM (mensuel). Défaut : mois ou période d'avant. */
   comparaison?: 'annee' | 'periode'
   /** La page suit le choix « année civile / fiscale » (pages annuelles) ; sinon toujours civile. */
   avecCalendrier?: boolean
@@ -150,12 +149,25 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     if (!periodes.isPlaceholderData && periodes.data) ecrireCache('periodes', periodes.data)
   }, [periodes.data, periodes.isPlaceholderData])
   const derniere = periodes.data?.at(-1)
-  const calendrier: Calendrier = avecCalendrier && p.calendrier === 'fiscal' ? 'fiscal' : 'civil'
+  // Pages annuelles : période et comparaison (R6). Sans choix, les anciens filtres (année, vue, mois…)
+  // sont traduits ; sinon le dernier mois disponible, comparé au mois d'avant.
+  const premierMois = periodes.data?.[0]
+  const min = premierMois && indice(premierMois.annee, premierMois.mois)
+  const max = derniere && indice(derniere.annee, derniere.mois)
+  const periode: PeriodeChoisie | null = (() => {
+    if (comparaison !== 'annee' || !derniere || min === undefined || max === undefined) return null
+    const sel = lireTexte(p.periode, max) ?? migrer(p, derniere, max) ?? moisSel(max)
+    const cmp = lireTexte(p.comparee, max)
+    return { sel, cmp: cmp && longueur(cmp) === longueur(sel) ? cmp : defautCmp(sel), min, max }
+  })()
+  const calendrier: Calendrier = periode
+    ? calendrierDe(periode.sel)
+    : avecCalendrier && p.calendrier === 'fiscal' ? 'fiscal' : 'civil'
   const fiscal = calendrier === 'fiscal' ? calendrier : undefined
   const exDerniere = derniere && exerciceDe(derniere.annee, derniere.mois, calendrier)
   // En fiscal, l'année est celle du début de l'exercice (2026 = avril 2026 → mars 2027), partagée
   // sous sa propre clé : `annee` reste une année civile pour les autres pages (Mensuel).
-  const annee = Number(fiscal ? p.exercice : p.annee) || exDerniere
+  const annee = periode ? anneeDe(periode.sel.d) : Number(fiscal ? p.exercice : p.annee) || exDerniere
   const finExercice = fiscal ? DEBUT_FISCAL - 1 : 12
   const moisDefaut = (annee === exDerniere ? derniere?.mois : finExercice) || finExercice
   const mois = (avecMois && Number(p.mois)) || moisDefaut
@@ -169,21 +181,23 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     retry: queryRetry,
   })
 
-  // Pages annuelles (R6) : bornes du raccourci choisi dans le menu Période, en rangs de l'exercice.
-  const vue = lireVue(p.vue)
-  const cmp = lireCmp(p.cmp)
-  const rangDe = (v: string | undefined) => {
-    const m = Number(v)
-    return Number.isInteger(m) && m >= 1 && m <= 12 ? rang(m, calendrier) : undefined
-  }
-  const rangDerniere = rang(moisDefaut, calendrier)
-  const periode = comparaison === 'annee'
-    ? { vue, cmp, derniere: rangDerniere, bornes: bornes(vue, rangDerniere, rangDe(p.fin), rangDe(p.debut)) }
-    : null
+  // Anciennes clés des pages annuelles (vue, mois de début et de fin, comparaison) : traduites en
+  // période une fois, puis retirées.
+  const anciennes = ['vue', 'debut', 'fin', 'cmp', 'cmp_annee'] as const
+  const aMigrer = !!periode && anciennes.some((k) => p[k])
+  const texteSel = periode && versTexte(periode.sel)
+  const periodeLue = max !== undefined && !!lireTexte(p.periode, max)
+  useEffect(() => {
+    if (!aMigrer || !texteSel) return
+    set({
+      ...Object.fromEntries(anciennes.map((k) => [k, undefined])),
+      ...(!periodeLue && { periode: texteSel, comparee: p.comparee }),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aMigrer, texteSel, periodeLue])
 
   const ref = (() => {
-    if (comparaison === 'annee' && cmp) return {}
-    if (comparaison === 'annee' && p.cmp_annee) return { ref_annee: Number(p.cmp_annee) }
+    if (periode) return {}
     const m = comparaison === 'periode' ? /^(\d{4})-(\d{1,2})$/.exec(p.cmp_periode ?? '') : null
     return m ? { ref_annee: Number(m[1]), ref_mois: Number(m[2]) } : {}
   })()
@@ -204,11 +218,12 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
 
   const filtres: FiltresPage | null = annee === undefined ? null : {
     annee,
-    mois: periode ? moisDeRang(periode.bornes.fin, calendrier) : mois,
+    mois: periode ? moisDe(periode.sel.f) : mois,
     ...(periode && {
-      debut: periode.bornes.debut > 1 ? moisDeRang(periode.bornes.debut, calendrier) : undefined,
-      cmp: periode.cmp || undefined,
-      vue: periode.vue,
+      du: texteMois(periode.sel.d),
+      au: texteMois(periode.sel.f),
+      cmp_du: texteMois(periode.cmp.d),
+      cmp_au: texteMois(periode.cmp.f),
     }),
     departement: choix.departement,
     service: choix.service,
@@ -238,7 +253,7 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     partage: p,
     periodes: periodes.data ?? [],
     calendrier,
-    /** Pages annuelles : raccourci, comparaison et bornes (rangs) de la période affichée. */
+    /** Pages annuelles : période, comparaison et mois disponibles (bornes du calendrier). */
     periode,
     annees: [...new Set(periodes.data?.map((x) => exerciceDe(x.annee, x.mois, calendrier)))],
     // Filtre « Département » proposé seulement quand le périmètre en couvre plusieurs.

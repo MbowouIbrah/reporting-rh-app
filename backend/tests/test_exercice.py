@@ -17,6 +17,15 @@ def test_mois_exercice_et_rang():
     assert ex.rang(7) == 7
 
 
+def test_exercice_depuis_un_mois_quelconque():
+    n = ex.mois_exercice(2025, 11)
+    assert n[0] == (2025, 11) and n[1] == (2025, 12) and n[2] == (2026, 1) and n[11] == (2026, 10)
+    assert [ex.rang(m, 11) for m in (11, 1, 10)] == [1, 3, 12]
+    assert ex.mois_exercice(2025, 4) == ex.mois_exercice(2025, "fiscal")
+    assert ex.mois_exercice(2025, 1) == ex.mois_exercice(2025)
+    assert ex.texte(ex.indice("2026-10")) == "2026-10" and ex.indice("2026-01") == 2026 * 12
+
+
 def test_en_mois_reels():
     res = {"serie_n": [{"mois": 1}, {"mois": 10}], "serie_n1": [{"mois": 12}], "mois_fin": 11}
     out = ex.en_mois_reels(res, 2025, 2024, "fiscal")

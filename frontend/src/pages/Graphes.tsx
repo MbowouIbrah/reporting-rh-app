@@ -13,7 +13,7 @@ import { useMontageDiffere } from '../hooks/useMontageDiffere'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
-import { libelleExercice } from '../lib/exercice'
+import { libelleExercicePeriode } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
 import { usePeut } from '../auth/AuthContext'
@@ -178,7 +178,6 @@ export default function Graphes() {
   const [premier, relais] = useAttente(ann.isLoading)
   const erreur = premier ? null : ann.error
 
-  const annee = f.filtres?.annee
   const contrats = ann.data?.d_contrat.effectifs.map((c) => c.contrat) ?? []
   const n1 = ann.data?.serie_n1
   const serie = premier ? undefined : ann.data?.serie_n.map((m: SerieMois, i) => ({
@@ -250,7 +249,7 @@ export default function Graphes() {
     )
   }
   // Pas de série N-1 (ni d'entrée de légende) quand l'année précédente n'a aucune paie
-  const avecN1 = f.filtres?.cmp !== 'aucune' && !!n1?.some((m) => m.remuneration != null)
+  const avecN1 = !!n1?.some((m) => m.remuneration != null)
   const aVentes = !!serie?.some((m) => m.ventes != null)
   const aClients = !!serie?.some((m) => m.clients != null)
   const aOr = !!serie?.some((m) => m.orProd != null)
@@ -260,8 +259,8 @@ export default function Graphes() {
   // Objectif tracé seulement s'il est défini sur au moins un mois
   const aObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => !!serie?.some((m) => m[k] != null)
   const lectObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => (aObj(k) ? ' ; en pointillés rouges, l’objectif' : '')
-  const serieN = annee === undefined ? '' : libelleExercice(annee, f.filtres?.calendrier)
-  const serieN1 = f.filtres ? libelleExercice(f.filtres.ref_annee ?? f.filtres.annee - 1, f.filtres.calendrier) : ''
+  const serieN = f.periode ? libelleExercicePeriode(f.periode.sel) : ''
+  const serieN1 = f.periode ? libelleExercicePeriode(f.periode.sel, -1) : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
   // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
@@ -424,7 +423,7 @@ export default function Graphes() {
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" onGraphiques={rapport ? undefined : () => { setCoches([]); setExportEtat('') }} />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} derniere={f.periode?.derniere} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} periode={f.periode} onChange={f.set} />
       )}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}

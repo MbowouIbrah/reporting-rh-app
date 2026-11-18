@@ -260,6 +260,11 @@ export interface Annuel {
   /** Dernier mois saisi de la période : base de l'effectif de fin. */
   mois_fin: number | null
   annee_fin?: number | null
+  /** Période servie et période comparée, « AAAA-MM » (R6). */
+  du?: string
+  au?: string
+  cmp_du?: string
+  cmp_au?: string
   effectif_fin: Cell
   front_back?: FrontBack | null
   effectif_fin_contrat: Record<string, Cell & { part: Val }>

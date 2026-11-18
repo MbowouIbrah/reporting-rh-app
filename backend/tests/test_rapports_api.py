@@ -1,6 +1,8 @@
+import io
 from decimal import Decimal as D
 
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent
@@ -167,6 +169,78 @@ def test_annuel_periode_et_comparaison(charge):
     assert get(charge, "annuel", annee=2026, debut=3, mois=2).status_code == 422
     assert get(charge, "annuel", annee=2026, mois=2, cmp="objectif").status_code == 422
     assert get(charge, "annuel/export", annee=2026, debut=2, mois=2, cmp="prec").status_code == 200
+
+
+def test_annuel_periode_au_calendrier(charge):
+    # année en cours à mois égaux : janvier → octobre 2026 contre janvier → octobre 2025
+    r = get(charge, "annuel", du="2026-01", au="2026-10").json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-01", "2026-10", "2025-01", "2025-10")
+    assert (r["annee_fin"], r["mois_fin"]) == (2026, 2) and r["cumul_ytd"]["m1"] is None
+    assert [(x["annee"], x["mois"]) for x in r["serie_n"]][:2] == [(2026, 1), (2026, 2)]
+    # période à cheval sur deux années : 12 mois à partir d'avril 2025
+    r = get(charge, "annuel", du="2025-04", au="2026-03").json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
+    assert (r["cmp_du"], r["cmp_au"]) == ("2024-04", "2025-03")
+    assert [(x["annee"], x["mois"]) for x in r["serie_n"]][0] == (2025, 4)
+    assert (r["annee_fin"], r["mois_fin"]) == (2026, 2)
+    # comparaison choisie : février contre janvier
+    r = get(charge, "annuel", du="2026-02", au="2026-02", cmp_du="2026-01", cmp_au="2026-01").json()
+    assert D(r["cumul_ytd"]["m"]) == D("3700") and D(r["cumul_ytd"]["m1"]) == D("7000.5")
+    assert (r["cmp_du"], r["cmp_au"]) == ("2026-01", "2026-01")
+    # deux mois comparés à deux autres, sur des années différentes
+    r = get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-12", cmp_au="2026-01").json()
+    assert D(r["cumul_ytd"]["m1"]) == D("7000.5") and r["cumul_ytd"]["nb_mois_n1"] == 1
+    # le mois de comparaison par défaut est le même mois de l'année d'avant
+    r = get(charge, "annuel", du="2026-02", au="2026-02").json()
+    assert (r["cmp_du"], r["cmp_au"]) == ("2025-02", "2025-02")
+    assert get(charge, "annuel", du="2020-01", au="2020-02").status_code == 404
+
+
+def test_annuel_periode_au_calendrier_refus(charge):
+    mess = get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01", cmp_au="2025-01")
+    assert mess.status_code == 422 and "même nombre de mois" in mess.json()["detail"]
+    assert get(charge, "annuel", du="2025-01", au="2026-01").status_code == 422  # 13 mois
+    assert get(charge, "annuel", du="2026-03", au="2026-02").status_code == 422
+    assert get(charge, "annuel", du="2026-01").status_code == 422
+    assert get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01").status_code == 422
+    assert get(charge, "annuel", du="2026-13", au="2026-13").status_code == 422
+    assert get(charge, "annuel").status_code == 422
+
+
+def test_annuel_ancien_chemin_et_periode_effective(charge):
+    r = get(charge, "annuel", annee=2026, mois=2).json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5")
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-01", "2026-02", "2025-01", "2025-02")
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2, cmp="prec").json()
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-02", "2026-02", "2026-01", "2026-01")
+    assert get(charge, "annuel", annee=2026, mois=2, cmp="aucune").json()["cmp_du"] is None
+    # `du` et `au` priment sur les anciens paramètres
+    r = get(charge, "annuel", annee=2025, mois=5, debut=3, du="2026-02", au="2026-02").json()
+    assert D(r["cumul_ytd"]["m"]) == D("3700")
+
+
+def test_annuel_export_periode_au_calendrier(charge):
+    r = get(charge, "annuel/export", du="2025-04", au="2026-03")
+    assert r.status_code == 200 and "reporting-annuel-2025-04_2026-03.xlsx" in r.headers[
+        "content-disposition"]
+    wb = load_workbook(io.BytesIO(r.content))
+    valeurs = [c for row in wb["Synthèse"].iter_rows(values_only=True) for c in row]
+    assert "Avril 2025 → mars 2026" in valeurs and "Avril 2024 → mars 2025" in valeurs
+    r = get(charge, "annuel/export", du="2026-01", au="2026-10")
+    valeurs = [c for row in load_workbook(io.BytesIO(r.content))["Synthèse"].iter_rows(
+        values_only=True) for c in row]
+    assert "Janvier → octobre 2026" in valeurs and "Janvier → octobre 2025" in valeurs
+    g = get(charge, "annuel/export", du="2026-01", au="2026-02", graphiques=True)
+    assert g.status_code == 200 and "graphes-2026-01_2026-02.xlsx" in g.headers[
+        "content-disposition"]
+    # ancien chemin intact
+    r = get(charge, "annuel/export", annee=2026, mois=2)
+    assert r.status_code == 200 and "reporting-annuel-2026.xlsx" in r.headers[
+        "content-disposition"]
 
 
 def test_individuel_nominatif_et_journal(charge, make_client, db):

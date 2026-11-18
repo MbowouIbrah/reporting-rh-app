@@ -176,6 +176,8 @@ MAX_MULTI = 4000
 TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
 # Comparaison du rapport annuel : vide = même période d'un autre exercice (ref_annee)
 Comparaison = Literal["", "prec", "aucune"]
+# Période choisie au calendrier : mois « AAAA-MM » de début et de fin, et de la comparaison
+MOIS_AAAA_MM = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
 def _liste(v: str | None) -> frozenset[str] | None:
@@ -285,14 +287,48 @@ def mensuel_export(
                  f"reporting-mensuel-{annee}-{mois:02d}.xlsx")
 
 
+def _plage(du, au, cmp_du, cmp_au):
+    """Période choisie au calendrier (`du`, `au`, `cmp_du`, `cmp_au` : « AAAA-MM ») ->
+    (début d'exercice, premier mois de l'exercice, indices de mois du début et de la fin, indice du
+    début de la comparaison). Les 12 rangs du moteur démarrent en janvier si la période tient dans
+    une année civile, sinon au mois `du`. Sans comparaison choisie : mêmes mois 12 mois plus tôt."""
+    if (du is None) != (au is None):
+        raise HTTPException(422, "Le début et la fin de la période vont ensemble")
+    if (cmp_du is None) != (cmp_au is None):
+        raise HTTPException(422, "Le début et la fin de la comparaison vont ensemble")
+    a, b = ex.indice(du), ex.indice(au)
+    if a > b:
+        raise HTTPException(422, "Le début de la période est après sa fin")
+    if b - a + 1 > 12:
+        raise HTTPException(422, "La période ne peut pas dépasser 12 mois")
+    if cmp_du is None:
+        c = a - 12
+    else:
+        c = ex.indice(cmp_du)
+        if ex.indice(cmp_au) - c != b - a:
+            raise HTTPException(
+                422, "La comparaison doit couvrir le même nombre de mois que la période")
+    depart = 1 if a // 12 == b // 12 else a % 12 + 1
+    return a // 12, depart, a, b, c
+
+
 def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
             matricule=None, activite=None, type_contrat=None,
-            calendrier: Calendrier = "civil", departement=None, debut=None, cmp="") -> dict:
+            calendrier: Calendrier = "civil", departement=None, debut=None, cmp="",
+            du=None, au=None, cmp_du=None, cmp_au=None) -> dict:
     """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
     l'exercice) ; `debut` : vrai mois de début (None : début de l'exercice). `cmp` : vide = même
     période de `ref_annee`, `prec` = les mêmes nombre de mois juste avant, `aucune`. Le moteur
-    reçoit des rangs 1 à 12 (kpi/exercice.py)."""
+    reçoit des rangs 1 à 12 (kpi/exercice.py). `du` et `au` (« AAAA-MM »), quand ils sont fournis,
+    remplacent `annee`, `mois`, `debut`, `calendrier`, `ref_annee` et `cmp` ; `cmp_du` et `cmp_au`
+    : période comparée (mêmes mois 12 mois plus tôt si absents)."""
     authorize(p, "report:read")
+    plage = None
+    if du is not None or au is not None:
+        annee, calendrier, a, b, c = plage = _plage(du, au, cmp_du, cmp_au)
+        mois, debut, ref_annee, cmp = b % 12 + 1, a % 12 + 1, None, ""
+    elif annee is None:
+        raise HTTPException(422, "L'année ou la période (du, au) est obligatoire")
     service, site, type_site, poste, activite, type_contrat, departement = map(
         _liste, (service, site, type_site, poste, activite, type_contrat, departement))
     scope = restreindre(db, scope_for(db, p), departement)
@@ -326,21 +362,31 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     params_fin = params_mois.get(fin) or _params(db, crit, *reels[fin - 1])
     refs = ch.charger_refs(db, type_site, scope)
     comparaison = None
+    debut_reel = reels[d - 1][0] * 12 + reels[d - 1][1] - 1
+    k = None  # indice de mois du début de la période comparée ; None : aucune comparaison
     if cmp == "aucune":
         comparaison = {}
-    elif cmp == "prec":
-        # les fin - d + 1 mois juste avant le début, rangés sur les mois de la période
-        y, m = reels[d - 1]
-        k = y * 12 + m - 1 - (fin - d + 1)
+    elif plage is not None or cmp == "prec":
+        # les mois comparés, rangés dans l'ordre sur les mois de la période : la période choisie
+        # (calendrier), ou les fin - d + 1 mois juste avant le début
+        k = plage[4] if plage is not None else debut_reel - (fin - d + 1)
         comparaison = pds((d + i, ((k + i) // 12, (k + i) % 12 + 1)) for i in range(fin - d + 1))
+    else:
+        y, m = ex.mois_exercice(ref, calendrier)[d - 1]
+        k = y * 12 + m - 1
     res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois, d,
                         comparaison)
-    return _sortie(p, ex.en_mois_reels(res, annee, ref, calendrier))
+    res = ex.en_mois_reels(res, annee, ref, calendrier)
+    # période et comparaison effectives, au format du calendrier (« AAAA-MM »)
+    res |= {"du": ex.texte(debut_reel), "au": ex.texte(debut_reel + fin - d),
+            "cmp_du": None if k is None else ex.texte(k),
+            "cmp_au": None if k is None else ex.texte(k + fin - d)}
+    return _sortie(p, res)
 
 
 @router.get("/annuel")
 def annuel(
-    annee: int = Query(ge=2000, le=2100),
+    annee: int | None = Query(None, ge=2000, le=2100),
     mois: int | None = Query(None, ge=1, le=12),
     service: str | None = Query(None, max_length=MAX_MULTI),
     site: str | None = Query(None, max_length=MAX_MULTI),
@@ -354,16 +400,21 @@ def annuel(
     calendrier: Calendrier = "civil",
     debut: int | None = Query(None, ge=1, le=12),
     cmp: Comparaison = "",
+    du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                   activite, type_contrat, calendrier, departement, debut, cmp)
+                   activite, type_contrat, calendrier, departement, debut, cmp,
+                   du, au, cmp_du, cmp_au)
 
 
 @router.get("/annuel/export")
 def annuel_export(
-    annee: int = Query(ge=2000, le=2100),
+    annee: int | None = Query(None, ge=2000, le=2100),
     mois: int | None = Query(None, ge=1, le=12),
     service: str | None = Query(None, max_length=MAX_MULTI),
     site: str | None = Query(None, max_length=MAX_MULTI),
@@ -377,6 +428,10 @@ def annuel_export(
     calendrier: Calendrier = "civil",
     debut: int | None = Query(None, ge=1, le=12),
     cmp: Comparaison = "",
+    du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
     graphiques: bool = False,
     graphes: str | None = Query(None, max_length=400, pattern="^[a-z_,]*$"),
     p: Principal = Depends(current_principal),
@@ -385,15 +440,29 @@ def annuel_export(
     """Classeur du rapport annuel ; `graphiques` : graphes d'évolution en graphiques Excel
     (`graphes` : identifiants, séparés par des virgules, des graphes cochés ; absent = tous)."""
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
-                  activite, type_contrat, calendrier, departement, debut, cmp)
-    an_fin, mois_fin = ex.fin_cumul(annee, mois, calendrier)
+                  activite, type_contrat, calendrier, departement, debut, cmp,
+                  du, au, cmp_du, cmp_au)
+    choisie = du is not None
+    an_fin, mois_fin = (int(res["au"][:4]), int(res["au"][5:])) if choisie else ex.fin_cumul(
+        annee, mois, calendrier)
     entite = "graphes_annuels" if graphiques else "rapport_annuel"
     audit.record(db, p.user_id, "export", entite, f"{an_fin}-{mois_fin:02d}", None,
                  {"service": service, "site": site, "type_site": type_site, "poste": poste,
                   "matricule": matricule, "activite": activite,
                   "type_contrat": type_contrat, "calendrier": calendrier,
-                  "departement": departement, "debut": debut, "cmp": cmp})
+                  "departement": departement, "debut": debut, "cmp": cmp,
+                  "du": du, "au": au, "cmp_du": cmp_du, "cmp_au": cmp_au})
     db.commit()
+    if choisie:
+        # libellés des deux périodes, nom de fichier à l'image de la période choisie
+        nom_n = xlsx.libelle_periode(res["du"], res["au"])
+        nom_ref = xlsx.libelle_periode(res["cmp_du"], res["cmp_au"])
+        fichier = f"{res['du']}_{res['au']}"
+        if graphiques:
+            ids = graphes.split(",") if graphes else None
+            return _xlsx(graphes_xlsx.graphiques(res, nom_n, nom_ref, ids),
+                         f"graphes-{fichier}.xlsx")
+        return _xlsx(xlsx.annuel_periode(res, nom_n, nom_ref), f"reporting-annuel-{fichier}.xlsx")
     suffixe = "-fiscal" if calendrier == "fiscal" else ""
     if graphiques:
         ref = ref_annee or annee - 1
