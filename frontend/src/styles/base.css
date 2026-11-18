@@ -697,16 +697,18 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .multi-bouton[aria-expanded='true'] { border-color: var(--navy); }
 .multi-menu { position: absolute; top: calc(100% + 2px); left: 0; z-index: var(--z-menu); width: max(100%, 260px); display: grid; gap: 4px; padding: 8px; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: var(--shadow-3); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink); }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-menu input[type='search'] { width: 100%; height: 30px; border-radius: 0; }
-.multi-actions { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: var(--fs-xs); }
 .multi-compte { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
-.multi-actions .bouton-lien { padding: 2px 0; border: 0; font-size: var(--fs-xs); cursor: pointer; }
-.multi-actions .bouton-lien:disabled { color: var(--muted); text-decoration: none; cursor: default; }
 .multi-liste { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
 .filtres .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
   display: flex; justify-content: flex-start; align-items: center; gap: var(--sp-2); width: auto; margin: 0; padding: 5px 4px;
   background: none; color: var(--ink); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; cursor: pointer; white-space: nowrap;
 }
 .multi-liste label:hover { background: var(--surface-hover); }
+/* ligne « Tout sélectionner » : une case comme les autres, séparée par un filet, toujours visible en haut */
+.filtres .multi-liste label.multi-tout, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label.multi-tout {
+  position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--rule); font-weight: 600;
+}
+.filtres .multi-liste label.multi-tout:hover { background: var(--surface-hover); }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
 .multi-liste .choix-vide { margin: 0; padding: 5px 4px; color: var(--muted); }
 /* Grille de saisie : valeurs proposées sous une cellule Poste, Site, Service… (sobre, angles droits) */

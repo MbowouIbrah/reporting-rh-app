@@ -4,7 +4,7 @@ import { valeurs } from '../hooks/useFiltres'
 const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 /** Filtre à sélection multiple (R4), à la manière d'Excel : toutes les cases cochées par défaut (= tous),
- *  Tout sélectionner / Tout désélectionner, recherche dans les longues listes.
+ *  une ligne « Tout sélectionner / Tout désélectionner » en tête de liste, recherche dans les longues listes.
  *  Valeur : choix séparés par « | » ; vide : tous. Aucune case cochée n'est qu'un état de saisie :
  *  à la fermeture, le filtre revient à tous. */
 export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true }: {
@@ -21,6 +21,7 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   const id = useId()
   const racine = useRef<HTMLDivElement>(null)
   const bouton = useRef<HTMLButtonElement>(null)
+  const caseTout = useRef<HTMLInputElement>(null)
   const [ouvert, setOuvert] = useState(false)
   const [saisie, setSaisie] = useState('')
   const [aucun, setAucun] = useState(false)
@@ -64,6 +65,10 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   }
   const tousVisibles = visibles.every((o) => coches.includes(o))
   const aucunVisible = !visibles.some((o) => coches.includes(o))
+  // case « tout » à moitié cochée quand une partie seulement des valeurs affichées l'est
+  useEffect(() => {
+    if (caseTout.current) caseTout.current.indeterminate = !tousVisibles && !aucunVisible
+  })
 
   return (
     <div
@@ -107,19 +112,24 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
               onChange={(e) => setSaisie(e.target.value)}
             />
           )}
-          <div className="multi-actions">
-            <button type="button" className="bouton-lien" disabled={!visibles.length || tousVisibles} onClick={() => appliquer(new Set([...coches, ...visibles]))}>
-              Tout sélectionner
-            </button>
-            <button type="button" className="bouton-lien" disabled={aucunVisible} onClick={() => appliquer(new Set(coches.filter((o) => !visibles.includes(o))))}>
-              Tout désélectionner
-            </button>
-          </div>
           <p className="multi-compte" aria-live="polite">
             {aucun ? 'Cochez au moins une valeur' : `${coches.length} sur ${options.length}`}
           </p>
           <div className="multi-liste">
             {visibles.length === 0 && <p className="choix-vide">Aucun résultat</p>}
+            {visibles.length > 0 && (
+              <label className="multi-tout">
+                <input
+                  type="checkbox"
+                  ref={caseTout}
+                  checked={tousVisibles}
+                  onChange={() => appliquer(tousVisibles
+                    ? new Set(coches.filter((o) => !visibles.includes(o)))
+                    : new Set([...coches, ...visibles]))}
+                />
+                {tousVisibles ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </label>
+            )}
             {visibles.map((o) => (
               <label key={o}>
                 <input type="checkbox" checked={coches.includes(o)} onChange={() => basculer(o)} />

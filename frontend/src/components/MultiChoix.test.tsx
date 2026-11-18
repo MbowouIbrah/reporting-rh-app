@@ -18,19 +18,24 @@ test('à la manière d’Excel : tout coché par défaut, valeur jointe par « |
   fireEvent.click(bouton)
   const cases = () => screen.getAllByRole('checkbox') as HTMLInputElement[]
   expect(cases().every((c) => c.checked)).toBe(true)
-  expect(screen.getByRole('button', { name: 'Tout sélectionner' })).toBeDisabled()
+  // une seule ligne « tout », case à gauche, texte selon l'état
+  expect(screen.getByRole('checkbox', { name: 'Tout désélectionner' })).toBeChecked()
   // décocher une valeur garde les autres, dans l'ordre des options
   fireEvent.click(screen.getByRole('checkbox', { name: 'Kribi' }))
   expect(screen.getByRole('status')).toHaveTextContent(/^Douala\|Limbé$/)
   expect(bouton).toHaveTextContent('Douala, Limbé')
-  // tout désélectionner : état de saisie, le filtre ne change pas encore
-  fireEvent.click(screen.getByRole('button', { name: 'Tout désélectionner' }))
+  const tout = screen.getByRole('checkbox', { name: 'Tout sélectionner' }) as HTMLInputElement
+  expect(tout.indeterminate).toBe(true)
+  // tout sélectionner puis tout désélectionner : aucune case = état de saisie, le filtre ne change pas encore
+  fireEvent.click(tout)
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Tout désélectionner' }))
   expect(cases().some((c) => c.checked)).toBe(false)
   expect(screen.getByText('Cochez au moins une valeur')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('checkbox', { name: 'Douala' }))
   expect(screen.getByRole('status')).toHaveTextContent(/^Douala$/)
   // tout recocher revient à « tous » (valeur vide)
-  fireEvent.click(screen.getByRole('button', { name: 'Tout sélectionner' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Tout sélectionner' }))
   expect(screen.getByRole('status')).toBeEmptyDOMElement()
   expect(bouton).toHaveTextContent('Tous')
 })
@@ -52,7 +57,7 @@ test('avec une recherche, les boutons n’agissent que sur les valeurs affichée
   render(<Banc options={VILLES} />)
   fireEvent.click(screen.getByRole('button', { name: /^Site/ }))
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'b' } }) // Bafoussam, Bertoua, Ebolowa, Kribi, Limbé
-  fireEvent.click(screen.getByRole('button', { name: 'Tout désélectionner' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Tout désélectionner' }))
   expect(screen.getByRole('status')).toHaveTextContent(/^Douala\|Garoua\|Maroua\|Yaoundé$/)
 })
 
@@ -61,7 +66,7 @@ test('Échap et clic à l’extérieur ferment le panneau ; recherche sans accen
   const bouton = screen.getByRole('button', { name: /^Site/ })
   fireEvent.click(bouton)
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'limbe' } })
-  expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+  expect(screen.getAllByRole('checkbox')).toHaveLength(2) // ligne « tout » + Limbé
   fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' })
   expect(screen.queryByRole('checkbox')).toBeNull()
   expect(bouton).toHaveFocus()
