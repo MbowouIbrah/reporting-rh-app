@@ -64,6 +64,7 @@ Options :
 - **Sélection multiple** : liste à cases avec recherche ; résumé dans le bouton (« Douala, Kribi », « 3 sites ») ; Tout / Aucun.
 - Serveur : chaque dimension accepte une liste de valeurs ; filtre de périmètre toujours appliqué dans la couche dépôt (inchangé).
 - Variantes en maquette : barre en ligne (A) ou panneau de filtres repliable (B).
+- Réalisé (R4, composant `MultiChoix`) : les valeurs voyagent jointes par « | » dans le même paramètre (lien et partage entre pages inchangés) ; le serveur les découpe une seule fois à l'entrée. « Tout » n'a pas de bouton : aucune case cochée vaut déjà tous. Un nouveau choix réduit une sélection multiple aux seules valeurs encore possibles.
 
 ### R5 Sites
 Référentiels : la liste des sites est rangée en trois groupes (Sites principaux, Agences, Sites déportés), chacun avec son nombre ; l'ajout demande le type. Rapports : le filtre « Type de site » existe déjà.

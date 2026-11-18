@@ -1,5 +1,6 @@
 """Filtre de périmètre appliqué côté serveur, dans la couche dépôt."""
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from sqlalchemy import Select, and_, false, select
@@ -55,14 +56,15 @@ def apply_scope(
     return stmt.where(and_(*(cols[dim].in_(vals) for dim, vals in scope.rules.items())))
 
 
-def restreindre(db: Session, scope: Scope, departement: str | None) -> Scope:
+def restreindre(db: Session, scope: Scope, departement: str | Collection[str] | None) -> Scope:
     """Filtre « département » des rapports : le périmètre réduit aux services du département
     (intersection avec ceux déjà accordés). Département inconnu ou vide : aucun service."""
     if not departement:
         return scope
+    noms = [departement] if isinstance(departement, str) else list(departement)
     services = frozenset(db.scalars(
         select(Service.libelle).join(Departement, Departement.id == Service.departement_id)
-        .where(Departement.libelle == departement)))
+        .where(Departement.libelle.in_(noms))))
     accordes = scope.rules.get("service")
     rules = dict(scope.rules)
     rules["service"] = services if accordes is None else services & accordes

@@ -8,6 +8,7 @@ import { libelleExercice } from '../lib/exercice'
 import { MOIS_COURTS } from '../lib/format'
 import BoutonReinitialiser from './BoutonReinitialiser'
 import ChoixPeriode, { type OptionPeriode } from './ChoixPeriode'
+import MultiChoix from './MultiChoix'
 
 type Patch = Record<string, string | number | undefined>
 
@@ -154,15 +155,10 @@ export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange }: {
   onChange: (v: string) => void
 }) {
   return (
-    <label>
-      Type de site
-      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{tous}</option>
-        {types.map((t) => (
-          <option key={t} value={t}>{LIBELLE_TYPE_SITE[t] ?? t}</option>
-        ))}
-      </select>
-    </label>
+    <MultiChoix
+      libelle="Type de site" pluriel="types" tous={tous} options={types} valeur={valeur} onChange={onChange}
+      nomOption={(t) => LIBELLE_TYPE_SITE[t] ?? t} souple={false}
+    />
   )
 }
 
@@ -172,17 +168,7 @@ export function ChoixPoste({ valeur, postes, tous = 'Tous', onChange }: {
   tous?: string
   onChange: (v: string) => void
 }) {
-  return (
-    <label className="souple">
-      Poste
-      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{tous}</option>
-        {postes.map((s) => (
-          <option key={s}>{s}</option>
-        ))}
-      </select>
-    </label>
-  )
+  return <MultiChoix libelle="Poste" pluriel="postes" tous={tous} options={postes} valeur={valeur} onChange={onChange} />
 }
 
 /** Titre de la barre : dit au premier coup d'œil que ce qui suit sont des filtres. */
@@ -247,62 +233,22 @@ export default function FiltresPeriode({
         <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />
       )}
       {departements && (
-        <label className="souple">
-          Département
-          <select value={filtres.departement ?? ''} onChange={(e) => onChange({ departement: e.target.value })}>
-            <option value="">Tous</option>
-            {departements.map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={filtres.departement ?? ''} onChange={(v) => onChange({ departement: v })} />
       )}
       {services && (
-        <label className="souple">
-          Service
-          <select value={filtres.service ?? ''} onChange={(e) => onChange({ service: e.target.value })}>
-            <option value="">Tous</option>
-            {services.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={filtres.service ?? ''} onChange={(v) => onChange({ service: v })} />
       )}
       {avecType && (
         <ChoixTypeSite valeur={filtres.type_site ?? ''} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
       {sites && (
-        <label className="souple">
-          Site
-          <select value={filtres.site ?? ''} onChange={(e) => onChange({ site: e.target.value })}>
-            <option value="">Tous</option>
-            {sites.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={filtres.site ?? ''} onChange={(v) => onChange({ site: v })} />
       )}
       {avecActivite && (
-        <label className="souple">
-          Activité
-          <select value={filtres.activite ?? ''} onChange={(e) => onChange({ activite: e.target.value })}>
-            <option value="">Toutes</option>
-            {activites!.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={filtres.activite ?? ''} onChange={(v) => onChange({ activite: v })} />
       )}
       {avecContrat && (
-        <label>
-          Contrat
-          <select value={filtres.type_contrat ?? ''} onChange={(e) => onChange({ type_contrat: e.target.value })}>
-            <option value="">Tous</option>
-            {typesContrat!.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={filtres.type_contrat ?? ''} onChange={(v) => onChange({ type_contrat: v })} souple={false} />
       )}
       {avecPoste && <ChoixPoste valeur={filtres.poste ?? ''} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
       {salaries && (

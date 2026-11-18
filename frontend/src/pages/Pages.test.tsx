@@ -217,11 +217,14 @@ test('Annuel : bloc Activité masqué sans donnée, affiché avec la mention « 
 test('Annuel : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {
   const { unmount } = rendu(<Annuel />, '/annuel', ['report:read', 'nominatif:read'])
   expect(await screen.findByRole('combobox', { name: 'Employé' })).toBeInTheDocument()
-  expect(await screen.findByLabelText('Type de site')).toHaveTextContent('Agence')
-  expect(await screen.findByLabelText('Poste')).toHaveTextContent('Chef atelier')
+  // sélection multiple (R4) : le panneau s'ouvre au clic, une case par valeur
+  fireEvent.click(await screen.findByRole('button', { name: /^Type de site/ }))
+  expect(screen.getByRole('checkbox', { name: 'Agence' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^Poste/ }))
+  expect(screen.getByRole('checkbox', { name: 'Chef atelier' })).toBeInTheDocument()
   unmount()
   rendu(<Annuel />, '/annuel', ['report:read'])
-  expect(await screen.findByLabelText('Type de site')).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: /^Type de site/ })).toBeInTheDocument()
   expect(screen.queryByRole('combobox', { name: 'Employé' })).toBeNull()
 })
 

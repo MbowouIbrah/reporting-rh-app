@@ -74,8 +74,15 @@ const DIMS = ['departement', 'service', 'site', 'type_site', 'activite', 'type_c
 type Dim = (typeof DIMS)[number]
 type Choix = Partial<Record<Dim, string | undefined>>
 
+/** Valeurs d'un filtre : plusieurs, séparées par « | » (R4, sélection multiple). */
+export const valeurs = (v: string | undefined) => (v ? v.split('|').filter(Boolean) : [])
+
 const compatible = (c: string[], choix: Choix, sauf?: Dim) =>
-  DIMS.every((d, i) => d === sauf || i >= c.length || !choix[d] || c[i] === choix[d])
+  DIMS.every((d, i) => d === sauf || i >= c.length || !choix[d] || valeurs(choix[d]).includes(c[i]))
+
+/** Valeurs choisies de `d` qui gardent au moins une combinaison avec `garde` ; vide : aucune. */
+const restantes = (combis: string[][], garde: Choix, d: Dim, v: string | undefined) =>
+  valeurs(v).filter((x) => combis.some((c) => compatible(c, { ...garde, [d]: x }))).join('|') || undefined
 
 /** Valeurs proposées par filtre : celles des combinaisons compatibles avec les autres filtres choisis
  *  (aucune option ne mène à un résultat vide) ; la valeur choisie reste toujours proposée. */
@@ -83,7 +90,7 @@ export function facettes(combis: string[][], choix: Choix): Record<Dim, string[]
   return Object.fromEntries(
     DIMS.map((d, i) => {
       const v = new Set(combis.filter((c) => compatible(c, choix, d)).map((c) => c[i]).filter(Boolean))
-      if (choix[d]) v.add(choix[d])
+      for (const x of valeurs(choix[d])) v.add(x)
       return [d, [...v].sort()]
     }),
   ) as Record<Dim, string[]>
@@ -95,8 +102,8 @@ export function compatibles(combis: string[][], choix: Choix): Choix {
   const garde: Choix = {}
   for (const d of DIMS) {
     if (!choix[d]) continue
-    const essai = { ...garde, [d]: choix[d] }
-    if (combis.some((c) => compatible(c, essai))) garde[d] = choix[d]
+    const r = restantes(combis, garde, d, choix[d])
+    if (r) garde[d] = r
   }
   return garde
 }
@@ -107,9 +114,9 @@ export function sansIncompatibles(combis: string[][], actuel: Choix, patch: Patc
   const efface: Patch = {}
   for (const d of DIMS) {
     if (d in patch || !actuel[d]) continue
-    const essai = { ...garde, [d]: actuel[d] }
-    if (combis.some((c) => compatible(c, essai))) garde[d] = actuel[d]
-    else efface[d] = undefined
+    const r = restantes(combis, garde, d, actuel[d])
+    if (r) garde[d] = r
+    if (r !== actuel[d]) efface[d] = r
   }
   return { ...patch, ...efface }
 }
@@ -168,11 +175,13 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
   // (pas de requête vide), puis retirés du partage.
   const combis = options.data?.combinaisons
   const garde = combis?.length ? compatibles(combis, p) : null
-  const ecartes = garde ? DIMS.filter((d) => p[d] && !garde[d]) : []
+  // Une valeur écartée d'un choix multiple réduit le choix ; le filtre disparaît s'il n'en reste aucune.
+  const ecartes = garde ? DIMS.filter((d) => p[d] && garde[d] !== p[d]) : []
   const choix: Choix = garde ?? p
-  const cleEcartes = ecartes.join()
+  const cleEcartes = JSON.stringify(Object.fromEntries(ecartes.map((d) => [d, garde?.[d] ?? null])))
   useEffect(() => {
-    if (cleEcartes) set(Object.fromEntries(cleEcartes.split(',').map((d) => [d, undefined])))
+    const e: Record<string, string | null> = JSON.parse(cleEcartes)
+    if (Object.keys(e).length) set(Object.fromEntries(Object.entries(e).map(([d, v]) => [d, v ?? undefined])))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleEcartes])
 

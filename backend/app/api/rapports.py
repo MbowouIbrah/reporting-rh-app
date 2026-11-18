@@ -170,6 +170,17 @@ def salaries(
                   key=lambda x: x["matricule"])
 
 
+# R4 : un filtre peut porter plusieurs valeurs, séparées par « | » dans le même paramètre.
+MAX_MULTI = 4000
+TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
+
+
+def _liste(v: str | None) -> frozenset[str] | None:
+    """Valeurs d'un filtre multiple (« A|B ») ; vide : aucun filtre."""
+    vals = frozenset(x.strip() for x in (v or "").split("|") if x.strip())
+    return vals or None
+
+
 def _reference(annee, mois, ref_annee, ref_mois) -> tuple[int, int]:
     """Période de comparaison du mensuel : celle choisie, sinon le mois précédent."""
     if ref_annee is None or ref_mois is None:
@@ -201,6 +212,8 @@ def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
              type_site=None, poste=None, matricule=None, activite=None, type_contrat=None,
              departement=None) -> dict:
     authorize(p, "report:read")
+    service, site, type_site, poste, activite, type_contrat, departement = map(
+        _liste, (service, site, type_site, poste, activite, type_contrat, departement))
     scope = restreindre(db, scope_for(db, p), departement)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
             "activite": activite, "type_contrat": type_contrat}
@@ -219,16 +232,16 @@ def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
 def mensuel(
     annee: int = Query(ge=2000, le=2100),
     mois: int = Query(ge=1, le=12),
-    service: str | None = None,
-    site: str | None = None,
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
     ref_annee: int | None = Query(None, ge=2000, le=2100),
     ref_mois: int | None = Query(None, ge=1, le=12),
-    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
-    poste: str | None = Query(None, max_length=200),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
     matricule: str | None = Query(None, max_length=30),
-    activite: str | None = Query(None, max_length=100),
-    type_contrat: str | None = Query(None, max_length=100),
-    departement: str | None = Query(None, max_length=100),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -241,16 +254,16 @@ def mensuel(
 def mensuel_export(
     annee: int = Query(ge=2000, le=2100),
     mois: int = Query(ge=1, le=12),
-    service: str | None = None,
-    site: str | None = None,
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
     ref_annee: int | None = Query(None, ge=2000, le=2100),
     ref_mois: int | None = Query(None, ge=1, le=12),
-    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
-    poste: str | None = Query(None, max_length=200),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
     matricule: str | None = Query(None, max_length=30),
-    activite: str | None = Query(None, max_length=100),
-    type_contrat: str | None = Query(None, max_length=100),
-    departement: str | None = Query(None, max_length=100),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -275,6 +288,8 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
     l'exercice). Le moteur reçoit des rangs 1 à 12 (kpi/exercice.py)."""
     authorize(p, "report:read")
+    service, site, type_site, poste, activite, type_contrat, departement = map(
+        _liste, (service, site, type_site, poste, activite, type_contrat, departement))
     scope = restreindre(db, scope_for(db, p), departement)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
             "activite": activite, "type_contrat": type_contrat}
@@ -307,15 +322,15 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
 def annuel(
     annee: int = Query(ge=2000, le=2100),
     mois: int | None = Query(None, ge=1, le=12),
-    service: str | None = None,
-    site: str | None = None,
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
     ref_annee: int | None = Query(None, ge=2000, le=2100),
-    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
-    poste: str | None = Query(None, max_length=200),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
     matricule: str | None = Query(None, max_length=30),
-    activite: str | None = Query(None, max_length=100),
-    type_contrat: str | None = Query(None, max_length=100),
-    departement: str | None = Query(None, max_length=100),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
     calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
@@ -328,15 +343,15 @@ def annuel(
 def annuel_export(
     annee: int = Query(ge=2000, le=2100),
     mois: int | None = Query(None, ge=1, le=12),
-    service: str | None = None,
-    site: str | None = None,
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
     ref_annee: int | None = Query(None, ge=2000, le=2100),
-    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
-    poste: str | None = Query(None, max_length=200),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
     matricule: str | None = Query(None, max_length=30),
-    activite: str | None = Query(None, max_length=100),
-    type_contrat: str | None = Query(None, max_length=100),
-    departement: str | None = Query(None, max_length=100),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
     calendrier: Calendrier = "civil",
     graphiques: bool = False,
     graphes: str | None = Query(None, max_length=400, pattern="^[a-z_,]*$"),
@@ -372,10 +387,10 @@ def annuel_export(
 def individuel_tous(
     annee: int = Query(ge=2000, le=2100),
     matricule: str | None = Query(None, max_length=30),
-    service: str | None = Query(None, max_length=100),
-    site: str | None = Query(None, max_length=100),
-    type_site: str | None = Query(None, pattern="^(principal|agence|deporte)$"),
-    poste: str | None = Query(None, max_length=200),
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
     calendrier: Calendrier = "civil",
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
@@ -386,6 +401,7 @@ def individuel_tous(
     (`exclues`) et le TOTAL MENSUEL ne somme que les colonnes comptées à la date du mois.
     `deporte` indique si un site déporté figure dans le mois (logement sinon sans objet)."""
     authorize(p, "nominatif:read")
+    service, site, type_site, poste = map(_liste, (service, site, type_site, poste))
     scope = scope_for(db, p)
     sal = None
     if matricule:
@@ -410,8 +426,8 @@ def individuel_tous(
         lignes = [] if pd is None else [
             L for L in pd.lignes
             if (sal is None or L.salarie_id == sal.id)
-            and (not service or L.service == service) and (not site or L.site == site)
-            and (not type_site or L.type_site == type_site) and (not poste or L.poste == poste)]
+            and (not service or L.service in service) and (not site or L.site in site)
+            and (not type_site or L.type_site in type_site) and (not poste or L.poste in poste)]
         if pd is None or not lignes:
             mois.append({"annee": a, "mois": m, "present": False})
             continue

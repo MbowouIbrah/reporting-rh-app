@@ -105,3 +105,16 @@ test("filtres partagés venus d'une autre page : ceux sans correspondance sont �
   expect(facettes(nominatives, { site: 'Douala' }).matricule).toEqual(['E1', 'E3'])
   expect(compatibles(COMBIS, { matricule: 'E9' })).toEqual({ matricule: 'E9' })
 })
+
+test('sélection multiple (R4) : valeurs jointes par « | », réduites aux seules compatibles', () => {
+  // les facettes d'un autre filtre suivent l'union des choix
+  expect(facettes(COMBIS, { site: 'Douala|Kribi' }).type_site).toEqual(['deporte', 'principal'])
+  expect(facettes(COMBIS, { service: 'SAV PL|Commerce VN' }).poste).toEqual(['Mécanicien', 'Vendeur'])
+  // un nouveau choix réduit une sélection multiple à ses valeurs encore possibles
+  expect(sansIncompatibles(COMBIS, { site: 'Douala|Kribi' }, { service: 'Commerce VN' })).toEqual({
+    service: 'Commerce VN',
+    site: 'Douala',
+  })
+  expect(sansIncompatibles(COMBIS, { site: 'Douala|Kribi' }, { service: 'SAV PL' })).toEqual({ service: 'SAV PL' })
+  expect(compatibles(COMBIS, { service: 'Commerce VN', site: 'Kribi|Douala' })).toEqual({ service: 'Commerce VN', site: 'Douala' })
+})

@@ -256,6 +256,27 @@ def test_filtre_type_de_site(charge, db):
     assert t["mois"][0]["effectif"] == 1
 
 
+def test_selection_multiple(charge, db):
+    """R4 : plusieurs valeurs d'un filtre, séparées par « | », s'additionnent."""
+    db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "agence"
+    db.commit()
+    total = get(charge, "mensuel", annee=2026, mois=1).json()["synthese"]
+    sites = get(charge, "filtres", annee=2026, mois=1).json()["sites"]
+    assert len(sites) >= 2
+    r = get(charge, "mensuel", annee=2026, mois=1, site="|".join(sites)).json()["synthese"]
+    assert r["effectif"]["fin"] == total["effectif"]["fin"]
+    assert D(r["ms"]["m"]) == D(total["ms"]["m"])
+    r = get(charge, "mensuel", annee=2026, mois=1, type_site="agence|principal").json()
+    assert r["synthese"]["effectif"]["fin"] == total["effectif"]["fin"]
+    assert set(sites) <= {c["site"] for c in r["c_site"]}
+    assert get(charge, "mensuel", annee=2026, mois=1, type_site="agence|x").status_code == 422
+    a = get(charge, "annuel", annee=2026, mois=2, site="|".join(sites)).json()
+    assert a["c_site"]
+    t = get(charge, "individuel/tous", annee=2026, site="|".join(sites)).json()
+    assert t["mois"][0]["effectif"] == total["effectif"]["fin"]
+    assert get(charge, "mensuel/export", annee=2026, mois=1, site="|".join(sites)).status_code == 200
+
+
 def test_filtre_activite(charge):
     acts = get(charge, "filtres", annee=2026).json()["activites"]
     assert acts
