@@ -144,7 +144,7 @@ def test_mail_envoye_une_seule_fois(db, make_client, lot, monkeypatch):
     envoyes = []
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.exemple.invalid")
     monkeypatch.setattr(mail, "envoyer",
-                        lambda dest, sujet, texte: envoyes.append((dest, texte)) or True)
+                        lambda dest, sujet, texte, html=None: envoyes.append((dest, texte)) or True)
     make_client(SAV).put(f"{API}/notifications/preferences", json={"notif_mail": True})
     publier(make_client, lot)
     r = envoyer(make_client(ADMIN), [employe(Matricule="E002")])
