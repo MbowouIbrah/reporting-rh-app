@@ -193,3 +193,25 @@ def invitation(adresse: str, email: str, jours: int) -> Courriel:
         apercu=f"Votre lien personnel, valable {jours} jour{pluriel}.",
     )
     return Courriel(sujet, texte, html)
+
+
+def donnees_disponibles(periode: str, lien: str, desabonnement: str) -> Courriel:
+    """Alerte « données du mois disponibles ». `periode` : « de mars 2026 », « d'avril 2026 »."""
+    appli = settings.APP_NAME
+    sujet = f"{appli} : données {periode} disponibles"
+    texte = (f"Bonjour,\n\nLes données {periode} sont disponibles dans {appli} :\n{lien}\n\n"
+             f"Pour ne plus recevoir ces e-mails :\n{desabonnement}")
+    p = escape(periode)
+    lien_desab = (f'<a href="{escape(desabonnement, quote=True)}" '
+                  f'style="color:{COULEURS["marine"]}">Se désabonner</a>')
+    html = _composer(
+        sujet=sujet, bandeau="Notification", titre=f"Les données {p} sont disponibles",
+        paragraphes=[f"Les données {p} viennent d'être publiées dans {escape(appli)}. "
+                     "Le rapport du mois est consultable dès maintenant."],
+        bouton="Consulter le rapport", url=lien,
+        bloc=_encadre("Vous ne voyez que les données de votre périmètre."),
+        securite=f"Vous recevez ce message car les alertes par e-mail sont activées sur votre "
+                 f"compte. {lien_desab}",
+        apercu=f"Le rapport {p} est consultable.",
+    )
+    return Courriel(sujet, texte, html)

@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import mail
+from app import mail, mail_modeles
 from app.core.config import settings
 from app.imports.regles import MOIS
 from app.models.auth import Utilisateur
@@ -103,12 +103,11 @@ def _disponible(db: Session, u: Utilisateur, annee: int, mois: int, lot_id: int)
                  f"Les données {_de(mois, annee)} sont disponibles",
                  "Le rapport du mois est consultable.", LIEN_RAPPORT, lot_id)
     if u.notif_mail and settings.SMTP_HOST and not _deja(db, u.id, annee, mois, "mail"):
-        sujet = f"{settings.APP_NAME} : données {_de(mois, annee)} disponibles"
-        texte = (f"Bonjour,\n\nLes données {_de(mois, annee)} sont disponibles dans "
-                 f"{settings.APP_NAME} :\n{settings.APP_URL.rstrip('/')}{LIEN_RAPPORT}\n\n"
-                 f"Pour ne plus recevoir ces e-mails :\n{url_desabonnement(u.id)}")
+        c = mail_modeles.donnees_disponibles(
+            _de(mois, annee), f"{settings.APP_URL.rstrip('/')}{LIEN_RAPPORT}",
+            url_desabonnement(u.id))
         try:
-            if mail.envoyer(u.email, sujet, texte):
+            if mail.envoyer(u.email, c.sujet, c.texte, c.html):
                 db.add(NotificationEnvoi(utilisateur_id=u.id, annee=annee, mois=mois, canal="mail"))
         except Exception:
             LOG.exception("Envoi de l'e-mail de notification impossible (utilisateur %s)", u.id)
