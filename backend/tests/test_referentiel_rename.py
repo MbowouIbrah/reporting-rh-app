@@ -20,10 +20,10 @@ def test_renommage_propage_perimetre_alias_audit(charge, make_client, db):
     rid = sid(db, "SAV PL")
     apercu = c.put(f"{API}/referentiels/service/{rid}", params={"apercu": True},
                    json={"libelle": "SAV Poids Lourds"})
-    assert apercu.json()["perimetres_maj"] == 2  # DPS et SAV PL
+    assert apercu.json()["perimetres_maj"] == 3  # DPS, Equipment et SAV PL
     assert db.get(Service, rid).libelle == "SAV PL"  # aperçu : rien d'écrit
     r = c.put(f"{API}/referentiels/service/{rid}", json={"libelle": "SAV Poids Lourds"})
-    assert r.status_code == 200 and r.json()["perimetres_maj"] == 2
+    assert r.status_code == 200 and r.json()["perimetres_maj"] == 3
     db.expire_all()
     assert db.scalar(select(PerimetreRegle.id).where(PerimetreRegle.valeur == "SAV PL")) is None
     # le lecteur de périmètre voit toujours ses données

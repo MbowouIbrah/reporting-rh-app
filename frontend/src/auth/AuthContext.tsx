@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import { ApiError, ErreurReseau, setMotDePasseAChangerHandler, setUnauthorizedHandler } from '../api/client'
-import { changerMotDePasse as apiChanger, getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
+import { changerMotDePasse as apiChanger, connexionParLien, getMe, login as apiLogin, logout as apiLogout } from '../api/rapports'
 import type { Me } from '../api/types'
 import { viderCache } from '../lib/cacheSession'
 import { viderPartage } from '../lib/filtresPartages'
@@ -16,6 +16,8 @@ interface Auth {
   verification: boolean
   can: (perm: string) => boolean
   login: (email: string, password: string, remember?: boolean) => Promise<void>
+  /** Ouvre la session à partir d'un lien de connexion directe (démo, invitation). */
+  connexionLien: (jeton: string) => Promise<void>
   logout: () => Promise<void>
   changerMotDePasse: (actuel: string, nouveau: string) => Promise<void>
 }
@@ -161,15 +163,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [qc],
   )
 
-  const login = useCallback(
-    async (email: string, password: string, remember = false) => {
-      const me = await apiLogin(email, password, remember)
+  const ouvrirSession = useCallback(
+    async (me: Me) => {
       oublier()
       await poser(me)
       canal.current?.postMessage('connexion')
     },
     [poser, oublier],
   )
+  const login = useCallback(
+    async (email: string, password: string, remember = false) => ouvrirSession(await apiLogin(email, password, remember)),
+    [ouvrirSession],
+  )
+  const connexionLien = useCallback(async (jeton: string) => ouvrirSession(await connexionParLien(jeton)), [ouvrirSession])
   const logout = useCallback(async () => {
     // Sans réponse du serveur, les cookies restent valides : fermer l'écran seul rouvrirait le compte
     // au retour du réseau (poste partagé). On refuse, l'appelant affiche le message.
@@ -195,8 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetch = q.refetch
   const reessayer = useCallback(() => void refetch(), [refetch])
   const value = useMemo<Auth>(
-    () => ({ me, loading: q.isLoading, panne, reessayer, verification: q.isFetching, can: (p) => !!me?.permissions.includes(p), login, logout, changerMotDePasse }),
-    [me, q.isLoading, panne, reessayer, q.isFetching, login, logout, changerMotDePasse],
+    () => ({ me, loading: q.isLoading, panne, reessayer, verification: q.isFetching, can: (p) => !!me?.permissions.includes(p), login, connexionLien, logout, changerMotDePasse }),
+    [me, q.isLoading, panne, reessayer, q.isFetching, login, connexionLien, logout, changerMotDePasse],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

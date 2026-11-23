@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
+from app.imports.regles import COMPOSANTES_BRUT
 from app.kpi import formules as f
 
 ABSENCES = "Absences (nb)"
@@ -34,6 +35,14 @@ RUBRIQUES_ACTIVITE = (
 )
 REFERENCE_COLONNE = "Référence reporting"
 ZERO = Decimal(0)
+# Rémunération globale : hors absences (des jours) et hors composantes du Brut Réel (déjà dedans).
+HORS_REMUNERATION = frozenset((ABSENCES, *COMPOSANTES_BRUT))
+
+
+def remuneration_globale(pd: "PeriodeData") -> Decimal:
+    """TOTAL CHARGES + rubriques hors total, sauf absences et composantes du Brut Réel (F7, 06/11) :
+    chaque montant compte une fois."""
+    return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r not in HORS_REMUNERATION), ZERO)
 
 
 def total_ligne(montants: dict[str, Decimal], exclues: frozenset[str]) -> Decimal:
@@ -156,8 +165,8 @@ OBJECTIFS_ACTIVITE = ("ventes", "clients", "productivite", "factures")
 def _objectifs(pd: PeriodeData | None, budgets: Budgets, params: Params) -> dict:
     """Objectifs d'un mois (None = non défini) : masse salariale (budget par employé x effectif),
     budgets de rubrique saisis (frais de mission, commissions, rémunération globale = toutes les
-    rubriques hors absences), puis valeurs d'objectif saisies (somme des cases, moyenne pour la
-    productivité)."""
+    rubriques hors absences et composantes du Brut Réel), puis valeurs d'objectif saisies (somme
+    des cases, moyenne pour la productivité)."""
     saisies = pd.saisies if pd else ()
 
     def saisi(cle: str) -> Decimal | None:
@@ -165,7 +174,7 @@ def _objectifs(pd: PeriodeData | None, budgets: Budgets, params: Params) -> dict
         return (_moyenne_opt if cle == "productivite" else _somme_opt)(vals)
 
     rub = budgets.rubrique
-    paie = [v for r, v in rub.items() if r != ABSENCES]
+    paie = [v for r, v in rub.items() if r not in HORS_REMUNERATION]
     return {
         "ms": f.budget(len(pd.ids), params.budget_employe) if _ok(pd) else None,
         "frais_mission": rub.get(FRAIS_MISSION),
@@ -186,7 +195,7 @@ def _avec_objectif(c: dict, cle: str, objectif: Decimal | None,
     """Cellule du réel complétée de son objectif (budget, écart, écart %) ; `budget_partiel` si
     une case attendue de l'objectif manque."""
     out = {**c, **_bud(c["m"], objectif)}
-    return {**out, "budget_partiel": True} if OBJECTIF[cle] in partiel else out
+    return {**out, "budget_partiel": True} if OBJECTIF.get(cle) in partiel else out
 
 
 def _ca_marge(pd: PeriodeData | None) -> dict:
@@ -194,12 +203,21 @@ def _ca_marge(pd: PeriodeData | None) -> dict:
     return {"ca": ca, "marge": marge, "taux_marge": f.taux_marge(ca, marge)}
 
 
+# (clé, libellé, groupe) : lignes du bloc ACTIVITÉ, dans l'ordre d'affichage, groupées par thème.
 LIGNES_ACTIVITE = (
-    ("ventes", "Nombre de ventes"), ("clients", "Nombre de clients"),
-    ("productivite", "Indice de productivité (moyenne)"), ("or", "OR"), ("devis", "Devis"),
-    ("factures", "Factures"), ("productifs", "Productifs (effectif)"),
-    ("or_par_productif", "OR par productif"), ("factures_par_productif", "Factures par productif"),
+    ("ventes", "Nombre de ventes", "Commercial"), ("clients", "Nombre de clients", "Commercial"),
+    ("ventes_par_client", "Ventes par client", "Commercial"),
+    ("or", "OR", "Atelier"), ("devis", "Devis", "Atelier"), ("factures", "Factures", "Atelier"),
+    ("transformation", "Taux de transformation (factures / devis)", "Atelier"),
+    ("productivite", "Indice de productivité (moyenne)", "Productivité"),
+    ("productifs", "Productifs (effectif)", "Productivité"),
+    ("or_par_productif", "OR par productif", "Productivité"),
+    ("factures_par_productif", "Factures par productif", "Productivité"),
+    ("ms_par_vente", "Masse salariale par vente", "Coût RH"),
 )
+# Ratio -> données dont il dépend (il est partiel si l'une l'est).
+DEPENDANCES_ACTIVITE = {"or_par_productif": ("or",), "factures_par_productif": ("factures",),
+                        "transformation": ("factures", "devis")}
 DONNEES_ACTIVITE = ("ventes", "clients", "productivite", "or", "devis", "factures")
 
 
@@ -237,7 +255,15 @@ def _activite(pd: PeriodeData | None) -> dict:
         "or": or_, "devis": saisi("devis"), "factures": factures, "productifs": productifs,
         "or_par_productif": _ratio(or_, productifs),
         "factures_par_productif": _ratio(factures, productifs),
+        **_ratios_activite(indic(VENTES), indic(CLIENTS), saisi("devis"), factures,
+                           pd.ms if lignes else None),
     }
+
+
+def _ratios_activite(ventes, clients, devis, factures, ms) -> dict:
+    """Ratios qui relient l'activité entre elle et à la masse salariale (coût RH d'une vente)."""
+    return {"ventes_par_client": _ratio(ventes, clients),
+            "transformation": _ratio(factures, devis), "ms_par_vente": _ratio(ms, ventes)}
 
 
 def _avec_partiel(c: dict, partiel: bool) -> dict:
@@ -251,14 +277,15 @@ def _bloc_activite(a: dict, a1: dict, partiel: frozenset[str] = frozenset(),
     `objectifs` : objectif de ventes, clients, productivité et factures (budget sur ces lignes)."""
     if all(a[k] is None and a1[k] is None for k in DONNEES_ACTIVITE):
         return None
-    dep = {"or_par_productif": "or", "factures_par_productif": "factures"}
     def ligne(k: str) -> dict:
-        c = _avec_partiel(cell(a[k], a1[k]), dep.get(k, k) in partiel)
-        if objectifs is not None and k in OBJECTIFS_ACTIVITE:
+        c = _avec_partiel(cell(a[k], a1[k]),
+                          any(d in partiel for d in DEPENDANCES_ACTIVITE.get(k, (k,))))
+        if objectifs is not None and (k in OBJECTIFS_ACTIVITE or k == "ms_par_vente"):
             c = _avec_objectif(c, k, objectifs.get(k), partiel)
+            c["realisation"] = _ratio(c["m"], c["budget"])
         return c
 
-    return [{"cle": k, "libelle": lib, **ligne(k)} for k, lib in LIGNES_ACTIVITE]
+    return [{"cle": k, "libelle": lib, "groupe": g, **ligne(k)} for k, lib, g in LIGNES_ACTIVITE]
 
 
 def _activite_cumul(pds: dict[int, PeriodeData], mois: int) -> dict:
@@ -273,7 +300,9 @@ def _activite_cumul(pds: dict[int, PeriodeData], mois: int) -> dict:
 
     prods = _moyenne_opt(par_mois[m]["productifs"] for m in ok)
     or_, factures = somme("or"), somme("factures")
+    ms = _somme_opt(pds[m].ms for m in ok)
     return {
+        **_ratios_activite(somme("ventes"), somme("clients"), somme("devis"), factures, ms),
         "ventes": somme("ventes"), "clients": somme("clients"),
         "productivite": _moyenne_opt(L.indicateurs[PRODUCTIVITE] for m in tous
                                      for L in pds[m].lignes if PRODUCTIVITE in L.indicateurs),
@@ -315,6 +344,104 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
     return [(n, cell(a.get(n, ZERO), b.get(n, ZERO) if prev else None)) for n in noms]
 
 
+def _front_back(pd: PeriodeData | None) -> dict | None:
+    """Retours N2 : effectif de fin de mois en front office et en back office, et leurs parts de
+    l'effectif total (ratios). Une ligne sans activité ne compte dans aucune des deux parts."""
+    if pd is None:
+        return None
+
+    def compte(mot: str, contrat: str | None = None) -> int:
+        return len({L.salarie_id for L in pd.lignes if _est(L, mot)
+                    and (contrat is None or L.contrat == contrat)})
+
+    total = len({L.salarie_id for L in pd.lignes})
+    front, back = compte("front"), compte("back")
+    part = (lambda x: Decimal(x) / total) if total else (lambda x: None)
+    # R9 (réunion du 17/11) : la même répartition pour chaque nature de contrat.
+    par_contrat = {c: {"front": compte("front", c), "back": compte("back", c)}
+                   for c in sorted({L.contrat for L in pd.lignes if L.contrat})}
+    return {"front": front, "back": back, "total": total,
+            "front_pct": part(front), "back_pct": part(back), "par_contrat": par_contrat}
+
+
+def _est(L: Ligne, mot: str) -> bool:
+    """Ligne en front (mot « front ») ou en back office (« back ») ; sans activité : ni l'un ni
+    l'autre."""
+    return mot in (L.activite or "").lower()
+
+
+def _agreger_contrats(pds: list[PeriodeData] | None, axe: str) -> dict | None:
+    """(service ou site, activité, contrat) -> (masse cumulée, effectif moyen) sur les périodes
+    données, en une seule passe sur les lignes ; None sans période (N-1 absent)."""
+    if not pds:
+        return None
+    ms: dict = defaultdict(lambda: ZERO)
+    eff: dict = defaultdict(int)
+    for pd in pds:
+        ids: dict = defaultdict(set)
+        for L in pd.lignes:
+            k = (getattr(L, axe), L.activite, L.contrat)
+            ms[k] += pd.total(L)
+            ids[k].add(L.salarie_id)
+        for k, v in ids.items():
+            eff[k] += len(v)
+    return {k: (ms[k], Decimal(eff[k]) / len(pds)) for k in ms}
+
+
+def _contrats_activite(agg: dict | None, agg1: dict | None, cle: str, activite: str,
+                       contrats) -> dict:
+    """Retours N2 (remarque 3) : détail d'une activité d'un service ou d'un site par nature de
+    contrat, masse et effectif côte à côte (replié sous la ligne de l'activité)."""
+    def v(g, c, i):
+        return None if g is None else g.get((cle, activite, c), (ZERO, ZERO))[i]
+    return {c: {"ms": cell(v(agg, c, 0), v(agg1, c, 0)),
+                "effectif": cell(v(agg, c, 1), v(agg1, c, 1))} for c in contrats}
+
+
+def _blocs_contrat(ventilation: list[dict], effectifs: list[dict],
+                   global_m: Decimal | None) -> list[dict]:
+    """Nature de contrat présentée comme la répartition par site : un bloc par contrat, une ligne
+    par activité (masse et effectif côte à côte), total du contrat, parts dans le contrat et dans
+    le global."""
+    eff = {e["contrat"]: {k: v for k, v in e.items() if k != "contrat"} for e in effectifs}
+    blocs = []
+    for c in dict.fromkeys(v["contrat"] for v in ventilation):
+        vs = [v for v in ventilation if v["contrat"] == c]
+        blocs.append({"contrat": c, "total": _somme([v["ms"] for v in vs]),
+                      "effectif": eff.get(c) or _somme([v["effectif"] for v in vs]),
+                      "activites": [{"activite": v["activite"], **v["ms"],
+                                     "effectif": v["effectif"]} for v in vs]})
+    return _avec_parts(blocs, global_m)
+
+
+def _avec_parts(blocs: list[dict], global_m: Decimal | None) -> list[dict]:
+    """Retours N2 (4, 6) : part de chaque activité dans l'effectif ET dans la masse salariale de son
+    service ou site, part du service ou site dans l'effectif et la masse globaux (périmètre vu),
+    et mêmes parts par nature de contrat. Comparer masse et effectif montre qui coûte plus par
+    personne. Effectif de la période (fin de mois en mensuel, moyenne mensuelle en annuel) ; masse
+    globale = somme des blocs affichés."""
+    def masse(b: dict):
+        return (b.get("total") or b.get("ms") or {}).get("m")
+
+    vals = [masse(b) for b in blocs if masse(b) is not None]
+    global_ms = sum(vals, ZERO) if vals else None
+    for b in blocs:
+        e, ms = b["effectif"]["m"], masse(b)
+        b["part_globale"] = _ratio(e, global_m)
+        b["part_masse_globale"] = _ratio(ms, global_ms)
+        for a in b["activites"]:
+            a["part"] = _ratio(a["effectif"]["m"], e)
+            a["part_masse"] = _ratio(a["m"], ms)
+            for x in (a.get("contrats") or {}).values():
+                x["part_masse"] = _ratio(x["ms"]["m"], a["m"])
+                x["part"] = _ratio(x["effectif"]["m"], a["effectif"]["m"])
+        b["parts_contrat"] = {
+            c: {"masse": _ratio((b.get("ms_contrat") or {}).get(c, {}).get("m"), ms),
+                "effectif": _ratio(x["m"], e)}
+            for c, x in (b.get("effectif_contrat") or {}).items()}
+    return blocs
+
+
 def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Params,
             budgets: Budgets | None = None) -> dict:
     budgets = budgets or Budgets()
@@ -322,6 +449,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
     objectifs = _objectifs(cur, budgets, params)
+    objectifs["ms_par_vente"] = _ratio(objectifs["ms"], objectifs["ventes"])
     activite = _bloc_activite(_activite(cur), _activite(prev), cur.partiel, objectifs)
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
@@ -346,7 +474,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "marge": cur.marge,
         "taux_marge": f.taux_marge(cur.ca, cur.marge),
         "exclus": exclus,
-        "remuneration_globale": ms + exclus,
+        "remuneration_globale": remuneration_globale(cur),
         "commissions": cell(cur.rubrique(COMMISSION), prev.rubrique(COMMISSION) if prev else None),
         "primes_total": cell(sum((cur.rubrique(r) for r in PRIMES), ZERO),
                              sum((prev.rubrique(r) for r in PRIMES), ZERO) if prev else None),
@@ -358,6 +486,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             {"rubrique": r, **cell(cur.rubrique(r), prev.rubrique(r) if prev else None)}
             for r in PRIMES
         ],
+        "front_back": _front_back(cur),
     }
 
     def mont(rub):
@@ -378,6 +507,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     def total(pd, L):
         return pd.total(L)
 
+    agg_s = _agreger_contrats([cur], "service")
+    agg_s1 = _agreger_contrats(prev and [prev], "service")
     b_service = []
     for s in refs.services:
         sub = PeriodeData(tuple(L for L in cur.lignes if L.service == s), cur.exclues)
@@ -392,7 +523,8 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
                 {"activite": n, **c, "effectif": cell(
                     Decimal(len({L.salarie_id for L in sub.lignes if L.activite == n})),
                     Decimal(len({L.salarie_id for L in sub1.lignes if L.activite == n}))
-                    if sub1 else None)}
+                    if sub1 else None),
+                 "contrats": _contrats_activite(agg_s, agg_s1, s, n, refs.contrats)}
                 for n, c in _cells(sub, sub1, refs.activites, lambda L: L.activite, total)],
             "ms_contrat": dict(_cells(sub, sub1, refs.contrats, lambda L: L.contrat, total)),
             "effectif_contrat": {c: cell(
@@ -420,8 +552,25 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
             return None
         return sum((pd.total(L) for L in pd.lignes if L.site == s and L.contrat == c), ZERO)
 
+    def site_act(pd, s, a):
+        if not pd:
+            return None, None
+        sel = [L for L in pd.lignes if L.site == s and L.activite == a]
+        return sum((pd.total(L) for L in sel), ZERO), len({L.salarie_id for L in sel})
+
+    agg_t, agg_t1 = _agreger_contrats([cur], "site"), _agreger_contrats(prev and [prev], "site")
+
+    def activites_site(s):
+        out = []
+        for a in refs.activites:
+            (ms0, e0), (ms1, e1) = site_act(cur, s, a), site_act(prev, s, a)
+            out.append({"activite": a, **cell(ms0, ms1), "effectif": cell_eff(e0, e1),
+                        "contrats": _contrats_activite(agg_t, agg_t1, s, a, refs.contrats)})
+        return out
+
     c_site = [{"site": s, "ms": {**sites_ms[s], **_bud(sites_ms[s]["m"], budgets.site.get(s))},
                "effectif": cell_eff(*sites_eff[s]),
+               "activites": activites_site(s),
                "effectif_contrat": {c: cell_eff(eff_site_contrat(cur, s, c),
                                                 eff_site_contrat(prev, s, c))
                                     for c in refs.contrats},
@@ -505,12 +654,13 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
         "a_type_charge": a_type
         + [{"rubrique": "TOTAL CHARGES", "exclu": False, **cell(ms_a, ms_a1),
             **_bud(ms_a, bud)}],
-        "b_service_activite": b_service,
-        "c_site": c_site,
+        "b_service_activite": _avec_parts(b_service, Decimal(len(cur.ids))),
+        "c_site": _avec_parts(c_site, Decimal(len(cur.ids))),
         "c_site_total": c_site_total,
         "d_contrat": {"effectifs": d_eff, "indicateurs": d_indic,
                       "total": cell(Decimal(eff), None if eff1 is None else Decimal(eff1)),
-                      "ventilation": ventilation},
+                      "ventilation": ventilation,
+                      "blocs": _blocs_contrat(ventilation, d_eff, Decimal(len(cur.ids)))},
         "controles": controles,
     }
 
@@ -564,6 +714,9 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                    **cell(ms_n, ms_n1),
                    **bud("rubrique", "TOTAL CHARGES", ms_n)})
 
+    pds, pds1 = [n[m] for m in ok], [n1[m] for m in ok1]
+    agg_s, agg_s1 = _agreger_contrats(pds, "service"), _agreger_contrats(pds1, "service")
+    agg_t, agg_t1 = _agreger_contrats(pds, "site"), _agreger_contrats(pds1, "site")
     b_service = []
     for s in refs.services:
         tot = cell_ms(lambda L, s=s: L.service == s)
@@ -573,7 +726,8 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
             "effectif": cell_eff(lambda L, s=s: L.service == s),
             "activites": [
                 {"activite": a, **cell_ms(lambda L, s=s, a=a: L.service == s and L.activite == a),
-                 "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a)}
+                 "effectif": cell_eff(lambda L, s=s, a=a: L.service == s and L.activite == a),
+                 "contrats": _contrats_activite(agg_s, agg_s1, s, a, refs.contrats)}
                 for a in refs.activites],
             "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.service == s and L.contrat == c)
                            for c in refs.contrats},
@@ -589,6 +743,13 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
                        for c in refs.contrats}
         c_site.append({"site": s, "ms": {**ms, **bud("site", s, ms["m"])},
                        "effectif": e,
+                       "activites": [
+                           {"activite": a,
+                            **cell_ms(lambda L, s=s, a=a: L.site == s and L.activite == a),
+                            "effectif": cell_eff(
+                                lambda L, s=s, a=a: L.site == s and L.activite == a),
+                            "contrats": _contrats_activite(agg_t, agg_t1, s, a, refs.contrats)}
+                           for a in refs.activites],
                        "effectif_contrat": par_contrat,
                        "ms_contrat": {c: cell_ms(lambda L, s=s, c=c: L.site == s and L.contrat == c)
                                       for c in refs.contrats}})
@@ -626,15 +787,17 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
          "ms": cell_ms(lambda L, c=c, a=a: L.contrat == c and L.activite == a),
          "effectif": cell_eff(lambda L, c=c, a=a: L.contrat == c and L.activite == a)}
         for c in refs.contrats for a in refs.activites]
+    global_m = cell_eff(lambda L: True)["m"]
+    effectifs = [{"contrat": c, **cell_eff(lambda L, c=c: L.contrat == c)} for c in refs.contrats]
     return {
         "a_type_charge": a_type,
-        "b_service_activite": b_service,
-        "c_site": c_site,
+        "b_service_activite": _avec_parts(b_service, global_m),
+        "c_site": _avec_parts(c_site, global_m),
         "c_site_total": {"ms": _somme([c["ms"] for c in c_site], budget=True),
                          "effectif": _somme([c["effectif"] for c in c_site])},
         "d_contrat": {"indicateurs": d_indic, "ventilation": ventilation,
-                      "effectifs": [{"contrat": c, **cell_eff(lambda L, c=c: L.contrat == c)}
-                                    for c in refs.contrats],
+                      "effectifs": effectifs,
+                      "blocs": _blocs_contrat(ventilation, effectifs, global_m),
                       "total": cell_eff(lambda L: True)},
         "effectif_global": cell_eff(lambda L: True),
         "nb_mois_absences": nb,
@@ -644,14 +807,18 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 def annuel(
     n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
     budgets: dict[int, Budgets] | None = None, params_mois: dict[int, Params] | None = None,
+    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None,
 ) -> dict:
-    """n, n1 : mois -> données de l'année N et N-1. `mois` : dernier mois du cumul. `budgets` et
+    """n, n1 : mois -> données de l'année N et N-1. Cumul des mois `debut` à `mois`. `budgets` et
     `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
-    défaut)."""
-    refs = _contrats_vus(refs, *n.values(), *n1.values())
-    def remuneration(pd: PeriodeData) -> Decimal:
-        # comme `remuneration_globale` du mensuel : TOTAL CHARGES + exclusions hors absences
-        return pd.ms + sum((pd.rubrique(r) for r in pd.exclues if r != ABSENCES), ZERO)
+    défaut). `comparaison` : données comparées au cumul, rangées sur les mois de N (période
+    précédente ; vide : aucune comparaison) ; absent : les mêmes mois de N-1. Les séries mensuelles
+    restent les deux années entières."""
+    refs = _contrats_vus(refs, *n.values(), *n1.values(), *(comparaison or {}).values())
+    n_tout, n1_tout = n, n1
+    n = {m: pd for m, pd in n_tout.items() if m >= debut}
+    n1 = comparaison if comparaison is not None else {
+        m: pd for m, pd in n1_tout.items() if m >= debut}
 
     def par_contrat(pd: PeriodeData) -> dict[str, int]:
         return {c: len({L.salarie_id for L in pd.lignes if L.contrat == c}) for c in refs.contrats}
@@ -672,7 +839,7 @@ def annuel(
             "formation": pd.rubrique(FORMATION),
             "carburant": pd.rubrique(CARBURANT),
             "credit_telephonique": pd.rubrique(CREDIT_TEL),
-            "remuneration": remuneration(pd),
+            "remuneration": remuneration_globale(pd),
             "effectif_contrat": par_contrat(pd),
         }
 
@@ -713,9 +880,9 @@ def annuel(
     ok1 = avec_donnees(n1, mois)
     s_n = ms_service(n, ok)
     s_n1 = ms_service(n1, ok1)
-    complet1 = sum((n1[m].ms for m in avec_donnees(n1)), ZERO)
+    complet1 = sum((n1_tout[m].ms for m in avec_donnees(n1_tout)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
-    objectifs_n = {m: _objectifs(n.get(m), (budgets or {}).get(m, Budgets()),
+    objectifs_n = {m: _objectifs(n_tout.get(m), (budgets or {}).get(m, Budgets()),
                                  (params_mois or {}).get(m, params)) for m in range(1, 13)}
 
     manque: set[str] = set()
@@ -737,6 +904,11 @@ def annuel(
     objectifs_activite = {k: objectif_cumul(k, [m for m, a in activite_n.items()
                                                  if a[k] is not None])
                           for k in OBJECTIFS_ACTIVITE}
+    # Objectif de masse salariale par vente = budget total de la période / objectif de ventes, sur
+    # les seuls mois qui ont un objectif de ventes (mêmes mois au numérateur et au dénominateur)
+    budget_ms = _somme_opt(objectifs_n[m]["ms"] for m in ok if objectifs_n[m]["ms"] is not None
+                           and objectifs_n[m]["ventes"] is not None)
+    objectifs_activite["ms_par_vente"] = _ratio(budget_ms, objectifs_activite["ventes"])
     # Résumé : cumuls N-1 sur la même période, part des MAD et CA par effectif moyen global
     # (docs/QUESTIONS_CLIENT.md C1, C3).
     avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]
@@ -776,10 +948,19 @@ def annuel(
     def cumul_rub(nom: str) -> Decimal | None:
         return sum((n[m].rubrique(nom) for m in ok), ZERO) if nb else None
 
+    # R9 (réunion du 17/11) : masse salariale cumulée en front et en back office ; CA et marge par
+    # employé front office = cumul / effectif moyen front office des mois de paie (C2).
+    def ms_fb(mot: str) -> Decimal:
+        return sum((n[m].total(L) for m in ok for L in n[m].lignes if _est(L, mot)), ZERO)
+
+    ms_front, ms_back = (ms_fb("front"), ms_fb("back")) if nb else (None, None)
+    eff_front = (Decimal(sum(len({L.salarie_id for L in n[m].lignes if _est(L, "front")})
+                             for m in ok)) / nb) if nb else None
+
     return {
         **blocs,
-        "serie_n": serie(n, objectifs_n),
-        "serie_n1": serie(n1),
+        "serie_n": serie(n_tout, objectifs_n),
+        "serie_n1": serie(n1_tout),
         "cumul_ytd": {**cell(c if nb else None, c1 if nb1 else None), "nb_mois": nb,
                       "nb_mois_n1": nb1},
         "moyenne_mensuelle": cell(moy, moy1),
@@ -819,6 +1000,12 @@ def annuel(
         "effectif_moyen": eff,
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
+        "front_back": _front_back(fin),
+        "ms_front_back": {"front": ms_front, "back": ms_back, "front_pct": ratio(ms_front, c),
+                          "back_pct": ratio(ms_back, c)} if nb else None,
+        "effectif_moyen_front": eff_front,
+        "ca_par_front": ratio(ca_ytd, eff_front),
+        "marge_par_front": ratio(marge_ytd, eff_front),
         "effectif_fin_contrat": {ct: avec_part(eff_fin(lambda L, ct=ct: L.contrat == ct),
                                                eff_fin_total) for ct in refs.contrats},
         # Part des MAD dans l'effectif : moyennes sur les mois de paie saisis (QUESTIONS_CLIENT C1)
@@ -831,7 +1018,7 @@ def annuel(
         "ms_contrat": {ct: avec_part(cell(ms_contrat(n, ok, ct), ms_contrat(n1, ok1, ct)),
                                      ms_total) for ct in refs.contrats},
         "ca_par_effectif": cell(ratio(ca_ytd, eff["m"]), ratio(ca1, eff["m1"])),
-        "cumul_annee_n1": complet1 if avec_donnees(n1) else None,
+        "cumul_annee_n1": complet1 if avec_donnees(n1_tout) else None,
         "par_service": [
             {"service": s, **cell(s_n.get(s, ZERO) if nb else None,
                                   s_n1.get(s, ZERO) if nb1 else None),

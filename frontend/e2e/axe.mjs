@@ -24,7 +24,7 @@ await page.getByLabel('Adresse e-mail').fill(courriel('drh'))
 await page.getByLabel('Mot de passe', { exact: true }).fill(PW)
 await page.getByRole('button', { name: 'Se connecter' }).click()
 await page.getByRole('navigation', { name: 'Rapports' }).waitFor()
-for (const p of ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']) {
+for (const p of ['resume', 'charges', 'graphes', 'individuel?matricule=E1']) {
   await page.goto(`${BASE}${p}`)
   await audit(p.split('?')[0])
 }

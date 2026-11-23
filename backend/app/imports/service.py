@@ -11,6 +11,8 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
+from app import notifications
+from app.imports import paie
 from app.imports.lecture import Feuille, FichierIllisible, lire
 from app.imports.regles import (
     ATTRIBUTS,
@@ -35,12 +37,13 @@ from app.imports.regles import (
     valider,
 )
 from app.imports.similarite import SEUIL_NOUVEAU_PROCHE, plus_proche, similarite
-from app.models.auth import AuditEvent
+from app.models.auth import AuditEvent, ReglageGlobal
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.imports import ImportAnomalie, LotImport, LotImportPrecedent, StagingLigne
 from app.models.referentiel import (
     TYPES_SITE,
     Activite,
+    Departement,
     Poste,
     RefAlias,
     Rubrique,
@@ -71,6 +74,9 @@ def charger_refs(db: Session) -> Refs:
                 idx[a.alias_norm] = base[a.cible_id]
         return idx
 
+    lib_act = libelles(Activite)
+    activite_du_poste = {p.libelle: lib_act.get(p.activite_id) for p in db.scalars(select(Poste))}
+    idx_postes = index("poste", Poste)
     rubs = list(db.scalars(select(Rubrique).where(Rubrique.actif).order_by(Rubrique.ordre)))
     par_id = {r.id: r.libelle for r in rubs}
     paie_ids = {r.id for r in rubs if r.nature == "paie"}
@@ -102,7 +108,8 @@ def charger_refs(db: Session) -> Refs:
         rubriques=[(r.libelle, r.unite) for r in rubs if r.nature == "paie"],
         rubriques_activite=[(r.libelle, r.unite) for r in rubs if r.nature != "paie"],
         rubrique_alias=alias,
-        postes=set(index("poste", Poste)), noms_connus=noms,
+        postes=set(idx_postes), noms_connus=noms,
+        postes_activite={k: activite_du_poste.get(v) for k, v in idx_postes.items()},
         annuaire={s.matricule_norm: (s.matricule, s.nom) for s in salaries if s.nom},
         historique=historique, montants=montants,
     )
@@ -115,7 +122,7 @@ def lot_dict(lot: LotImport) -> dict:
         "valide_le": lot.valide_le.isoformat() if lot.valide_le else None,
         "annule_le": lot.annule_le.isoformat() if lot.annule_le else None,
         "nb_lignes": lot.nb_lignes, "nb_bloquants": lot.nb_bloquants, "nb_avert": lot.nb_avert,
-        "stats": lot.stats,
+        "stats": lot.stats, "origine": lot.origine,
     }
 
 
@@ -128,10 +135,14 @@ def _nb_modifications(db: Session, lot: LotImport) -> int:
         AuditEvent.action.in_(ACTIONS_MODIF))) or 0
 
 
-def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str | None = None) -> LotImport:
+def analyser(db: Session, user_id: int | None, nom: str, contenu: bytes, reprise: str | None = None,
+             annee: int | None = None, mois: int | None = None, origine: str = "manuel",
+             chemin: str | None = None) -> LotImport:
     """Fichier déjà en vérification : avec des modifications enregistrées, `reprise` choisit de les
     reprendre (« reprendre ») ou de tout annuler (« recommencer ») ; sans modification, l'ancien lot
-    est abandonné et le fichier analysé comme neuf."""
+    est abandonné et le fichier analysé comme neuf.
+    Export de paie (.csv) : le mois est celui choisi (`annee`, `mois`), sinon celui du nom du fichier.
+    `origine` : 'manuel' (envoi) ou 'dossier' (dossier de paie, `user_id` vide, `chemin` = nom du fichier)."""
     sha = hashlib.sha256(contenu).hexdigest()
     lots = list(db.scalars(select(LotImport).where(LotImport.sha256 == sha).order_by(LotImport.id.desc())))
     valide = next((x for x in lots if x.statut == "valide"), None)
@@ -156,22 +167,65 @@ def analyser(db: Session, user_id: int, nom: str, contenu: bytes, reprise: str |
     db.flush()
     refs = charger_refs(db)
     try:
-        feuille = lire(contenu, entetes_reconnus(refs))
+        if paie.est_csv(nom):
+            periode = (annee, mois) if annee and mois else paie.mois_du_nom(nom)
+            if periode is None:
+                raise HTTPException(422, "Mois du fichier introuvable : son nom n'est pas de la forme "
+                                         "BrutFinalMMAA (ex. BrutFinal1026.csv). Choisir le mois à importer.")
+            if not (1 <= periode[1] <= 12 and 2000 <= periode[0] <= 2100):
+                raise HTTPException(422, "Mois ou année invalide")
+            feuille = paie.lire_csv(contenu, [lib for lib, _u in refs.rubriques],
+                                    paie.correspondance(db), *periode)
+        else:
+            feuille = lire(contenu, entetes_reconnus(refs))
     except FichierIllisible as e:
         raise HTTPException(422, str(e)) from None
-    return analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs)
+    lot = analyser_feuille(db, user_id, nom, feuille, sha, len(contenu), refs, origine, chemin)
+    if origine == "dossier" and lot.chemin:
+        _remplacer_version(db, user_id, lot)
+    return lot
 
 
-def analyser_feuille(db: Session, user_id: int, nom: str, feuille: Feuille, sha: str,
-                     taille: int, refs: Refs | None = None) -> LotImport:
+def _remplacer_version(db: Session, user_id: int | None, lot: LotImport) -> None:
+    """Fichier du dossier modifié avant validation : l'ancien lot en vérification est abandonné et ses
+    valeurs ajoutées aux listes sont reprises si le nouveau fichier les cite encore (inconnues).
+    Corrections et choix par cellule ne sont pas repris : les lignes du fichier ont pu bouger."""
+    anciens = list(db.scalars(select(LotImport).where(
+        LotImport.origine == "dossier", LotImport.chemin == lot.chemin, LotImport.id != lot.id,
+        LotImport.statut.in_(("pret", "rejete"))).order_by(LotImport.id)))
+    if not anciens:
+        return
+    inconnues = {norm(v) for v in db.scalars(select(ImportAnomalie.valeur).where(
+        ImportAnomalie.lot_id == lot.id, ImportAnomalie.code.in_(NOUVELLES))) if v}
+    ajouts: dict[str, dict] = {}
+    for x in anciens:
+        for dim, valeurs in ((x.feuille or {}).get("ajouts") or {}).items():
+            for v, extra in valeurs.items():
+                if dim in DIM_REFS and norm(v) in inconnues:
+                    ajouts.setdefault(dim, {})[v] = extra
+        x.statut, x.annule_par, x.annule_le = "annule", user_id, _now()
+        audit.record(db, user_id, "import_abandonne", "lot_import", x.id, None,
+                     {"statut": "annule", "remplace_par": lot.id})
+    if ajouts and lot.feuille:
+        _relancer(db, lot, _feuille_du_lot(lot), _refs_du_lot(db, lot, ajouts), ajouts=ajouts)
+        audit.record(db, user_id, "import_ajout_referentiel", "lot_import", lot.id, None,
+                     {"repris_de": [x.id for x in anciens], "ajouts": ajouts})
+    db.commit()
+
+
+def analyser_feuille(db: Session, user_id: int | None, nom: str, feuille: Feuille, sha: str,
+                     taille: int, refs: Refs | None = None, origine: str = "manuel",
+                     chemin: str | None = None) -> LotImport:
     lignes, anos, stats = valider(feuille, refs or charger_refs(db))
     lot = LotImport(fichier_nom=nom[:255], sha256=sha, taille=taille, cree_par=user_id,
-                    statut=_statut(anos), feuille=_feuille_json(feuille))
+                    statut=_statut(anos), feuille=_feuille_json(feuille),
+                    origine=origine, chemin=chemin[:500] if chemin else None)
     db.add(lot)
     db.flush()
     _ecrire(db, lot, lignes, anos, stats)
     audit.record(db, user_id, "import_analyse", "lot_import", lot.id, None,
-                 {"statut": lot.statut, "fichier": lot.fichier_nom, **(stats or {})})
+                 {"statut": lot.statut, "fichier": lot.fichier_nom, "origine": origine,
+                  **({"chemin": lot.chemin} if lot.chemin else {}), **(stats or {})})
     db.commit()
     return lot
 
@@ -183,10 +237,16 @@ def _statut(anos) -> str:
 def _feuille_json(f: Feuille) -> dict:
     """Valeurs JSON telles quelles ; une date ou une heure est gardée comme la lisent les règles (texte)."""
     def v(x):
+        if isinstance(x, Decimal):  # montant de la paie : entier, ou décimal qui se relit à l'identique
+            if x == x.to_integral_value():
+                return int(x)
+            f = float(x)
+            return f if Decimal(repr(f)) == x else str(x)
         return x if x is None or isinstance(x, str | int | float | bool) else str(x)
     return {"entete_ligne": f.entete_ligne, "entetes": [v(x) for x in f.entetes],
             "lignes": [[n, [v(x) for x in row]] for n, row in f.lignes], "ligne_ignoree": f.ligne_ignoree,
-            "formules": [[n, j, t] for n, fs in f.formules.items() for j, t in fs.items()]}
+            "formules": [[n, j, t] for n, fs in f.formules.items() for j, t in fs.items()],
+            **({"departements": f.departements} if f.departements else {})}
 
 
 def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
@@ -253,7 +313,7 @@ def _feuille_du_lot(lot: LotImport) -> Feuille:
     for n, j, t in f.get("formules", []):
         formules.setdefault(n, {})[j] = t
     return Feuille(f["entete_ligne"], f["entetes"], [(n, tuple(r)) for n, r in f["lignes"]],
-                   f["ligne_ignoree"], formules)
+                   f["ligne_ignoree"], formules, f.get("departements", {}))
 
 
 # Rapport annoté : à corriger, à confirmer.
@@ -271,9 +331,31 @@ def _refs_du_lot(db: Session, lot: LotImport, ajouts: dict | None = None) -> Ref
         for v in valeurs:
             if isinstance(idx, set):  # postes : textes normalisés seulement
                 idx.add(norm(v))
+                if valeurs[v]:  # activité choisie pour ce poste
+                    refs.postes_activite[norm(v)] = refs.activites.get(norm(valeurs[v]), valeurs[v])
             else:
                 idx[norm(v)] = v
     return refs
+
+
+def _verifier_ajout(refs: Refs, dim: str, valeur: str, activite: str | None) -> str | None:
+    """Valeur à ajouter à sa liste. Un poste déjà connu mais sans activité peut recevoir la sienne.
+    Renvoie l'activité retenue (poste seulement)."""
+    if not valeur or len(valeur) > 200:
+        raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
+    if dim != "poste":
+        if norm(valeur) in getattr(refs, DIM_REFS[dim]):
+            raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+        return None
+    choisie = None
+    if activite:
+        choisie = refs.activites.get(norm(activite))
+        if choisie is None:
+            raise HTTPException(422, "Activité inconnue : " + ", ".join(sorted(set(refs.activites.values()))))
+    cle = norm(valeur)
+    if cle in refs.postes and (not choisie or refs.postes_activite.get(cle)):
+        raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+    return choisie
 
 
 def _relancer(db: Session, lot: LotImport, feuille: Feuille, refs: Refs, **decisions) -> None:
@@ -309,7 +391,8 @@ def _controler(feuille: Feuille, refs: Refs, ignores):
 
 
 def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dict[int, dict[str, str | None]],
-                        ajouts: list[dict], retirees: list[int], ignores: list[str], simuler: bool):
+                        ajouts: list[dict], retirees: list[int], ignores: list[str], simuler: bool,
+                        alias: list[dict] | None = None):
     """Toutes les décisions de l'écran en une fois : valeurs ajoutées aux listes, lignes retirées, cellules
     corrigées, cellules ignorées. Simulation : renvoie les points restants sans rien écrire."""
     lot = _lot_modifiable(db, lot_id)
@@ -320,15 +403,15 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
         dim, valeur, type_site = a["dimension"], (a.get("valeur") or "").strip(), a.get("type_site")
         if dim not in DIM_REFS:
             raise HTTPException(422, "Liste inconnue")
-        if not valeur or len(valeur) > 200:
-            raise HTTPException(422, "Valeur attendue (200 caractères au plus)")
-        if norm(valeur) in getattr(refs, DIM_REFS[dim]):
-            raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
-        if dim != "site":
+        activite = _verifier_ajout(refs, dim, valeur, a.get("activite"))
+        if dim == "poste":
+            type_site = activite  # pour un poste, la valeur gardée est l'activité choisie
+        elif dim != "site":
             type_site = None
         elif type_site not in TYPES_SITE and not simuler:
             raise HTTPException(422, "Type de site obligatoire : " + ", ".join(TYPES_SITE))
         tout.setdefault(dim, {})[valeur] = type_site
+    rattaches = [_verifier_alias(db, a) for a in alias or []]
     refs = _refs_du_lot(db, lot, tout)
     cols = colonnes(feuille.entetes, refs)
     texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
@@ -373,12 +456,39 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
               ignores=tous_ignores)
     for a in ajouts:
         traces.append(("import_ajout_referentiel", None, a))
+    for dim, valeur, cible in rattaches:
+        if not db.scalar(select(RefAlias.id).where(RefAlias.dimension == dim,
+                                                   RefAlias.alias_norm == norm(valeur))):
+            db.add(RefAlias(dimension=dim, alias_norm=norm(valeur), cible_id=cible.id))
+        traces.append(("import_rattachement", None,
+                       {"dimension": dim, "valeur": valeur, "cible": cible.libelle}))
     if ignores:
         traces.append(("import_ignore", None, {"cellules": ignores}))
     for action, avant, apres in traces:
         audit.record(db, user_id, action, "lot_import", lot.id, avant, apres)
     db.commit()
     return lot
+
+
+def _verifier_alias(db: Session, a: dict):
+    """« Rattacher à » : la valeur du fichier devient un autre nom d'une valeur connue de la liste ;
+    les prochains fichiers la reconnaissent d'office."""
+    dim, valeur, cible = a.get("dimension"), (a.get("valeur") or "").strip(), a.get("cible") or ""
+    if dim not in DIM_REFS or dim not in DIM_MODELS:
+        raise HTTPException(422, "Liste inconnue")
+    model = DIM_MODELS[dim]
+    c = db.scalar(select(model).where(model.libelle == cible))
+    if c is None:
+        raise HTTPException(422, f"« {cible} » n'est pas dans la liste")
+    if not valeur or norm(valeur) == norm(c.libelle):
+        raise HTTPException(422, "Valeur à rattacher vide ou identique")
+    if any(norm(v) == norm(valeur) for v in db.scalars(select(model.libelle))):
+        raise HTTPException(422, f"« {valeur} » est déjà dans la liste")
+    autre = db.scalar(select(RefAlias).where(RefAlias.dimension == dim,
+                                             RefAlias.alias_norm == norm(valeur)))
+    if autre is not None and autre.cible_id != c.id:
+        raise HTTPException(422, f"« {valeur} » est déjà rattaché à une autre valeur")
+    return dim, valeur, c
 
 
 def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
@@ -410,8 +520,9 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
 
 
 def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, valeur: str,
-                        type_site: str | None = None) -> LotImport:
-    """Décide d'ajouter une valeur inconnue à sa liste : gardée dans le lot, créée à la validation."""
+                        type_site: str | None = None, activite: str | None = None) -> LotImport:
+    """Décide d'ajouter une valeur inconnue à sa liste : gardée dans le lot, créée à la validation.
+    Pour un poste, `activite` classe le poste (nouveau, ou connu mais sans activité)."""
     if dimension not in DIM_REFS:
         raise HTTPException(422, "Liste inconnue")
     valeur = (valeur or "").strip()
@@ -424,13 +535,13 @@ def ajouter_referentiel(db: Session, user_id: int, lot_id: int, dimension: str, 
         type_site = None
     lot = _lot_modifiable(db, lot_id)
     refs = _refs_du_lot(db, lot)
-    if norm(valeur) in getattr(refs, DIM_REFS[dimension]):
-        raise HTTPException(409, f"« {valeur} » est déjà dans la liste")
+    choisie = _verifier_ajout(refs, dimension, valeur, activite)
     ajouts = {d: dict(v) for d, v in lot.feuille.get("ajouts", {}).items()}
-    ajouts.setdefault(dimension, {})[valeur] = type_site
+    ajouts.setdefault(dimension, {})[valeur] = choisie if dimension == "poste" else type_site
     _relancer(db, lot, _feuille_du_lot(lot), _refs_du_lot(db, lot, ajouts), ajouts=ajouts)
     audit.record(db, user_id, "import_ajout_referentiel", "lot_import", lot.id, None,
-                 {"dimension": dimension, "valeur": valeur, "type_site": type_site})
+                 {"dimension": dimension, "valeur": valeur, "type_site": type_site,
+                  **({"activite": choisie} if dimension == "poste" else {})})
     db.commit()
     return lot
 
@@ -658,7 +769,7 @@ def propositions(db: Session, lot_id: int, anos) -> dict[int, dict]:
 
 
 CODES_NOMS = ("NOM_PROCHE", "NOM_INCOHERENT", "NOM_SIMILAIRE", "MATRICULE_DOUTEUX")
-NOUVELLES = ("REFERENTIEL_INCONNU", "POSTE_NOUVEAU")
+NOUVELLES = ("REFERENTIEL_INCONNU", "POSTE_NOUVEAU", "POSTE_SANS_ACTIVITE")
 SEUIL_VALEUR_PROCHE = 0.75  # valeur existante proposée en remplacement d'une valeur inconnue
 
 
@@ -682,7 +793,7 @@ def _proposition_nouvelle(nouvelles: tuple, col: str | None, valeur: str) -> dic
     j = cols.get(col)
     if j is not None:
         prop["lignes"] = [n for n, r in rows if j < len(r) and r[j] is not None and norm(str(r[j])) == norm(valeur)]
-    scores = [(similarite(valeur, v), v) for v in existantes.get(col, [])]
+    scores = [(similarite(valeur, v), v) for v in existantes.get(col, []) if norm(v) != norm(valeur)]
     meilleur = max(scores, default=(0, None))
     if meilleur[0] >= SEUIL_VALEUR_PROCHE:
         prop["proche"] = meilleur[1]
@@ -771,6 +882,44 @@ ATTRS_APERCU = (("poste", "Poste", Poste, "poste_id"), ("type_contrat", "Type Co
                 ("site", "Site", Site, "site_id"), ("service", "Service", Service, "service_id"))
 
 
+CLE_PUBLICATION_AUTO = "publication_auto"
+
+
+def publication_auto(db: Session) -> bool:
+    v = db.scalar(select(ReglageGlobal.valeur).where(ReglageGlobal.cle == CLE_PUBLICATION_AUTO))
+    return bool(isinstance(v, dict) and v.get("actif"))
+
+
+def regler_publication_auto(db: Session, user_id: int, actif: bool) -> bool:
+    ligne = db.scalar(select(ReglageGlobal).where(ReglageGlobal.cle == CLE_PUBLICATION_AUTO))
+    avant = dict(ligne.valeur) if ligne else None
+    if ligne:
+        ligne.valeur = {"actif": actif}
+    else:
+        db.add(ReglageGlobal(cle=CLE_PUBLICATION_AUTO, valeur={"actif": actif}))
+    db.flush()
+    audit.record(db, user_id, "update", "reglage", CLE_PUBLICATION_AUTO, avant, {"actif": actif})
+    db.commit()
+    return actif
+
+
+def publier_si_auto(db: Session, lot: LotImport) -> LotImport:
+    """Publication automatique (réglage, coupée par défaut) d'un lot du dossier sans problème.
+    Jamais d'écrasement en silence : un lot qui modifie des lignes déjà en base attend l'admin."""
+    if lot.origine != "dossier" or lot.statut != "pret" or not publication_auto(db):
+        return lot
+    if apercu(db, lot.id)["modifiee"]:
+        return lot
+    try:
+        lot = valider_lot(db, None, lot.id)
+    except HTTPException:  # déjà importé, vide : reste à l'admin
+        db.rollback()
+        return db.get(LotImport, lot.id)
+    audit.record(db, None, "import_publie_auto", "lot_import", lot.id, None, {"statut": "valide"})
+    db.commit()
+    return lot
+
+
 def apercu(db: Session, lot_id: int) -> dict:
     """Différences entre le lot et la base, sans écriture : ce que la validation changerait."""
     from app.kpi.chargement import exclues_a_date
@@ -852,8 +1001,21 @@ def _absents_du_lot(db: Session, presents: set[Cle], periodes: set[tuple[int, in
     return sortie
 
 
-def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None = None) -> LotImport:
-    """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée)."""
+def _departements_des_services(db: Session, lot: LotImport) -> dict[str, int]:
+    """Service normalisé -> id du département connu (libellé ou alias) cité par le fichier de paie."""
+    cites = (lot.feuille or {}).get("departements") or {}
+    if not cites:
+        return {}
+    idx = {norm(d.libelle): d.id for d in db.scalars(select(Departement))}
+    for a in db.scalars(select(RefAlias).where(RefAlias.dimension == "departement")):
+        idx.setdefault(a.alias_norm, a.cible_id)
+    return {s: idx[norm(d)] for s, d in cites.items() if norm(d) in idx}
+
+
+def valider_lot(db: Session, user_id: int | None, lot_id: int, garder: set[Cle] | None = None,
+                commit: bool = True) -> LotImport:
+    """Valide le lot. `garder` : clés dont la ligne déjà en base est conservée (ligne du lot ignorée).
+    `commit=False` : écritures seulement envoyées (aperçu du mois, annulé ensuite)."""
     lot = _get_lot(db, lot_id, verrou=True)
     if lot.statut != "pret":
         raise HTTPException(409, f"Lot au statut « {lot.statut} » : validation impossible")
@@ -877,7 +1039,9 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
         lot.statut, lot.valide_par, lot.valide_le = "valide", user_id, _now()
         audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                      {"situations": 0, "montants": 0, "remplacees": 0, "ignorees": ignorees})
-        db.commit()
+        if commit:
+            notifications.lot_publie(db, lot)
+        db.commit() if commit else db.flush()
         return lot
 
     cles_periodes = {(r.annee, r.mois) for r in rows}
@@ -908,6 +1072,17 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
                 audit.record(db, user_id, "salarie_renomme", "salarie", s.id, {"nom": s.nom}, {"nom": nom})
                 s.nom = nom
 
+    # postes ajoutés dans le lot (avec leur activité) ou classés ici : avant ceux créés d'après les lignes
+    act_ids = {norm(k): v for k, v in _ids(db, Activite).items()}
+    postes_base = {norm(p.libelle): p for p in db.scalars(select(Poste))}
+    for v, act in (((lot.feuille or {}).get("ajouts") or {}).get("poste") or {}).items():
+        aid = act_ids.get(norm(act)) if act else None
+        existant = postes_base.get(norm(v))
+        if existant is None:
+            db.add(Poste(libelle=v, activite_id=aid))
+        elif aid is not None and existant.activite_id is None:
+            existant.activite_id = aid
+    db.flush()
     postes = {norm(k): v for k, v in _ids(db, Poste).items()}
     for r in rows:
         p = r.donnees.get("poste")
@@ -921,9 +1096,14 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
     for dim, valeurs in ((lot.feuille or {}).get("ajouts") or {}).items():
         model = DIM_MODELS[dim]
         connus = {norm(k) for k in _ids(db, model)}
+        dep_de = _departements_des_services(db, lot) if dim == "service" else {}
         for v, type_site in valeurs.items():
             if norm(v) not in connus:
-                db.add(Site(libelle=v, type_site=type_site) if dim == "site" else model(libelle=v))
+                if dim == "site":
+                    db.add(Site(libelle=v, type_site=type_site))
+                else:  # un service créé rejoint le département de sa ligne ; un service connu reste tel quel
+                    db.add(model(libelle=v, **({"departement_id": dep_de.get(norm(v))}
+                                               if dim == "service" else {})))
         db.flush()
 
     ids = {d: _ids(db, m) for d, m in DIM_MODELS.items() if d != "poste"}
@@ -1001,7 +1181,9 @@ def valider_lot(db: Session, user_id: int, lot_id: int, garder: set[Cle] | None 
     audit.record(db, user_id, "import_valide", "lot_import", lot.id, None,
                  {"situations": len(sits), "montants": len(montants),
                   "remplacees": len(a_remplacer), "ignorees": ignorees})
-    db.commit()
+    if commit:
+        notifications.lot_publie(db, lot)
+    db.commit() if commit else db.flush()
     return lot
 
 

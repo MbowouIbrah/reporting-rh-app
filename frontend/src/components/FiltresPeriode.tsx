@@ -6,14 +6,21 @@ import ChoixSalarie, { type Salarie } from './ChoixSalarie'
 import type { ClePartagee, Partage } from '../lib/filtresPartages'
 import { libelleExercice } from '../lib/exercice'
 import { MOIS_COURTS } from '../lib/format'
+import {
+  anneeDe, indice, libelle, lireTexte, longueur, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
+} from '../lib/periode'
 import BoutonReinitialiser from './BoutonReinitialiser'
-import ChoixPeriode, { type OptionPeriode } from './ChoixPeriode'
+import ChoixPeriode from './ChoixPeriode'
+import MultiChoix from './MultiChoix'
 
 type Patch = Record<string, string | number | undefined>
 
 interface Props {
   filtres: FiltresPage
-  annees: number[]
+  /** Années ou exercices proposés (sélecteur d'année seul). */
+  annees?: number[]
+  /** Départements proposés ; absent : pas de filtre « Département ». */
+  departements?: string[]
   services?: string[]
   sites?: string[]
   /** Types de site présents dans les données. */
@@ -24,11 +31,13 @@ interface Props {
   /** Employés proposés ; absent sans le droit nominatif : le filtre « Employé » n'est pas affiché. */
   salaries?: Salarie[]
   avecMois?: boolean
-  /** Sélecteur « Comparer à » : une année (annuel) ou une période (mensuel). */
+  /** Sélecteur « Comparer à » : une période (annuel) ou un mois (mensuel). */
   comparaison?: 'annee' | 'periode'
-  /** Choix « Année civile / Année fiscale » (pages annuelles). */
+  /** Choix « Année civile / Année fiscale » (sélecteur d'année seul). */
   avecCalendrier?: boolean
   periodes?: Periode[]
+  /** Pages annuelles : période, comparaison et mois disponibles du calendrier. */
+  periode?: PeriodeChoisie | null
   /** Champs supplémentaires, alignés sur la même ligne que les filtres. */
   children?: ReactNode
   onChange: (patch: Patch) => void
@@ -37,74 +46,81 @@ interface Props {
 }
 
 /** Période précédant (annee, mois) : mois d'avant, décembre de l'année d'avant en janvier. */
-const clePeriode = (p: { annee: number; mois: number }) => `${p.annee}-${String(p.mois).padStart(2, '0')}`
-
 export const moisPrecedent = (annee: number, mois: number) =>
   mois === 1 ? { annee: annee - 1, mois: 12 } : { annee, mois: mois - 1 }
 
-/** Libellé de la colonne de comparaison des tableaux : la période choisie, sinon le mois ou l'année d'avant. */
+/** Période des paramètres « AAAA-MM » d'une page annuelle. */
+const selDe = (du?: string, au?: string) => (du && au ? lireTexte(`${du}..${au}`) : null)
+
+/** Libellé de la colonne de comparaison des tableaux : la période choisie, sinon le mois d'avant. */
 export function libelleComparaison(f: FiltresPage, mode: 'annee' | 'periode') {
-  if (mode === 'annee') return libelleExercice(f.ref_annee ?? f.annee - 1, f.calendrier)
+  if (mode === 'annee') {
+    const s = selDe(f.cmp_du, f.cmp_au)
+    return s ? libelle(s) : ''
+  }
   const p = f.ref_annee && f.ref_mois ? { annee: f.ref_annee, mois: f.ref_mois } : moisPrecedent(f.annee, f.mois)
   return libellePeriode(p)
+}
+
+/** En-tête de la colonne de la période affichée (pages annuelles). */
+export function libelleCourant(f: FiltresPage) {
+  const s = selDe(f.du, f.au)
+  return s ? libelle(s) : ''
 }
 
 /** Libellé court d'une période (« Juin 2026 ») : en-têtes de tableaux. */
 export const libellePeriode = (p: { annee: number; mois: number }) => `${MOIS_COURTS[p.mois - 1]} ${p.annee}`
 
-export function ChoixComparaison({ mode, filtres: f, annees, periodes = [], onChange }: {
-  mode: 'annee' | 'periode'
-  filtres: FiltresPage
-  annees: number[]
-  periodes?: Periode[]
-  onChange: (patch: Patch) => void
-}) {
-  if (mode === 'annee') {
-    const autres = annees.filter((a) => a !== f.annee && a !== f.annee - 1).sort((a, b) => b - a)
-    return (
-      <label>
-        Comparer à
-        <select value={f.ref_annee ?? ''} onChange={(e) => onChange({ cmp_annee: e.target.value })}>
-          <option value="">{libelleExercice(f.annee - 1, f.calendrier)}</option>
-          {autres.map((a) => (
-            <option key={a} value={a}>{libelleExercice(a, f.calendrier)}</option>
-          ))}
-        </select>
-      </label>
-    )
-  }
-  const prec = moisPrecedent(f.annee, f.mois)
-  const exclues = new Set([clePeriode(f), clePeriode(prec)])
-  const options: OptionPeriode[] = [
-    { valeur: '', ...prec },
-    ...periodes.filter((p) => !exclues.has(clePeriode(p))).map((p) => ({ valeur: clePeriode(p), annee: p.annee, mois: p.mois })),
-  ].sort((x, y) => clePeriode(x).localeCompare(clePeriode(y)))
-  const valeur = f.ref_annee && f.ref_mois ? clePeriode({ annee: f.ref_annee, mois: f.ref_mois }) : ''
-  return <ChoixPeriode libelle="Comparer à" options={options} valeur={valeur} onChange={(v) => onChange({ cmp_periode: v })} />
-}
+const FLECHE = <span className="fl" aria-hidden="true">↔</span>
 
-/** Période étudiée (mensuel) : périodes importées en ordre chronologique, plus la période affichée si elle n'y est pas. */
-function ChoixMoisAnnee({ filtres: f, periodes, onChange }: {
+/** Page mensuelle : un mois, comparé à un autre mois (par défaut le mois d'avant). */
+function ChoixMois({ filtres: f, periodes, comparaison, onChange }: {
   filtres: FiltresPage
   periodes: Periode[]
+  comparaison: boolean
   onChange: (patch: Patch) => void
 }) {
-  const valeur = clePeriode(f)
-  const cles = new Set([valeur, ...periodes.map(clePeriode)])
-  const options = [...cles].sort().map((c) => {
-    const [annee, mois] = c.split('-').map(Number)
-    return { valeur: c, annee, mois }
-  })
+  if (!periodes.length) return null
+  const premier = periodes[0]
+  const dernier = periodes[periodes.length - 1]
+  const min = indice(premier.annee, premier.mois)
+  const max = indice(dernier.annee, dernier.mois)
+  const prec = moisPrecedent(f.annee, f.mois)
+  const cmp = f.ref_annee && f.ref_mois ? indice(f.ref_annee, f.ref_mois) : indice(prec.annee, prec.mois)
   return (
-    <ChoixPeriode
-      libelle="Période"
-      options={options}
-      valeur={valeur}
-      onChange={(v) => {
-        const [annee, mois] = v.split('-').map(Number)
-        onChange({ annee, mois })
-      }}
-    />
+    <>
+      <ChoixPeriode
+        titre="Période" moisSeul valeur={moisSel(indice(f.annee, f.mois))} min={min} max={max}
+        onChange={(s) => onChange({ annee: anneeDe(s.d), mois: moisDe(s.d) })}
+      />
+      {comparaison && (
+        <>
+          {FLECHE}
+          <ChoixPeriode
+            titre="Comparer à" moisSeul valeur={moisSel(cmp)} min={min} max={max}
+            onChange={(s) => onChange({ cmp_periode: texteMois(s.d) })}
+          />
+        </>
+      )}
+    </>
+  )
+}
+
+/** Pages annuelles (R6) : période et comparaison dans un calendrier compact. */
+function ChoixPeriodes({ periode, onChange }: { periode: PeriodeChoisie; onChange: (patch: Patch) => void }) {
+  return (
+    <>
+      <ChoixPeriode
+        titre="Période" valeur={periode.sel} min={periode.min} max={periode.max}
+        onChange={(s) => onChange({ periode: versTexte(s), comparee: undefined })}
+      />
+      {FLECHE}
+      <ChoixPeriode
+        titre="Comparer à" valeur={periode.cmp} min={periode.min} max={periode.max}
+        longueur={longueur(periode.sel)} modele={periode.sel}
+        onChange={(s) => onChange({ comparee: versTexte(s) })}
+      />
+    </>
   )
 }
 
@@ -152,15 +168,10 @@ export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange }: {
   onChange: (v: string) => void
 }) {
   return (
-    <label>
-      Type de site
-      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{tous}</option>
-        {types.map((t) => (
-          <option key={t} value={t}>{LIBELLE_TYPE_SITE[t] ?? t}</option>
-        ))}
-      </select>
-    </label>
+    <MultiChoix
+      libelle="Type de site" pluriel="types" tous={tous} options={types} valeur={valeur} onChange={onChange}
+      nomOption={(t) => LIBELLE_TYPE_SITE[t] ?? t} souple={false}
+    />
   )
 }
 
@@ -170,17 +181,7 @@ export function ChoixPoste({ valeur, postes, tous = 'Tous', onChange }: {
   tous?: string
   onChange: (v: string) => void
 }) {
-  return (
-    <label className="souple">
-      Poste
-      <select value={valeur} onChange={(e) => onChange(e.target.value)}>
-        <option value="">{tous}</option>
-        {postes.map((s) => (
-          <option key={s}>{s}</option>
-        ))}
-      </select>
-    </label>
-  )
+  return <MultiChoix libelle="Poste" pluriel="postes" tous={tous} options={postes} valeur={valeur} onChange={onChange} />
 }
 
 /** Titre de la barre : dit au premier coup d'œil que ce qui suit sont des filtres. */
@@ -208,8 +209,8 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 }
 
 export default function FiltresPeriode({
-  filtres, annees, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
-  children, onChange, partage,
+  filtres, annees = [], departements, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
+  periode, children, onChange, partage,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
@@ -217,10 +218,12 @@ export default function FiltresPeriode({
   const avecContrat = !!typesContrat?.length
   // Réinitialiser rend aux filtres affichés leur valeur par défaut (dernière période, période d'avant, tous).
   const cles: ClePartagee[] = [
-    ...(avecCalendrier ? (['calendrier', 'exercice'] as const) : []),
+    ...(avecCalendrier || comparaison === 'annee' ? (['calendrier', 'exercice'] as const) : []),
+    ...(comparaison === 'annee' ? (['periode', 'comparee', 'vue', 'debut', 'fin', 'cmp', 'cmp_annee'] as const) : []),
     'annee',
     ...(avecMois ? (['mois'] as const) : []),
-    ...(comparaison === 'annee' ? (['cmp_annee'] as const) : comparaison === 'periode' ? (['cmp_periode'] as const) : []),
+    ...(comparaison === 'periode' ? (['cmp_periode'] as const) : []),
+    ...(departements ? (['departement'] as const) : []),
     ...(services ? (['service'] as const) : []),
     ...(sites ? (['site'] as const) : []),
     ...(avecType ? (['type_site'] as const) : []),
@@ -233,62 +236,32 @@ export default function FiltresPeriode({
     <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
       <TitreFiltres />
       {avecMois ? (
-        <ChoixMoisAnnee filtres={filtres} periodes={periodes ?? []} onChange={onChange} />
+        <ChoixMois filtres={filtres} periodes={periodes ?? []} comparaison={comparaison === 'periode'} onChange={onChange} />
+      ) : comparaison === 'annee' ? (
+        periode && <ChoixPeriodes periode={periode} onChange={onChange} />
       ) : (
         <>
           {avecCalendrier && <ChoixCalendrier filtres={filtres} onChange={onChange} />}
           <ChoixAnnee filtres={filtres} annees={annees} onChange={onChange} />
         </>
       )}
-      {comparaison && (
-        <ChoixComparaison mode={comparaison} filtres={filtres} annees={annees} periodes={periodes} onChange={onChange} />
+      {departements && (
+        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={filtres.departement ?? ''} onChange={(v) => onChange({ departement: v })} />
       )}
       {services && (
-        <label className="souple">
-          Service
-          <select value={filtres.service ?? ''} onChange={(e) => onChange({ service: e.target.value })}>
-            <option value="">Tous</option>
-            {services.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={filtres.service ?? ''} onChange={(v) => onChange({ service: v })} />
       )}
       {avecType && (
         <ChoixTypeSite valeur={filtres.type_site ?? ''} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
       {sites && (
-        <label className="souple">
-          Site
-          <select value={filtres.site ?? ''} onChange={(e) => onChange({ site: e.target.value })}>
-            <option value="">Tous</option>
-            {sites.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={filtres.site ?? ''} onChange={(v) => onChange({ site: v })} />
       )}
       {avecActivite && (
-        <label className="souple">
-          Activité
-          <select value={filtres.activite ?? ''} onChange={(e) => onChange({ activite: e.target.value })}>
-            <option value="">Toutes</option>
-            {activites!.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={filtres.activite ?? ''} onChange={(v) => onChange({ activite: v })} />
       )}
       {avecContrat && (
-        <label>
-          Contrat
-          <select value={filtres.type_contrat ?? ''} onChange={(e) => onChange({ type_contrat: e.target.value })}>
-            <option value="">Tous</option>
-            {typesContrat!.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+        <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={filtres.type_contrat ?? ''} onChange={(v) => onChange({ type_contrat: v })} souple={false} />
       )}
       {avecPoste && <ChoixPoste valeur={filtres.poste ?? ''} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
       {salaries && (

@@ -1,18 +1,19 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Fragment, type ReactNode, useDeferredValue, useState } from 'react'
+import { createContext, Fragment, type ReactNode, useCallback, useContext, useDeferredValue, useRef, useState } from 'react'
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { getAnnuel } from '../api/rapports'
+import { exporterGraphes, getAnnuel } from '../api/rapports'
+import { Bouton } from '../components/Kit'
 import type { SerieMois } from '../api/types'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison } from '../components/FiltresPeriode'
+import FiltresPeriode from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
 import { useMontageDiffere } from '../hooks/useMontageDiffere'
 import { useFiltres } from '../hooks/useFiltres'
 import { useSalaries } from '../hooks/useSalaries'
 import { compact, decimal2, entier, fcfa, MOIS_COURTS } from '../lib/format'
-import { libelleExercice } from '../lib/exercice'
+import { libelleExercicePeriode } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 import { useLocation } from 'react-router-dom'
 import { usePeut } from '../auth/AuthContext'
@@ -78,12 +79,26 @@ const ANIMATION = { animationDuration: 450, animationEasing: 'ease-out' } as con
 
 const num = (v: string | number | null | undefined) => (v == null ? null : Number(v))
 
+/** Mode sélection de l'export « graphiques dynamiques » : graphes cochés, null hors de ce mode. */
+const Selection = createContext<{ coches: string[]; basculer: (id: string) => void } | null>(null)
+const ID_PAR_TITRE = Object.fromEntries(GRAPHES.map((g) => [g.titre, g.id]))
+
 function Carte({ titre, lecture, note, children }: { titre: string; lecture?: string; note?: string; children: ReactNode }) {
   // Rapport PDF : tout est monté d'emblée pour l'impression. À l'écran, chaque graphe se monte à son tour, squelette en attendant.
   const { zone, monte } = useMontageDiffere<HTMLElement>(useLocation().pathname.startsWith('/rapport'))
+  const selection = useContext(Selection)
+  const id = ID_PAR_TITRE[titre]
+  const coche = !!selection && selection.coches.includes(id)
   return (
-    <figure className="graphe" ref={zone} aria-busy={monte ? undefined : true}>
-      <figcaption>{titre}</figcaption>
+    <figure className={`graphe${coche ? ' graphe-coche' : ''}`} ref={zone} aria-busy={monte ? undefined : true}>
+      <figcaption>
+        {selection && id ? (
+          <label className="graphe-choix">
+            <input type="checkbox" checked={coche} onChange={() => selection.basculer(id)} />
+            {titre}
+          </label>
+        ) : titre}
+      </figcaption>
       {lecture && <p className="graphe-lecture">{lecture}</p>}
       <div className="graphe-zone">
         {monte && (
@@ -141,6 +156,16 @@ export default function Graphes() {
   const [noms, enregistrerNoms] = useNomsGroupes()
   const peutRenommer = usePeut('referentiel:write')
   const [personnalise, setPersonnalise] = useState(false)
+  // Export « graphiques dynamiques » : null = hors sélection ; sinon les graphes cochés
+  const [coches, setCoches] = useState<string[] | null>(null)
+  const [exportEtat, setExportEtat] = useState<'' | 'encours' | 'erreur'>('')
+  const basculer = useCallback((id: string) => setCoches((c) => (c && c.includes(id) ? c.filter((x) => x !== id) : [...(c ?? []), id])), [])
+  // Titre du groupe visible, à côté du menu : écrit directement, sans redessiner les graphiques
+  const titreActif = useRef<HTMLHeadingElement>(null)
+  const surGroupeActif = useCallback((id: string) => {
+    const t = document.getElementById(id)?.dataset.titre
+    if (t && titreActif.current) titreActif.current.textContent = t
+  }, [])
   // Tout vient du rapport annuel : un mois sans données dans le périmètre n'efface pas les graphes
   const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
   const salaries = useSalaries(f.filtres?.annee, f.filtres?.calendrier)
@@ -153,7 +178,6 @@ export default function Graphes() {
   const [premier, relais] = useAttente(ann.isLoading)
   const erreur = premier ? null : ann.error
 
-  const annee = f.filtres?.annee
   const contrats = ann.data?.d_contrat.effectifs.map((c) => c.contrat) ?? []
   const n1 = ann.data?.serie_n1
   const serie = premier ? undefined : ann.data?.serie_n.map((m: SerieMois, i) => ({
@@ -235,8 +259,8 @@ export default function Graphes() {
   // Objectif tracé seulement s'il est défini sur au moins un mois
   const aObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => !!serie?.some((m) => m[k] != null)
   const lectObj = (k: 'objMs' | 'objFrais' | 'objRemu' | 'objVentes' | 'objClients') => (aObj(k) ? ' ; en pointillés rouges, l’objectif' : '')
-  const serieN = annee === undefined ? '' : libelleExercice(annee, f.filtres?.calendrier)
-  const serieN1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
+  const serieN = f.periode ? libelleExercicePeriode(f.periode.sel) : ''
+  const serieN1 = f.periode ? libelleExercicePeriode(f.periode.sel, -1) : ''
   const comparaison = avecN1 ? ` ; en gris, ${serieN1} pour comparer` : ''
   const commun = { serie: (serie ?? []) as Record<string, unknown>[], anim: ANIM, serieN, serieN1 }
   // Graphiques qui ont des données (les trois d'activité et ceux à clé : seulement si la série a une valeur)
@@ -379,6 +403,15 @@ export default function Graphes() {
       {g.graphes.map((id) => <Fragment key={id}>{rendu[id]?.()}</Fragment>)}
     </div>
   )
+  const exporterSelection = () => {
+    if (!f.filtres || !coches?.length) return
+    setExportEtat('encours')
+    // Le classeur suit l'ordre des graphes à l'écran (catalogue)
+    exporterGraphes(f.filtres, GRAPHES.map((g) => g.id).filter((id) => coches.includes(id))).then(
+      () => { setExportEtat(''); setCoches(null) },
+      () => setExportEtat('erreur'),
+    )
+  }
   const retablir = () => {
     setConfig(retablirOrigine(config))
   }
@@ -386,20 +419,37 @@ export default function Graphes() {
   return (
     // Squelette au premier chargement seulement ; à un changement de filtre, les graphes restent affichés
     // et glissent vers les nouvelles valeurs à leur arrivée.
+    <Selection.Provider value={coches && !rapport ? { coches, basculer } : null}>
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
-      <TitreRapport titre="GRAPHES D’ÉVOLUTION" />
+      <TitreRapport titre="GRAPHES D’ÉVOLUTION" onGraphiques={rapport ? undefined : () => { setCoches([]); setExportEtat('') }} />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" avecCalendrier filtres={f.filtres} annees={f.annees} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={salaries} partage={f.partage} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} periode={f.periode} onChange={f.set} />
       )}
-      {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture. */}
+      {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
+          Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}
       {!rapport && (serie ? menu.length > 0 : premier && groupesSquelette.length > 0) && (
-        <MenuGroupes
-          groupes={serie ? menu : groupesSquelette}
-          nbAffiches={serie ? montres.length : montresSquelette.length}
-          vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
-          onVue={(v) => setConfig(choisirVue(config, v))}
-          onPersonnaliser={() => setPersonnalise(true)}
-        />
+        <div className="graphes-tete">
+          <MenuGroupes
+            groupes={serie ? menu : groupesSquelette}
+            nbAffiches={serie ? montres.length : montresSquelette.length}
+            vue={serie ? vueDuMenu(montres, menu) : vueDuMenu(montresSquelette, groupesSquelette)}
+            onVue={(v) => setConfig(choisirVue(config, v))}
+            onPersonnaliser={() => setPersonnalise(true)}
+          />
+          {serie && !enBascule && rendus.length > 1 && (
+            <h2 ref={titreActif} className="graphes-groupe-titre graphes-tete-titre">{rendus[0].nom}</h2>
+          )}
+          {coches && (
+            <div className="graphes-selection" role="group" aria-label="Export des graphiques dynamiques">
+              {exportEtat === 'erreur' && <span role="alert">Export impossible pour le moment. Réessayez.</span>}
+              {coches.length === 0 && <span className="graphes-selection-aide">Cochez les graphes à exporter</span>}
+              <Bouton variante="lien" onClick={() => setCoches(null)}>Annuler</Bouton>
+              <Bouton disabled={coches.length === 0 || exportEtat === 'encours' || !f.filtres} onClick={exporterSelection}>
+                {exportEtat === 'encours' ? 'Préparation…' : `Exporter ${coches.length} graphe${coches.length > 1 ? 's' : ''}`}
+              </Bouton>
+            </div>
+          )}
+        </div>
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {serie && menu.length === 0 && (
@@ -434,6 +484,7 @@ export default function Graphes() {
         // Tous les groupes (et toujours le rapport PDF) : un écran par groupe
         <SnapSections
           libelle="Groupes de graphiques"
+          onActif={surGroupeActif}
           sections={rendus.map((g) => ({
             id: `groupe-${g.id}`,
             titre: g.nom,
@@ -507,5 +558,6 @@ export default function Graphes() {
         </details>
       )}
     </section>
+    </Selection.Provider>
   )
 }

@@ -50,5 +50,5 @@ corrigé (juillet), import et réimport d'août, CA / marge / budgets, employés
 d'une valeur par la saisie, refus d'écriture aux lecteurs (drh, dps). Les fichiers viennent de `fichier_erreurs.py`.
 Ces parcours remplissent juillet et août et ajoutent comptes et employés de test : `reinit.py` repart de zéro.
 
-À savoir pour la démo : les filtres sont partagés entre les pages. Un service choisi sur Mensuel reste actif
+À savoir pour la démo : les filtres sont partagés entre les pages. Un service choisi sur Répartition des charges reste actif
 sur Individuel (« Matricule introuvable » si l'employé n'en fait pas partie) : « Réinitialiser les filtres ».

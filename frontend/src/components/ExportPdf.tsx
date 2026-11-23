@@ -16,21 +16,24 @@ export function urlRapport(sections: string[], filtres: Record<string, string | 
 /** Largeur proche de la zone imprimable A4 paysage (277 mm ≈ 1047 px) : mêmes règles CSS à l'écran qu'au papier. */
 const LARGEUR_IMPRESSION = 'popup,width=1080,height=900'
 
-/** Titre d'une page de rapport, avec le bouton d'export à sa droite. */
-export function TitreRapport({ titre }: { titre: string }) {
+/** Titre d'une page de rapport, avec le bouton d'export à sa droite.
+ *  `onGraphiques` (page Graphes) : le menu propose aussi les graphiques dynamiques. */
+export function TitreRapport({ titre, onGraphiques }: { titre: string; onGraphiques?: () => void }) {
   return (
     <div className="titre-rapport">
       <h2 className="bandeau-titre">{titre}</h2>
-      <ExportPdf />
+      <ExportPdf onGraphiques={onGraphiques} />
     </div>
   )
 }
 
-/** Bouton d'export : menu déroulant du choix des parties, puis le rapport s'ouvre dans un onglet prêt à enregistrer en PDF. */
-export default function ExportPdf() {
+/** Bouton d'export : menu déroulant du choix des parties, puis le rapport s'ouvre dans un onglet prêt à enregistrer en PDF.
+ *  Avec `onGraphiques`, le menu propose d'abord deux choix : graphiques dynamiques (sélection à l'écran) ou résumé PDF. */
+export default function ExportPdf({ onGraphiques }: { onGraphiques?: () => void } = {}) {
   const { can } = useAuth()
   const { pathname } = useLocation()
   const [ouvert, setOuvert] = useState(false)
+  const [etape, setEtape] = useState<'choix' | 'pdf'>('pdf')
   const [choix, setChoix] = useState<string[]>([])
   const zone = useRef<HTMLDivElement>(null)
   const bouton = useRef<HTMLButtonElement>(null)
@@ -75,14 +78,36 @@ export default function ExportPdf() {
         aria-expanded={ouvert}
         aria-controls="export-menu"
         onClick={() => {
-          if (!ouvert) setChoix([courante.id])
+          if (!ouvert) {
+            setChoix([courante.id])
+            setEtape(onGraphiques ? 'choix' : 'pdf')
+          }
           setOuvert((o) => !o)
         }}
       >
         <FileDown aria-hidden="true" size={16} />
-        Exporter en PDF
+        {onGraphiques ? 'Exporter' : 'Exporter en PDF'}
       </button>
-      {ouvert && (
+      {ouvert && onGraphiques && etape === 'choix' && (
+        <div id="export-menu" className="export-menu export-types" role="group" aria-label="Type d’export">
+          <button
+            type="button"
+            className="export-type"
+            onClick={() => {
+              setOuvert(false)
+              onGraphiques()
+            }}
+          >
+            <strong>Graphiques dynamiques (réutilisables)</strong>
+            <span>Excel : chaque graphe reste modifiable, même collé dans PowerPoint.</span>
+          </button>
+          <button type="button" className="export-type" onClick={() => setEtape('pdf')}>
+            <strong>Budget réalisé PDF</strong>
+            <span>Les parties du rapport choisies, prêtes à imprimer.</span>
+          </button>
+        </div>
+      )}
+      {ouvert && etape === 'pdf' && (
         <div id="export-menu" className="export-menu">
           <fieldset className="export-choix">
             <legend>Parties à inclure, avec les filtres en cours</legend>

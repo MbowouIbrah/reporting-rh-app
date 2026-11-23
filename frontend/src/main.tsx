@@ -15,6 +15,7 @@ import '@fontsource/dm-sans/latin-800.css'
 import '@fontsource/jetbrains-mono/latin-500.css'
 import './styles/base.css'
 import './styles/mouvement.css'
+import './styles/interactions.css'
 
 
 const queryClient = new QueryClient({

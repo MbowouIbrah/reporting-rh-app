@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useEnregistrerColonnes } from '../../api/admin'
 import { useStructure, useTableau, type FiltresTableau, type LigneTableau } from '../../api/donnees'
@@ -54,6 +55,13 @@ export default function Donnees() {
   const d = q.data
   // En-tête et filtres : ceux des lignes affichées, sinon la structure seule (premier chargement).
   const st = d ?? s.data
+  // Filtres sans aucune ligne (souvent hérités d'une autre page) : le plus précis est retiré, jusqu'à retrouver des lignes.
+  const vide = !!d && !q.isPlaceholderData && d.lignes.length === 0
+  const aRetirer = vide ? (['matricule', 'site', 'service', 'mois', 'annee'] as const).find((c) => filtres[c]) : undefined
+  useEffect(() => {
+    if (aRetirer) changer({ [aRetirer]: undefined })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aRetirer])
   const [charge] = useAttente(q.isLoading || q.isPlaceholderData)
   // Aucune ligne à habiller (premier chargement, ou tableau précédent vide) : lignes vides en squelette.
   const [squelette] = useAttente(q.isLoading || (q.isPlaceholderData && !d?.lignes.length))
@@ -96,8 +104,8 @@ export default function Donnees() {
           Mois
           <select value={filtres.mois ?? ''} onChange={(e) => changer({ mois: e.target.value })}>
             <option value="">Tous</option>
-            {MOIS.map((m, i) => (
-              <option key={m} value={i + 1}>{m}</option>
+            {(st?.filtres.mois ?? MOIS.map((_, i) => i + 1)).map((n) => (
+              <option key={n} value={n}>{MOIS[n - 1]}</option>
             ))}
           </select>
         </label>

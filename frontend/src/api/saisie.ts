@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, BASE, queryRetry, telecharger } from './client'
 import { qs } from './rapports'
+import type { Mensuel } from './types'
 
 export const ATTRIBUTS = ['poste', 'type_contrat', 'activite', 'site', 'service'] as const
 export type Attribut = (typeof ATTRIBUTS)[number]
@@ -57,6 +58,8 @@ export interface Lot {
   nb_bloquants: number
   nb_avert: number
   stats: Record<string, unknown> | null
+  /** Envoi manuel ou fichier déposé dans le dossier de paie. */
+  origine?: 'manuel' | 'dossier'
 }
 
 export interface Changement {
@@ -159,11 +162,44 @@ export const creerLotSaisie = (brouillon_id: string, annee: number, mois: number
   api<Lot>('/donnees/lots', json({ brouillon_id, annee, mois, lignes }))
 
 /** `reprise` : réponse au refus 409 d'un fichier déjà en vérification avec des modifications enregistrées. */
-export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer') {
+export function envoyerFichier(f: File, reprise?: 'reprendre' | 'recommencer', periode?: { annee: number; mois: number }) {
   const fd = new FormData()
   fd.append('fichier', f)
-  return api<Lot>(reprise ? `/imports${qs({ reprise })}` : '/imports', { method: 'POST', body: fd })
+  return api<Lot>(reprise || periode ? `/imports${qs({ reprise, ...periode })}` : '/imports', { method: 'POST', body: fd })
 }
+
+export const lireLot = (id: number) => api<Lot>(`/imports/${id}`)
+
+/** État d'un fichier du dossier de paie : à analyser, en vérification, importé, annulé, mois à choisir, trop gros. */
+export type EtatFichier = 'a_traiter' | 'en_verification' | 'importe' | 'annule' | 'mois_introuvable' | 'trop_volumineux'
+
+export interface FichierDossier {
+  nom: string
+  taille: number
+  modifie_le: string
+  annee: number | null
+  mois: number | null
+  etat: EtatFichier
+  lot_id: number | null
+}
+
+/** `actif` faux : dossier de paie non configuré (IMPORT_DIR), seul l'envoi manuel reste possible. */
+export interface DossierPaie {
+  actif: boolean
+  fichiers: FichierDossier[]
+}
+
+export const useFichiersDossier = () =>
+  useQuery({
+    queryKey: ['saisie', 'dossier'],
+    queryFn: () => api<DossierPaie>('/imports/dossier'),
+    refetchOnMount: 'always',
+    retry: queryRetry,
+  })
+
+/** Analyse un fichier du dossier maintenant ; `periode` : mois choisi quand le nom du fichier n'en donne pas. */
+export const analyserFichierDossier = (nom: string, periode?: { annee: number; mois: number }) =>
+  api<Lot>(`/imports/dossier/${encodeURIComponent(nom)}${periode ? qs({ ...periode }) : ''}`, { method: 'POST' })
 
 export const lireApercu = (id: number) => api<Apercu>(`/imports/${id}/apercu`)
 export const lireAnomalies = (id: number, gravite?: string) =>
@@ -171,16 +207,18 @@ export const lireAnomalies = (id: number, gravite?: string) =>
 export const lireLigne = (id: number, num: number) => api<LigneLot>(`/imports/${id}/lignes/${num}`)
 export const corrigerLigne = (id: number, num: number, valeurs: Record<string, string | null>) =>
   api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'PUT', body: JSON.stringify({ valeurs }) })
-export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string) =>
-  api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null }))
+export const ajouterReferentiel = (id: number, dimension: string, valeur: string, type_site?: string, activite?: string) =>
+  api<Lot>(`/imports/${id}/referentiels`, json({ dimension, valeur, type_site: type_site ?? null, activite: activite ?? null }))
 export const retirerLigne = (id: number, num: number) => api<Lot>(`/imports/${id}/lignes/${num}`, { method: 'DELETE' })
 
 /** Toutes les décisions de l'écran Vérification, enregistrées ensemble. */
 export interface Decisions {
   lignes: Record<number, Record<string, string | null>>
-  ajouts: { dimension: string; valeur: string; type_site: string | null }[]
+  ajouts: { dimension: string; valeur: string; type_site: string | null; activite?: string | null }[]
   retirees: number[]
   ignores: string[]
+  /** Valeurs du fichier rattachées à une valeur connue de la liste (reconnues d'office ensuite). */
+  alias?: { dimension: string; valeur: string; cible: string }[]
 }
 export const appliquerDecisions = (id: number, d: Decisions) => api<Lot>(`/imports/${id}/decisions`, json(d))
 /** Points qui resteraient après ces décisions, sans rien enregistrer. */
@@ -188,6 +226,15 @@ export const simulerDecisions = (id: number, d: Decisions) =>
   api<{ anomalies: { ligne: number | null; colonne: string | null; code: string }[] }>(
     `/imports/${id}/decisions`, json({ ...d, simuler: true }))
 export const validerLot = (id: number, garder: Cle[]) => api<Lot>(`/imports/${id}/valider`, json({ garder }))
+/** Tableaux Mensuel du mois calculés comme si le lot était enregistré ; rien n'est écrit. */
+export interface ApercuMois { annee: number; mois: number; periodes: [number, number][]; mensuel: Mensuel }
+export const apercuMois = (id: number, garder: Cle[], periode?: { annee: number; mois: number }) =>
+  api<ApercuMois>(`/imports/${id}/apercu-mois${periode ? qs({ ...periode }) : ''}`, json({ garder }))
+/** Publication automatique des fichiers du dossier sans problème (coupée par défaut). */
+export const usePublicationAuto = (enabled: boolean) =>
+  useQuery({ queryKey: ['saisie', 'publication-auto'], queryFn: () => api<{ actif: boolean }>('/imports/publication-auto'), enabled, retry: queryRetry })
+export const reglerPublicationAuto = (actif: boolean) =>
+  api<{ actif: boolean }>('/imports/publication-auto', { ...json({ actif }), method: 'PUT' })
 export const annulerLot = (id: number) => api<Lot>(`/imports/${id}/annuler`, { method: 'POST' })
 
 export const urlRapport = (id: number) => `${BASE}/imports/${id}/rapport.xlsx`

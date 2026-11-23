@@ -47,14 +47,18 @@ export const useActiverColonne = () =>
   useEcriture(({ id, actif }: { id: number; actif: boolean }) => api(`/parametrage/rubriques/${id}`, json('PUT', { actif })))
 
 // ---- listes de valeurs (sites et services) ----
-export type DimensionRef = 'site' | 'service'
+export type DimensionRef = 'site' | 'service' | 'poste' | 'departement'
 export interface ValeurRef {
   id: number
   libelle: string
   actif: boolean
   type_site?: string
+  /** Postes seulement : activité du poste (null : non classé). */
+  activite_id?: number | null
   /** Services seulement : compte dans l'effectif productif (OR et factures par productif). */
   productif?: boolean
+  /** Services seulement : département de rattachement (null : non rattaché). */
+  departement_id?: number | null
 }
 export interface ModifRef {
   dim: DimensionRef
@@ -63,6 +67,8 @@ export interface ModifRef {
   actif?: boolean
   type_site?: string
   productif?: boolean
+  activite_id?: number | null
+  departement_id?: number | null
 }
 export const TYPES_SITE = ['principal', 'agence', 'deporte'] as const
 
@@ -70,6 +76,12 @@ export const useReferentiel = (dim: DimensionRef) =>
   useQuery({
     queryKey: ['admin', 'ref', dim],
     queryFn: () => api<{ valeurs: ValeurRef[] }>(`/referentiels/${dim}`),
+    retry: queryRetry,
+  })
+export const useActivites = () =>
+  useQuery({
+    queryKey: ['admin', 'ref', 'activite'],
+    queryFn: () => api<{ valeurs: { id: number; libelle: string }[] }>('/referentiels/activite'),
     retry: queryRetry,
   })
 export const apercuRenommage = (dim: DimensionRef, id: number, libelle: string) =>
@@ -108,6 +120,7 @@ export interface Portee {
   perimetres: number[]
   services: string[]
   sites: string[]
+  departements: string[]
 }
 export interface Compte {
   id: number
@@ -137,3 +150,24 @@ export const useModifierCompte = () =>
   useEcriture(({ id, ...b }: ComptePatch) => api<Compte>(`/users/${id}`, json('PUT', b)))
 export const useSupprimerCompte = () =>
   useEcriture((id: number) => api(`/users/${id}`, { method: 'DELETE' }))
+
+// ---- correspondance de la paie : colonnes du fichier de paie additionnées dans chaque rubrique ----
+export interface LigneCorrespondance {
+  id: number
+  colonne: string
+  rubrique_id: number
+  rubrique: string
+}
+export const useCorrespondance = () =>
+  useQuery({
+    queryKey: ['admin', 'correspondance'],
+    queryFn: () => api<LigneCorrespondance[]>('/parametrage/correspondance-paie'),
+    retry: queryRetry,
+  })
+export const useCreerCorrespondance = () =>
+  useEcriture((b: { colonne: string; rubrique_id: number }) => api<LigneCorrespondance>('/parametrage/correspondance-paie', json('POST', b)))
+export const useModifierCorrespondance = () =>
+  useEcriture(({ id, ...b }: { id: number; colonne: string; rubrique_id: number }) =>
+    api<LigneCorrespondance>(`/parametrage/correspondance-paie/${id}`, json('PUT', b)))
+export const useSupprimerCorrespondance = () =>
+  useEcriture((id: number) => api(`/parametrage/correspondance-paie/${id}`, { method: 'DELETE' }))

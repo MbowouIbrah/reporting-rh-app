@@ -51,6 +51,9 @@ class LotImport(Base):
     stats: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Feuille lue (en-têtes, valeurs brutes) : contrôles relancés après une correction sur place.
     feuille: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Origine : envoi à la main ('manuel') ou dossier de paie ('dossier', chemin = nom du fichier).
+    origine: Mapped[str] = mapped_column(String(10), default="manuel", server_default="manuel")
+    chemin: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class StagingLigne(Base):

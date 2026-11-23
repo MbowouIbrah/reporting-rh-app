@@ -62,10 +62,12 @@ class Portee:
     perimetres: frozenset[int] = frozenset()
     services: frozenset[str] = frozenset()
     sites: frozenset[str] = frozenset()
+    departements: frozenset[str] = frozenset()
 
     @property
     def vide(self) -> bool:
-        return not (self.tout or self.perimetres or self.services or self.sites)
+        return not (self.tout or self.perimetres or self.services or self.sites
+                    or self.departements)
 
 
 @dataclass(frozen=True)

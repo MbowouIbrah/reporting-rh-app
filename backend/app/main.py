@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +9,7 @@ from app.api.budgets import router as budgets_router
 from app.api.donnees import router as donnees_router
 from app.api.health import router as health_router
 from app.api.imports import router as imports_router
+from app.api.notifications import router as notifications_router
 from app.api.parametrage import router as parametrage_router
 from app.api.parcours import router as parcours_router
 from app.api.periodes import router as periodes_router
@@ -15,8 +18,20 @@ from app.api.rapports import router as rapports_router
 from app.api.reglages import router as reglages_router
 from app.api.salaries import router as salaries_router
 from app.core.config import settings
+from app.imports import dossier
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Surveillance du dossier de paie : jamais lancée par les tests (ENV=test)."""
+    if settings.ENV != "test":
+        dossier.demarrer()
+    yield
+    dossier.arreter()
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.APP_NAME,
     docs_url=None if settings.ENV == "prod" else "/docs",
     redoc_url=None,
@@ -42,3 +57,4 @@ app.include_router(salaries_router, prefix=settings.API_PREFIX)
 app.include_router(parcours_router, prefix=settings.API_PREFIX)
 app.include_router(donnees_router, prefix=settings.API_PREFIX)
 app.include_router(reglages_router, prefix=settings.API_PREFIX)
+app.include_router(notifications_router, prefix=settings.API_PREFIX)

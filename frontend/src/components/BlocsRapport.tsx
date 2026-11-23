@@ -1,9 +1,11 @@
 import { Fragment, type ReactNode, useState } from 'react'
-import type { Budget, Cell, CellPartiel, LigneActivite, Mensuel } from '../api/types'
+import type { Budget, Cell, CellPartiel, FrontBack, LigneActivite, Mensuel, Val } from '../api/types'
 import { cls, clsCharge, clsResultat, decimal2, entier, fcfa, pct } from '../lib/format'
 
 /** Blocs communs aux onglets MENSUEL et ANNUEL de l'Excel : mêmes tableaux, libellés de période différents. */
 export type Blocs = Pick<Mensuel, 'a_type_charge' | 'lignes_ca_marge' | 'frais_mission' | 'b_service_activite' | 'c_site' | 'c_site_total' | 'd_contrat'>
+type Activites = Blocs['b_service_activite'][number]['activites']
+
 export interface Libelles {
   prec: string
   cour: string
@@ -21,7 +23,6 @@ export function Panneau({ titre, className, id, sansTitre, children }: { titre: 
 
 /** Bulle d'aide de la colonne : écart rapporté au budget, signé. */
 const LIB_BUDGET = ['Budget', 'Écart', '% Budget']
-const LIB_OBJECTIF = ['Objectif', 'Écart', 'Écart %']
 
 function Tete({ premiere, lib, budget, libBudget = LIB_BUDGET, bourrage = 0 }: {
   premiere: string; lib: Libelles; budget?: boolean; libBudget?: string[]; bourrage?: number
@@ -137,32 +138,98 @@ export function TypesCharge({ d, lib }: { d: Blocs; lib: Libelles }) {
 }
 
 // Indices et ratios : les décimales comptent (0,85 ne doit pas s'afficher « 1 »).
-const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif'])
+const RATIOS = new Set(['productivite', 'productifs', 'or_par_productif', 'factures_par_productif', 'ventes_par_client'])
+const POURCENTAGES = new Set(['transformation'])
 
-// Lignes d'activité qui portent un objectif ; ce sont des résultats (le dépasser est bon).
-const AVEC_OBJECTIF = new Set(['ventes', 'clients', 'productivite', 'factures'])
+const formatActivite = (cle: string) => (RATIOS.has(cle) ? decimal2 : POURCENTAGES.has(cle) ? pct : fcfa)
 
-/** 6. Activité : ventes, clients, productivité, OR, devis, factures ; masqué par l'appelant quand `activite` est null.
- *  Les colonnes Objectif / Écart / Écart % occupent les trois dernières colonnes de la grille (plus de bourrage) dès que le serveur les envoie. */
-export function Activite({ lignes, lib }: { lignes: LigneActivite[]; lib: Libelles }) {
-  const objectif = lignes.some((l) => 'budget' in l)
-  const bourrage = objectif ? 0 : COLONNES - 4
+/** Taux de réalisation de l'objectif, avec une jauge plafonnée à 100 % (atteint : vert).
+ *  `cout` : un coût (masse salariale par vente) est atteint quand il reste à l'objectif ou en dessous. */
+const Realisation = ({ v, cout }: { v?: Val; cout?: boolean }) => {
+  if (v == null || v === 'n/a') return <>{pct(v ?? null)}</>
+  const r = Number(v)
   return (
-    <table className="dense tab-global aligne">
-      <Tete premiere="Indicateur" lib={lib} budget={objectif} libBudget={LIB_OBJECTIF} bourrage={bourrage} />
-      <tbody>
-        {lignes.map((l) => (
-          <Ligne
-            key={l.cle}
-            label={l.libelle}
-            cell={l}
-            budget={objectif ? (AVEC_OBJECTIF.has(l.cle) ? l : true) : undefined}
-            sens="resultat"
-            format={RATIOS.has(l.cle) ? decimal2 : fcfa}
-            bourrage={bourrage}
-          />
-        ))}
-      </tbody>
+    <span className="realisation">
+      {pct(v)}
+      <span className={`jauge${(cout ? r <= 1 : r >= 1) ? ' atteint' : ''}`} aria-hidden="true">
+        <span style={{ width: `${Math.max(0, Math.min(r, 1)) * 100}%` }} />
+      </span>
+    </span>
+  )
+}
+
+/** 4. Activité : indicateurs regroupés par thème (commercial, atelier, productivité, coût RH),
+ *  réalisé (N-1, N, écart) puis objectif et taux de réalisation ; masqué par l'appelant quand `activite` est null. */
+export function Activite({ lignes, lib, titre }: { lignes: LigneActivite[]; lib: Libelles; titre?: string }) {
+  const objectif = lignes.some((l) => 'budget' in l)
+  const groupes = [...new Set(lignes.map((l) => l.groupe ?? ''))].map((g) => ({ g, ls: lignes.filter((l) => (l.groupe ?? '') === g) }))
+  return (
+    <table className="dense repartition activite-tab">
+      <thead>
+        {titre && (
+          <tr className="groupes">
+            <th colSpan={2} className="groupes-titre">{titre}</th>
+            <th colSpan={4}>Réalisé</th>
+            {objectif && (
+              <>
+                <th className="gouttiere" />
+                <th colSpan={3}>Objectif</th>
+              </>
+            )}
+          </tr>
+        )}
+        <tr>
+          <th scope="col" className="libelle">Thème</th>
+          <th scope="col" className="libelle">Indicateur</th>
+          <th scope="col">{lib.prec}</th>
+          <th scope="col">{lib.cour}</th>
+          <th scope="col">Écart</th>
+          <th scope="col">Écart %</th>
+          {objectif && (
+            <>
+              <th className="gouttiere" />
+              <th scope="col">Objectif</th>
+              <th scope="col">Écart</th>
+              <th scope="col">Réalisation</th>
+            </>
+          )}
+        </tr>
+      </thead>
+      {groupes.map(({ g, ls }) => (
+        <tbody key={g} className="bloc">
+          {ls.map((l, i) => {
+            const f = formatActivite(l.cle)
+            const avecObj = l.budget !== undefined
+            const cout = l.cle === 'ms_par_vente'
+            return (
+              <tr key={l.cle}>
+                {i === 0 && (
+                  <th scope="rowgroup" rowSpan={ls.length} className="nom">{g}</th>
+                )}
+                <th scope="row" className="libelle">{l.libelle}{l.partiel && <Partiel />}</th>
+                <td className="num">{f(l.m1)}</td>
+                <td className="num">{f(l.m)}</td>
+                <td className={clsEcart(l.var)}>{f(l.var)}</td>
+                <td className={clsEcart(l.var_pct)}>{pct(l.var_pct)}</td>
+                {objectif && (
+                  <>
+                    <td className="gouttiere" aria-hidden="true" />
+                    {avecObj ? (
+                      <>
+                        <td className="num">{f(l.budget ?? null)}{l.budget_partiel && <Partiel />}</td>
+                        <td className={(cout ? clsCharge : clsResultat)(l.ecart ?? null)}>{f(l.ecart ?? null)}</td>
+                        <td className="num"><Realisation v={l.realisation} cout={cout} /></td>
+                      </>
+                    ) : (
+                      <td colSpan={3} />
+                    )}
+                  </>
+                )}
+              </tr>
+            )
+          })}
+        </tbody>
+      ))}
     </table>
   )
 }
@@ -211,222 +278,263 @@ const Budgets = ({ b, rowSpan }: { b: Budget; rowSpan?: number }) => (
   </>
 )
 
-/** 3. Répartition par service et activité, présentée comme l'onglet Excel : service fusionné sur ses activités,
- *  une ligne Staff (effectif) sous chaque activité, budget fusionné par service, puis total et effectif global.
- *  Un clic sur le bloc d'un service le déplie par nature de contrat, comme les sites. */
-export function ServicesActivites({ d, lib }: { d: Blocs; lib: Libelles }) {
-  const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
-  const [ouvert, setOuvert] = useState<string | null>(null)
-  return (
-    <table className="dense aligne double services">
-      <thead>
-        <tr>
-          <th scope="col">Service</th>
-          <th scope="col">Activité</th>
-          <th scope="col">{lib.prec}</th>
-          <th scope="col">{lib.cour}</th>
-          <th scope="col">Variation</th>
-          <th scope="col">Var. %</th>
-          <th scope="col">Budget</th>
-          <th scope="col">Écart</th>
-          <th scope="col">% Budget</th>
-        </tr>
-      </thead>
-      <tbody>
-        {d.b_service_activite.map((b, n) => (
-          <ServiceBloc
-            key={b.service}
-            b={b}
-            bande={n % 2 === 1}
-            ouvert={ouvert === b.service}
-            basculer={() => setOuvert(ouvert === b.service ? null : b.service)}
-          />
-        ))}
-      </tbody>
-      <tbody className="pied">
-        {total && (
-          <tr className="total">
-            <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
-            <Valeurs c={total} />
-            <Budgets b={total} />
-          </tr>
-        )}
-      </tbody>
-      <tbody>
-        <tr className="total staff">
-          <th scope="row" colSpan={2}>Effectif global</th>
-          <Valeurs c={d.d_contrat.total} />
-          <td colSpan={3} />
-        </tr>
-      </tbody>
-    </table>
+/** Écart nul en gris, baisse en rouge, hausse sans couleur (maquette D1 sobre). */
+const clsEcart = (v?: Val) => `${cls(v)}${v != null && v !== 'n/a' && Number(v) === 0 ? ' nul' : ''}`
+const nul = (v?: Val) => v == null || v === 'n/a' || Number(v) === 0
+const vide = (c: Cell) => nul(c.m) && nul(c.m1)
+
+/** Part dans l'activité, le site ou le service, en badge neutre. */
+const Part = ({ v }: { v?: Val }) => (v == null ? null : <span className="part-badge">{pct(v)}</span>)
+
+/** Part du site ou du service dans la masse ou l'effectif global, sous son nom. */
+const PartGlobale = ({ v, libelle }: { v?: Val; libelle: string }) =>
+  v == null ? null : (
+    <span className="part-globale">
+      <span>{libelle}</span> <b>{pct(v)}</b>
+    </span>
   )
+
+interface LigneRep {
+  ms: Cell
+  effectif: Cell
+  part_masse?: Val
+  part?: Val
 }
 
-/** Le damier alterne par service (bande), pas par ligne : les cellules fusionnées suivent leur bloc. */
-function ServiceBloc({ b, bande, ouvert, basculer }: {
-  b: Blocs['b_service_activite'][number]; bande: boolean; ouvert: boolean; basculer: () => void
-}) {
-  const activites = b.activites
-  const contrats = Object.keys(b.effectif_contrat ?? {})
-  const depliable = contrats.length > 0
-  const hauteur = activites.length * 2 + (ouvert ? 2 * contrats.length : 0)
-  const clic = depliable ? basculer : undefined
-  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${bande ? 'bande' : ''}`.replace(/\s+/g, ' ').trim() || undefined
-  return (
-    <>
-      {activites.map((a, i) => (
-        <Fragment key={a.activite}>
-          <tr className={classe(i === 0 ? 'debut-service' : '')} onClick={clic}>
-            {i === 0 && (
-              <th scope="rowgroup" rowSpan={activites.length * 2} className={ouvert ? 'service ouvert' : 'service'}>
-                {depliable ? (
-                  <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail par contrat de ${b.service}`}>
-                    <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {b.service}
-                  </button>
-                ) : (
-                  b.service
-                )}
-              </th>
-            )}
-            <td>{a.activite}</td>
-            <Valeurs c={a} />
-            {i === 0 && <Budgets b={b.total} rowSpan={hauteur} />}
-          </tr>
-          <tr className={classe('staff')} onClick={clic}>
-            <td>Staff</td>
-            <Valeurs c={a.effectif} />
-          </tr>
-        </Fragment>
-      ))}
-      {ouvert &&
-        contrats.map((contrat, i) => (
-          <Fragment key={contrat}>
-            <tr className={classe('detail-contrat')} onClick={clic}>
-              {i === 0 && <EnteteDetail libelle="Détail par type de contrat" lignes={2 * contrats.length} />}
-              <td className="retrait">{contrat}</td>
-              <Valeurs c={b.ms_contrat?.[contrat] ?? VIDE} />
-            </tr>
-            <tr className={classe('staff detail-contrat')} onClick={clic}>
-              <td className="retrait">Staff {contrat}</td>
-              <Valeurs c={b.effectif_contrat![contrat]} />
-            </tr>
-          </Fragment>
-        ))}
-    </>
-  )
-}
-
-/** 2. Répartition par site, présentée comme la répartition par service : site fusionné sur ses lignes,
- *  masse salariale puis Staff (effectif) ; un clic sur le bloc d'un site le déplie par nature de contrat
- *  (masse salariale et Staff). Un seul site déplié à la fois. */
-export function Sites({ d, lib }: { d: Blocs; lib: Libelles }) {
-  const [ouvert, setOuvert] = useState<string | null>(null)
-  return (
-    <table className="dense aligne double services">
-      <thead>
-        <tr>
-          <th scope="col">Site</th>
-          <th scope="col">Indicateur</th>
-          <th scope="col">{lib.prec}</th>
-          <th scope="col">{lib.cour}</th>
-          <th scope="col">Variation</th>
-          <th scope="col">Var. %</th>
-          <th scope="col">Budget</th>
-          <th scope="col">Écart</th>
-          <th scope="col">% Budget</th>
-        </tr>
-      </thead>
-      <tbody>
-        {d.c_site.map((r, n) => (
-          <SiteBloc
-            key={r.site}
-            r={r}
-            bande={n % 2 === 1}
-            ouvert={ouvert === r.site}
-            basculer={() => setOuvert(ouvert === r.site ? null : r.site)}
-          />
-        ))}
-      </tbody>
-      <tbody className="pied">
-        {d.c_site_total && (
-          <>
-            <tr className="total">
-              <th scope="row" rowSpan={2}>TOTAL GÉNÉRAL</th>
-              <td>Masse salariale</td>
-              <Valeurs c={d.c_site_total.ms} />
-              <Budgets b={d.c_site_total.ms} rowSpan={2} />
-            </tr>
-            <tr className="total staff">
-              <td>Staff</td>
-              <Valeurs c={d.c_site_total.effectif} />
-            </tr>
-          </>
-        )}
-      </tbody>
-    </table>
-  )
-}
-
-function SiteBloc({ r, bande, ouvert, basculer }: {
-  r: Blocs['c_site'][number]; bande: boolean; ouvert: boolean; basculer: () => void
-}) {
-  const contrats = Object.keys(r.effectif_contrat ?? {})
-  const fond = bande ? 'bande' : ''
-  const hauteur = 2 + (ouvert ? 2 * contrats.length : 0)
-  const depliable = contrats.length > 0
-  // Tout le bloc du site est cliquable : un clic sur n'importe laquelle de ses lignes le déplie ou le replie.
-  const clic = depliable ? basculer : undefined
-  const classe = (base: string) => `${base} ${depliable ? 'depliable' : ''} ${fond}`.replace(/\s+/g, ' ').trim()
-  return (
-    <>
-      <tr className={classe('debut-service')} onClick={clic}>
-        <th scope="rowgroup" rowSpan={2} className={ouvert ? 'service ouvert' : 'service'}>
-          {depliable ? (
-            <button type="button" className="deplier" aria-expanded={ouvert} aria-label={`Détail par contrat de ${r.site}`}>
-              <span aria-hidden="true">{ouvert ? '▾' : '▸'}</span> {r.site}
-            </button>
-          ) : (
-            r.site
-          )}
-        </th>
-        <td>Masse salariale</td>
-        <Valeurs c={r.ms} />
-        <Budgets b={r.ms} rowSpan={hauteur} />
-      </tr>
-      <tr className={classe('staff')} onClick={clic}>
-        <td>Staff</td>
-        <Valeurs c={r.effectif} />
-      </tr>
-      {ouvert &&
-        contrats.map((contrat, i) => (
-          <Fragment key={contrat}>
-            <tr className={classe('detail-contrat')} onClick={clic}>
-              {i === 0 && <EnteteDetail libelle="Détail par type de contrat" lignes={2 * contrats.length} />}
-              <td className="retrait">{contrat}</td>
-              <Valeurs c={r.ms_contrat?.[contrat] ?? VIDE} />
-            </tr>
-            <tr className={classe('staff detail-contrat')} onClick={clic}>
-              <td className="retrait">Staff {contrat}</td>
-              <Valeurs c={r.effectif_contrat![contrat]} />
-            </tr>
-          </Fragment>
-        ))}
-    </>
-  )
-}
-
-/** Cellule de la première colonne qui couvre le détail par contrat d'un site ou d'un service déplié. */
-const EnteteDetail = ({ libelle, lignes }: { libelle: string; lignes: number }) => (
-  <th scope="rowgroup" rowSpan={lignes} className="service detail">
-    <span className="detail-libelle">{libelle}</span>
-  </th>
+/** Chiffres d'une ligne : masse (N-1, N, écart, écart %, part), gouttière, effectif (N-1, N, écart, part),
+ *  puis le budget du bloc s'il existe (undefined : pas de groupe budget ; null : cellules vides). */
+const Chiffres = ({ l, budget }: { l: LigneRep; budget?: Budget | null }) => (
+  <>
+    <td className="num masse">{fcfa(l.ms.m1)}</td>
+    <td className="num masse">{fcfa(l.ms.m)}</td>
+    <td className={`${clsEcart(l.ms.var)} masse`}>{fcfa(l.ms.var)}</td>
+    <td className={`${clsEcart(l.ms.var_pct)} masse`}>{pct(l.ms.var_pct)}</td>
+    <td className="num masse">
+      <Part v={l.part_masse} />
+    </td>
+    <td className="gouttiere" aria-hidden="true" />
+    <td className="num">{fcfa(l.effectif.m1)}</td>
+    <td className="num">{fcfa(l.effectif.m)}</td>
+    <td className={clsEcart(l.effectif.var)}>{fcfa(l.effectif.var)}</td>
+    <td className="num">
+      <Part v={l.part} />
+    </td>
+    {budget !== undefined && (
+      <>
+        <td className="gouttiere" aria-hidden="true" />
+        {budget ? <Budgets b={budget} /> : <td colSpan={3} className="budget" />}
+      </>
+    )}
+  </>
 )
 
-const VIDE: Cell = { m: null, m1: null, var: null, var_pct: null }
+const AXES = { site: 'Site', service: 'Service', contrat: 'Contrat' }
 
-/** 5. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
-export function AnalyseEffectifs({ d }: { d: Blocs }) {
+interface BlocRep {
+  nom: string
+  activites: Activites
+  total: LigneRep
+  budget: Budget
+  partMasse?: Val
+  partEffectif?: Val
+}
+
+/** 2 et 3. Répartition par site ou par service (remarque 3, maquette D1 sobre) : une ligne par activité,
+ *  masse et effectif côte à côte ; chaque activité se déplie par contrat, le nom du bloc déplie toutes ses activités ;
+ *  un seul bloc ouvert à la fois (ouvrir un autre bloc replie le précédent) ;
+ *  chaque bloc finit par son total, qui porte le budget. Activités et contrats à zéro masqués. */
+function Repartition({ axe, blocs, general, lib, titre }: {
+  axe: 'site' | 'service' | 'contrat'
+  titre?: string
+  blocs: BlocRep[]
+  general?: { ms: Cell & Budget; effectif: Cell }
+  lib: Libelles
+}) {
+  // Un seul site (ou service) déplié à la fois ; dans ce bloc, plusieurs activités peuvent être ouvertes.
+  const [ouvert, setOuvert] = useState<{ bloc: string; activites: string[] } | null>(null)
+  const avecBudget = blocs.some((b) => b.budget.budget != null)
+  const sansBudget = avecBudget ? null : undefined
+  const plein = (x: { ms: Cell; effectif: Cell }) => !(vide(x.ms) && vide(x.effectif))
+  const contratsDe = (a: Activites[number]) => Object.entries(a.contrats ?? {}).filter(([, x]) => plein(x))
+  return (
+    <table className={`dense repartition${ouvert ? '' : ' replie'}`}>
+      <thead>
+        {titre && (
+          // Bandeau du panneau : titre et groupes de colonnes sur la même ligne bleue.
+          <tr className="groupes">
+            <th colSpan={2} className="groupes-titre">{titre}</th>
+            <th colSpan={5}>Masse salariale (FCFA)</th>
+            <th className="gouttiere" />
+            <th colSpan={4}>Effectif</th>
+            {avecBudget && (
+              <>
+                <th className="gouttiere" />
+                <th colSpan={3}>Budget</th>
+              </>
+            )}
+          </tr>
+        )}
+        <tr>
+          <th scope="col" className="libelle">{AXES[axe]}</th>
+          <th scope="col" className="libelle">Activité</th>
+          <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.prec}</th>
+          <th scope="col" className="masse" title="Masse salariale en FCFA">Masse {lib.cour}</th>
+          <th scope="col" className="masse">Écart</th>
+          <th scope="col" className="masse">Écart %</th>
+          <th scope="col" className="masse">Part</th>
+          <th className="gouttiere" />
+          <th scope="col" title="Effectif en personnes">Effectif {lib.prec}</th>
+          <th scope="col" title="Effectif en personnes">Effectif {lib.cour}</th>
+          <th scope="col">Écart</th>
+          <th scope="col">Part</th>
+          {avecBudget && (
+            <>
+              <th className="gouttiere" />
+              <th scope="col" title="Budget de masse salariale">Budget</th>
+              <th scope="col">Écart</th>
+              <th scope="col">% Budget</th>
+            </>
+          )}
+        </tr>
+      </thead>
+      {blocs.map((b) => {
+        const acts = b.activites.filter((a) => plein({ ms: a, effectif: a.effectif }))
+        const ouvertes = ouvert?.bloc === b.nom ? ouvert.activites : []
+        const estOuverte = (a: Activites[number]) => ouvertes.includes(a.activite)
+        const depliables = acts.filter((a) => contratsDe(a).length > 0).map((a) => a.activite)
+        const toutOuvert = depliables.length > 0 && depliables.every((x) => ouvertes.includes(x))
+        const basculer = (x: string) => {
+          const suite = ouvertes.includes(x) ? ouvertes.filter((y) => y !== x) : [...ouvertes, x]
+          setOuvert(suite.length ? { bloc: b.nom, activites: suite } : null)
+        }
+        const hauteur = acts.length + 1 + acts.reduce((n, a) => n + (estOuverte(a) ? contratsDe(a).length : 0), 0)
+        const parts = (
+          <>
+            <PartGlobale v={b.partMasse} libelle="Masse globale" />
+            <PartGlobale v={b.partEffectif} libelle="Effectif global" />
+          </>
+        )
+        const nom = (
+          <th scope="rowgroup" rowSpan={hauteur} className={`nom${ouvertes.length ? ' ouvert' : ''}`}>
+            {depliables.length > 0 ? (
+              <button
+                type="button"
+                className="deplier deplier-bloc"
+                aria-expanded={toutOuvert}
+                aria-label={`Détail par contrat de toutes les activités (${b.nom})`}
+                onClick={() => setOuvert(toutOuvert ? null : { bloc: b.nom, activites: depliables })}
+              >
+                <span className="nom-ligne">
+                  <span aria-hidden="true">{toutOuvert ? '▾' : '▸'}</span> {b.nom}
+                </span>
+                {parts}
+              </button>
+            ) : (
+              <>
+                {b.nom}
+                {parts}
+              </>
+            )}
+          </th>
+        )
+        return (
+          <tbody key={b.nom} className={`bloc${ouvertes.length ? ' ouvert' : ''}`}>
+            {acts.map((a, i) => {
+              const det = contratsDe(a)
+              const o = estOuverte(a)
+              return (
+                <Fragment key={a.activite}>
+                  <tr className="activite">
+                    {i === 0 && nom}
+                    <th scope="row" className="libelle">
+                      {det.length > 0 ? (
+                        <button
+                          type="button"
+                          className="deplier"
+                          aria-expanded={o}
+                          aria-label={`Détail par contrat de ${a.activite} (${b.nom})`}
+                          onClick={() => basculer(a.activite)}
+                        >
+                          <span aria-hidden="true">{o ? '▾' : '▸'}</span> {a.activite}
+                        </button>
+                      ) : (
+                        a.activite
+                      )}
+                    </th>
+                    <Chiffres l={{ ms: a, effectif: a.effectif, part_masse: a.part_masse, part: a.part }} budget={sansBudget} />
+                  </tr>
+                  {o &&
+                    det.map(([c, x], j) => (
+                      <tr key={c} className={`contrat${j % 2 ? ' alt' : ''}`}>
+                        <th scope="row" className="libelle">{c}</th>
+                        <Chiffres l={x} budget={sansBudget} />
+                      </tr>
+                    ))}
+                </Fragment>
+              )
+            })}
+            <tr className="total-bloc">
+              {acts.length === 0 && nom}
+              <th scope="row" className="libelle">Total {axe}</th>
+              <Chiffres l={b.total} budget={avecBudget ? b.budget : undefined} />
+            </tr>
+          </tbody>
+        )
+      })}
+      {general && (
+        <tbody className="general">
+          <tr>
+            <th scope="row" colSpan={2}>TOTAL GÉNÉRAL</th>
+            <Chiffres l={{ ms: general.ms, effectif: general.effectif }} budget={avecBudget ? general.ms : undefined} />
+          </tr>
+        </tbody>
+      )}
+    </table>
+  )
+}
+
+export function ServicesActivites({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
+  const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
+  return (
+    <Repartition
+      axe="service"
+      titre={titre}
+      lib={lib}
+      general={total && { ms: total, effectif: d.d_contrat.total }}
+      blocs={d.b_service_activite.map((b) => ({
+        nom: b.service,
+        activites: b.activites ?? [],
+        total: { ms: b.total, effectif: b.effectif },
+        budget: b.total,
+        partMasse: b.part_masse_globale,
+        partEffectif: b.part_globale,
+      }))}
+    />
+  )
+}
+
+export function Sites({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
+  return (
+    <Repartition
+      axe="site"
+      titre={titre}
+      lib={lib}
+      general={d.c_site_total}
+      blocs={d.c_site.map((r) => ({
+        nom: r.site,
+        // Anciens rapports sans ventilation par activité : le bloc se réduit à son total.
+        activites: r.activites ?? [],
+        total: { ms: r.ms, effectif: r.effectif },
+        budget: r.ms,
+        partMasse: r.part_masse_globale,
+        partEffectif: r.part_globale,
+      }))}
+    />
+  )
+}
+
+/** 6. Analyse des effectifs : total puis par nature de contrat ; l'effectif de fin, ligne de total, ferme le tableau. */
+export function AnalyseEffectifs({ d, fb }: { d: Blocs; fb?: FrontBack | null }) {
   // Dernière colonne (ensemble) en tête ; aucune colonne sans indicateur
   const ind = d.d_contrat.indicateurs
   const cols = ind.length > 0 ? [ind[ind.length - 1], ...ind.slice(0, -1)] : []
@@ -442,6 +550,7 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
     </tr>
   )
   return (
+    <>
     <table className="dense aligne">
       <thead>
         <tr>
@@ -464,13 +573,43 @@ export function AnalyseEffectifs({ d }: { d: Blocs }) {
         {ligne('Effectif fin de période', (i) => entier(i.fin), 'total')}
       </tbody>
     </table>
+    {fb && fb.total > 0 && <FrontBackLigne fb={fb} />}
+    </>
   )
 }
 
-/** 4. Nature de contrat × activité, présentée comme la répartition par service : contrat fusionné sur ses
- *  activités, une ligne Staff (effectif) sous chaque activité, puis total et effectif global. */
-export function Contrats({ d, lib }: { d: Blocs; lib: Libelles }) {
+/** Ratio front / back office sur l'effectif de fin (une ligne sans activité ne compte dans aucune des deux parts). */
+export function FrontBackLigne({ fb }: { fb: FrontBack }) {
+  return (
+    <p className="front-back">
+      <strong>Front / Back office</strong> : {pct(fb.front_pct)} / {pct(fb.back_pct)}
+      <span className="note"> ({entier(fb.front)} front, {entier(fb.back)} back sur {entier(fb.total)} en fin de période)</span>
+    </p>
+  )
+}
+
+/** 5. Nature de contrat × activité, même structure que la répartition par site : masse et effectif côte à côte,
+ *  un bloc par contrat, total du contrat puis TOTAL GÉNÉRAL. Anciens rapports sans blocs : ancien rendu. */
+export function Contrats({ d, lib, titre }: { d: Blocs; lib: Libelles; titre?: string }) {
   const total = d.a_type_charge.find((r) => r.rubrique === 'TOTAL CHARGES')
+  if (d.d_contrat.blocs) {
+    return (
+      <Repartition
+        axe="contrat"
+        titre={titre}
+        lib={lib}
+        general={total && { ms: total, effectif: d.d_contrat.total }}
+        blocs={d.d_contrat.blocs.map((b) => ({
+          nom: b.contrat,
+          activites: b.activites,
+          total: { ms: b.total, effectif: b.effectif },
+          budget: {},
+          partMasse: b.part_masse_globale,
+          partEffectif: b.part_globale,
+        }))}
+      />
+    )
+  }
   const contrats = [...new Set(d.d_contrat.ventilation.map((v) => v.contrat))]
   return (
     <table className="dense aligne double services">

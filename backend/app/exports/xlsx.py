@@ -12,6 +12,9 @@ from app.kpi import exercice as ex
 
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
         "septembre", "octobre", "novembre", "décembre"]
+# Abréviations de l'écran (calendrier, filtres, en-têtes de colonnes).
+MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.",
+               "nov.", "déc."]
 CELL = ("m1", "m", "var", "var_pct")
 BUDGET = ("budget", "ecart", "ecart_pct")
 TOTAL = "TOTAL CHARGES"
@@ -143,15 +146,51 @@ def mensuel(r: dict, annee: int, mois: int, prec: str) -> bytes:
     return _sortie(wb)
 
 
+def libelle_periode(du: str, au: str) -> str:
+    """Période « AAAA-MM » -> « Avr. 2025 → mars 2026 », « Janv. → oct. 2026 », ou le mois
+    seul (« Oct. 2026 »)."""
+    (ad, md), (aa, ma) = (int(du[:4]), int(du[5:7])), (int(au[:4]), int(au[5:7]))
+    debut = f"{MOIS_COURTS[md - 1].capitalize()} {ad}"
+    if (ad, md) == (aa, ma):
+        return debut
+    if ad == aa:
+        return f"{MOIS_COURTS[md - 1].capitalize()} → {MOIS_COURTS[ma - 1]} {aa}"
+    return f"{debut} → {MOIS_COURTS[ma - 1]} {aa}"
+
+
+def annuel_periode(r: dict, periode: str, comparee: str) -> bytes:
+    """Rapport annuel d'une période choisie au calendrier : `periode` et `comparee` sont les
+    libellés des deux périodes (libelle_periode)."""
+    wb = Workbook()
+    lignes = [
+        ["Période", periode],
+        ["Comparée à", comparee],
+        ["Moyenne mensuelle", r["moyenne_mensuelle"]["m"]],
+        ["Mois saisis", r["cumul_ytd"]["nb_mois"]],
+    ]
+    if "marge_ytd" in r:
+        lignes.append(["Marge cumulée", r["marge_ytd"]])
+        lignes.append(["Mois avec marge saisie", r["nb_mois_marge"]])
+    _feuille(wb, "Synthèse", ["Indicateur", periode], lignes)
+    _blocs(wb, r, comparee, periode)
+    return _sortie(wb)
+
+
 def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None,
-           calendrier: str = "civil") -> bytes:
-    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul."""
+           calendrier: str = "civil", debut: int | None = None, cmp: str = "") -> bytes:
+    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul ; `debut` : vrai mois
+    de début (None : début de l'exercice) ; `cmp` : comparaison choisie (api/rapports.py)."""
     wb = Workbook()
     fiscal = calendrier == "fiscal"
-    debut = f"d'{MOIS[ex.DEBUT_FISCAL - 1]} {annee}" if fiscal else "de janvier"
     fin = ex.fin_cumul(annee, mois, calendrier)[0]
+    if debut is None:
+        de = f"d'{MOIS[ex.DEBUT_FISCAL - 1]} {annee}" if fiscal else "de janvier"
+        periode = f"Cumul {de} à {MOIS[mois - 1]} {fin}"
+    else:
+        an_debut = ex.fin_cumul(annee, debut, calendrier)[0]
+        periode = f"De {MOIS[debut - 1]} {an_debut} à {MOIS[mois - 1]} {fin}"
     lignes = [
-        ["Période", f"Cumul {debut} à {MOIS[mois - 1]} {fin}"],
+        ["Période", periode],
         ["Moyenne mensuelle", r["moyenne_mensuelle"]["m"]],
         ["Mois saisis", r["cumul_ytd"]["nb_mois"]],
     ]
@@ -162,5 +201,6 @@ def annuel(r: dict, annee: int, mois: int, ref_annee: int | None = None,
     def nom(a: int) -> str:
         return f"{a}-{(a + 1) % 100:02d}" if fiscal else str(a)
     _feuille(wb, "Synthèse", ["Indicateur", nom(annee)], lignes)
-    _blocs(wb, r, nom(ref), nom(annee))
+    prec = {"prec": "Période précédente", "aucune": "Sans comparaison"}.get(cmp, nom(ref))
+    _blocs(wb, r, prec, nom(annee))
     return _sortie(wb)

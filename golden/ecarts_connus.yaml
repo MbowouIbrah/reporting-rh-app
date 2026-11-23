@@ -7,3 +7,5 @@
   raison: "VAR % : l'application renvoie n/a ou null là où l'Excel affiche 0 ou vide ; accepté"
 - id: commission_hors_total
   raison: "Commission sortie du total (décision Q1, migration 0010) ; l'Excel V4 la comptait : les tests de parité retirent la règle avant de comparer"
+- id: bonus_hors_total
+  raison: "Bonus sorti du total (décision F7, migration 0023) : déjà compté dans le Brut Réel, l'Excel V4 le comptait deux fois ; les tests de parité retirent la règle avant de comparer"

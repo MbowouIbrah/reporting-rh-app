@@ -81,7 +81,7 @@ test('un clic sur la ligne du point déplie la ligne du fichier (en-tête et val
 })
 
 const LOT = { id: 7, statut: 'pret' } as saisie.Lot
-const decisions = (d: Partial<saisie.Decisions>): saisie.Decisions => ({ lignes: {}, ajouts: [], retirees: [], ignores: [], ...d })
+const decisions = (d: Partial<saisie.Decisions>): saisie.Decisions => ({ lignes: {}, ajouts: [], retirees: [], ignores: [], alias: [], ...d })
 
 /** Rien n'est enregistré avant « Enregistrer » ; la vérification renvoie les points restants. */
 function serveur(restants: AnomalieLot[] = []) {
@@ -274,6 +274,38 @@ test('site inconnu : ajout bloqué tant qu’aucun type n’est choisi, puis env
   fireEvent.click(bouton)
   await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7,
     decisions({ ajouts: [{ dimension: 'site', valeur: 'Kribi', type_site: 'agence' }] })))
+})
+
+test('site inconnu : « Rattacher » à une valeur de la liste remplace la valeur et envoie le rattachement', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('REFERENTIEL_INCONNU', 'bloquant', 'Valeur inconnue.', 'Site'), ligne: 40, valeur: 'Kribi',
+    proposition: { dimension: 'site' } })
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Site « Kribi » absent de la liste des sites : que faire ?' }),
+    { target: { value: '1' } })
+  const bouton = screen.getByRole('button', { name: 'Enregistrer' })
+  expect(bouton).toBeDisabled()  // valeur de la liste attendue
+  fireEvent.change(screen.getByRole('combobox', { name: /Valeur de la liste/ }), { target: { value: 'Douala' } })
+  expect(bouton).toBeEnabled()
+  fireEvent.click(bouton)
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7, decisions({
+    lignes: { 40: { Site: 'Douala' } }, alias: [{ dimension: 'site', valeur: 'Kribi', cible: 'Douala' }] })))
+})
+
+test('poste sans activité : enregistrement bloqué tant qu’aucune activité n’est choisie, puis envoyée avec le poste', async () => {
+  vi.spyOn(saisie, 'lireLigne').mockResolvedValue(LIGNE_BRUTE)
+  const { appliquer } = serveur()
+  pointsOuverts({ ...anomalie('POSTE_SANS_ACTIVITE', 'bloquant', 'Poste sans activité.', 'Poste'), ligne: 40, valeur: 'Comptable',
+    proposition: { dimension: 'poste' } })
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Poste « Comptable » sans activité : que faire ?' }),
+    { target: { value: '0' } })
+  const bouton = screen.getByRole('button', { name: 'Enregistrer' })
+  expect(bouton).toBeDisabled()  // activité du poste attendue
+  fireEvent.change(screen.getByRole('combobox', { name: 'Activité du poste' }), { target: { value: 'Back Office' } })
+  expect(bouton).toBeEnabled()
+  fireEvent.click(bouton)
+  await vi.waitFor(() => expect(appliquer).toHaveBeenCalledWith(7,
+    decisions({ ajouts: [{ dimension: 'poste', valeur: 'Comptable', type_site: null, activite: 'Back Office' }] })))
 })
 
 test('montant illisible : « Ignorer la valeur » laisse la cellule vide ; le point passe au vert sans quitter la liste', async () => {

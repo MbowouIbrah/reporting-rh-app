@@ -9,13 +9,15 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.imports.lecture import norm
 from app.kpi.chargement import rubriques_exclues
 from app.kpi.moteur import ABSENCES, CA_INDIVIDUEL, COMMISSION, MARGE_INDIVIDUELLE, PRIMES
 from app.models.pilotage import Parametre
-from app.models.referentiel import Rubrique, RubriqueRegle
+from app.models.referentiel import CorrespondancePaie, Rubrique, RubriqueRegle
 from app.referentiels_init import DEBUT
 from app.repos.remplissage import annees_remplies, remplissage
 from app.repos.scope import scope_for
@@ -295,3 +297,89 @@ def creer_parametre(
     audit.record(db, p.user_id, "create", "parametre", x.id, None, _param(x))
     db.commit()
     return _param(x)
+
+
+# ---- export de paie : colonne de paie -> rubrique (colonnes d'une rubrique additionnées) ----
+def _corresp(c: CorrespondancePaie, libelle: str) -> dict:
+    return {"id": c.id, "colonne": c.colonne, "rubrique_id": c.rubrique_id, "rubrique": libelle}
+
+
+class CorrespondanceIn(BaseModel):
+    colonne: str
+    rubrique_id: int
+
+
+def _verifier_correspondance(
+    db: Session, body: CorrespondanceIn, courant: int | None
+) -> tuple[str, str]:
+    colonne = " ".join(body.colonne.split())
+    if not colonne or len(colonne) > 200:
+        raise HTTPException(422, "Colonne de paie attendue (200 caractères au plus)")
+    rub = db.get(Rubrique, body.rubrique_id)
+    if rub is None or rub.nature != "paie":
+        raise HTTPException(422, "Rubrique de paie inconnue")
+    autre = db.scalar(select(CorrespondancePaie.id).where(
+        CorrespondancePaie.colonne_norm == norm(colonne), CorrespondancePaie.id != (courant or 0)))
+    if autre is not None:
+        raise HTTPException(409, "Cette colonne de paie est déjà associée à une rubrique")
+    return colonne, rub.libelle
+
+
+@router.get("/parametrage/correspondance-paie")
+def lire_correspondance(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(p, "referentiel:write")
+    return [_corresp(c, lib) for c, lib in db.execute(
+        select(CorrespondancePaie, Rubrique.libelle)
+        .join(Rubrique, Rubrique.id == CorrespondancePaie.rubrique_id)
+        .order_by(Rubrique.ordre, CorrespondancePaie.id))]
+
+
+@router.post("/parametrage/correspondance-paie", status_code=201)
+def creer_correspondance(
+    body: CorrespondanceIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    authorize(p, "referentiel:write")
+    colonne, lib = _verifier_correspondance(db, body, None)
+    c = CorrespondancePaie(colonne=colonne, colonne_norm=norm(colonne),
+                           rubrique_id=body.rubrique_id)
+    db.add(c)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Cette colonne de paie est déjà associée à une rubrique") from None
+    audit.record(db, p.user_id, "create", "correspondance_paie", c.id, None, _corresp(c, lib))
+    db.commit()
+    return _corresp(c, lib)
+
+
+@router.put("/parametrage/correspondance-paie/{cid}")
+def modifier_correspondance(
+    cid: int, body: CorrespondanceIn, p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    authorize(p, "referentiel:write")
+    c = db.get(CorrespondancePaie, cid)
+    if c is None:
+        raise HTTPException(404, "Correspondance introuvable")
+    avant = _corresp(c, db.get(Rubrique, c.rubrique_id).libelle)
+    colonne, lib = _verifier_correspondance(db, body, cid)
+    c.colonne, c.colonne_norm, c.rubrique_id = colonne, norm(colonne), body.rubrique_id
+    db.flush()
+    audit.record(db, p.user_id, "update", "correspondance_paie", cid, avant, _corresp(c, lib))
+    db.commit()
+    return _corresp(c, lib)
+
+
+@router.delete("/parametrage/correspondance-paie/{cid}", status_code=204)
+def supprimer_correspondance(
+    cid: int, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    authorize(p, "referentiel:write")
+    c = db.get(CorrespondancePaie, cid)
+    if c is None:
+        raise HTTPException(404, "Correspondance introuvable")
+    audit.record(db, p.user_id, "delete", "correspondance_paie", cid,
+                 _corresp(c, db.get(Rubrique, c.rubrique_id).libelle), None)
+    db.delete(c)
+    db.commit()

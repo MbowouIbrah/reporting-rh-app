@@ -8,6 +8,9 @@ import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { type Calendrier, DEBUT_FISCAL, exerciceDe } from '../lib/exercice'
 import {
+  anneeDe, calendrierDe, defautCmp, indice, longueur, lireTexte, migrer, migrerComparaison, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
+} from '../lib/periode'
+import {
   abonnerPartage,
   CLES_PARTAGEES,
   lirePartage,
@@ -19,14 +22,14 @@ import {
 const STALE = 5 * 60 * 1000
 
 /** Une nouvelle année remet à zéro le mois et les comparaisons ; un nouveau mois, la période comparée.
- *  Un nouveau calendrier remet aussi l'année : « 2026 » n'a pas le même sens en civil et en fiscal. */
+ *  Un nouveau calendrier remet aussi l'année : « 2026 » n'a pas le même sens en civil et en fiscal.
+ *  Une nouvelle période (pages annuelles) remet la comparaison à sa valeur par défaut. */
 export function avecCascade(patch: Patch, actuel: Partage): Patch {
   const p = { ...patch }
-  const change = (k: 'annee' | 'mois' | 'calendrier' | 'exercice') => k in p && String(p[k] ?? '') !== (actuel[k] ?? '')
+  const change = (k: 'annee' | 'mois' | 'calendrier' | 'exercice' | 'periode') => k in p && String(p[k] ?? '') !== (actuel[k] ?? '')
   if (change('annee') && !('mois' in p)) p.mois = undefined
-  // La comparaison annuelle est une année civile ou un exercice, selon le calendrier.
-  if ((change('annee') || change('calendrier') || change('exercice')) && !('cmp_annee' in p)) p.cmp_annee = undefined
   if ((change('annee') || change('mois')) && !('cmp_periode' in p)) p.cmp_periode = undefined
+  if (change('periode') && !('comparee' in p)) p.comparee = undefined
   return p
 }
 
@@ -68,13 +71,21 @@ export function usePartage() {
   return { partage, set }
 }
 
-/** Filtres liés, dans l'ordre des colonnes de `combinaisons` (/rapports/filtres). */
-const DIMS = ['service', 'site', 'type_site', 'activite', 'type_contrat', 'poste'] as const
+/** Filtres liés, dans l'ordre des colonnes de `combinaisons` (/rapports/filtres). Le matricule
+ *  (8e colonne) n'est servi qu'avec le droit nominatif. */
+const DIMS = ['departement', 'service', 'site', 'type_site', 'activite', 'type_contrat', 'poste', 'matricule'] as const
 type Dim = (typeof DIMS)[number]
 type Choix = Partial<Record<Dim, string | undefined>>
 
+/** Valeurs d'un filtre : plusieurs, séparées par « | » (R4, sélection multiple). */
+export const valeurs = (v: string | undefined) => (v ? v.split('|').filter(Boolean) : [])
+
 const compatible = (c: string[], choix: Choix, sauf?: Dim) =>
-  DIMS.every((d, i) => d === sauf || !choix[d] || c[i] === choix[d])
+  DIMS.every((d, i) => d === sauf || i >= c.length || !choix[d] || valeurs(choix[d]).includes(c[i]))
+
+/** Valeurs choisies de `d` qui gardent au moins une combinaison avec `garde` ; vide : aucune. */
+const restantes = (combis: string[][], garde: Choix, d: Dim, v: string | undefined) =>
+  valeurs(v).filter((x) => combis.some((c) => compatible(c, { ...garde, [d]: x }))).join('|') || undefined
 
 /** Valeurs proposées par filtre : celles des combinaisons compatibles avec les autres filtres choisis
  *  (aucune option ne mène à un résultat vide) ; la valeur choisie reste toujours proposée. */
@@ -82,10 +93,22 @@ export function facettes(combis: string[][], choix: Choix): Record<Dim, string[]
   return Object.fromEntries(
     DIMS.map((d, i) => {
       const v = new Set(combis.filter((c) => compatible(c, choix, d)).map((c) => c[i]).filter(Boolean))
-      if (choix[d]) v.add(choix[d])
+      for (const x of valeurs(choix[d])) v.add(x)
       return [d, [...v].sort()]
     }),
   ) as Record<Dim, string[]>
+}
+
+/** Choix réellement appliqués : un filtre partagé venu d'une autre page, d'une autre année ou d'un
+ *  autre mois qui n'a plus aucune correspondance est écarté (les précédents dans l'ordre priment). */
+export function compatibles(combis: string[][], choix: Choix): Choix {
+  const garde: Choix = {}
+  for (const d of DIMS) {
+    if (!choix[d]) continue
+    const r = restantes(combis, garde, d, choix[d])
+    if (r) garde[d] = r
+  }
+  return garde
 }
 
 /** Après un changement, efface les autres filtres choisis devenus incompatibles (le plus récent l'emporte). */
@@ -94,9 +117,9 @@ export function sansIncompatibles(combis: string[][], actuel: Choix, patch: Patc
   const efface: Patch = {}
   for (const d of DIMS) {
     if (d in patch || !actuel[d]) continue
-    const essai = { ...garde, [d]: actuel[d] }
-    if (combis.some((c) => compatible(c, essai))) garde[d] = actuel[d]
-    else efface[d] = undefined
+    const r = restantes(combis, garde, d, actuel[d])
+    if (r) garde[d] = r
+    if (r !== actuel[d]) efface[d] = r
   }
   return { ...patch, ...efface }
 }
@@ -104,7 +127,7 @@ export function sansIncompatibles(combis: string[][], actuel: Choix, patch: Patc
 interface Options {
   /** La page affiche un sélecteur de mois ; sinon le mois partagé est ignoré (dernier mois saisi). */
   avecMois?: boolean
-  /** Comparaison choisie : une année (annuel) ou une période AAAA-MM (mensuel). Défaut : N-1 ou M-1. */
+  /** Comparaison choisie : une période (annuel) ou un mois AAAA-MM (mensuel). Défaut : mois ou période d'avant. */
   comparaison?: 'annee' | 'periode'
   /** La page suit le choix « année civile / fiscale » (pages annuelles) ; sinon toujours civile. */
   avecCalendrier?: boolean
@@ -126,52 +149,104 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     if (!periodes.isPlaceholderData && periodes.data) ecrireCache('periodes', periodes.data)
   }, [periodes.data, periodes.isPlaceholderData])
   const derniere = periodes.data?.at(-1)
-  const calendrier: Calendrier = avecCalendrier && p.calendrier === 'fiscal' ? 'fiscal' : 'civil'
+  // Pages annuelles : période et comparaison (R6). Sans choix, les anciens filtres (année, vue, mois…)
+  // sont traduits ; sinon le dernier mois disponible, comparé au mois d'avant.
+  const premierMois = periodes.data?.[0]
+  const min = premierMois && indice(premierMois.annee, premierMois.mois)
+  const max = derniere && indice(derniere.annee, derniere.mois)
+  const periode: PeriodeChoisie | null = (() => {
+    if (comparaison !== 'annee' || !derniere || min === undefined || max === undefined) return null
+    const sel = lireTexte(p.periode, max) ?? migrer(p, derniere, max) ?? moisSel(max)
+    const cmp = lireTexte(p.comparee, max) ?? (lireTexte(p.periode, max) ? null : migrerComparaison(p, sel))
+    return { sel, cmp: cmp && longueur(cmp) === longueur(sel) ? cmp : defautCmp(sel), min, max }
+  })()
+  const calendrier: Calendrier = periode
+    ? calendrierDe(periode.sel)
+    : avecCalendrier && p.calendrier === 'fiscal' ? 'fiscal' : 'civil'
   const fiscal = calendrier === 'fiscal' ? calendrier : undefined
   const exDerniere = derniere && exerciceDe(derniere.annee, derniere.mois, calendrier)
   // En fiscal, l'année est celle du début de l'exercice (2026 = avril 2026 → mars 2027), partagée
-  // sous sa propre clé : `annee` reste une année civile pour les autres pages (Mensuel).
-  const annee = Number(fiscal ? p.exercice : p.annee) || exDerniere
+  // sous sa propre clé : `annee` reste une année civile pour les autres pages (mois choisi).
+  const annee = periode ? anneeDe(periode.sel.d) : Number(fiscal ? p.exercice : p.annee) || exDerniere
   const finExercice = fiscal ? DEBUT_FISCAL - 1 : 12
   const moisDefaut = (annee === exDerniere ? derniere?.mois : finExercice) || finExercice
   const mois = (avecMois && Number(p.mois)) || moisDefaut
+  // Page mensuelle : les listes ne proposent que ce que le mois affiché contient.
+  const moisFiltres = avecMois && !fiscal ? mois : undefined
   const options = useQuery({
-    queryKey: ['filtres', annee, fiscal],
-    queryFn: () => getFiltres(annee!, fiscal),
+    queryKey: ['filtres', annee, fiscal, moisFiltres],
+    queryFn: () => getFiltres(annee!, fiscal, moisFiltres),
     enabled: annee !== undefined,
     staleTime: STALE,
     retry: queryRetry,
   })
 
+  // Anciennes clés des pages annuelles (vue, mois de début et de fin, comparaison) : traduites en
+  // période une fois, puis retirées.
+  const anciennes = ['vue', 'debut', 'fin', 'cmp', 'cmp_annee', 'cmp_periode'] as const
+  const aMigrer = !!periode && anciennes.some((k) => p[k])
+  const texteSel = periode && versTexte(periode.sel)
+  const periodeLue = max !== undefined && !!lireTexte(p.periode, max)
+  const texteCmp = periode && versTexte(periode.cmp)
+  const cmpMigree = !!p.cmp_periode && !lireTexte(p.comparee, max)
+  useEffect(() => {
+    if (!aMigrer || !texteSel) return
+    set({
+      ...Object.fromEntries(anciennes.map((k) => [k, undefined])),
+      ...(!periodeLue && { periode: texteSel, comparee: cmpMigree ? texteCmp ?? undefined : p.comparee }),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aMigrer, texteSel, periodeLue])
+
   const ref = (() => {
-    if (comparaison === 'annee' && p.cmp_annee) return { ref_annee: Number(p.cmp_annee) }
+    if (periode) return {}
     const m = comparaison === 'periode' ? /^(\d{4})-(\d{1,2})$/.exec(p.cmp_periode ?? '') : null
     return m ? { ref_annee: Number(m[1]), ref_mois: Number(m[2]) } : {}
   })()
 
+  // Filtres partagés sans correspondance dans les données de la page : écartés tout de suite
+  // (pas de requête vide), puis retirés du partage.
+  const combis = options.data?.combinaisons
+  const garde = combis?.length ? compatibles(combis, p) : null
+  // Une valeur écartée d'un choix multiple réduit le choix ; le filtre disparaît s'il n'en reste aucune.
+  const ecartes = garde ? DIMS.filter((d) => p[d] && garde[d] !== p[d]) : []
+  const choix: Choix = garde ?? p
+  const cleEcartes = JSON.stringify(Object.fromEntries(ecartes.map((d) => [d, garde?.[d] ?? null])))
+  useEffect(() => {
+    const e: Record<string, string | null> = JSON.parse(cleEcartes)
+    if (Object.keys(e).length) set(Object.fromEntries(Object.entries(e).map(([d, v]) => [d, v ?? undefined])))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleEcartes])
+
   const filtres: FiltresPage | null = annee === undefined ? null : {
     annee,
-    mois,
-    service: p.service,
-    site: p.site,
-    type_site: p.type_site,
-    poste: p.poste,
-    activite: p.activite,
-    type_contrat: p.type_contrat,
+    mois: periode ? moisDe(periode.sel.f) : mois,
+    ...(periode && {
+      du: texteMois(periode.sel.d),
+      au: texteMois(periode.sel.f),
+      cmp_du: texteMois(periode.cmp.d),
+      cmp_au: texteMois(periode.cmp.f),
+    }),
+    departement: choix.departement,
+    service: choix.service,
+    site: choix.site,
+    type_site: choix.type_site,
+    poste: choix.poste,
+    activite: choix.activite,
+    type_contrat: choix.type_contrat,
     // Un matricule partagé (lien, autre page) n'est transmis qu'avec le droit nominatif : sinon 403.
-    matricule: nominatif ? p.matricule : undefined,
+    matricule: nominatif ? choix.matricule : undefined,
     ...ref,
     ...(fiscal && { calendrier: fiscal }),
   }
 
   // Filtres liés : chaque liste ne garde que les valeurs compatibles avec les autres choix, et un
   // nouveau choix efface ceux qui ne le sont plus.
-  const combis = options.data?.combinaisons
-  const f = combis ? facettes(combis, p) : null
+  const f = combis ? facettes(combis, choix) : null
   function setLie(brut: Patch) {
     const { annee: a, ...reste } = brut
     const patch: Patch = fiscal && 'annee' in brut ? { ...reste, exercice: a } : brut
-    set(combis && DIMS.some((d) => d in patch) ? sansIncompatibles(combis, p, patch) : patch)
+    set(combis && DIMS.some((d) => d in patch) ? sansIncompatibles(combis, choix, patch) : patch)
   }
 
   return {
@@ -180,13 +255,22 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     partage: p,
     periodes: periodes.data ?? [],
     calendrier,
+    /** Pages annuelles : période, comparaison et mois disponibles (bornes du calendrier). */
+    periode,
     annees: [...new Set(periodes.data?.map((x) => exerciceDe(x.annee, x.mois, calendrier)))],
+    // Filtre « Département » proposé seulement quand le périmètre en couvre plusieurs.
+    departements: (options.data?.departements?.length ?? 0) > 1
+      ? (f?.departement ?? options.data?.departements)
+      : undefined,
     services: f?.service ?? options.data?.services ?? [],
     sites: f?.site ?? options.data?.sites ?? [],
     typesSite: f?.type_site ?? options.data?.types_site ?? [],
     postes: f?.poste ?? options.data?.postes ?? [],
     activites: f?.activite ?? options.data?.activites ?? [],
     typesContrat: f?.type_contrat ?? options.data?.types_contrat ?? [],
+    /** Employés compatibles avec les autres filtres (combinaisons nominatives), la personne choisie comprise. */
+    garderSalaries: <T extends { matricule: string }>(l: T[] | undefined) =>
+      l && f && combis?.[0]?.length === DIMS.length ? l.filter((s) => f.matricule.includes(s.matricule)) : l,
     pret: !periodes.isLoading,
     // Une panne n'est pas une absence de période : sans liste connue, la page affiche l'erreur.
     vide: periodes.isSuccess && !derniere,

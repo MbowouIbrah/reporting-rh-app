@@ -6,10 +6,13 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.imports.lecture import norm
 from app.kpi.moteur import RUBRIQUES_ACTIVITE
 from app.models.pilotage import Parametre
 from app.models.referentiel import (
     Activite,
+    CorrespondancePaie,
+    Departement,
     RefAlias,
     Rubrique,
     RubriqueRegle,
@@ -19,7 +22,11 @@ from app.models.referentiel import (
 )
 
 SERVICES = ["Commerce VN", "Commerce Pièces", "Administration", "SAV PL",
-            "SAV Engins", "Sites Déportés", "Pneumatique"]
+            "SAV Engins", "SAV Chariot", "Sites Déportés", "Pneumatique",
+            "Winpart", "Motul", "Autofast"]
+DEPARTEMENTS = ["Equipment", "Winpart"]
+# Département de chaque service (les autres : Equipment).
+DEPARTEMENT_DE = {"Winpart": "Winpart", "Motul": "Winpart", "Autofast": "Winpart"}
 ACTIVITES = ["Front office", "Back Office"]
 CONTRATS = ["CDI", "CDD", "MAD", "Stage"]
 SITES = ["Yaoundé", "Douala", "Bertoua", "Ngaoundéré", "Garoua", "Dehane",
@@ -35,10 +42,24 @@ RUBRIQUES = [
     ("Assurance Maladie", "FCFA"), ("Formation", "FCFA"),
     ("TVA & Marge MAD", "FCFA"),
 ]
-SERVICES_PRODUCTIFS = ["SAV PL", "SAV Engins"]
+SERVICES_PRODUCTIFS = ["SAV PL", "SAV Engins", "SAV Chariot"]
 # Règles d'exclusion du total de ligne à date d'effet (docs/P0_CADRAGE.md §1).
 EXCLUES_TOTAL_LIGNE = ["Absences (nb)", "Salaire brut garantie", "Primes sur ventes",
-                       "Primes sur résultats", "Productivité Ateliers", "Commission"]
+                       "Primes sur résultats", "Productivité Ateliers", "Commission", "Bonus"]
+# Export de paie : colonnes additionnées dans chaque rubrique (proposition par défaut, modifiable
+# dans l'administration). Une rubrique absente de la base est sautée.
+CORRESPONDANCE_PAIE = {
+    "Brut Réel": ["BRUT"],
+    "Salaire brut garantie": ["SALAIRE DE BASE"],
+    "Bonus": ["BONUS"],
+    "Commission": ["COMMISSIONS"],
+    "Primes exceptionnelles": ["PRIME EXCEPTIONNELLE"],
+    "Productivité Ateliers": ["PRIME SUR RENDEMENT", "RAPPEL RENDEMENT"],
+    "Logement site déporté": ["LOGEMENT DEPLACE"],
+    "Charges Patronales": ["CNPS PAT", "AT PAT", "ALLOC FAM", "CF PAT", "FNE"],
+    "Assurance Maladie": ["ASS. MALADIE"],
+    "Frais de mission": ["DEPALCEMENT PRO", "RAPPEL DEPLAC. PRO"],  # orthographe exacte de l'export
+}
 DEBUT = date(2000, 1, 1)
 PARAMETRES_DEFAUT = {"jours_ouvres": "22", "budget_employe": "600000"}
 
@@ -51,9 +72,14 @@ def _fill(db: Session, model, libelles: list[str]) -> None:
 def seed_referentiels(db: Session) -> None:
     """Idempotent : ne touche pas à ce qui existe déjà."""
     services_existants = {s.id for s in db.scalars(select(Service))}
-    for model, libelles in ((Service, SERVICES), (Activite, ACTIVITES),
-                            (TypeContrat, CONTRATS), (Site, SITES)):
+    for model, libelles in ((Departement, DEPARTEMENTS), (Service, SERVICES),
+                            (Activite, ACTIVITES), (TypeContrat, CONTRATS), (Site, SITES)):
         _fill(db, model, libelles)
+    db.flush()
+    departements = {d.libelle: d.id for d in db.scalars(select(Departement))}
+    for srv in db.scalars(select(Service)):
+        if srv.id not in services_existants and srv.departement_id is None:
+            srv.departement_id = departements[DEPARTEMENT_DE.get(srv.libelle, "Equipment")]
     existantes = set(db.scalars(select(Rubrique.libelle)))
     for ordre, (lib, unite) in enumerate(RUBRIQUES, start=1):
         if lib not in existantes:
@@ -76,6 +102,11 @@ def seed_referentiels(db: Session) -> None:
         )
     if not db.scalar(select(RefAlias.id).where(RefAlias.dimension == "rubrique")):
         db.add(RefAlias(dimension="rubrique", alias_norm="variable", cible_id=rub["Commission"]))
+    if not db.scalar(select(CorrespondancePaie.id).limit(1)):
+        db.add_all(
+            CorrespondancePaie(colonne=c, colonne_norm=norm(c), rubrique_id=rub[lib])
+            for lib, colonnes in CORRESPONDANCE_PAIE.items() if lib in rub for c in colonnes
+        )
     if not db.scalar(select(Parametre.id).limit(1)):
         db.add_all(Parametre(cle=c, valeur=Decimal(v), date_debut=DEBUT)
                    for c, v in PARAMETRES_DEFAUT.items())

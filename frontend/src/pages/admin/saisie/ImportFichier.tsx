@@ -1,29 +1,40 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, queryRetry } from '../../../api/client'
-import { envoyerFichier, lireAnomalies, urlRapport, type Lot } from '../../../api/saisie'
+import { envoyerFichier, lireAnomalies, lireLot, urlRapport, type Lot } from '../../../api/saisie'
 import Etat from '../../../components/Etat'
 import { Bouton, ChoixFichier } from '../../../components/Kit'
+import { MOIS } from '../../../lib/format'
 import BarreParcours from './BarreParcours'
 import Etapes from './Etapes'
 import FormulesRefusees, { CODES_FORMULE } from './FormulesRefusees'
 import PointsAttention, { aConfirmer, repartir, VOLET_ERREURS } from './PointsAttention'
 
 const ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+/** Fichier à importer : classeur Excel ou export de paie. */
+const ACCEPT_IMPORT = `${ACCEPT},.csv,text/csv`
+/** Réponse du serveur quand le nom d'un fichier de paie ne donne pas le mois. */
+const MOIS_INTROUVABLE = /^Mois du fichier introuvable/
 
 interface Props {
   fichier: File
+  /** Lot déjà créé (fichier du dossier de paie) : il est ouvert sans renvoyer le fichier. */
+  lotId?: number
   onLot: (lot: Lot) => void
   onAutre: (f: File | undefined) => void
   onRetour: () => void
 }
 
 /** Analyse d'un fichier : prêt -> aperçu ; refusé -> erreurs à corriger dans Excel, rapport téléchargeable. */
-export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Props) {
-  const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string; modifications?: number }>({})
+export default function ImportFichier({ fichier, lotId, onLot, onAutre, onRetour }: Props) {
+  const [etat, setEtat] = useState<{ lot?: Lot; erreur?: string; modifications?: number; moisAChoisir?: boolean }>({})
   // Choix fait pour ce fichier-là seulement : un autre fichier repose la question.
   const [reprise, setReprise] = useState<{ fichier: File; choix: 'reprendre' | 'recommencer' }>()
   const choix = reprise?.fichier === fichier ? reprise.choix : undefined
+  // Mois choisi pour ce fichier-là seulement (export de paie dont le nom n'indique pas le mois).
+  const [periode, setPeriode] = useState<{ fichier: File; annee: number; mois: number }>()
+  const [saisie, setSaisie] = useState({ annee: String(new Date().getFullYear()), mois: '' })
+  const mois = periode?.fichier === fichier ? { annee: periode.annee, mois: periode.mois } : undefined
   const [volet, setVolet] = useState<string>(VOLET_ERREURS)
   const [pied, setPied] = useState<HTMLElement | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -41,16 +52,18 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
   useEffect(() => {
     let actif = true
     setEtat({})
-    envoyerFichier(fichier, choix)
+    const demande = lotId !== undefined ? lireLot(lotId) : envoyerFichier(fichier, choix, mois)
+    demande
       .then((lot) => (actif ? avancer(lot, () => actif) : undefined))
       .catch((e) => {
         if (!actif) return
+        if (e instanceof ApiError && e.status === 422 && MOIS_INTROUVABLE.test(e.message)) return setEtat({ moisAChoisir: true })
         const deja = e instanceof ApiError && e.status === 409
         if (deja && e.info?.reprise) return setEtat({ modifications: Number(e.info.modifications) })
         setEtat({ erreur: deja ? 'Ce fichier a déjà été importé et enregistré.' : e instanceof Error ? e.message : 'Fichier illisible.' })
       })
     return () => { actif = false }
-  }, [fichier, choix, avancer])
+  }, [fichier, lotId, choix, mois?.annee, mois?.mois, avancer])
 
   const lot = etat.lot
   const anomalies = useQuery({
@@ -78,7 +91,27 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
           <button type="button" className="bouton bouton-lien" onClick={() => setReprise({ fichier, choix: 'recommencer' })}>Tout annuler et recommencer</button>
         </p>
       )}
-      {!lot && !etat.erreur && etat.modifications === undefined && <Etat type="chargement" />}
+      {etat.moisAChoisir && (
+        <form className="bandeau ko" aria-label="Mois du fichier" onSubmit={(e) => {
+          e.preventDefault()
+          setPeriode({ fichier, annee: Number(saisie.annee), mois: Number(saisie.mois) })
+        }}>
+          <span>Le nom du fichier n’indique pas le mois (modèle : BrutFinal1026.csv, pour octobre 2026). Choisissez le mois à importer.</span>
+          <label className="decision">
+            <span>Mois</span>
+            <select value={saisie.mois} onChange={(e) => setSaisie({ ...saisie, mois: e.target.value })}>
+              <option value="" disabled>Choisir…</option>
+              {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </label>
+          <label className="decision">
+            <span>Année</span>
+            <input type="number" min={2000} max={2100} value={saisie.annee} onChange={(e) => setSaisie({ ...saisie, annee: e.target.value })} />
+          </label>
+          <button type="submit" className="bouton bouton-primaire" disabled={!saisie.mois || !saisie.annee}>Importer ce mois</button>
+        </form>
+      )}
+      {!lot && !etat.erreur && etat.modifications === undefined && !etat.moisAChoisir && <Etat type="chargement" />}
       {(lot || etat.erreur) && (
         <p className="bandeau ko" role="alert">
           {etat.erreur ?? (pret ? `${nbConfirmer} point${nbConfirmer > 1 ? 's' : ''} à confirmer avant de continuer : choisissez une solution pour chacun, puis Enregistrer. Rien n’est enregistré pour l’instant.` : formules ? 'Fichier refusé : des formules n’ont pas de valeur utilisable. Corrigez le fichier dans Excel, puis importez-le de nouveau. Rien n’est enregistré.' : `Fichier refusé : ${lot!.nb_bloquants} erreur${lot!.nb_bloquants > 1 ? 's' : ''} à corriger. Cliquez une ligne, puis la cellule en rouge pour la corriger ici, ou corrigez le fichier Excel et importez-le de nouveau. Rien n’est enregistré pour l’instant.`)}
@@ -96,7 +129,7 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
       <div className="saisie-pied">
         <span className="pied-liens">
           {lot && <a className="bouton bouton-lien" href={urlRapport(lot.id)} download>Télécharger le rapport d’erreurs (xlsx)</a>}
-          {(lot || etat.erreur) && <ChoixFichier variante="lien" libelle="Choisir un autre fichier" accept={ACCEPT} inputRef={input} onFichier={onAutre} />}
+          {(lot || etat.erreur || etat.moisAChoisir) && <ChoixFichier variante="lien" libelle="Choisir un autre fichier" accept={ACCEPT_IMPORT} inputRef={input} onFichier={onAutre} />}
         </span>
         <span ref={setPied} className="pied-actions" />
       </div>
@@ -104,4 +137,4 @@ export default function ImportFichier({ fichier, onLot, onAutre, onRetour }: Pro
   )
 }
 
-export { ACCEPT }
+export { ACCEPT, ACCEPT_IMPORT }

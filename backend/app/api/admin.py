@@ -17,7 +17,7 @@ from app.models.auth import (
     UtilisateurPermission,
     UtilisateurPortee,
 )
-from app.models.referentiel import Service, Site
+from app.models.referentiel import Departement, Service, Site
 from app.security import audit
 from app.security.deps import current_principal, portee_de, to_principal
 from app.security.passwords import check_password, hash_password
@@ -40,6 +40,7 @@ class PorteeIn(BaseModel):
     perimetres: list[int] = []
     services: list[str] = []
     sites: list[str] = []
+    departements: list[str] = []
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -105,7 +106,8 @@ def _check_droits(db: Session, permissions: list[str], portee: PorteeIn) -> None
     for pid in portee.perimetres:
         if db.get(Perimetre, pid) is None:
             raise HTTPException(422, f"Périmètre inconnu : {pid}")
-    for model, vals in ((Service, portee.services), (Site, portee.sites)):
+    for model, vals in ((Service, portee.services), (Site, portee.sites),
+                        (Departement, portee.departements)):
         connus = set(db.scalars(select(model.libelle).where(model.libelle.in_(vals))))
         if inconnus := set(vals) - connus:
             raise HTTPException(422, f"Valeur inconnue : {', '.join(sorted(inconnus))}")
@@ -129,6 +131,8 @@ def _poser_droits(u: Utilisateur, permissions: list[str] | None, portee: PorteeI
                              for v in sorted(set(portee.services)))
             u.portees.extend(UtilisateurPortee(type="site", valeur=v)
                              for v in sorted(set(portee.sites)))
+            u.portees.extend(UtilisateurPortee(type="departement", valeur=v)
+                             for v in sorted(set(portee.departements)))
 
 
 def _user_dict(u: Utilisateur) -> dict:
@@ -146,6 +150,7 @@ def _user_dict(u: Utilisateur) -> dict:
             "perimetres": sorted(portee.perimetres),
             "services": sorted(portee.services),
             "sites": sorted(portee.sites),
+            "departements": sorted(portee.departements),
         },
     }
 

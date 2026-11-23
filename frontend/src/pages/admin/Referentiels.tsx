@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import {
   apercuRenommage,
   TYPES_SITE,
+  useActivites,
   useCreerRef,
   useModifierRef,
   useReferentiel,
@@ -25,6 +26,8 @@ const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
 const majs = (perimetres: number, comptes: number) =>
   `${[perimetres || !comptes ? pluriel(perimetres, 'périmètre') : '', comptes ? pluriel(comptes, 'compte') : ''].filter(Boolean).join(' et ')} mis à jour.`
 
+const GROUPE_SITE: Record<string, string> = { principal: 'Sites principaux', agence: 'Agences', deporte: 'Sites déportés' }
+
 interface Apercu {
   pour: string
   nb: number | null
@@ -34,7 +37,9 @@ interface Apercu {
 
 function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; singulier: string }) {
   const sites = dim === 'site'
+  const services = dim === 'service'
   const q = useReferentiel(dim)
+  const departements = useReferentiel('departement')
   const modifier = useModifierRef()
   const creer = useCreerRef()
   const [renommage, setRenommage] = useState<Renommage | null>(null)
@@ -83,15 +88,29 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
       { onSuccess: () => setLibelle(''), onError: (x) => setErreurAjout(x.message) },
     )
   }
-  const changer = (v: ValeurRef, b: { actif?: boolean; type_site?: string; productif?: boolean }) => {
+  const changer = (
+    v: ValeurRef,
+    b: { actif?: boolean; type_site?: string; productif?: boolean; departement_id?: number | null },
+  ) => {
     setErreur(null)
     modifier.mutate({ dim, id: v.id, ...b }, { onError: surErreur })
   }
 
-  const colonnes = sites ? ['Libellé', 'Type de site', 'Statut', 'Actions'] : ['Libellé', 'Productif', 'Statut', 'Actions']
+  const colonnes = sites
+    ? ['Libellé', 'Type de site', 'Statut', 'Actions']
+    : services
+      ? ['Libellé', 'Productif', 'Département', 'Statut', 'Actions']
+      : ['Libellé', 'Statut', 'Actions']
   if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
   if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
   const valeurs = q.data?.valeurs ?? []
+  // R5 : sites rangés par type (principal, agences, déportés) ; changer le type déplace la ligne de groupe.
+  const groupes: [string | null, ValeurRef[]][] = sites
+    ? TYPES_SITE.map((t) => {
+        const liste = valeurs.filter((v) => (v.type_site ?? 'principal') === t)
+        return [`${GROUPE_SITE[t]} (${liste.length})`, liste]
+      })
+    : [[null, valeurs]]
 
   return (
     <Panneau titre={titre}>
@@ -122,7 +141,13 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
             <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
           </thead>
           <tbody>
-            {valeurs.map((v) => (
+            {groupes.map(([titreGroupe, liste]) => [
+              titreGroupe && (
+                <tr key={titreGroupe} className="sous-titre">
+                  <th scope="rowgroup" colSpan={colonnes.length}>{titreGroupe}</th>
+                </tr>
+              ),
+              ...liste.map((v) => (
               <tr key={v.id}>
                 <th scope="row">
                   {renommage?.id === v.id ? (
@@ -159,7 +184,7 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                     </select>
                   </td>
                 )}
-                {!sites && (
+                {services && (
                   <td>
                     <input
                       type="checkbox"
@@ -168,6 +193,21 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                       disabled={modifier.isPending}
                       onChange={(e) => changer(v, { productif: e.target.checked })}
                     />
+                  </td>
+                )}
+                {services && (
+                  <td>
+                    <select
+                      aria-label={`Département de ${v.libelle}`}
+                      value={v.departement_id ?? ''}
+                      disabled={modifier.isPending}
+                      onChange={(e) => changer(v, { departement_id: e.target.value === '' ? null : Number(e.target.value) })}
+                    >
+                      <option value="">Non rattaché</option>
+                      {(departements.data?.valeurs ?? [])
+                        .filter((d) => d.actif || d.id === v.departement_id)
+                        .map((d) => <option key={d.id} value={d.id}>{d.libelle}</option>)}
+                    </select>
                   </td>
                 )}
                 <td><span className={v.actif ? 'statut statut-ok' : 'statut'}>{v.actif ? 'Actif' : 'Inactif'}</span></td>
@@ -187,7 +227,8 @@ function Bloc({ dim, titre, singulier }: { dim: DimensionRef; titre: string; sin
                   </Bouton>
                 </td>
               </tr>
-            ))}
+              )),
+            ])}
           </tbody>
         </table>
       )}
@@ -221,6 +262,57 @@ function TypesContrat() {
   )
 }
 
+// Les postes viennent des imports : ils ne se créent pas ici, seule leur activité se règle.
+function Postes() {
+  const q = useReferentiel('poste')
+  const activites = useActivites()
+  const modifier = useModifierRef()
+  const [erreur, setErreur] = useState<string | null>(null)
+  const colonnes = ['Libellé', 'Activité', 'Statut']
+  if (q.isLoading) return <Etat type="chargement" colonnes={colonnes} lignes={4} />
+  if (q.isError) return <Etat type={etatErreur(q.error)} onRetry={() => q.refetch()} />
+  const valeurs = q.data?.valeurs ?? []
+  const choix = activites.data?.valeurs ?? []
+  const classer = (v: ValeurRef, valeur: string) => {
+    setErreur(null)
+    modifier.mutate({ dim: 'poste', id: v.id, activite_id: valeur === '' ? null : Number(valeur) }, { onError: (e) => setErreur(e.message) })
+  }
+  return (
+    <Panneau titre="Postes">
+      <p className="note">Chaque poste est Front office ou Back Office : les lignes importées reprennent l’activité de leur poste.</p>
+      {erreur && <p className="champ-erreur admin-erreur admin-erreur-bloc" role="alert">{erreur}</p>}
+      {valeurs.length === 0 ? (
+        <Etat type="vide" titre="Aucun poste" aide="Les postes apparaissent avec les fichiers importés." />
+      ) : (
+        <table className="dense">
+          <thead>
+            <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {valeurs.map((v) => (
+              <tr key={v.id}>
+                <th scope="row">{v.libelle}</th>
+                <td>
+                  <select
+                    aria-label={`Activité de ${v.libelle}`}
+                    value={v.activite_id ?? ''}
+                    disabled={modifier.isPending}
+                    onChange={(e) => classer(v, e.target.value)}
+                  >
+                    <option value="">Non classé</option>
+                    {choix.map((a) => <option key={a.id} value={a.id}>{a.libelle}</option>)}
+                  </select>
+                </td>
+                <td><span className={v.actif ? 'statut statut-ok' : 'statut'}>{v.actif ? 'Actif' : 'Inactif'}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Panneau>
+  )
+}
+
 export default function Referentiels() {
   return (
     <section className="page-ecran rapport-excel admin-excel">
@@ -229,6 +321,10 @@ export default function Referentiels() {
         <Bloc dim="site" titre="Sites" singulier="site" />
         <Bloc dim="service" titre="Services" singulier="service" />
         <TypesContrat />
+      </div>
+      <div className="admin-duo">
+        <Postes />
+        <Bloc dim="departement" titre="Départements" singulier="département" />
       </div>
       <Colonnes />
     </section>

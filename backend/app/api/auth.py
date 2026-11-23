@@ -8,11 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import mail
+from app import mail, mail_modeles
 from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.auth import AuditEvent, PreferenceUtilisateur, Utilisateur
-from app.security import audit
+from app.security import audit, liens
 from app.security.deps import current_principal, session_principal, to_principal
 from app.security.passwords import check_password, hash_password, verify_password
 from app.security.policy import ACTIONS, Principal, is_allowed
@@ -30,6 +30,10 @@ class LoginIn(BaseModel):
     email: str
     password: str
     remember: bool = False
+
+
+class LienIn(BaseModel):
+    jeton: str
 
 
 class OubliIn(BaseModel):
@@ -73,6 +77,7 @@ def _me(p: Principal) -> dict:
         "fonction": p.fonction,
         "permissions": sorted(a for a in ACTIONS if is_allowed(p, a)),
         "doit_changer_mdp": p.doit_changer_mdp,
+        "import_mode": settings.IMPORT_MODE,
     }
 
 
@@ -87,6 +92,25 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)) -> d
     audit.record(db, user.id, "login", "utilisateur", user.id)
     db.commit()
     _set_cookies(response, user, body.remember)
+    return _me(to_principal(user))
+
+
+@router.post("/lien")
+def connexion_par_lien(body: LienIn, response: Response, db: Session = Depends(get_db)) -> dict:
+    """Connexion directe par lien (démo, invitation) : même session qu'une connexion normale."""
+    try:
+        user = liens.utiliser(db, body.jeton)
+    except liens.LienDejaUtilise:
+        audit.record(db, None, "login_lien_echec", "utilisateur", apres={"motif": "deja_utilise"})
+        db.commit()
+        raise HTTPException(status_code=410, detail="Lien déjà utilisé") from None
+    if user is None:
+        audit.record(db, None, "login_lien_echec", "utilisateur")
+        db.commit()
+        raise HTTPException(status_code=401, detail="Lien invalide ou expiré")
+    audit.record(db, user.id, "login_lien", "utilisateur", user.id)
+    db.commit()
+    _set_cookies(response, user, False)
     return _me(to_principal(user))
 
 
@@ -109,9 +133,9 @@ def refresh(
     return {"status": "ok"}
 
 
-def _envoyer(dest: str, sujet: str, texte: str) -> None:
+def _envoyer(dest: str, c: mail_modeles.Courriel) -> None:
     try:
-        mail.envoyer(dest, sujet, texte)
+        mail.envoyer(dest, c.sujet, c.texte, html=c.html)
     except Exception:
         log.exception("Envoi de l'e-mail de réinitialisation impossible")
 
@@ -144,11 +168,6 @@ def _traiter_oubli(email: str) -> None:
         jeton = make_token(user.id, "reset", pwd=empreinte(user.password_hash))
         # Fragment (#) : le jeton n'est jamais envoyé au serveur, donc absent des journaux d'accès.
         lien = f"{settings.APP_URL.rstrip('/')}/reinitialiser#jeton={jeton}"
-        texte = (
-            "Bonjour,\n\nPour choisir un nouveau mot de passe, ouvrez ce lien "
-            f"(valable {settings.RESET_TOKEN_MINUTES} minutes, usage unique) :\n{lien}\n\n"
-            "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
-        )
         audit.record(db, user.id, "reinit_demande", "utilisateur", user.id)
         if not settings.SMTP_HOST:
             if settings.ENV != "prod":
@@ -156,7 +175,7 @@ def _traiter_oubli(email: str) -> None:
             audit.record(db, user.id, "reinit_non_envoye", "utilisateur", user.id)
         db.commit()
         if settings.SMTP_HOST:
-            _envoyer(user.email, f"{settings.APP_NAME} : réinitialisation du mot de passe", texte)
+            _envoyer(user.email, mail_modeles.reinitialisation(lien, settings.RESET_TOKEN_MINUTES))
 
 
 @router.post("/reinitialiser")

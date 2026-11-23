@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import { apresImport, usePilotage, type Groupe } from '../../api/pilotage'
 import { urlModele, useDernierePeriode, usePreparation, type Lot } from '../../api/saisie'
 import Etat, { etatErreur } from '../../components/Etat'
@@ -17,13 +18,14 @@ import { cleBrouillon, effacerBrouillon, lireBrouillon, nouveauBrouillonId } fro
 import ChoixEmployes, { selectionDefaut } from './saisie/ChoixEmployes'
 import type { Enregistrement } from './saisie/Enregistre'
 import GrilleSaisie, { lignesSelection } from './saisie/GrilleSaisie'
-import ImportFichier, { ACCEPT } from './saisie/ImportFichier'
+import FichiersDossier from './saisie/FichiersDossier'
+import ImportFichier, { ACCEPT_IMPORT } from './saisie/ImportFichier'
 
 type Etape =
   | { e: 'depart' }
   | { e: 'choix' }
   | { e: 'grille'; lignes: Ligne[]; brouillonId: string }
-  | { e: 'fichier'; fichier: File }
+  | { e: 'fichier'; fichier: File; lotId?: number }
   | { e: 'apercu'; lot: Lot; depuis: 'grille' | 'fichier' }
   | { e: 'budgets' }
   | { e: 'donnees'; groupe?: Groupe }
@@ -32,6 +34,9 @@ const suivant = (a: number, m: number) => (m === 12 ? [a + 1, 1] : [a, m + 1])
 
 export default function Saisie() {
   const qc = useQueryClient()
+  const { me } = useAuth()
+  // Mode « dossier » : les fichiers arrivent par le dossier de paie, le dépôt manuel disparaît du menu.
+  const depotManuel = me?.import_mode !== 'dossier'
   const derniere = useDernierePeriode()
   const auj = new Date()
   const [choixPeriode, setChoixPeriode] = useState<[number, number] | null>(null)
@@ -61,6 +66,8 @@ export default function Saisie() {
 
   const surLot = useCallback((lot: Lot) => setEtape((et) => ({ e: 'apercu', lot, depuis: et.e === 'fichier' ? 'fichier' : 'grille' })), [])
   const choisirFichier = (f: File | undefined) => f && setEtape({ e: 'fichier', fichier: f })
+  // Fichier du dossier de paie : seul son nom compte, le lot est déjà créé côté serveur.
+  const ouvrirDuDossier = (nom: string, lotId: number) => setEtape({ e: 'fichier', fichier: new File([], nom), lotId })
   // Enregistré : retour sur la feuille DONNEES, qui confirme et propose d'annuler.
   const fini = (lot: Lot, enregistrees: number) => {
     if (etape.e === 'apercu' && etape.depuis === 'grille') effacerBrouillon(cle)
@@ -95,6 +102,7 @@ export default function Saisie() {
             <span className="note">Dernier mois saisi : {MOIS[derniere.data.mois - 1]} {derniere.data.annee} ({derniere.data.lignes} lignes)</span>
           )}
         </div>
+        <FichiersDossier onOuvrir={(nom, lotId) => garde(() => ouvrirDuDossier(nom, lotId))} />
         <div className="saisie-cartes saisie-cartes-depart">
           <Carte titre="Saisir dans l’application">
             <ol className="saisie-deux-temps">
@@ -113,7 +121,7 @@ export default function Saisie() {
               )}
             </div>
           </Carte>
-          <Carte titre="Remplir un fichier Excel">
+          {depotManuel && <Carte titre="Remplir un fichier Excel">
             <ol className="saisie-deux-temps">
               <li><span>Téléchargez le modèle vide (sans la liste des employés).</span></li>
               <li>
@@ -129,9 +137,9 @@ export default function Saisie() {
               <a className="bouton bouton-secondaire" href={plusieurs ? urlModele() : urlModele(annee, mois)} download>
                 <Download aria-hidden="true" size={16} strokeWidth={2.25} /> Télécharger le modèle vide
               </a>
-              <ChoixFichier libelle="Importer un fichier (.xlsx)" variante="primaire" accept={ACCEPT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
+              <ChoixFichier libelle="Importer un fichier (.xlsx ou .csv)" variante="primaire" accept={ACCEPT_IMPORT} inputRef={fichierRef} onFichier={(f) => garde(() => choisirFichier(f))} />
             </div>
-          </Carte>
+          </Carte>}
         </div>
         <h3 className="saisie-sous-bandeau">{plusieurs ? 'DONNÉES DU MOIS' : `DONNÉES DE ${periode.toUpperCase()}`}</h3>
         {/* CA, marge, activité et budgets se rattachent à un seul mois : chaque carte ouvre sa page ; plusieurs mois, la raison remplace les cartes. */}
@@ -201,7 +209,7 @@ export default function Saisie() {
   }
 
   if (etape.e === 'fichier') {
-    return <ImportFichier fichier={etape.fichier} onLot={surLot} onAutre={choisirFichier} onRetour={() => setEtape({ e: 'depart' })} />
+    return <ImportFichier fichier={etape.fichier} lotId={etape.lotId} onLot={surLot} onAutre={choisirFichier} onRetour={() => setEtape({ e: 'depart' })} />
   }
 
   if (etape.e === 'apercu') {

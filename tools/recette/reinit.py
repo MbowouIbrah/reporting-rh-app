@@ -1,8 +1,9 @@
 """Base de recette : repart de zéro à chaque passage, toujours avec les mêmes données.
 
 Usage (API arrêtée, depuis backend/) : .venv/Scripts/python ../tools/recette/reinit.py
-Options : --base recette.db (fichier SQLite, dans backend/), --fin AAAA-MM (dernier mois de paie).
-Comptes : comptes.local.csv (généré par generer_comptes.py à partir de comptes.exemple.csv, non suivi).
+Options : --demo (cas de démonstration), --base recette.db (fichier SQLite, dans backend/),
+--fin AAAA-MM (dernier mois de paie).
+Comptes : comptes.local.csv (généré par generer_comptes.py depuis comptes.exemple.csv, non suivi).
 
 Contenu : comptes de comptes.local.csv, historique de paie 100 % fictif (donnees_fictives.py,
 de janvier 2024 à --fin),
@@ -18,6 +19,7 @@ import os
 import secrets
 import subprocess
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 from generer_comptes import charger
@@ -79,6 +81,10 @@ def historique_recette(fin: tuple[int, int] = (2026, 6)) -> tuple[bytes, list[st
 
 
 def _preparer(base: str) -> None:
+    if base.startswith("postgresql"):
+        os.environ.update(DATABASE_URL=base, ENV="test", COOKIE_SECURE="false",
+                          SECRET_KEY=os.environ.get("SECRET_KEY") or "presentation-" + "x" * 40)
+        return
     fichier = BACKEND / base
     try:
         fichier.unlink(missing_ok=True)
@@ -92,11 +98,76 @@ def _preparer(base: str) -> None:
                    check=True, capture_output=True)
 
 
+def _mois_precedents(fin: tuple[int, int], n: int) -> list[tuple[int, int]]:
+    a, m = fin
+    out = []
+    for _ in range(n):
+        out.append((a, m))
+        a, m = (a, m - 1) if m > 1 else (a - 1, 12)
+    return out[::-1]
+
+
+def _demo(c, api: str, cibles: dict, fin: tuple[int, int]) -> list[str]:
+    """Cas de démonstration en plus de la recette : activité par service, objectifs par service
+    et par site (dont productivité), et une saisie de CA en conflit avec le calcul des employés."""
+    services, sites = cibles["service"], cibles["site"]
+    prod = [s for s in ("SAV PL", "SAV Engins", "Commerce Pièces", "Commerce VN", "Pneumatique")
+            if s in services]
+    for k, (annee, mois) in enumerate(_mois_precedents(fin, 6)):
+        cases = []
+        for i, lib in enumerate(prod):
+            base = 40 + 9 * i + 3 * k
+            cases.append({"site_id": None, "service_id": services[lib], "valeurs": {
+                "or": str(base), "devis": str(base * 2 + 5), "factures": str(base + 7)}})
+        r = c.put(f"{api}/pilotage/saisies", json={
+            "annee": annee, "mois": mois, "groupe": "activite", "niveau": "service",
+            "cases": cases})
+        assert r.status_code == 200, r.text
+    annee = fin[0]
+    # Objectif annuel = CA et marge des employés du dernier mois x 12, +10 % : atteinte plausible.
+    vue = c.get(f"{api}/pilotage/saisies", params={
+        "groupe": "ca_marge", "niveau": "service", "annee": fin[0], "mois": fin[1]}).json()
+    calcule = {x["service_id"]: x["valeurs"] for x in vue["cases"]}
+    obj_service = []
+    for lib in prod:
+        v = calcule.get(services[lib], {})
+        for ind, cle in (("obj_ca", "ca"), ("obj_marge", "marge")):
+            emp = (v.get(cle) or {}).get("employes")
+            if emp:
+                obj_service.append({"service_id": services[lib], "indicateur": ind,
+                                    "total": str(int(Decimal(emp) * 132 // 10))})
+    r = c.put(f"{api}/pilotage/saisies/annee", json={
+        "annee": annee, "groupe": "obj_ca_marge", "niveau": "service", "cases": obj_service})
+    assert r.status_code == 200, r.text
+    obj_site = [{"site_id": sites[lib], "indicateur": ind, "total": t}
+                for lib in ("Douala", "Yaoundé") if lib in sites
+                for ind, t in (("obj_ventes", "1200"), ("obj_clients", "600"),
+                               ("obj_factures", "2000"), ("obj_productivite", "0.95"))]
+    r = c.put(f"{api}/pilotage/saisies/annee", json={
+        "annee": annee, "groupe": "obj_activite", "niveau": "site", "cases": obj_site})
+    assert r.status_code == 200, r.text
+    notes = [f"Activité (OR, devis, factures) des 6 derniers mois pour {', '.join(prod)}",
+             f"Objectifs {annee} par service (CA, marge) et par site (ventes, clients, factures, "
+             "productivité) pour Douala et Yaoundé"]
+    if "Commerce VN" in services:
+        r = c.put(f"{api}/pilotage/saisies", json={
+            "annee": fin[0], "mois": fin[1], "groupe": "ca_marge", "niveau": "service",
+            "cases": [{"site_id": None, "service_id": services["Commerce VN"],
+                       "valeurs": {"ca": "55000000", "marge": "7500000"}}]})
+        assert r.status_code == 200, r.text
+        notes.append(f"Conflit de saisie : CA de Commerce VN saisi en {fin[1]:02d}/{fin[0]} "
+                     "différent du calcul des employés (à trancher dans Saisie)")
+    return notes
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="recette.db")
     ap.add_argument("--fin", type=_lire_fin, default=_mois_clos(),
                     help="dernier mois de paie, AAAA-MM (défaut : dernier mois clos)")
+    ap.add_argument("--demo", action="store_true",
+                    help="ajoute les cas de démonstration "
+                         "(activité, objectifs par niveau, conflit)")
     args = ap.parse_args()
     comptes = charger()
     mdp_de = {c["email"]: c["mot_de_passe"] for c in comptes}
@@ -107,22 +178,24 @@ def main() -> None:
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
 
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
     from app.db.session import SessionLocal
     from app.main import app
     from app.models.auth import Perimetre, Utilisateur
     from app.models.referentiel import Rubrique, Service, Site
     from app.seed import _user, run
-    from fastapi.testclient import TestClient
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         run(db, admins[0]["email"], mdp_de[admins[0]["email"]], None, mdp_provisoire=False)
         perim = {p.code: p.id for p in db.scalars(select(Perimetre))}
         for c in comptes:
             email = c["email"].strip().lower()
+            ps = [perim[x] for x in c["perimetre"].split("+")] if c["perimetre"] else []
             _user(db, email, c["nom"], c["mot_de_passe"], c["modele"],
-                  perim[c["perimetre"]] if c["perimetre"] else None, c["nominatif"] == "oui",
-                  provisoire=False)
+                  ps[0] if ps else None, c["nominatif"] == "oui",
+                  provisoire=False, autres=tuple(ps[1:]))
             # Le premier admin existe déjà (créé par run avec un nom générique) : nom du CSV.
             db.flush()
             u = db.scalar(select(Utilisateur).where(Utilisateur.email == email))
@@ -187,6 +260,9 @@ def main() -> None:
     for (annee, mois), lignes in par_mois.items():
         r = c.put(f"{api}/pilotage/budgets", json={"annee": annee, "mois": mois, "lignes": lignes})
         assert r.status_code == 200, r.text
+
+    if args.demo:
+        notes += _demo(c, api, cibles, args.fin)
 
     print(f"Base {args.base} prête : {lot['nb_lignes']} lignes de paie, "
           f"{len(comptes)} comptes (mots de passe dans tools/recette/comptes.local.csv).")

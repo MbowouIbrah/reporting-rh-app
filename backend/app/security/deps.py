@@ -18,6 +18,7 @@ def portee_de(user: Utilisateur) -> Portee:
         perimetres=valeurs("perimetre"),
         services=valeurs("service"),
         sites=valeurs("site"),
+        departements=valeurs("departement"),
     )
 
 

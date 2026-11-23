@@ -9,6 +9,13 @@ export interface Budget {
   ecart_pct?: Val
 }
 
+/** Effectif de fin en front office et en back office, et leurs parts de l'effectif total. */
+export interface FrontBack {
+  front: number; back: number; total: number; front_pct: Val; back_pct: Val
+  /** R9 : répartition de chaque nature de contrat. */
+  par_contrat?: Record<string, { front: number; back: number }>
+}
+
 export interface Cell {
   m1: Val
   m: Val
@@ -23,7 +30,7 @@ export type CellPartiel = Cell & { partiel?: true }
 export type CellObjectif = CellPartiel & Budget & { budget_partiel?: true }
 
 /** Ligne du bloc ACTIVITÉ ; `activite` vaut null tant qu'aucune donnée d'activité n'existe. */
-export type LigneActivite = { cle: string; libelle: string } & CellObjectif
+export type LigneActivite = { cle: string; libelle: string; groupe?: string; realisation?: Val } & CellObjectif
 
 /** Objectifs d'un mois (null = non défini) ; `ca` et `marge` absents sans la permission marge:read. */
 export interface Objectifs {
@@ -68,6 +75,8 @@ export interface Me {
   fonction: string
   permissions: string[]
   doit_changer_mdp: boolean
+  /** « dossier » : les fichiers de paie arrivent par le dossier, plus de dépôt manuel. */
+  import_mode: 'depot' | 'dossier'
 }
 
 export interface Periode {
@@ -77,6 +86,7 @@ export interface Periode {
 
 
 export interface Filtres {
+  departements?: string[]
   services: string[]
   sites: string[]
   types_site?: string[]
@@ -85,7 +95,7 @@ export interface Filtres {
   postes?: string[]
   activites?: string[]
   types_contrat?: string[]
-  /** N-uplets présents [service, site, type de site, activité, contrat, poste] ; '' = sans valeur. */
+  /** N-uplets présents [département, service, site, type de site, activité, contrat, poste] ; '' = sans valeur. */
   combinaisons?: string[][]
 }
 
@@ -111,6 +121,9 @@ export interface Indicateurs {
   taux_absenteisme: Val
 }
 
+/** Détail d'une activité par contrat (remarque 3) : parts dans l'activité. */
+export interface LigneContrat { ms: Cell; effectif: Cell; part_masse?: Val; part?: Val }
+
 export interface Mensuel {
   synthese: {
     ms: Cell & { budget: Val; ecart: Val; ecart_pct: Val }
@@ -134,6 +147,7 @@ export interface Mensuel {
     ca?: Val
     marge?: Val
     taux_marge?: Val
+    front_back?: FrontBack | null
   }
   a_type_charge: ({ rubrique: string; exclu: boolean } & Cell & Budget)[]
   /** Absent sans la permission marge:read. */
@@ -148,7 +162,13 @@ export interface Mensuel {
     service: string
     total: Cell & Budget
     effectif: Cell
-    activites: ({ activite: string; effectif: Cell } & Cell)[]
+    /** Part du service dans l'effectif global (ratio, retours N2). */
+    part_globale?: Val
+    /** Part du bloc dans la masse salariale globale, et parts de chaque contrat dans le bloc (ratios). */
+    part_masse_globale?: Val
+    parts_contrat?: Record<string, { masse?: Val; effectif?: Val }>
+    /** part : part de l'activité dans l'effectif du service (ratio). */
+    activites: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val; contrats?: Record<string, LigneContrat> } & Cell)[]
     /** Masse salariale et effectif du service par nature de contrat (CDI, CDD, MAD). */
     ms_contrat?: Record<string, Cell>
     effectif_contrat?: Record<string, Cell>
@@ -157,6 +177,12 @@ export interface Mensuel {
     site: string
     ms: Cell & Budget
     effectif: Cell
+    /** Ventilation du site par activité, comme les services (retours N2, point 6). */
+    activites?: ({ activite: string; effectif: Cell; part?: Val; part_masse?: Val; contrats?: Record<string, LigneContrat> } & Cell)[]
+    part_globale?: Val
+    /** Part du bloc dans la masse salariale globale, et parts de chaque contrat dans le bloc (ratios). */
+    part_masse_globale?: Val
+    parts_contrat?: Record<string, { masse?: Val; effectif?: Val }>
     /** Effectif du site par nature de contrat (CDI, CDD, MAD), dans l'ordre de la liste des contrats. */
     effectif_contrat?: Record<string, Cell>
     /** Masse salariale du site par nature de contrat, mêmes clés que effectif_contrat. */
@@ -169,6 +195,15 @@ export interface Mensuel {
     indicateurs: Indicateurs[]
     total: Cell
     ventilation: { contrat: string; activite: string; ms: Cell; effectif: Cell }[]
+    /** Un bloc par contrat (masse et effectif côte à côte, comme la répartition par site) ; absent des anciens rapports. */
+    blocs?: {
+      contrat: string
+      total: Cell
+      effectif: Cell
+      activites: (Cell & { activite: string; effectif: Cell; part?: Val; part_masse?: Val })[]
+      part_globale?: Val
+      part_masse_globale?: Val
+    }[]
   }
   controles: Controle[]
 }
@@ -203,6 +238,80 @@ export interface SerieMois {
   objectifs?: Objectifs
 }
 
+export type AxeCharge = 'type' | 'site' | 'service' | 'activite' | 'contrat'
+
+/** Ligne d'un axe : montants sur la période et la période comparée, part, effectif, budget. */
+export interface LigneChargeBase extends Cell {
+  libelle: string
+  part: Val
+  effectif: number
+  effectif1: number | null
+  /** Écart d'effectif et son pourcentage (ratio), calculés par le serveur. */
+  effectif_var: number | null
+  effectif_var_pct: Val
+  entrees: number | null
+  sorties: number | null
+  budget: Dec | null
+  /** Écart au budget et part du budget consommée (ratio), calculés par le serveur ; null sans budget. */
+  ecart_budget: Dec | null
+  realisation: Val
+  type_site?: string
+  /** Rubriques de primes d'un mois seul : comparées au même mois un an plus tôt. */
+  cmp_primes?: boolean
+}
+export interface LigneCharge extends LigneChargeBase { enfants?: LigneChargeBase[] }
+/** Budget de l'axe entier (somme des lignes), écart et réalisation du total ; null sans budget complet. */
+export interface BudgetAxe { budget: Dec; ecart_budget: Dec | null; realisation: Val }
+export interface AxeLignes { lignes: LigneCharge[]; budget_raison: string | null; budget_total: BudgetAxe | null }
+export interface EffectifContrat {
+  libelle: string
+  n: number
+  n1: number | null
+  var: number | null
+  var_pct: Val
+  /** Part de l'effectif total (ratio), calculée par le serveur. */
+  part: Val
+  entrees: number | null
+  sorties: number | null
+}
+/** Page « Répartition des charges » : total et axes sur la période, comparés à la période d'avant. */
+export interface Charges {
+  du: string
+  au: string
+  cmp_du?: string
+  cmp_au?: string
+  /** Période de comparaison des rubriques de primes d'un mois seul (même mois un an plus tôt). */
+  cmp_primes_du?: string | null
+  cmp_primes_au?: string | null
+  partiel: boolean
+  total: Cell
+  effectif: { n: number; n1: number | null; var: number | null; var_pct: Val }
+  entrees: number | null
+  sorties: number | null
+  hors_total: { montant: Dec; nb_rubriques: number }
+  axes: Record<AxeCharge, AxeLignes>
+  effectifs_contrat: EffectifContrat[]
+  activite: LigneActivite[] | null
+  lignes_ca_marge: { ca: CellPartiel; marge: CellPartiel } | null
+  cout_par_vente: { n: Val; n1: Val; var: Val; var_pct: Val }
+  objectifs_atteints: [number, number] | null
+  controles?: Controle[]
+}
+/** Personne d'une ligne d'axe (droit nominatif) : montants, entrée ou sortie sur la période. */
+export interface ChargesPersonne extends Cell {
+  matricule: string
+  nom: string
+  service: string
+  site: string
+  activite: string
+  contrat: string
+  poste: string
+  entree: boolean
+  sortie: boolean
+  /** Part de la personne dans la ligne (ratio), calculée par le serveur. */
+  part: Val
+}
+
 export interface Annuel {
   serie_n: SerieMois[]
   serie_n1: SerieMois[]
@@ -225,7 +334,13 @@ export interface Annuel {
   /** Dernier mois saisi de la période : base de l'effectif de fin. */
   mois_fin: number | null
   annee_fin?: number | null
+  /** Période servie et période comparée, « AAAA-MM » (R6). */
+  du?: string
+  au?: string
+  cmp_du?: string
+  cmp_au?: string
   effectif_fin: Cell
+  front_back?: FrontBack | null
   effectif_fin_contrat: Record<string, Cell & { part: Val }>
   effectif_moyen_mad: Cell
   part_mad: { m: Val; m1: Val }
@@ -234,6 +349,12 @@ export interface Annuel {
   ms_contrat: Record<string, Cell & { part: Val }>
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
+  /** R9 : masse salariale cumulée en front et en back office, et leurs parts. */
+  ms_front_back?: { front: Val; back: Val; front_pct: Val; back_pct: Val } | null
+  effectif_moyen_front?: Val
+  /** R9 (C2) : CA et marge par employé front office ; absents sans le droit « marge ». */
+  ca_par_front?: Val
+  marge_par_front?: Val
   a_type_charge: Mensuel['a_type_charge']
   lignes_ca_marge?: Mensuel['lignes_ca_marge']
   frais_mission?: Mensuel['frais_mission']

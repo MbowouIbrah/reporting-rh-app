@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CalendarRange, Database, LayoutDashboard, UserRound } from 'lucide-react'
+import { BarChart3, Database, LayoutDashboard, PieChart, UserRound } from 'lucide-react'
 import { useIsFetching } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
@@ -11,10 +11,9 @@ import LienPage from './LienPage'
 import MenuProfil from './MenuProfil'
 
 const ONGLETS = [
-  { to: '/resume', label: 'Résumé', Icone: LayoutDashboard },
+  { to: '/resume', label: 'Budget réalisé', Icone: LayoutDashboard },
   { to: '/graphes', label: 'Graphes', Icone: BarChart3 },
-  { to: '/annuel', label: 'Annuel', Icone: CalendarRange },
-  { to: '/mensuel', label: 'Mensuel', Icone: CalendarDays },
+  { to: '/charges', label: 'Répartition des charges', Icone: PieChart },
   { to: '/individuel', label: 'Individuel', perm: 'nominatif:read', Icone: UserRound },
 ]
 

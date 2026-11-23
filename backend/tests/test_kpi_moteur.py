@@ -176,6 +176,23 @@ def test_annuel_cumul_moyenne_nb_mois_et_marge_ytd():
     assert r2["cumul_ytd"]["m"] == 300 and r2["marge_ytd"] == 200 and r2["nb_mois_ca"] == 1
 
 
+def test_annuel_periode_debut_fin_et_comparaison():
+    # R6 : cumul des mois 3 à 4 ; séries entières ; comparaison libre (période précédente, aucune)
+    n = {1: pd(L(1, Brut_Réel=100)), 3: pd(L(1, Brut_Réel=200), ca=10), 4: pd(L(2, Brut_Réel=300))}
+    n1 = {3: pd(L(1, Brut_Réel=20)), 4: pd(L(1, Brut_Réel=30))}
+    r = annuel(n, n1, 4, REFS, Params(), debut=3)
+    assert r["cumul_ytd"]["m"] == 500 and r["cumul_ytd"]["nb_mois"] == 2
+    assert r["cumul_ytd"]["m1"] == 50 and r["ca_ytd"] == 10
+    assert r["serie_n"][0]["ms"] == 100 and r["cumul_annee_n1"] == 50
+    assert r["effectif_moyen"]["m"] == 1 and r["mois_fin"] == 4
+    prec = {3: pd(L(1, Brut_Réel=7)), 4: pd(L(1, Brut_Réel=8), ca=4)}
+    r = annuel(n, n1, 4, REFS, Params(), debut=3, comparaison=prec)
+    assert r["cumul_ytd"]["m1"] == 15 and r["lignes_ca_marge"]["ca"]["m1"] == 4
+    assert r["serie_n1"][2]["ms"] == 20  # la série reste N-1
+    r = annuel(n, n1, 4, REFS, Params(), debut=3, comparaison={})
+    assert r["cumul_ytd"]["m1"] is None and r["effectif_fin"]["m1"] is None
+
+
 def test_annuel_blocs_coherents_avec_le_cumul():
     n = {1: pd(L(1, Brut_Réel=100), L(2, Brut_Réel=40, site="Yaoundé", ctr="CDD", Absences_nb=3)),
          2: pd(L(1, Brut_Réel=200), L(3, Brut_Réel=60, service="Commerce VN"))}
@@ -349,11 +366,12 @@ def test_masse_par_contrat_et_site_somme_au_site():
 
 
 def test_annuel_serie_frais_mission_remuneration_et_contrats():
-    n = {1: pd(L(1, Brut_Réel=100, Frais_de_mission=30, Primes_sur_ventes=20, Absences_nb=2),
+    n = {1: pd(L(1, Brut_Réel=100, Frais_de_mission=30, Primes_sur_ventes=20, Primes_sur_résultats=5, Absences_nb=2),
                L(2, Brut_Réel=50, ctr="MAD"))}
     s = annuel(n, {}, 1, REFS, Params())["serie_n"]
     assert s[0]["frais_mission"] == 30
-    assert s[0]["remuneration"] == 180 + 20  # TOTAL CHARGES + exclusions hors absences
+    # TOTAL CHARGES + exclusions, hors absences et composantes du Brut Réel (primes sur ventes)
+    assert s[0]["remuneration"] == 180 + 5
     assert s[0]["effectif_contrat"] == {"CDI": 1, "CDD": 0, "MAD": 1}
     assert s[1]["frais_mission"] is None and s[1]["effectif_contrat"] is None
 
@@ -441,3 +459,77 @@ def test_exclusion_changeant_en_cours_d_annee():
                 Budgets(rubrique={"Charges Patronales": D(10)}))
     t = next(x for x in m["a_type_charge"] if x["rubrique"] == "TOTAL CHARGES")
     assert t["m1"] == m["synthese"]["ms"]["m1"] == 1030  # N-1 avec ses propres exclusions
+
+
+def test_front_back_office_mensuel_et_annuel():
+    """Retours N2 : parts front / back office de l'effectif de fin de mois."""
+    cur = pd(L(1), L(2), L(3, act="Back Office"), L(4, act=""))
+    fb = mensuel(cur, None, REFS, Params())["synthese"]["front_back"]
+    assert (fb["front"], fb["back"], fb["total"]) == (2, 1, 4)
+    assert fb["front_pct"] == D("0.5") and fb["back_pct"] == D("0.25")
+    n = {1: pd(L(1)), 2: pd(L(1, act="Back Office"), L(2))}
+    fb = annuel(n, {}, 2, REFS, Params())["front_back"]
+    assert (fb["front"], fb["back"], fb["front_pct"]) == (1, 1, D("0.5"))
+    assert annuel({}, {}, 2, REFS, Params())["front_back"] is None
+
+
+def test_front_back_office_masse_ca_marge_et_contrats():
+    """R9 (réunion du 17/11) : front / back office sur la masse salariale (cumul), le CA et la marge
+    par employé front office (C2 : effectif moyen front office) et l'effectif par contrat."""
+    n = {1: pd(L(1, Brut_Réel=600), L(2, act="Back Office", ctr="CDD", Brut_Réel=400),
+               ca=1000, marge=300),
+         2: pd(L(1, Brut_Réel=600), L(3, Brut_Réel=200),
+               L(2, act="Back Office", ctr="CDD", Brut_Réel=400), ca=2000, marge=600)}
+    r = annuel(n, {}, 2, REFS, Params())
+    ms = r["ms_front_back"]
+    assert (ms["front"], ms["back"]) == (1400, 800)
+    assert ms["front_pct"] == D(1400) / D(2200) and ms["back_pct"] == D(800) / D(2200)
+    assert r["effectif_moyen_front"] == D("1.5")
+    assert r["ca_par_front"] == 2000 and r["marge_par_front"] == 600
+    pc = r["front_back"]["par_contrat"]
+    assert pc["CDI"] == {"front": 2, "back": 0} and pc["CDD"] == {"front": 0, "back": 1}
+    vide = annuel({}, {}, 2, REFS, Params())
+    assert vide["ms_front_back"] is None and vide["ca_par_front"] is None
+
+
+def test_parts_d_effectif_par_service_et_par_site():
+    """Retours N2 (4, 6) : % de chaque activité dans son service / site, % du service / site
+    dans l'effectif global ; les sites sont ventilés par activité comme les services."""
+    cur = pd(L(1, Brut_Réel=100), L(2, act="Back Office", Brut_Réel=50),
+             L(3, service="Commerce VN", site="Yaoundé", Brut_Réel=30),
+             L(4, service="Commerce VN", site="Yaoundé"))
+    m = mensuel(cur, None, REFS, Params())
+    sav = m["b_service_activite"][0]
+    assert sav["part_globale"] == D("0.5")
+    assert [a["part"] for a in sav["activites"]] == [D("0.5"), D("0.5")]
+    # Parts de masse : SAV pèse 150 sur 180 (Brut_Réel), Front office 100 sur 150.
+    assert sav["part_masse_globale"] == D(150) / D(180)
+    assert sav["activites"][0]["part_masse"] == D(100) / D(150)
+    assert sum(x["part_masse_globale"] for x in m["c_site"]) == 1
+    assert {c: v["effectif"] for c, v in sav["parts_contrat"].items() if v["effectif"]} == {"CDI": D(1)}
+    yde = m["c_site"][1]
+    assert yde["part_globale"] == D("0.5")
+    assert [(a["activite"], a["m"], a["part"]) for a in yde["activites"]] == [
+        ("Front office", D(30), D(1)), ("Back Office", D(0), D(0))]
+    a = annuel({1: cur}, {}, 1, REFS, Params())
+    assert a["c_site"][0]["part_globale"] == D("0.5")
+    assert a["c_site"][0]["activites"][1]["part"] == D("0.5")
+    assert a["b_service_activite"][1]["activites"][0]["part"] == D(1)
+
+
+def test_detail_par_contrat_de_chaque_activite():
+    """Remarque 3 : chaque activité d'un service / site se déplie par contrat
+    (masse, effectif, parts dans l'activité), en mensuel comme en annuel."""
+    cur = pd(L(1, Brut_Réel=100), L(2, ctr="CDD", Brut_Réel=50),
+             L(3, act="Back Office", Brut_Réel=30))
+    prev = pd(L(1, Brut_Réel=80))
+    m = mensuel(cur, prev, REFS, Params())
+    fo = m["b_service_activite"][0]["activites"][0]["contrats"]
+    assert (fo["CDI"]["ms"]["m"], fo["CDI"]["ms"]["m1"]) == (D(100), D(80))
+    assert fo["CDD"]["effectif"]["m"] == 1 and fo["CDD"]["part_masse"] == D(50) / D(150)
+    assert fo["CDI"]["part"] == D("0.5") and fo["MAD"]["ms"]["m"] == 0
+    site = m["c_site"][0]["activites"][1]["contrats"]
+    assert site["CDI"]["ms"]["m"] == D(30) and site["CDI"]["part"] == 1
+    a = annuel({1: cur, 2: cur}, {1: prev}, 2, REFS, Params())
+    fo = a["b_service_activite"][0]["activites"][0]["contrats"]
+    assert fo["CDI"]["ms"]["m"] == D(200) and fo["CDD"]["effectif"]["m"] == 1

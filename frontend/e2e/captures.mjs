@@ -9,8 +9,8 @@ if (!PW) throw new Error('E2E_PASSWORD absent')
 const courriel = (nom) => `${nom}@exemple.invalid`
 const BASE = `http://localhost:${process.env.E2E_WEB_PORT || 5173}/`
 const roles = [
-  ['drh', courriel('drh'), ['resume', 'mensuel', 'annuel', 'graphes', 'individuel?matricule=E1']],
-  ['perimetre', courriel('dps.equipment'), ['resume', 'mensuel']],
+  ['drh', courriel('drh'), ['resume', 'charges', 'graphes', 'individuel?matricule=E1']],
+  ['perimetre', courriel('dps.equipment'), ['resume', 'charges']],
 ]
 const tailles = [[1440, 900], [1024, 768], [390, 844]]
 

@@ -100,7 +100,7 @@ def test_0016_donnees_activite(tmp_path, monkeypatch):
             "Nombre de ventes", "Nombre de clients", "Indice de productivité",
             "CA individuel", "Marge individuelle"]
         prod = {r[0] for r in c.execute(text("SELECT libelle FROM service WHERE productif"))}
-        assert prod == {"SAV PL", "SAV Engins"}
+        assert prod == {"SAV PL", "SAV Engins", "SAV Chariot"}  # SAV Chariot : 0025
         assert "reference_activite" in {x["name"] for x in inspect(c).get_columns(
             "situation_mensuelle")}
         assert "valeur_saisie" in inspect(c).get_table_names()
@@ -238,4 +238,81 @@ def test_0021_dates_saisies_remplies_unicite_et_descente(tmp_path, monkeypatch):
     i = inspect(eng)
     assert "date_employes" not in i.get_table_names()
     assert "modifie_le" not in {x["name"] for x in i.get_columns("valeur_saisie")}
+    command.upgrade(cfg, "head")
+
+
+def test_0026_import_paie_colonnes_table_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'p.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0025")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO rubrique (libelle, unite, ordre, actif) "
+                       "VALUES ('Brut Réel', 'FCFA', 1, 1), ('Charges Patronales', 'FCFA', 2, 1)"))
+    command.upgrade(cfg, "0026")
+    i = inspect(eng)
+    assert {x["name"]: x for x in i.get_columns("poste")}["activite_id"]["nullable"] is True
+    assert "correspondance_paie" in i.get_table_names()
+    with eng.begin() as c:
+        liens = dict(c.execute(text(
+            "SELECT p.colonne, r.libelle FROM correspondance_paie p JOIN rubrique r ON r.id = p.rubrique_id")).all())
+        assert liens["BRUT"] == "Brut Réel"
+        assert liens["CNPS PAT"] == "Charges Patronales"
+        assert "BONUS" not in liens  # rubrique absente de la base : sautée
+    command.downgrade(cfg, "0025")
+    i = inspect(eng)
+    assert "correspondance_paie" not in i.get_table_names()
+    assert "activite_id" not in {x["name"] for x in i.get_columns("poste")}
+    command.upgrade(cfg, "head")
+
+
+def test_0027_origine_chemin_frais_de_mission_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'd.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0026")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO rubrique (libelle, unite, ordre, actif) "
+                       "VALUES ('Frais de mission', 'FCFA', 1, 1), ('Bonus', 'FCFA', 2, 1)"))
+        c.execute(text("INSERT INTO lot_import (fichier_nom, sha256, taille, statut, cree_le, nb_lignes, "
+                       "nb_bloquants, nb_avert) VALUES ('a.xlsx', 'abc', 1, 'pret', CURRENT_TIMESTAMP, 0, 0, 0)"))
+        # colonne déjà reliée ailleurs (casse et espaces ignorés) : laissée telle quelle
+        c.execute(text("INSERT INTO correspondance_paie (colonne, colonne_norm, rubrique_id) "
+                       "VALUES ('Rappel deplac. pro', 'rappel deplac. pro', 2)"))
+    command.upgrade(cfg, "0027")
+    cols = {x["name"]: x for x in inspect(eng).get_columns("lot_import")}
+    assert cols["origine"]["nullable"] is False and cols["chemin"]["nullable"] is True
+    with eng.begin() as c:
+        assert c.execute(text("SELECT origine, chemin FROM lot_import")).one() == ("manuel", None)
+        liens = dict(c.execute(text(
+            "SELECT p.colonne_norm, r.libelle FROM correspondance_paie p "
+            "JOIN rubrique r ON r.id = p.rubrique_id")).all())
+        assert liens["depalcement pro"] == "Frais de mission"
+        assert liens["rappel deplac. pro"] == "Bonus"
+    command.downgrade(cfg, "0026")
+    assert not {"origine", "chemin"} & {x["name"] for x in inspect(eng).get_columns("lot_import")}
+    with eng.begin() as c:
+        assert "depalcement pro" not in {r[0] for r in c.execute(text(
+            "SELECT colonne_norm FROM correspondance_paie"))}
+    command.upgrade(cfg, "head")
+
+
+def test_0029_notifications_tables_colonnes_et_descente(tmp_path, monkeypatch):
+    url = f"sqlite+pysqlite:///{tmp_path / 'd.db'}"
+    monkeypatch.setattr(settings, "DATABASE_URL", url)
+    cfg = Config("alembic.ini")
+    command.upgrade(cfg, "0028")
+    eng = create_engine(url)
+    with eng.begin() as c:
+        c.execute(text("INSERT INTO utilisateur (email, nom, password_hash, actif, cree_le) "
+                       "VALUES ('a@exemple.invalid', 'A', 'x', 1, CURRENT_TIMESTAMP)"))
+    command.upgrade(cfg, "0029")
+    assert {"notification", "notification_envoi"} <= set(inspect(eng).get_table_names())
+    with eng.begin() as c:
+        assert c.execute(text("SELECT notif_mail, notif_mail_depuis FROM utilisateur")).one() == (0, None)
+    command.downgrade(cfg, "0028")
+    assert not {"notification", "notification_envoi"} & set(inspect(eng).get_table_names())
+    assert "notif_mail" not in {x["name"] for x in inspect(eng).get_columns("utilisateur")}
     command.upgrade(cfg, "head")

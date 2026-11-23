@@ -104,7 +104,8 @@ def test_export_audite_et_404(charge, db):
     assert (ev.entite, ev.entite_id, ev.apres) == (
         "rapport_mensuel", "2026-02",
         {"service": "SAV PL", "site": None, "type_site": None, "poste": None, "matricule": None,
-         "activite": None, "type_contrat": None})
+         "activite": None, "type_contrat": None,
+         "departement": None})
     assert get(charge, "mensuel/export", annee=2030, mois=1).status_code == 404
 
 
@@ -163,3 +164,27 @@ def test_export_annuel_budget_cumule(charge, db):
     ca = g["Chiffre d'affaires"]
     assert D(str(ca[4])) == 12000 and eq(ca[4], ecran["lignes_ca_marge"]["ca"]["budget"])
     assert D(str(g["dont Frais de mission"][4])) == 123
+
+
+def test_graphes_en_vrais_graphiques_excel(make_client, charge):
+    """Retours N2 (2) : une feuille par graphe, données + graphique Excel lié ; droits respectés."""
+    ecran = get(charge, "annuel", annee=2026, mois=2).json()
+    r = get(charge, "annuel/export", annee=2026, mois=2, graphiques="true")
+    assert "graphes-2026.xlsx" in r.headers["content-disposition"]
+    wb = load_workbook(BytesIO(r.content))
+    ws = wb["Masse salariale"]
+    assert [c.value for c in ws[5]][:2] == ["Mois", "2026"]
+    assert D(str(ws["B6"].value)) == D(ecran["serie_n"][0]["ms"])
+    assert len(ws._charts) == 1 and "Effectif" in wb.sheetnames
+    assert "Marge" in wb.sheetnames
+    equip = load_workbook(BytesIO(get(make_client(EQUIP), "annuel/export", annee=2026, mois=2,
+                                      graphiques="true").content))
+    assert "Marge" not in equip.sheetnames  # marge réservée, comme à l'écran
+
+
+def test_graphes_choisis_seulement(charge):
+    """Seuls les graphes cochés à l'écran sont exportés, dans l'ordre du classeur."""
+    r = get(charge, "annuel/export", annee=2026, mois=2, graphiques="true", graphes="effectif,ca,inconnu")
+    assert load_workbook(BytesIO(r.content)).sheetnames == ["Effectif", "CA"]
+    assert get(charge, "annuel/export", annee=2026, mois=2, graphiques="true",
+               graphes="ms;drop").status_code == 422

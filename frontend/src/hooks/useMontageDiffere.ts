@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
 // Un seul montage par tranche : le navigateur peint entre deux, la page répond pendant le tracé.
-const file: Array<() => void> = []
+// Les graphes se montent dans l'ordre de lecture (ordre du document : ligne par ligne, de gauche à droite),
+// quel que soit l'ordre dans lequel ils sont signalés.
+type Tache = { el: Element; lancer: () => void }
+const file: Tache[] = []
 let enCours = false
 
 function suivant() {
@@ -10,19 +13,23 @@ function suivant() {
     enCours = false
     return
   }
-  tache()
+  tache.lancer()
   requestAnimationFrame(() => setTimeout(suivant, 0))
 }
 
-function planifier(tache: () => void) {
-  file.push(tache)
+function planifier(el: Element, lancer: () => void) {
+  const tache = { el, lancer }
+  // Insérée avant la première tâche qui la suit dans le document
+  const i = file.findIndex((t) => el.compareDocumentPosition(t.el) & Node.DOCUMENT_POSITION_FOLLOWING)
+  file.splice(i < 0 ? file.length : i, 0, tache)
   if (!enCours) {
     enCours = true
-    suivant()
+    // Attendre une image : les graphes signalés ensemble sont triés avant le premier montage
+    requestAnimationFrame(suivant)
   }
   return () => {
-    const i = file.indexOf(tache)
-    if (i >= 0) file.splice(i, 1)
+    const k = file.indexOf(tache)
+    if (k >= 0) file.splice(k, 1)
   }
 }
 
@@ -45,7 +52,7 @@ export function useMontageDiffere<T extends HTMLElement>(immediat = false) {
       (entrees) => {
         if (!entrees.some((e) => e.isIntersecting)) return
         observateur.disconnect()
-        annuler = planifier(() => setMonte(true))
+        annuler = planifier(el, () => setMonte(true))
       },
       // Un écran d'avance : le graphe est prêt avant d'arriver à l'écran
       { root, rootMargin: '100% 0px' },

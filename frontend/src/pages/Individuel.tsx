@@ -13,9 +13,9 @@ import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
 import { useOrdreColonnes } from '../hooks/useOrdreColonnes'
 import { useSalaries } from '../hooks/useSalaries'
-import { cls, decimal2, fcfa, montantEntier, largeurEntete, matriculeAffiche, MOIS, somme } from '../lib/format'
+import { cls, decimal2, fcfa, montantEntier, matriculeAffiche, MOIS, somme } from '../lib/format'
 import { type Calendrier, ordreMois } from '../lib/exercice'
-import { plafonner } from '../lib/plafond'
+import { entetesDeuxLignes, plafonnerTout } from '../lib/plafond'
 import { TitreRapport } from '../components/ExportPdf'
 
 /** Colonnes du reporting individuel, dans l'ordre demandé (servies aussi par l'API). */
@@ -52,7 +52,7 @@ const modeleVide = (cal?: Calendrier): IndividuelTous => ({ ...MODELE_VIDE, mois
  * rendu de la page (glisser d'un en-tête, attente, filtres). `cle` résume l'ordre et la zone des colonnes.
  */
 const CorpsIndividuel = memo(
-  function CorpsIndividuel({ d, rubriques, exclues }: { d: IndividuelTous; rubriques: string[]; exclues: Set<string>; cle: string }) {
+  function CorpsIndividuel({ d, rubriques, exclues, activite }: { d: IndividuelTous; rubriques: string[]; exclues: Set<string>; activite: ColActivite[]; cle: string }) {
     const classe = (r: string) => (exclues.has(r) ? ' exclu' : '')
     const val = (v: Val | undefined) => v ?? '0'
     const totalMois = (m: IndividuelTous['mois'][number]) => m.total ?? '0'
@@ -64,6 +64,7 @@ const CorpsIndividuel = memo(
     const totalRub = (r: string) => somme(d.mois.map((m) => m.montants?.[r] ?? null)) ?? '0'
     const totalStaff = (r: string) => d.mois.reduce((n, m) => n + (m.staff?.[r] ?? 0), 0)
     return (
+      <>
       <tbody>
         {d.mois.map((m) => (
           <Fragment key={m.mois}>
@@ -74,6 +75,9 @@ const CorpsIndividuel = memo(
                   {!m.present || sansObjet(r, m) ? '-' : fcfa(val(m.montants?.[r]))}
                 </td>
               ))}
+              {activite.map((c, i) => (
+                <td key={c} className={i ? 'num activite' : 'num activite debut'}>{m.present ? texteActivite(c, m.activite?.[c]) : '-'}</td>
+              ))}
               <td className="num fige-d1">{m.present ? fcfa(totalMois(m)) : '-'}</td>
             </tr>
             <tr className="sous">
@@ -83,16 +87,22 @@ const CorpsIndividuel = memo(
                   {!m.present || sansObjet(r, m) ? '-' : (m.staff?.[r] ?? 0)}
                 </td>
               ))}
+              {activite.map((c, i) => <td key={c} className={i ? 'activite' : 'activite debut'} />)}
               <td className="fige-d1" />
             </tr>
           </Fragment>
         ))}
+      </tbody>
+      <tbody className="pied-fige">
         <tr className="total">
           <th scope="row" className="fige-g">Total MS</th>
           {rubriques.map((r) => (
             <td className={'num' + classe(r)} key={r}>
               {aucun || sansObjet(r) ? '-' : fcfa(totalRub(r))}
             </td>
+          ))}
+          {activite.map((c, i) => (
+            <td key={c} className={i ? 'num activite' : 'num activite debut'}>{aucun ? '-' : texteActivite(c, d.activite_total?.[c])}</td>
           ))}
           <td className="num fige-d1">{aucun ? '-' : fcfa(somme(d.mois.filter((m) => m.present).map(totalMois)) ?? '0')}</td>
         </tr>
@@ -103,9 +113,11 @@ const CorpsIndividuel = memo(
               {aucun || sansObjet(r) ? '-' : totalStaff(r)}
             </td>
           ))}
+          {activite.map((c, i) => <td key={c} className={i ? 'activite' : 'activite debut'} />)}
           <td className="fige-d1" />
         </tr>
       </tbody>
+      </>
     )
   },
   (a, b) => a.d === b.d && a.cle === b.cle,
@@ -114,7 +126,7 @@ const CorpsIndividuel = memo(
 /** Reporting individuel, calqué sur l'onglet REPORTING_RH_INDIVIDUEL : tous les employés par défaut. */
 export default function Individuel() {
   const f = useFiltres({ avecMois: false, avecCalendrier: true })
-  const matricule = f.partage.matricule ?? ''
+  const matricule = f.filtres?.matricule ?? ''
   const setMatricule = (m: string) => f.set({ matricule: m })
   const annee = f.filtres?.annee
   const service = f.filtres?.service
@@ -154,8 +166,7 @@ export default function Individuel() {
   const aActivite = activites.some((m) => Object.values(m.activite ?? {}).some((v) => v != null))
   const avecCaInd = activites.some((m) => m.activite && 'ca_individuel' in m.activite)
   // Total de l'année calculé par le serveur (productivité = moyenne des mois renseignés).
-  const totalActivite = (cle: ColActivite) => d?.activite_total?.[cle] ?? null
-  const colsActivite: { cle: ColActivite; titre: string }[] = [
+  const colsActivite: { cle: ColActivite; titre: string }[] = !aActivite ? [] : [
     { cle: 'ventes', titre: 'Nombre de ventes' },
     { cle: 'clients', titre: 'Nombre de clients' },
     { cle: 'productivite', titre: 'Indice de productivité' },
@@ -171,7 +182,10 @@ export default function Individuel() {
   // À refaire si les lignes ou les colonnes changent, ou à la fin de l'attente, pas à chaque rendu.
   const zone = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
-    const poser = () => zone.current?.querySelectorAll<HTMLElement>(':scope > .panneau').forEach(plafonner)
+    const poser = () => {
+      zone.current?.querySelectorAll<HTMLElement>('table.individuel').forEach(entetesDeuxLignes)
+      if (zone.current) plafonnerTout(zone.current.querySelectorAll<HTMLElement>(':scope > .panneau'))
+    }
     poser()
     window.addEventListener('resize', poser)
     return () => window.removeEventListener('resize', poser)
@@ -209,7 +223,7 @@ export default function Individuel() {
           {f.postes.length > 0 && (
             <ChoixPoste valeur={poste ?? ''} postes={f.postes} onChange={(v) => f.set({ poste: v })} />
           )}
-          <ChoixEmploye salaries={salaries ?? []} valeur={matricule} onChange={setMatricule} />
+          <ChoixEmploye salaries={f.garderSalaries(salaries) ?? []} valeur={matricule} onChange={setMatricule} />
           <div className="filtres-actions">
             <BoutonReinitialiser
               actif={(['matricule', 'site', 'service', 'type_site', 'poste', 'annee', 'calendrier', 'exercice'] as const).some((k) => f.partage[k])}
@@ -242,56 +256,25 @@ export default function Individuel() {
               <tr>
                 <th scope="col" className="fige-g">Mois</th>
                 {rubriques.map((r) => (
-                  <th scope="col" key={r} {...colonnes.entete(r)} className={classe(r).trim() || undefined} style={{ minWidth: Math.round(largeurEntete(r) * 0.68) }}>
+                  <th scope="col" key={r} {...colonnes.entete(r)} className={classe(r).trim() || undefined}>
                     {r}
                   </th>
+                ))}
+                {colsActivite.map((c, i) => (
+                  <th scope="col" key={c.cle} className={i ? 'num activite' : 'num activite debut'} title="Activité du périmètre">{c.titre}</th>
                 ))}
                 <th scope="col" className="num fige-d1">Total mensuel</th>
               </tr>
             </thead>
-            <CorpsIndividuel d={d} rubriques={rubriques} exclues={exclues} cle={cleColonnes} />
+            <CorpsIndividuel d={d} rubriques={rubriques} exclues={exclues} activite={colsActivite.map((c) => c.cle)} cle={cleColonnes} />
           </table>
         </Panneau>
-      )}
-      {d && aActivite && (
-        <details className="section details-donnees">
-          <summary>
-            <span className="section-titre">Activité</span>
-          </summary>
-          <div className="section-corps">
-            <div className="table-scroll">
-              <table className="dense">
-                <thead>
-                  <tr>
-                    <th scope="col">Mois</th>
-                    {colsActivite.map((c) => <th key={c.cle} scope="col" className="num">{c.titre}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activites.map((m) => (
-                    <tr key={m.mois}>
-                      <th scope="row">{MOIS[m.mois - 1]}</th>
-                      {colsActivite.map((c) => (
-                        <td key={c.cle} className="num">{texteActivite(c.cle, m.activite?.[c.cle])}</td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="total">
-                    <th scope="row">Total</th>
-                    {colsActivite.map((c) => (
-                      <td key={c.cle} className="num">{texteActivite(c.cle, totalActivite(c.cle))}</td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </details>
       )}
       {d && (
         <p className="note">
           Note : le TOTAL MENSUEL additionne les colonnes ci-dessus, hors{' '}
-          <span className="legende-exclu">colonnes hachurées</span> (exclues du total).
+          <span className="legende-exclu">colonnes hachurées</span> (exclues du total) et{' '}
+          <span className="legende-activite">colonnes d’activité</span> (hors total, autre nature).
         </p>
       )}
     </section>

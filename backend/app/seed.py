@@ -28,9 +28,12 @@ from app.security.deps import to_principal
 from app.security.passwords import check_password, hash_password
 from app.security.policy import MODELES, is_allowed
 
-# Mêmes valeurs que la migration 0011 (la base de test est créée sans migrations).
+# Mêmes valeurs que les migrations 0011 et 0025 (la base de test est créée sans migrations).
 PERIMETRES = {
-    "dps": ("DPS", ["Commerce Pièces", "SAV PL", "SAV Engins", "Sites Déportés"]),
+    "dps": ("DPS", ["Commerce Pièces", "SAV PL", "SAV Engins", "SAV Chariot", "Sites Déportés"]),
+    "equipment": ("Equipment", ["Commerce Pièces", "SAV PL", "SAV Engins", "SAV Chariot",
+                                "Sites Déportés", "Pneumatique"]),
+    "winpart": ("Winpart", ["Winpart", "Motul", "Autofast"]),
     "commerce_vn": ("Commerce VN", ["Commerce VN"]),
     "pneumatique": ("Pneumatique", ["Pneumatique"]),
     "sav_pl": ("SAV PL", ["SAV PL"]),
@@ -40,14 +43,14 @@ PERIMETRES = {
 
 
 def _user(db: Session, email: str, nom: str, pw: str, modele: str, pid=None, nominatif=False,
-          provisoire=True):
+          provisoire=True, autres: tuple[int, ...] = ()):
     """Compte créé d'après un modèle (mêmes droits que la conversion de la migration 0014)."""
     if db.scalar(select(Utilisateur).where(Utilisateur.email == email)):
         return
     fonction, tout, perms = MODELES[modele]
     perms = perms | ({"nominatif"} if nominatif else set())
-    portee = UtilisateurPortee(type="tout") if tout else UtilisateurPortee(
-        type="perimetre", perimetre_id=pid)
+    portees = [UtilisateurPortee(type="tout")] if tout else [
+        UtilisateurPortee(type="perimetre", perimetre_id=p) for p in (pid, *autres)]
     db.add(
         Utilisateur(
             email=email,
@@ -56,7 +59,7 @@ def _user(db: Session, email: str, nom: str, pw: str, modele: str, pid=None, nom
             password_hash=hash_password(pw),
             doit_changer_mdp=provisoire,
             permissions=[UtilisateurPermission(permission=c) for c in sorted(perms)],
-            portees=[portee],
+            portees=portees,
         )
     )
 
@@ -96,6 +99,9 @@ def run(db: Session, admin_email: str, admin_password: str, demo_password: str |
               provisoire=mdp_provisoire)
         _user(db, f"dop@{demo_domaine}", "DOP", demo_password, "global", None, True,
               provisoire=mdp_provisoire)
+        _user(db, f"dop.equipment@{demo_domaine}", "DOP Equipment", demo_password,
+              "perimetre", ids["equipment"], provisoire=mdp_provisoire,
+              autres=(ids["winpart"],))
         _user(db, f"dps.equipment@{demo_domaine}", "DPS", demo_password,
               "perimetre", ids["dps"], provisoire=mdp_provisoire)
         _user(db, f"dir.commercial.vn@{demo_domaine}", "Directeur commercial VN", demo_password,

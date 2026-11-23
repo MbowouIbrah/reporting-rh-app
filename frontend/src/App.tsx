@@ -3,17 +3,20 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth'
 import Layout from './components/Layout'
 import LimiteErreur from './components/LimiteErreur'
-import Annuel from './pages/Annuel'
+import VersCharges from './components/VersCharges'
 import ChangerMotDePasse from './pages/ChangerMotDePasse'
+import Charges from './pages/Charges'
 import Individuel from './pages/Individuel'
 import Login from './pages/Login'
 import Reinitialiser from './pages/Reinitialiser'
+import ConnexionRapide from './pages/ConnexionRapide'
+import Desabonnement from './pages/Desabonnement'
+import Correspondance from './pages/admin/Correspondance'
 import Donnees from './pages/admin/Donnees'
 import Employes from './pages/admin/Employes'
 import Referentiels from './pages/admin/Referentiels'
 import Saisie from './pages/admin/Saisie'
 import Utilisateurs from './pages/admin/Utilisateurs'
-import Mensuel from './pages/Mensuel'
 import Resume from './pages/Resume'
 import { chargerGraphes, chargerRapport } from './lib/pagesDifferees'
 
@@ -25,6 +28,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reinitialiser" element={<Reinitialiser />} />
+      <Route path="/connexion-rapide" element={<ConnexionRapide />} />
+      <Route path="/desabonnement" element={<Desabonnement />} />
       <Route path="/changer-mot-de-passe" element={<ChangerMotDePasse />} />
       <Route
         path="/rapport"
@@ -46,8 +51,10 @@ export default function App() {
         }
       >
         <Route path="/resume" element={<Resume />} />
-        <Route path="/mensuel" element={<Mensuel />} />
-        <Route path="/annuel" element={<Annuel />} />
+        <Route path="/budget-realise" element={<Resume />} />
+        <Route path="/charges" element={<Charges />} />
+        <Route path="/mensuel" element={<VersCharges />} />
+        <Route path="/annuel" element={<VersCharges />} />
         <Route
           path="/graphes"
           element={
@@ -96,6 +103,14 @@ export default function App() {
           element={
             <RequireAuth perm="referentiel:write">
               <Referentiels />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/correspondance"
+          element={
+            <RequireAuth perm="referentiel:write">
+              <Correspondance />
             </RequireAuth>
           }
         />

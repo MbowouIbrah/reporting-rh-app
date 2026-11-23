@@ -5,11 +5,11 @@ import Utilisateurs from './Utilisateurs'
 import { erreurApi, monter, type Appel } from './testSupport'
 
 const MDP = mdpTest()
-const TOUT = { tout: true, perimetres: [], services: [], sites: [] }
+const TOUT = { tout: true, perimetres: [], services: [], sites: [], departements: [] }
 const ADMIN = ['nominatif', 'marge', 'import', 'saisie', 'referentiel', 'comptes', 'journal']
 const COMPTES = [
   { id: 1, email: courriel('admin'), nom: 'Admin RH', fonction: 'DRH', actif: true, doit_changer_mdp: false, permissions: ADMIN, portee: TOUT },
-  { id: 2, email: courriel('chef.sav'), nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, doit_changer_mdp: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'] } },
+  { id: 2, email: courriel('chef.sav'), nom: 'Chef Sav', fonction: 'Chef SAV', actif: true, doit_changer_mdp: true, permissions: [], portee: { tout: false, perimetres: [5], services: [], sites: ['Douala'], departements: [] } },
   { id: 3, email: courriel('dg'), nom: 'Élise Directrice', fonction: '', actif: false, doit_changer_mdp: false, permissions: ['nominatif', 'marge'], portee: TOUT },
 ]
 const PERIMETRES = [
@@ -18,6 +18,7 @@ const PERIMETRES = [
 ]
 const REFERENTIELS: Record<string, unknown> = {
   service: { valeurs: [{ id: 1, libelle: 'Commerce VN', actif: true }, { id: 2, libelle: 'SAV PL', actif: true }] },
+  departement: { valeurs: [{ id: 1, libelle: 'Equipment', actif: true }, { id: 2, libelle: 'Winpart', actif: true }] },
   site: { valeurs: [{ id: 1, libelle: 'Douala', actif: true }, { id: 2, libelle: 'Yaoundé', actif: true }, { id: 3, libelle: 'Garoua', actif: true }] },
 }
 const PERMS = ['users:read', 'users:write']
@@ -129,7 +130,7 @@ test('données visibles : périmètres, services et sites cochés partent avec l
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({
     permissions: ['nominatif'],
-    portee: { tout: false, perimetres: [5, 6], services: ['Commerce VN'], sites: ['Douala'] },
+    portee: { tout: false, perimetres: [5, 6], services: ['Commerce VN'], sites: ['Douala'], departements: [] },
   })
 })
 
@@ -150,7 +151,7 @@ test('permissions : celles qui exigent toutes les données sont grisées et reti
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({
     permissions: ['nominatif'],
-    portee: { tout: false, perimetres: [], services: [], sites: ['Yaoundé'] },
+    portee: { tout: false, perimetres: [], services: [], sites: ['Yaoundé'], departements: [] },
   })
 })
 
@@ -165,6 +166,23 @@ test('« Tout » dans les services et les sites = toutes les données', async ()
   enregistrer()
   await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
   expect(ecritures(appels)[0].body).toEqual({ permissions: ['marge'], portee: TOUT })
+})
+
+test('départements : cochés dans les données visibles et envoyés au serveur', async () => {
+  const appels = monter(page, PERMS, servir)
+  const f = await ouvrir('Chef Sav')
+  const deps = within(await f.findByRole('group', { name: 'Départements' }))
+  fireEvent.click(deps.getByLabelText('Winpart'))
+  // un département restreint aussi les services : « Tout » des sites ne donne pas toutes les données
+  fireEvent.click(within(f.getByRole('group', { name: 'Sites' })).getByLabelText('Tout'))
+  expect(f.queryByText(/ce compte voit toute l’entreprise/)).not.toBeInTheDocument()
+  fireEvent.click(within(f.getByRole('group', { name: 'Sites' })).getByLabelText('Tout'))
+  enregistrer()
+  await waitFor(() => expect(ecritures(appels)).toHaveLength(1))
+  expect(ecritures(appels)[0].body).toEqual({
+    permissions: [],
+    portee: { tout: false, perimetres: [5], services: [], sites: [], departements: ['Winpart'] },
+  })
 })
 
 test('suppression annulée : la fiche revient', async () => {

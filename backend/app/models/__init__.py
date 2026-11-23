@@ -1,5 +1,6 @@
 from app.models.auth import (  # noqa: F401
     AuditEvent,
+    LienConnexion,
     Perimetre,
     PerimetreRegle,
     PreferenceUtilisateur,
@@ -15,9 +16,11 @@ from app.models.imports import (  # noqa: F401
     LotImportPrecedent,
     StagingLigne,
 )
+from app.models.notifications import Notification, NotificationEnvoi  # noqa: F401
 from app.models.pilotage import Budget, DateEmployes, Parametre, ValeurSaisie  # noqa: F401
 from app.models.referentiel import (  # noqa: F401
     Activite,
+    Departement,
     Poste,
     RefAlias,
     Rubrique,

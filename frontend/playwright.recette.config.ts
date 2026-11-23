@@ -37,7 +37,8 @@ export default defineConfig({
       timeout: 300_000,
     },
     {
-      command: 'npx vite --port ' + WEB_PORT + ' --strictPort',
+      // E2E_PREVIEW=1 : version compilée (npm run build au préalable), pour les mesures de fluidité.
+      command: `npx vite ${process.env.E2E_PREVIEW ? 'preview ' : ''}--port ${WEB_PORT} --strictPort`,
       env: { API_PORT },
       url: `http://localhost:${WEB_PORT}/`,
       reuseExistingServer: false,

@@ -194,8 +194,14 @@ export async function importer(page: Page, chemin: string) {
   throw new Error('Le fichier a été abandonné à chaque envoi ' + trace.join(' ; '))
 }
 
-/** Sélecteur « Période » des rapports (liste mois + année, pas un <select>). */
+/** Calendrier « Période » des rapports : ◀ année ▶, grille des mois, puis OK. */
 export async function choisirPeriode(page: Page, mois: string, annee = 2026) {
-  await page.getByRole('combobox', { name: 'Période' }).click()
-  await page.getByRole('option').filter({ hasText: mois }).filter({ hasText: String(annee) }).click()
+  await page.getByRole('button', { name: /^Période/ }).click()
+  const calendrier = page.getByRole('dialog', { name: 'Période' })
+  const affichee = async () => Number(await calendrier.locator('.cal-annee').textContent())
+  for (let i = 0; i < 6 && (await affichee()) !== annee; i++) {
+    await calendrier.getByRole('button', { name: (await affichee()) < annee ? 'Année suivante' : 'Année précédente' }).click()
+  }
+  await calendrier.getByRole('button', { name: `${mois.toLowerCase()} ${annee}` }).click()
+  await calendrier.getByRole('button', { name: 'OK' }).click()
 }

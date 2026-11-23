@@ -3,7 +3,6 @@
 Fonction pure : aucune lecture en base, aucun float dans les montants.
 """
 
-import hashlib
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -66,6 +65,8 @@ class Refs:
     rubriques_activite: list[tuple[str, str]] = field(default_factory=list)
     rubrique_alias: dict[str, str] = field(default_factory=dict)  # norm -> libellé canonique
     postes: set[str] = field(default_factory=set)  # normalisés
+    # poste normalisé (alias compris) -> libellé de son activité ; None tant que le poste n'est pas classé
+    postes_activite: dict[str, str | None] = field(default_factory=dict)
     noms_connus: dict[str, str] = field(default_factory=dict)  # matricule casefold -> nom norm
     annuaire: dict[str, tuple[str, str]] = field(default_factory=dict)  # matricule casefold -> (matricule, nom)
     # matricule casefold -> mois enregistrés (année, mois, {colonne: libellé}), du plus ancien au plus récent
@@ -110,20 +111,6 @@ PREFIXE_SANS_MATRICULE = "SM-"
 
 def est_sans_matricule(matricule: str | None) -> bool:
     return bool(matricule) and matricule.startswith(PREFIXE_SANS_MATRICULE)
-
-
-def matricule_sans_matricule(nom: str, refs: "Refs") -> tuple[str, list[str]]:
-    """Identifiant d'un employé sans matricule, déduit de son nom : (matricule, homonymes en cas d'ambiguïté).
-
-    Un employé déjà connu sous ce nom (nom nettoyé : espaces, casse, accents) est retrouvé ; sinon un
-    identifiant technique stable est dérivé du nom, pour que les mois suivants retombent sur la même fiche."""
-    cle = norm(nom)
-    connus = [m for m, n in refs.noms_connus.items() if n == cle]
-    if len(connus) == 1:
-        return refs.annuaire.get(connus[0], (connus[0], ""))[0], []
-    if len(connus) > 1:
-        return "", sorted(refs.annuaire.get(m, (m, ""))[0] for m in connus)
-    return PREFIXE_SANS_MATRICULE + hashlib.sha1(cle.encode()).hexdigest()[:12].upper(), []
 
 
 def chiffres(matricule: str) -> str:
@@ -189,7 +176,8 @@ def texte(v):
 def ligne_de_total(row, cols, formules) -> tuple[str, str] | None:
     """(colonne, valeur) qui montre qu'une ligne est un total et non un employé, sinon None."""
     def g(nom):
-        return row[cols[nom]] if cols[nom] < len(row) else None
+        j = cols.get(nom)
+        return row[j] if j is not None and j < len(row) else None
     mat = texte(g("MATRICULE"))
     for nom in ATTRIBUTS:
         t = texte(g(nom))
@@ -401,7 +389,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
             f"Données après {MAX_LIGNES_VIDES} lignes vides consécutives : elles ne seraient pas "
             "importées. Supprimer les lignes vides au-dessus.")
-    requis = ATTRIBUTS + [r for r, _ in refs.rubriques]
+    # L'activité est facultative : absente ou vide, elle vient du poste (voir plus bas).
+    requis = [a for a in ATTRIBUTS if a != "Activité"] + [r for r, _ in refs.rubriques]
     manquants = [e for e in requis if e not in cols]
     for m in manquants:
         add(feuille.entete_ligne, m, "ENTETE_MANQUANT", BLOQUANT, None, f"Colonne « {m} » absente.")
@@ -441,7 +430,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     # Valeurs absentes des listes : (colonne, valeur normalisée) -> (valeur lue, lignes).
     inconnus: dict[tuple[str, str], tuple[str, list[int]]] = {}
     postes_nouveaux: dict[str, tuple[str, list[int]]] = {}
-    sans_matricule: dict[str, tuple[str, list[int]]] = {}
+    postes_sans_activite: dict[str, tuple[str, list[int]]] = {}
 
     for num, row in feuille.lignes:
         if ligne_vide(row, utiles):
@@ -453,8 +442,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         inconnu = False
 
         def g(nom, row=row):
-            j = cols[nom]
-            return row[j] if j < len(row) else None
+            j = cols.get(nom)
+            return row[j] if j is not None and j < len(row) else None
 
         total = ligne_de_total(row, cols, feuille.formules.get(num, {}))
         if total:
@@ -480,6 +469,17 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                                  ("Service", refs.services, "service")):
             v = g(nom)
             t = texte(v)
+            if not t and nom == "Activité":
+                # Activité vide ou colonne absente : celle du poste de la ligne.
+                p_txt = re.sub(r"\s+", " ", texte(g("Poste")) or "")
+                if p_txt:
+                    deduite = refs.postes_activite.get(norm(p_txt))
+                    if deduite:
+                        L.activite = deduite
+                    else:
+                        postes_sans_activite.setdefault(norm(p_txt), (p_txt, []))[1].append(num)
+                        inconnu = True
+                    continue
             if not t:
                 add(num, nom, "VALEUR_MANQUANTE", BLOQUANT, v, f"{SUJETS[nom]} est obligatoire et la cellule est vide. {admis(nom, index)}")
                 continue
@@ -500,19 +500,10 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
         mat_brut = g("MATRICULE")
         mat = texte(mat_brut)
         if not mat:
-            nom_seul = texte(g("Noms"))
-            if not nom_seul:
-                add(num, "MATRICULE", "VALEUR_MANQUANTE", BLOQUANT, mat_brut,
-                    "Matricule ou nom obligatoire (un employé sans matricule est identifié par son nom).")
-                mat = None
-            else:
-                mat, homonymes = matricule_sans_matricule(nom_seul, refs)
-                if est_sans_matricule(mat) and mat.casefold() not in refs.annuaire:
-                    sans_matricule.setdefault(mat, (nom_seul, []))[1].append(num)
-                if homonymes:
-                    add(num, "MATRICULE", "NOM_HOMONYME", BLOQUANT, nom_seul,
-                        f"Plusieurs employés portent ce nom ({', '.join(homonymes)}) : indiquer le matricule.")
-                    mat = None
+            # Retours N2 (e) : plus d'identifiant provisoire « SM- » ; les anciens restent lisibles.
+            add(num, "MATRICULE", "VALEUR_MANQUANTE", BLOQUANT, mat_brut,
+                "Matricule manquant : chaque employé, MAD compris, doit avoir son matricule.")
+            mat = None
         else:
             if isinstance(mat_brut, (int, float)) and not isinstance(mat_brut, bool):
                 add(num, "MATRICULE", "MATRICULE_NUMERIQUE", AVERT, mat_brut,
@@ -629,14 +620,16 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
     for (nom, _n), (t, nums) in inconnus.items():
         add(nums[0], nom, "REFERENTIEL_INCONNU", BLOQUANT, t,
             f"« {t} » ne figure pas dans la liste{_sur_lignes(nums)}. {admis(nom, index_de[nom])}")
-    for p, nums in postes_nouveaux.values():
+    for cle, (p, nums) in postes_sans_activite.items():
+        existe = cle in refs.postes
+        add(nums[0], "Poste", "POSTE_SANS_ACTIVITE", BLOQUANT, p,
+            f"Le poste « {p} » {'n’a pas encore d’activité' if existe else 'n’existe pas encore'}"
+            f"{_sur_lignes(nums)} : choisir son activité (Front office ou Back Office).")
+    for cle, (p, nums) in postes_nouveaux.items():
+        if cle in postes_sans_activite:
+            continue
         add(nums[0], "Poste", "POSTE_NOUVEAU", AVERT, p,
             f"Le poste « {p} » n’existe pas encore{_sur_lignes(nums)} : le créer ou le remplacer par un poste existant.")
-
-    for nom_seul, nums in sans_matricule.values():
-        add(nums[0], "MATRICULE", "SANS_MATRICULE", AVERT, None,
-            f"{nom_seul} n’a pas de matricule{_sur_lignes(nums)} : un identifiant provisoire lui est donné. "
-            "Saisir son matricule si vous le connaissez.")
 
     by_num = {L.num: L for L in lignes}
     _periodes_isolees(lignes, add)

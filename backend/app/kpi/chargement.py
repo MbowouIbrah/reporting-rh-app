@@ -1,6 +1,7 @@
 """Lecture des données (toujours filtrées par périmètre) vers les structures du moteur."""
 
 from collections import defaultdict
+from collections.abc import Collection
 from datetime import date
 from decimal import Decimal
 
@@ -34,14 +35,26 @@ from app.models.referentiel import (
 from app.repos import saisies as rs
 from app.repos.scope import Scope, apply_scope
 
+Choix = str | Collection[str] | None
 
-def charger_refs(db: Session, type_site: str | None = None, scope: Scope | None = None) -> Refs:
+
+def ens(v: Choix) -> frozenset[str] | None:
+    """Valeurs d'un filtre (R4, sélection multiple) : une valeur seule ou plusieurs ; vide : aucun
+    filtre. Une chaîne reste une valeur entière (jamais un test de sous-chaîne)."""
+    if not v:
+        return None
+    return frozenset({v}) if isinstance(v, str) else frozenset(v)
+
+
+def charger_refs(db: Session, type_site: Choix = None, scope: Scope | None = None) -> Refs:
     """Listes de valeurs actives ; un type de site ne garde que les sites de ce type, un périmètre
     que ses services et sites (les tableaux n'affichent pas de ligne hors périmètre)."""
+    types = ens(type_site)
+
     def libs(model):
         q = select(model.libelle).where(model.actif).order_by(model.id)
-        if type_site and model is Site:
-            q = q.where(Site.type_site == type_site)
+        if types and model is Site:
+            q = q.where(Site.type_site.in_(types))
         dim = {Service: "service", Site: "site"}.get(model)
         if scope and not scope.unrestricted and dim in scope.rules:
             q = q.where(model.libelle.in_(scope.rules[dim]))
@@ -50,6 +63,13 @@ def charger_refs(db: Session, type_site: str | None = None, scope: Scope | None 
     rub = tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.actif, Rubrique.nature == "paie")
                           .order_by(Rubrique.ordre)))
     return Refs(libs(Service), libs(Activite), libs(Site), libs(TypeContrat), rub)
+
+
+def rubriques_paie(db: Session) -> tuple[str, ...]:
+    """Toutes les rubriques de paie, actives ou non, dans l'ordre du référentiel : une rubrique
+    désactivée garde ses montants dans les données et dans le total."""
+    return tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.nature == "paie")
+                            .order_by(Rubrique.ordre)))
 
 
 def charger_params(db: Session, annee: int, mois: int) -> Params:
@@ -64,9 +84,9 @@ def charger_params(db: Session, annee: int, mois: int) -> Params:
 
 
 def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
-                    service: str | None, site: str | None, *, type_site: str | None = None,
-                    poste: str | None = None, salarie_id: int | None = None,
-                    activite: str | None = None, type_contrat: str | None = None) -> Budgets:
+                    service: Choix, site: Choix, *, type_site: Choix = None,
+                    poste: Choix = None, salarie_id: int | None = None,
+                    activite: Choix = None, type_contrat: Choix = None) -> Budgets:
     """Budgets de la période visibles pour ce périmètre et ces filtres : un budget n'est montré
     que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global).
     Aucun budget pour un poste, une activité ou une personne ; un type de site ne garde que les
@@ -76,6 +96,7 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
     pid = db.scalar(select(Periode.id).where(Periode.annee == annee, Periode.mois == mois))
     if pid is None:
         return Budgets()
+    service, site, type_site = ens(service), ens(site), ens(type_site)
 
     def lus(axe: str, model) -> dict[str, Decimal]:
         q = (select(model.libelle, Budget.valeur)
@@ -84,10 +105,10 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
         if model is Rubrique:
             q = q.where(Rubrique.nature == "paie")
         if type_site and model is Site:
-            q = q.where(Site.type_site == type_site)
+            q = q.where(Site.type_site.in_(type_site))
         return {lib: Decimal(str(v)) for lib, v in db.execute(q)}
 
-    def visible(vals: dict[str, Decimal], dim: str, autre: str | None, choisi: str | None):
+    def visible(vals: dict[str, Decimal], dim: str, autre, choisi: frozenset[str] | None):
         if autre:
             return {}
         if not scope.unrestricted:
@@ -95,7 +116,7 @@ def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
             if scope.rules.get("site" if dim == "service" else "service"):
                 return {}
             vals = {k: v for k, v in vals.items() if k in scope.rules.get(dim, ())}
-        return {k: v for k, v in vals.items() if choisi in (None, k)}
+        return {k: v for k, v in vals.items() if choisi is None or k in choisi}
 
     global_ = scope.unrestricted and not service and not site and not type_site
     rubrique = lus("rubrique", Rubrique) if global_ else {}
@@ -249,34 +270,52 @@ def charger_tableau(db: Session, scope: Scope, *, annee: int | None = None,
     return out
 
 
-def options_tableau(db: Session, scope: Scope) -> dict:
-    """Valeurs proposées par les filtres du tableau, limitées au périmètre."""
-    base = _situations_tableau(scope, None, None, None, None, None).order_by(None)
+def options_tableau(db: Session, scope: Scope, choix: dict | None = None) -> dict:
+    """Valeurs proposées par les filtres du tableau, limitées au périmètre. Chaque liste ne garde
+    que les valeurs compatibles avec les autres filtres choisis (aucun choix ne mène à un tableau
+    vide) ; la valeur choisie reste proposée."""
+    c = {k: v for k, v in (choix or {}).items() if v not in (None, "")}
 
-    def distinctes(col) -> list:
-        vals = db.scalars(base.with_only_columns(col).distinct())
-        return sorted(v for v in vals if v is not None)
+    def base(sauf: str):
+        autres = {k: v for k, v in c.items() if k != sauf}
+        return _situations_tableau(scope, autres.get("annee"), autres.get("mois"),
+                                   autres.get("service"), autres.get("site"), None,
+                                   autres.get("matricule")).order_by(None)
 
-    salaries = db.execute(base.with_only_columns(Salarie.matricule, Salarie.nom).distinct()
-                          .order_by(Salarie.nom, Salarie.matricule))
-    return {"annees": distinctes(Periode.annee), "services": distinctes(Service.libelle),
-            "sites": distinctes(Site.libelle),
-            "salaries": [{"matricule": m, "nom": n} for m, n in salaries]}
+    def distinctes(cle: str, col) -> list:
+        vals = {v for v in db.scalars(base(cle).with_only_columns(col).distinct()) if v is not None}
+        if cle in c:
+            vals.add(c[cle])
+        return sorted(vals)
+
+    salaries = dict(db.execute(base("matricule").with_only_columns(Salarie.matricule, Salarie.nom)
+                               .distinct()).all())
+    if "matricule" in c and c["matricule"] not in salaries:
+        salaries.update(db.execute(select(Salarie.matricule, Salarie.nom)
+                                   .where(Salarie.matricule == c["matricule"])).all())
+    return {"annees": distinctes("annee", Periode.annee),
+            "mois": distinctes("mois", Periode.mois),
+            "services": distinctes("service", Service.libelle),
+            "sites": distinctes("site", Site.libelle),
+            "salaries": [{"matricule": m, "nom": n}
+                         for m, n in sorted(salaries.items(), key=lambda x: (x[1] or "", x[0]))]}
 
 
-def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
-            type_site: str | None = None, poste: str | None = None,
-            salarie_id: int | None = None, activite: str | None = None,
-            type_contrat: str | None = None) -> PeriodeData | None:
+def filtrer(pd: PeriodeData | None, service: Choix, site: Choix, *,
+            type_site: Choix = None, poste: Choix = None,
+            salarie_id: int | None = None, activite: Choix = None,
+            type_contrat: Choix = None) -> PeriodeData | None:
     """Filtre d'affichage choisi par l'utilisateur, appliqué après le périmètre (jamais en deçà)."""
     if pd is None:
         return None
+    service, site, type_site = ens(service), ens(site), ens(type_site)
+    poste, activite, type_contrat = ens(poste), ens(activite), ens(type_contrat)
     lignes = tuple(L for L in pd.lignes
-                   if (not service or L.service == service) and (not site or L.site == site)
-                   and (not type_site or L.type_site == type_site)
-                   and (not poste or L.poste == poste)
-                   and (not activite or L.activite == activite)
-                   and (not type_contrat or L.contrat == type_contrat)
+                   if (not service or L.service in service) and (not site or L.site in site)
+                   and (not type_site or L.type_site in type_site)
+                   and (not poste or L.poste in poste)
+                   and (not activite or L.activite in activite)
+                   and (not type_contrat or L.contrat in type_contrat)
                    and (salarie_id is None or L.salarie_id == salarie_id))
     # Une saisie (CA, marge, OR, devis, factures) n'est gardée que si son niveau permet de
     # répondre au filtre : un filtre site ou type de site veut un site renseigné, un filtre service
@@ -285,9 +324,9 @@ def filtrer(pd: PeriodeData | None, service: str | None, site: str | None, *,
 
     def gardee(s: Saisie) -> bool:
         return not sans_saisie and (
-            (not service or (s.service is not None and s.service == service))
-            and (not site or (s.site is not None and s.site == site))
-            and (not type_site or (s.type_site is not None and s.type_site == type_site)))
+            (not service or s.service in service)
+            and (not site or s.site in site)
+            and (not type_site or s.type_site in type_site))
 
     saisies = tuple(s for s in pd.saisies if gardee(s))
     return PeriodeData(lignes, pd.exclues, ca=_total(saisies, "ca"), marge=_total(saisies, "marge"),

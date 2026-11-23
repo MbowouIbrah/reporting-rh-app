@@ -139,7 +139,7 @@ def test_oubli_limite_cinq_minutes(make_client, db, caplog):
 
 def test_oubli_envoie_le_mail_sans_ecrire_le_lien(make_client, monkeypatch, caplog):
     envois = []
-    monkeypatch.setattr(mail, "envoyer", lambda d, s, t: envois.append((d, s, t)) or True)
+    monkeypatch.setattr(mail, "envoyer", lambda d, s, t, html=None: envois.append((d, s, t)) or True)
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.test")
     with caplog.at_level(logging.WARNING, logger=LOGGER):
         assert _oubli(make_client()).status_code == 200

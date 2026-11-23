@@ -1,6 +1,8 @@
+import io
 from decimal import Decimal as D
 
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app.models.auth import AuditEvent
@@ -154,6 +156,93 @@ def test_annuel_global(charge):
     assert r["cumul_ytd"]["m1"] is None
 
 
+def test_annuel_periode_et_comparaison(charge):
+    # R6 : février seul, comparé à janvier (période précédente) ou à rien
+    jan = D(get(charge, "annuel", annee=2026, mois=1).json()["cumul_ytd"]["m"])
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2).json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") - jan and r["cumul_ytd"]["nb_mois"] == 1
+    assert len(r["serie_n"]) == 12 and r["serie_n"][0]["ms"] is not None
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2, cmp="prec").json()
+    assert D(r["cumul_ytd"]["m1"]) == jan and r["cumul_ytd"]["nb_mois_n1"] == 1
+    r = get(charge, "annuel", annee=2026, mois=2, cmp="aucune").json()
+    assert r["cumul_ytd"]["m1"] is None
+    assert get(charge, "annuel", annee=2026, debut=3, mois=2).status_code == 422
+    assert get(charge, "annuel", annee=2026, mois=2, cmp="objectif").status_code == 422
+    assert get(charge, "annuel/export", annee=2026, debut=2, mois=2, cmp="prec").status_code == 200
+
+
+def test_annuel_periode_au_calendrier(charge):
+    # année en cours à mois égaux : janvier → octobre 2026 contre janvier → octobre 2025
+    r = get(charge, "annuel", du="2026-01", au="2026-10").json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-01", "2026-10", "2025-01", "2025-10")
+    assert (r["annee_fin"], r["mois_fin"]) == (2026, 2) and r["cumul_ytd"]["m1"] is None
+    assert [(x["annee"], x["mois"]) for x in r["serie_n"]][:2] == [(2026, 1), (2026, 2)]
+    # période à cheval sur deux années : 12 mois à partir d'avril 2025
+    r = get(charge, "annuel", du="2025-04", au="2026-03").json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
+    assert (r["cmp_du"], r["cmp_au"]) == ("2024-04", "2025-03")
+    assert [(x["annee"], x["mois"]) for x in r["serie_n"]][0] == (2025, 4)
+    assert (r["annee_fin"], r["mois_fin"]) == (2026, 2)
+    # comparaison choisie : février contre janvier
+    r = get(charge, "annuel", du="2026-02", au="2026-02", cmp_du="2026-01", cmp_au="2026-01").json()
+    assert D(r["cumul_ytd"]["m"]) == D("3700") and D(r["cumul_ytd"]["m1"]) == D("7000.5")
+    assert (r["cmp_du"], r["cmp_au"]) == ("2026-01", "2026-01")
+    # deux mois comparés à deux autres, sur des années différentes
+    r = get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-12", cmp_au="2026-01").json()
+    assert D(r["cumul_ytd"]["m1"]) == D("7000.5") and r["cumul_ytd"]["nb_mois_n1"] == 1
+    # le mois de comparaison par défaut est le même mois de l'année d'avant
+    r = get(charge, "annuel", du="2026-02", au="2026-02").json()
+    assert (r["cmp_du"], r["cmp_au"]) == ("2025-02", "2025-02")
+    assert get(charge, "annuel", du="2020-01", au="2020-02").status_code == 404
+
+
+def test_annuel_periode_au_calendrier_refus(charge):
+    mess = get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01", cmp_au="2025-01")
+    assert mess.status_code == 422 and "même nombre de mois" in mess.json()["detail"]
+    assert get(charge, "annuel", du="2025-01", au="2026-01").status_code == 422  # 13 mois
+    assert get(charge, "annuel", du="2026-03", au="2026-02").status_code == 422
+    assert get(charge, "annuel", du="2026-01").status_code == 422
+    assert get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01").status_code == 422
+    assert get(charge, "annuel", du="2026-13", au="2026-13").status_code == 422
+    assert get(charge, "annuel").status_code == 422
+
+
+def test_annuel_ancien_chemin_et_periode_effective(charge):
+    r = get(charge, "annuel", annee=2026, mois=2).json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5")
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-01", "2026-02", "2025-01", "2025-02")
+    r = get(charge, "annuel", annee=2026, debut=2, mois=2, cmp="prec").json()
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2026-02", "2026-02", "2026-01", "2026-01")
+    assert get(charge, "annuel", annee=2026, mois=2, cmp="aucune").json()["cmp_du"] is None
+    # `du` et `au` priment sur les anciens paramètres
+    r = get(charge, "annuel", annee=2025, mois=5, debut=3, du="2026-02", au="2026-02").json()
+    assert D(r["cumul_ytd"]["m"]) == D("3700")
+
+
+def test_annuel_export_periode_au_calendrier(charge):
+    r = get(charge, "annuel/export", du="2025-04", au="2026-03")
+    assert r.status_code == 200 and "reporting-annuel-2025-04_2026-03.xlsx" in r.headers[
+        "content-disposition"]
+    wb = load_workbook(io.BytesIO(r.content))
+    valeurs = [c for row in wb["Synthèse"].iter_rows(values_only=True) for c in row]
+    assert "Avr. 2025 → mars 2026" in valeurs and "Avr. 2024 → mars 2025" in valeurs
+    r = get(charge, "annuel/export", du="2026-01", au="2026-10")
+    valeurs = [c for row in load_workbook(io.BytesIO(r.content))["Synthèse"].iter_rows(
+        values_only=True) for c in row]
+    assert "Janv. → oct. 2026" in valeurs and "Janv. → oct. 2025" in valeurs
+    g = get(charge, "annuel/export", du="2026-01", au="2026-02", graphiques=True)
+    assert g.status_code == 200 and "graphes-2026-01_2026-02.xlsx" in g.headers[
+        "content-disposition"]
+    # ancien chemin intact
+    r = get(charge, "annuel/export", annee=2026, mois=2)
+    assert r.status_code == 200 and "reporting-annuel-2026.xlsx" in r.headers[
+        "content-disposition"]
+
+
 def test_individuel_nominatif_et_journal(charge, make_client, db):
     assert get(make_client(EQUIP), "individuel", annee=2026, matricule="E1").status_code == 403
     assert get(make_client(VN), "individuel", annee=2026, matricule="E2").status_code == 403
@@ -256,6 +345,27 @@ def test_filtre_type_de_site(charge, db):
     assert t["mois"][0]["effectif"] == 1
 
 
+def test_selection_multiple(charge, db):
+    """R4 : plusieurs valeurs d'un filtre, séparées par « | », s'additionnent."""
+    db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "agence"
+    db.commit()
+    total = get(charge, "mensuel", annee=2026, mois=1).json()["synthese"]
+    sites = get(charge, "filtres", annee=2026, mois=1).json()["sites"]
+    assert len(sites) >= 2
+    r = get(charge, "mensuel", annee=2026, mois=1, site="|".join(sites)).json()["synthese"]
+    assert r["effectif"]["fin"] == total["effectif"]["fin"]
+    assert D(r["ms"]["m"]) == D(total["ms"]["m"])
+    r = get(charge, "mensuel", annee=2026, mois=1, type_site="agence|principal").json()
+    assert r["synthese"]["effectif"]["fin"] == total["effectif"]["fin"]
+    assert set(sites) <= {c["site"] for c in r["c_site"]}
+    assert get(charge, "mensuel", annee=2026, mois=1, type_site="agence|x").status_code == 422
+    a = get(charge, "annuel", annee=2026, mois=2, site="|".join(sites)).json()
+    assert a["c_site"]
+    t = get(charge, "individuel/tous", annee=2026, site="|".join(sites)).json()
+    assert t["mois"][0]["effectif"] == total["effectif"]["fin"]
+    assert get(charge, "mensuel/export", annee=2026, mois=1, site="|".join(sites)).status_code == 200
+
+
 def test_filtre_activite(charge):
     acts = get(charge, "filtres", annee=2026).json()["activites"]
     assert acts
@@ -286,12 +396,16 @@ def test_filtre_type_contrat(charge):
 def test_filtres_combinaisons(charge):
     f = get(charge, "filtres", annee=2026).json()
     combis = f["combinaisons"]
-    assert combis and all(len(c) == 6 for c in combis)
-    assert sorted({c[0] for c in combis}) == f["services"]
-    assert sorted({c[1] for c in combis}) == f["sites"]
-    assert sorted({c[4] for c in combis}) == f["types_contrat"]
+    assert combis and all(len(c) == 8 for c in combis)  # 8e colonne : matricule (droit nominatif)
+    # Combinaisons du mois affiché seulement : E3 absent en février, E4 en janvier.
+    assert {c[7] for c in get(charge, "filtres", annee=2026, mois=1).json()["combinaisons"]} == {"E1", "E2", "E3"}
+    assert {c[7] for c in get(charge, "filtres", annee=2026, mois=2).json()["combinaisons"]} == {"E1", "E2", "E4"}
+    assert sorted({c[0] for c in combis}) == f["departements"]
+    assert sorted({c[1] for c in combis}) == f["services"]
+    assert sorted({c[2] for c in combis}) == f["sites"]
+    assert sorted({c[5] for c in combis}) == f["types_contrat"]
     # Chaque couple service + site proposé renvoie des effectifs.
-    for service, site in {(c[0], c[1]) for c in combis}:
+    for service, site in {(c[1], c[2]) for c in combis}:
         r = get(charge, "mensuel", annee=2026, mois=1, service=service, site=site).json()
         assert r["synthese"]["effectif"]["fin"] > 0, (service, site)
 
@@ -349,7 +463,7 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
         "Salaire brut garanti", "Frais de mission", "Primes exceptionnelles", "Logement site déporté",
         "Carburant véhicule service", "Crédit téléphonique", "Brut réel", "Marge MAD + TVA"]
     assert set(j["exclues"]) == {"Salaire brut garanti", "Commission", "Primes de productivité",
-                                 "Primes sur ventes", "Primes sur résultats"}
+                                 "Primes sur ventes", "Primes sur résultats", "Bonus"}
     jan = j["mois"][0]
     assert D(jan["montants"]["Primes sur ventes"]) == 30 and jan["staff"]["Primes sur résultats"] == 1
     assert D(jan["montants"]["Brut réel"]) == 5000
@@ -358,3 +472,24 @@ def test_individuel_colonnes_exclusions_et_deporte(make_client, db):
     db.scalar(select(Site).where(Site.libelle == "Douala")).type_site = "deporte"
     db.commit()
     assert get(c, "individuel/tous", annee=2025).json()["mois"][0]["deporte"] is True
+
+
+def test_filtre_departement(charge, make_client):
+    # Les trois services de janvier sont dans Equipment ; Winpart n'a personne.
+    r = get(charge, "mensuel", annee=2026, mois=1, departement="Equipment").json()
+    assert D(r["synthese"]["ms"]["m"]) == D("7000.5")
+    assert r["synthese"]["ca"] is None  # pas de CA par département, comme par service
+    assert get(charge, "mensuel", annee=2026, mois=1, departement="Winpart").status_code == 404
+    assert get(charge, "mensuel", annee=2026, mois=1, departement="Inconnu").status_code == 404
+    a = get(charge, "annuel", annee=2026, mois=2, departement="Equipment").json()
+    assert D(a["cumul_ytd"]["m"]) == D("10700.5")
+    # le département ne peut pas élargir le périmètre : DPS Equipment reste sur SAV PL
+    e = get(make_client(EQUIP), "mensuel", annee=2026, mois=1, departement="Equipment").json()
+    assert D(e["synthese"]["ms"]["m"]) == D("1000.5")
+    f = get(charge, "filtres", annee=2026).json()
+    assert f["departements"] == ["Equipment"]
+    assert {c[0] for c in f["combinaisons"]} == {"Equipment"}
+    assert {c[1] for c in f["combinaisons"]} == {"SAV PL", "Commerce VN", "Administration"}
+    ex = charge.get(f"{API}/rapports/annuel/export",
+                    params={"annee": 2026, "mois": 2, "departement": "Equipment"})
+    assert ex.status_code == 200

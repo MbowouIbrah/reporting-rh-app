@@ -42,6 +42,8 @@ class Feuille:
     lignes: list[tuple[int, tuple]]  # (numéro de ligne Excel, valeurs)
     ligne_ignoree: int | None = None  # 1re ligne remplie après MAX_LIGNES_VIDES lignes vides
     formules: dict[int, dict[int, str]] = field(default_factory=dict)  # ligne -> {position: formule}
+    # Export de paie : département de chaque service (service normalisé -> intitulé du fichier).
+    departements: dict[str, str] = field(default_factory=dict)
 
 
 # Valeurs d'erreur d'Excel (codes du fichier, et leur version française collée en texte).

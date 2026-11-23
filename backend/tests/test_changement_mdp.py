@@ -124,7 +124,8 @@ def test_toute_route_passe_par_la_porte_sauf_les_routes_prevues():
         (ouvertes if session_principal in deps else publiques).add(chemin)
     assert ouvertes == {"/api/v1/auth/me", CHANGER}
     assert publiques == {"/health", "/health/ready"} | {f"/api/v1/auth/{x}" for x in (
-        "login", "refresh", "mot-de-passe-oublie", "reinitialiser", "logout")}
+        "login", "lien", "refresh", "mot-de-passe-oublie", "reinitialiser", "logout")} | {
+        "/api/v1/notifications/desabonner"}
 
 
 def test_changement_refuse(db, make_client):

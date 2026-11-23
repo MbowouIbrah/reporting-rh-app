@@ -23,3 +23,9 @@ backend/.carte-tests.json
 # Comptes de recette locaux (adresses et mots de passe générés) et notes de passation
 tools/recette/comptes.local.csv
 PASSATION.md
+tools/recette/mail-liens.local.html
+
+# Dossier de dépôt de la paie (données réelles)
+/import/
+
+.impeccable/

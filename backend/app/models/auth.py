@@ -58,6 +58,10 @@ class Utilisateur(Base):
     fonction: Mapped[str] = mapped_column(String(200), default="", server_default="")  # sans effet
     # Mot de passe provisoire : tout est bloqué tant que la personne ne l'a pas changé.
     doit_changer_mdp: Mapped[bool] = mapped_column(Boolean, default=True, server_default=false())
+    # Option « Me prévenir aussi par e-mail » (coupée par défaut) et date d'abonnement.
+    notif_mail: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    notif_mail_depuis: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
     permissions: Mapped[list["UtilisateurPermission"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
     )
@@ -78,13 +82,14 @@ class UtilisateurPermission(Base):
 
 
 class UtilisateurPortee(Base):
-    """Données accordées : tout, un périmètre (perimetre_id), un service ou un site (valeur)."""
+    """Données accordées : tout, un périmètre (perimetre_id), ou un service, un site ou un
+    département (valeur)."""
 
     __tablename__ = "utilisateur_portee"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     utilisateur_id: Mapped[int] = mapped_column(ForeignKey("utilisateur.id", ondelete="CASCADE"))
-    type: Mapped[str] = mapped_column(String(20))  # tout | perimetre | service | site
+    type: Mapped[str] = mapped_column(String(20))  # tout | perimetre | service | site | departement
     perimetre_id: Mapped[int | None] = mapped_column(ForeignKey("perimetre.id"), nullable=True)
     valeur: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
@@ -124,3 +129,20 @@ class ReglageGlobal(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     cle: Mapped[str] = mapped_column(String(60), unique=True)
     valeur: Mapped[list | dict] = mapped_column(JsonType)
+
+
+class LienConnexion(Base):
+    """Lien de connexion directe (démo, invitation) : seule l'empreinte du jeton est gardée."""
+
+    __tablename__ = "lien_connexion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    utilisateur_id: Mapped[int] = mapped_column(
+        ForeignKey("utilisateur.id", ondelete="CASCADE"), index=True)
+    empreinte: Mapped[str] = mapped_column(String(64), unique=True)
+    cree_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expire_le: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoque_le: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    derniere_utilisation: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    nb_utilisations: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

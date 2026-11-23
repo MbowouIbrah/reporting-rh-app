@@ -36,7 +36,7 @@ def valeurs(matricule: str, mois: int, service: str, activite: str) -> dict:
         if n % 9 == 1 and mois == 6:
             ca += 0.5  # décimales gardées telles quelles
         return {**v, CA: ca, MARGE: marge}
-    if activite == "back office" and service in ("SAV PL", "SAV Engins"):
+    if activite == "back office" and service in ("SAV PL", "SAV Engins", "SAV Chariot"):
         return {PRODUCTIVITE: round(0.85 + ((n + mois) % 30) / 100, 2)}
     return {}
 

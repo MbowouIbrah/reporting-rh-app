@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquettes de la réunion du 17/11 — Reporting RH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="maquette.css">
+<style>
+  .sommaire { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+  .fiche { display: grid; gap: var(--sp-1); padding: var(--sp-4); background: var(--surface); border: 1px solid var(--rule-strong); color: inherit; text-decoration: none; }
+  .fiche:hover { background: var(--info-soft); border-color: var(--navy-3); }
+  .fiche h3 { font-size: var(--fs-lg); }
+  .fiche .retours { font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--red-deep); letter-spacing: 0.04em; }
+  .fiche .variantes { font-size: var(--fs-sm); color: var(--muted); }
+  .fiche .ouvrir { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--navy); margin-top: var(--sp-1); }
+  .intro { margin-bottom: var(--sp-4); max-width: 80ch; color: var(--navy-2); }
+</style>
+</head>
+<body>
+<div class="maq-top"><div class="maq-top-in"><span><strong>Maquettes</strong> · réunion du 17/11 · données fictives, rien n'est enregistré</span></div></div>
+<div class="cadre">
+  <header class="topbar"><div class="topbar-inner">
+    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
+  </div></header>
+  <main class="page">
+    <div class="entete-page"><h2>Sommaire des maquettes</h2><p class="muted">8 écrans, 2 ou 3 variantes chacun, au thème actuel de l'application</p></div>
+    <p class="intro">Chaque page montre « Variante X — nom » avec ses points pour et contre. Les variantes d'un même écran se changent avec les onglets du bandeau gris. Une seule variante sera retenue par écran.</p>
+    <div class="sommaire">
+      <a class="fiche" href="periode.html">
+        <span class="retours">R6 · 2e version</span>
+        <h3>Période et comparaison simplifiées</h3>
+        <span class="variantes">calendrier compact (validé)</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="filtres.html">
+        <span class="retours">R4 · R6</span>
+        <h3>Filtres : période, comparaison, sélection multiple</h3>
+        <span class="variantes">A. Barre en ligne · B. Panneau de filtres</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="charges.html">
+        <span class="retours">R10 · R11 · R12 · R13 · 5e version</span>
+        <h3>Répartition des charges (à valider)</h3>
+        <span class="variantes">Sans tableau · synthèse + cartes KPI par axe : famille, type de charge, site, service, activité, contrat, marque · montant, comparaison, variation, budget, réalisé, écart</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="budget-realise.html">
+        <span class="retours">R8 · R9</span>
+        <h3>Budget réalisé : front office / back office</h3>
+        <span class="variantes">A. Barre bicolore · B. Deux montants</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="marques.html">
+        <span class="retours">R3 · R14</span>
+        <h3>Répartition par marque et référentiel des marques</h3>
+        <span class="variantes">Variante unique, même format que la répartition par site</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="sites-admin.html">
+        <span class="retours">R5</span>
+        <h3>Référentiels : sites par type</h3>
+        <span class="variantes">Variante unique : trois groupes avec leur nombre</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+      <a class="fiche" href="connexion.html">
+        <span class="retours">R1</span>
+        <h3>Page de connexion : nouveau fond</h3>
+        <span class="variantes">A. Aplat navy et motif · B. Photo à gauche, formulaire à droite · C. Blanc cassé et bande rouge</span>
+        <span class="ouvrir">Ouvrir la maquette →</span>
+      </a>
+    </div>
+    <p class="note-maq">Retours sans maquette (R2 mot de passe oublié par e-mail, R7 curseur et survol) : les règles de curseur de R7 sont déjà appliquées dans ces maquettes (flèche sur texte fixe, main et survol sur ce qui se clique, interdit sur ce qui est désactivé).</p>
+  </main>
+</div>
+</body>
+</html>

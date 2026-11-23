@@ -1,7 +1,9 @@
 import { CircleUserRound, LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useChangerPreferenceMail, usePreferencesMail } from '../api/notifications'
 import { useAuth } from '../auth/AuthContext'
+import Cloche from './Cloche'
 
 /** Nom de l'utilisateur et icône profil de la barre : l'icône ouvre un menu avec l'adresse, le rôle et la déconnexion. */
 export default function MenuProfil() {
@@ -9,6 +11,8 @@ export default function MenuProfil() {
   const navigate = useNavigate()
   const [ouvert, setOuvert] = useState(false)
   const [echec, setEchec] = useState(false)
+  const preference = usePreferencesMail(ouvert)
+  const changerPreference = useChangerPreferenceMail()
   const zone = useRef<HTMLDivElement>(null)
   const bouton = useRef<HTMLButtonElement>(null)
 
@@ -36,6 +40,7 @@ export default function MenuProfil() {
 
   return (
     <div className="user profil" ref={zone}>
+      <Cloche />
       <span className="profil-barre-nom" title={me?.nom || me?.email}>{me?.nom || me?.email}</span>
       <button
         ref={bouton}
@@ -61,6 +66,16 @@ export default function MenuProfil() {
               <span className="badge badge-neutre" title={me.fonction}>{me.fonction}</span>
             </div>
           )}
+          <label className="profil-option">
+            <input
+              type="checkbox"
+              checked={preference.data?.notif_mail ?? false}
+              disabled={!preference.data || changerPreference.isPending}
+              onChange={(e) => changerPreference.mutate(e.target.checked)}
+            />
+            Me prévenir aussi par e-mail
+          </label>
+          {changerPreference.isError && <p className="champ-erreur" role="alert">Préférence non enregistrée. Réessayez.</p>}
           <button
             type="button"
             className="btn-link profil-sortie"
