@@ -248,3 +248,18 @@ test('parts : badges neutres dans les colonnes Part, parts globales sous le nom'
   expect(globales).toEqual(['Masse globale 70 %', 'Effectif global 60 %'])
   expect(container.querySelectorAll('thead th[scope="col"]')).toHaveLength(11)
 })
+
+test('Activité : la masse salariale par vente est un coût, atteint quand elle reste à l’objectif ou en dessous', () => {
+  const lignes = [
+    { cle: 'ms_par_vente', libelle: 'MS par vente', groupe: 'Commercial', ...cell, budget: '10', ecart: '-2', ecart_pct: '-0.2', realisation: '0.8' },
+    { cle: 'ventes', libelle: 'Ventes', groupe: 'Commercial', ...cell, budget: '10', ecart: '-2', ecart_pct: '-0.2', realisation: '0.8' },
+  ]
+  const { container } = render(<Activite lignes={lignes} lib={lib} titre="4. Activité" />)
+  const ms = cellsTr(screen.getByText('MS par vente').closest('tr')!)
+  expect(ms.at(-2)!.className).toBe('num bon')
+  expect(ms.at(-1)!.querySelector('.jauge')).toHaveClass('atteint')
+  const ventes = cellsTr(screen.getByText('Ventes').closest('tr')!)
+  expect(ventes.at(-2)!.className).toBe('num neg')
+  expect(ventes.at(-1)!.querySelector('.jauge')).not.toHaveClass('atteint')
+  expect(container.querySelectorAll('.jauge')).toHaveLength(2)
+})

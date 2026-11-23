@@ -6,7 +6,7 @@ import Cloche from './Cloche'
 const LISTE = {
   non_lues: 1,
   notifications: [
-    { id: 5, type: 'donnees_disponibles', titre: 'Les données d’octobre 2026 sont disponibles', texte: 'Le rapport du mois est consultable.', lien: '/mensuel', cree_le: '2026-11-02T08:00:00+00:00', lue: false },
+    { id: 5, type: 'donnees_disponibles', titre: 'Les données d’octobre 2026 sont disponibles', texte: 'Le rapport du mois est consultable.', lien: '/charges', cree_le: '2026-11-02T08:00:00+00:00', lue: false },
     { id: 4, type: 'lot_publie', titre: 'Septembre 2026 publié', texte: 'Fichier a.csv', lien: null, cree_le: '2026-10-02T08:00:00+00:00', lue: true },
   ],
 }
@@ -49,7 +49,7 @@ test('ouvrir le lien marque la notification lue', async () => {
   rendu()
   fireEvent.click(await screen.findByRole('button', { name: /Notifications/ }))
   const lien = screen.getByRole('link', { name: 'Ouvrir' })
-  expect(lien).toHaveAttribute('href', '/mensuel')
+  expect(lien).toHaveAttribute('href', '/charges')
   fireEvent.click(lien)
   await waitFor(() => expect(appels(spy, '/notifications/5/lue')).toHaveLength(1))
 })

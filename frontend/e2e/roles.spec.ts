@@ -11,7 +11,7 @@ async function connecter(page: Page, email: string) {
 
 const onglets = (page: Page) => page.getByRole('navigation', { name: 'Rapports' }).getByRole('link')
 
-const BASE_ONGLETS = ['Résumé', 'Graphes', 'Annuel', 'Mensuel', 'Individuel']
+const BASE_ONGLETS = ['Résumé', 'Graphes', 'Répartition des charges', 'Individuel']
 for (const email of [courriel('admin'), courriel('drh')]) {
   test(`${email} : onglets, marge visible, contrôles OK`, async ({ page }) => {
     await connecter(page, email)
@@ -19,17 +19,17 @@ for (const email of [courriel('admin'), courriel('drh')]) {
       email.startsWith('admin') ? [...BASE_ONGLETS, 'Administration'] : BASE_ONGLETS,
     )
     await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ }).first()).toBeVisible()
-    await page.getByRole('link', { name: 'Mensuel' }).click()
+    await page.getByRole('link', { name: 'Répartition des charges' }).click()
     await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
-    await expect(page.getByText('4. Répartition par nature de contrat')).toBeVisible()
+    await expect(page.getByText('5. Répartition par nature de contrat')).toBeVisible()
   })
 }
 
 test('lecteur de périmètre : ni Individuel, ni marge, services limités', async ({ page }) => {
   await connecter(page, courriel('dps.equipment'))
-  await expect(onglets(page)).toHaveText(['Résumé', 'Graphes', 'Annuel', 'Mensuel'])
+  await expect(onglets(page)).toHaveText(['Résumé', 'Graphes', 'Répartition des charges'])
   await expect(page.locator('.tuile .micro', { hasText: /^Marge$/ })).toHaveCount(0)
-  await page.getByRole('link', { name: 'Mensuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   const services = page.getByLabel('Service').locator('option')
   await expect(services).toHaveText(['Tous', 'SAV PL'])
   await page.goto('individuel')
@@ -40,26 +40,26 @@ test('lecteur de périmètre : ni Individuel, ni marge, services limités', asyn
 
 test('directeur commercial VN : seul son service', async ({ page }) => {
   await connecter(page, courriel('dir.commercial.vn'))
-  await page.getByRole('link', { name: 'Annuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   await expect(page.getByLabel('Service').locator('option')).toHaveText(['Tous', 'Commerce VN'])
 })
 
-// Règle actuelle : les filtres sont communs à toutes les pages (la période choisie sur le mensuel
+// Règle actuelle : les filtres sont communs à toutes les pages (la période choisie sur la répartition des charges
 // se retrouve ailleurs), et non plus propres à chaque page comme à l'origine.
 test('filtres partagés entre pages', async ({ page }) => {
   await connecter(page, courriel('admin'))
-  await page.getByRole('link', { name: 'Mensuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   await page.getByRole('button', { name: /^Période/ }).click()
   await page.getByRole('button', { name: 'janvier 2026' }).click()
   await page.getByRole('button', { name: 'OK' }).click()
-  await expect(page).toHaveURL(/mois=1/)
+  await expect(page).toHaveURL(/periode=/)
   const service = () => page.getByRole('combobox', { name: 'Service' })
   const libelle = (await service().locator('option').nth(1).textContent())!
   await service().selectOption(libelle)
-  await page.getByRole('link', { name: 'Annuel' }).click()
-  await expect(page).toHaveURL(/annuel/)
+  await page.getByRole('link', { name: 'Graphes' }).click()
+  await expect(page).toHaveURL(/graphes/)
   await expect(service()).toHaveValue(libelle)
-  await page.getByRole('link', { name: 'Mensuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   await expect(service()).toHaveValue(libelle)
   await expect(page.getByRole('button', { name: /^Période/ })).toContainText(/Janvier\s*2026/)
 })
@@ -67,7 +67,7 @@ test('filtres partagés entre pages', async ({ page }) => {
 test('access token supprimé : rattrapé par le refresh', async ({ page, context }) => {
   await connecter(page, courriel('admin'))
   await context.clearCookies({ name: 'access_token' })
-  await page.getByRole('link', { name: 'Mensuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   await expect(page.getByRole('heading', { name: '1. Reporting global' })).toBeVisible()
 })
 

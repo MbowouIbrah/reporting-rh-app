@@ -143,14 +143,15 @@ const POURCENTAGES = new Set(['transformation'])
 
 const formatActivite = (cle: string) => (RATIOS.has(cle) ? decimal2 : POURCENTAGES.has(cle) ? pct : fcfa)
 
-/** Taux de réalisation de l'objectif, avec une jauge plafonnée à 100 % (atteint : vert). */
-const Realisation = ({ v }: { v?: Val }) => {
+/** Taux de réalisation de l'objectif, avec une jauge plafonnée à 100 % (atteint : vert).
+ *  `cout` : un coût (masse salariale par vente) est atteint quand il reste à l'objectif ou en dessous. */
+const Realisation = ({ v, cout }: { v?: Val; cout?: boolean }) => {
   if (v == null || v === 'n/a') return <>{pct(v ?? null)}</>
   const r = Number(v)
   return (
     <span className="realisation">
       {pct(v)}
-      <span className={`jauge${r >= 1 ? ' atteint' : ''}`} aria-hidden="true">
+      <span className={`jauge${(cout ? r <= 1 : r >= 1) ? ' atteint' : ''}`} aria-hidden="true">
         <span style={{ width: `${Math.max(0, Math.min(r, 1)) * 100}%` }} />
       </span>
     </span>
@@ -199,6 +200,7 @@ export function Activite({ lignes, lib, titre }: { lignes: LigneActivite[]; lib:
           {ls.map((l, i) => {
             const f = formatActivite(l.cle)
             const avecObj = l.budget !== undefined
+            const cout = l.cle === 'ms_par_vente'
             return (
               <tr key={l.cle}>
                 {i === 0 && (
@@ -215,8 +217,8 @@ export function Activite({ lignes, lib, titre }: { lignes: LigneActivite[]; lib:
                     {avecObj ? (
                       <>
                         <td className="num">{f(l.budget ?? null)}{l.budget_partiel && <Partiel />}</td>
-                        <td className={clsResultat(l.ecart ?? null)}>{f(l.ecart ?? null)}</td>
-                        <td className="num"><Realisation v={l.realisation} /></td>
+                        <td className={(cout ? clsCharge : clsResultat)(l.ecart ?? null)}>{f(l.ecart ?? null)}</td>
+                        <td className="num"><Realisation v={l.realisation} cout={cout} /></td>
                       </>
                     ) : (
                       <td colSpan={3} />

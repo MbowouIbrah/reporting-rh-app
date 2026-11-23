@@ -67,15 +67,15 @@ test('lecteur de périmètre : pas d’administration', async ({ page }) => {
 
 // L'export xlsx des rapports a été retiré de l'écran au profit de l'export PDF : même règle vérifiée,
 // le rapport s'ouvre avec les filtres de l'écran (période choisie).
-test('export PDF mensuel : le rapport s’ouvre avec les filtres de l’écran', async ({ page }) => {
+test('export PDF des charges : le rapport s’ouvre avec les filtres de l’écran', async ({ page }) => {
   await connecter(page, courriel('admin'))
-  await page.getByRole('link', { name: 'Mensuel' }).click()
+  await page.getByRole('link', { name: 'Répartition des charges' }).click()
   await page.getByRole('button', { name: /^Période/ }).click()
   await page.getByRole('button', { name: 'janvier 2026' }).click()
   await page.getByRole('button', { name: 'OK' }).click()
   await page.getByRole('button', { name: 'Exporter en PDF' }).click()
   const [rapport] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Exporter', exact: true }).click()])
-  await expect(rapport).toHaveURL(/\/rapport\?(?=.*annee=2026)(?=.*mois=1(&|$))(?=.*sections=mensuel(&|$))/)
+  await expect(rapport).toHaveURL(/\/rapport\?(?=.*periode=)(?=.*sections=charges(&|$))/)
   await expect(rapport.locator('.snap-section').first()).toBeVisible()
   await expect(rapport.getByRole('navigation', { name: 'Rapports' })).toHaveCount(0)
 })

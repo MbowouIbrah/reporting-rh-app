@@ -15,7 +15,7 @@ interface Props {
   longueur?: number
   /** Période à comparer : un clic sur l'année prend les mêmes mois de cette année. */
   modele?: Sel
-  /** Un seul mois à la fois : ni plage, ni clic sur l'année (page Mensuel). */
+  /** Un seul mois à la fois : ni plage, ni clic sur l'année (sélecteur d'un mois). */
   moisSeul?: boolean
 }
 

@@ -84,6 +84,12 @@ export function lireTexte(t: string | undefined, max?: number): Sel | null {
   return d === f ? mois(d) : plage(d, f, max)
 }
 
+/** Libellé abrégé d'une période servie par le serveur (début et fin « AAAA-MM »), vide si illisible. */
+export function libelleTexte(du?: string | null, au?: string | null) {
+  const s = du && au ? lireTexte(`${du}..${au}`) : null
+  return s ? libelle(s) : ''
+}
+
 /** Exercice de base de la période (comme le serveur) : janvier si elle tient dans une année civile,
  *  sinon 12 mois à partir de son premier mois. */
 export function exerciceBase(s: Sel) {
@@ -104,11 +110,13 @@ export const calendrierDe = (s: Sel): Calendrier =>
 /** Anciennes clés d'URL des pages annuelles, relues une fois pour fabriquer la période. */
 export interface AnciensFiltres {
   annee?: string
+  mois?: string
   exercice?: string
   calendrier?: string
   vue?: string
   debut?: string
   fin?: string
+  cmp_periode?: string
 }
 
 /** Période équivalente aux anciens filtres (cumul de l'exercice par défaut, mois, trimestre, année, plage). */
@@ -143,4 +151,12 @@ export function migrer(p: AnciensFiltres, derniere: { annee: number; mois: numbe
       break
   }
   return debut === dernier ? mois(depart + debut - 1) : plage(depart + debut - 1, depart + dernier - 1, max)
+}
+
+/** Comparaison équivalente à l'ancienne clé `cmp_periode` de la page Mensuel : le mois comparé, « AAAA-M »
+ *  ou « AAAA-MM ». Null si elle est illisible ou si la période `sel` n'est pas un mois. */
+export function migrerComparaison(p: AnciensFiltres, sel: Sel): Sel | null {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(p.cmp_periode ?? '')
+  const n = Number(m?.[2])
+  return m && sel.d === sel.f && n >= 1 && n <= 12 ? mois(indice(Number(m[1]), n)) : null
 }

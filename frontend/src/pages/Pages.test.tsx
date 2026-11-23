@@ -4,18 +4,13 @@ import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '../auth/AuthContext'
 import RequireAuth from '../auth/RequireAuth'
-import Annuel from './Annuel'
+import Charges from './Charges'
 import Graphes from './Graphes'
 import Individuel from './Individuel'
-import Mensuel from './Mensuel'
 import Resume from './Resume'
 
-// Bloc ACTIVITÉ de l'annuel : null tant qu'aucune donnée d'activité n'existe.
-let activiteAnnuel: unknown = null
 // Série mensuelle avec CA et marge renseignés (droit marge).
 let serieCa = false
-// Contrôles de cohérence du mensuel : aucun écart par défaut.
-let controlesMensuel: unknown[] = []
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -39,15 +34,15 @@ function routes(avecMarge: boolean, perms: string[]) {
         ],
       }
     if (url.includes('/rapports/salaries')) return [{ matricule: 'E1', nom: 'Ann' }]
-    if (url.includes('/rapports/mensuel'))
+    if (url.includes('/rapports/charges')) {
+      const vide = { lignes: [], budget_raison: null, budget_total: null }
       return {
-        synthese: {
-          ms: cell('1000'), commissions: cell('10'), primes_total: cell('5'),
-          ...(avecMarge ? { ca: null, marge: null, taux_marge: null } : {}),
-        },
-        controles: controlesMensuel, a_type_charge: [], b_service_activite: [], c_site: [],
-        d_contrat: { effectifs: [], indicateurs: [], ventilation: [], total: cell('0') },
+        du: '2026-01', au: '2026-02', partiel: false, total: cell('1000'), effectif: { n: 4, n1: 3, var: 1, var_pct: '0.3333' }, entrees: 1, sorties: 0,
+        hors_total: { montant: '0', nb_rubriques: 0 },
+        axes: { type: vide, site: vide, service: vide, activite: vide, contrat: vide },
+        effectifs_contrat: [], activite: null, lignes_ca_marge: null, cout_par_vente: { n: null, n1: null, var: null, var_pct: null }, objectifs_atteints: null,
       }
+    }
     if (url.includes('/rapports/annuel'))
       return {
         serie_n: serie.map((s) => (avecMarge ? { ...s, ca: serieCa && s.mois <= 2 ? '5000' : null, marge: serieCa && s.mois <= 2 ? '800' : null, taux_marge: null } : s)),
@@ -60,7 +55,7 @@ function routes(avecMarge: boolean, perms: string[]) {
         mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
         ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
         ...(avecMarge ? { ca_ytd: null, marge_ytd: null, ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
-        activite: activiteAnnuel,
+        activite: null,
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
       }
@@ -167,55 +162,14 @@ test('Résumé : tuiles marge absentes sans la permission', async () => {
   expect(screen.queryByText('Chiffre d’affaires')).toBeNull()
 })
 
-test('Mensuel : un écart de cohérence est signalé au-dessus des tableaux', async () => {
-  controlesMensuel = [
-    { controle: 'Total services = MS globale', ecart: '12', bloquant: true },
-    { controle: 'Écart d’arrondi', ecart: '0.4', bloquant: false },
-  ]
-  try {
-    rendu(<Mensuel />, '/mensuel', ['report:read'])
-    const alerte = await screen.findByRole('alert')
-    expect(alerte).toHaveTextContent('Contrôles de cohérence en écart : Total services = MS globale')
-    expect(alerte).not.toHaveTextContent('arrondi')
-  } finally {
-    controlesMensuel = []
-  }
-})
-
-test('Mensuel : pas de ligne de contrôles et d’indicateurs au-dessus des tableaux', async () => {
-  rendu(<Mensuel />, '/mensuel', ['report:read'])
-  await screen.findByText('1. Reporting global')
-  expect(screen.queryByText(/Contrôles de cohérence/)).toBeNull()
-  expect(screen.queryByText(/Effectif fin de mois/)).toBeNull()
-  expect(screen.queryByText(/Taux de rotation/)).toBeNull()
-})
-
-test('Annuel : pas de bandeau de cumul au-dessus des tableaux', async () => {
-  rendu(<Annuel />, '/annuel', ['report:read'])
-  await screen.findByText('1. Reporting global')
+test('Répartition des charges : pas de bandeau de cumul au-dessus des cartes', async () => {
+  rendu(<Charges />, '/charges', ['report:read'])
+  await screen.findByRole('link', { name: /Types de charge/ })
   expect(screen.queryByText(/Moyenne mensuelle/)).toBeNull()
 })
 
-test('Annuel : bloc Activité masqué sans donnée, affiché avec la mention « partiel »', async () => {
-  rendu(<Annuel />, '/annuel', ['report:read'])
-  await screen.findByText('1. Reporting global')
-  expect(screen.queryByText('4. Activité')).toBeNull()
-  activiteAnnuel = [
-    { cle: 'ventes', libelle: 'Ventes', ...cell('12'), partiel: true },
-    { cle: 'productivite', libelle: 'Productivité', ...cell('1.5') },
-  ]
-  try {
-    rendu(<Annuel />, '/annuel', ['report:read'])
-    expect(await screen.findByText('4. Activité')).toBeInTheDocument()
-    expect(screen.getByRole('rowheader', { name: /Ventes\s*partiel/ })).toBeInTheDocument()
-    expect(screen.getByRole('rowheader', { name: 'Productivité' })).toBeInTheDocument()
-  } finally {
-    activiteAnnuel = null
-  }
-})
-
-test('Annuel : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {
-  const { unmount } = rendu(<Annuel />, '/annuel', ['report:read', 'nominatif:read'])
+test('Répartition des charges : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {
+  const { unmount } = rendu(<Charges />, '/charges', ['report:read', 'nominatif:read'])
   expect(await screen.findByRole('combobox', { name: 'Employé' })).toBeInTheDocument()
   // sélection multiple (R4) : le panneau s'ouvre au clic, une case par valeur
   fireEvent.click(await screen.findByRole('button', { name: /^Type de site/ }))
@@ -223,7 +177,7 @@ test('Annuel : filtres type de site, poste et employé (employé réservé au no
   fireEvent.click(screen.getByRole('button', { name: /^Poste/ }))
   expect(screen.getByRole('checkbox', { name: 'Chef atelier' })).toBeInTheDocument()
   unmount()
-  rendu(<Annuel />, '/annuel', ['report:read'])
+  rendu(<Charges />, '/charges', ['report:read'])
   expect(await screen.findByRole('button', { name: /^Type de site/ })).toBeInTheDocument()
   expect(screen.queryByRole('combobox', { name: 'Employé' })).toBeNull()
 })

@@ -193,5 +193,5 @@ export function apresImport(qc: QueryClient) {
 }
 
 function rechargerRapports(qc: QueryClient) {
-  for (const k of ['annuel', 'mensuel', 'periodes', 'filtres', 'individuel', 'individuel-tous']) qc.invalidateQueries({ queryKey: [k] })
+  for (const k of ['annuel', 'mensuel', 'charges', 'charges-personnes', 'periodes', 'filtres', 'individuel', 'individuel-tous']) qc.invalidateQueries({ queryKey: [k] })
 }

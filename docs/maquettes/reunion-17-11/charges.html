@@ -3,268 +3,1025 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Maquette Répartition des charges (R10 à R13) — Reporting RH</title>
+<title>Répartition des charges — Reporting RH</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="maquette.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..800&display=swap" rel="stylesheet">
+<!-- Feuilles de style réelles de l'application : même rendu, mêmes marges -->
+<link rel="stylesheet" href="../../../frontend/src/styles/base.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/mouvement.css">
+<link rel="stylesheet" href="../../../frontend/src/styles/interactions.css">
 <style>
-  .periode-fixe { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); padding: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-3); background: var(--surface); border: 1px solid var(--rule-strong); font-size: var(--fs-sm); color: var(--navy-2); }
-  .periode-fixe b { color: var(--navy); }
-  .periode-fixe a { margin-left: auto; color: var(--navy); font-weight: var(--fw-bold); }
-  .cartes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-4); }
-  .carte-charge { display: grid; gap: 2px; align-content: start; text-align: left; font: inherit; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0; color: var(--ink); min-height: 150px; }
-  .carte-charge:hover { background: var(--info-soft); border-color: var(--navy-3); }
-  .carte-charge[aria-pressed='true'] { background: var(--info-soft); border-color: var(--navy); box-shadow: inset 0 -4px 0 var(--red); }
-  .carte-charge .nom { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--muted); }
-  .carte-charge .montant { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--navy); padding-top: 4px; }
-  .carte-charge .devise { font-size: var(--fs-xs); color: var(--muted); }
-  .carte-charge .ligne { font-size: var(--fs-sm); color: var(--muted); display: flex; justify-content: space-between; gap: var(--sp-2); }
-  .carte-charge .ecart { font-size: var(--fs-sm); font-weight: var(--fw-bold); }
-  .carte-charge .indice { margin-top: var(--sp-1); padding-top: var(--sp-1); border-top: 1px dotted var(--rule-strong); font-size: var(--fs-xs); color: var(--navy-3); font-weight: var(--fw-medium); }
-  .carte-charge.total { background: var(--paper-3); }
-  .carte-charge.total .nom { color: var(--navy); }
-  .fil { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-bottom: var(--sp-3); font-size: var(--fs-md); }
-  .fil .sep { color: var(--muted-2); padding: 0 2px; }
-  .fil button { background: none; border: 0; padding: 4px 8px; font: inherit; font-weight: var(--fw-bold); color: var(--info); text-decoration: underline; border-radius: var(--radius); }
-  .fil button:hover { background: var(--surface-hover); }
-  .fil .courant { font-weight: var(--fw-bold); color: var(--navy); padding: 4px 8px; }
-  .indication { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
-  .section-niv { margin-bottom: var(--sp-3); }
-  .masque { padding: var(--sp-4); display: grid; gap: var(--sp-2); }
-  @media (max-width: 1250px) { .cartes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* Seuls ajouts propres à la maquette : calendrier, filtres simulés, cartes KPI */
+  #ddPeriode .cal { position: absolute; top: calc(100% + 4px); left: 0; z-index: var(--z-modal); width: 296px; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: var(--shadow-3); padding: var(--sp-3); display: none; }
+  #ddPeriode.ouvert .cal { display: block; }
+  .cal-an { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-2); }
+  .cal-an button { font: inherit; background: none; border: 1px solid transparent; border-radius: 8px; padding: 4px 10px; color: var(--navy); cursor: pointer; }
+  .cal-an .an { font-weight: var(--fw-bold); }
+  .cal-an button:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--rule-strong); }
+  .cal-an button:disabled { color: var(--muted-2); cursor: default; }
+  .cal-mois { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .cal-mois button { font: inherit; font-size: var(--fs-sm); padding: 8px 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; color: var(--ink); cursor: pointer; }
+  .cal-mois button:hover:not(:disabled) { border-color: var(--navy-3); background: var(--info-soft); }
+  .cal-mois button.dans { background: var(--info-soft); border-color: var(--info-soft); }
+  .cal-mois button.bord { background: var(--navy); border-color: var(--navy); color: var(--paper); font-weight: var(--fw-bold); }
+  .cal-mois button:disabled { color: var(--muted-2); background: var(--paper-3); cursor: default; }
+  .cal-pied { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); margin-top: var(--sp-3); font-size: var(--fs-sm); color: var(--muted); }
+
+  /* Hausse d'une charge = rouge, baisse = vert ; le signe et la flèche restent affichés (jamais la couleur seule) */
+  .hausse { color: var(--red-deep); }
+  .baisse { color: var(--success); }
+  /* Contrôles du mois : bandeau neutre sur une ligne, détail au clic */
+  .controles { margin: 0 0 var(--sp-3); background: var(--paper-3); border: 1px solid var(--rule); color: var(--navy); font-size: var(--fs-sm); }
+  .controles summary { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 14px; cursor: pointer; list-style: none; }
+  .controles summary::-webkit-details-marker { display: none; }
+  .controles summary:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+  .controles .voir { margin-left: auto; color: var(--navy-3); text-decoration: underline; }
+  .controles .voir::before { content: 'Voir ▾'; }
+  .controles[open] .voir::before { content: 'Masquer ▴'; }
+  .controles ul { margin: 0; padding: 0 14px 8px 32px; color: var(--ink); }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(760px, 92vw); background: var(--navy); color: var(--paper); padding: 10px 16px; font-size: var(--fs-sm); box-shadow: var(--shadow-3); z-index: 99; display: none; }
+  .toast.vu { display: block; }
+  /* Filtres cliquables de la maquette : un seul choix par filtre (l'appli permet plusieurs) */
+  /* 10 filtres sur une ligne : les listes cèdent un peu de largeur, la barre ne dépasse jamais à droite */
+  .filtres.filtres-rapport > .filtre.multi-choix:not(#ddPeriode, #ddComp) { flex: 0 1 auto; min-width: 0; }
+  .filtres.filtres-rapport > .filtre.multi-choix:not(#ddPeriode, #ddComp) .multi-bouton { width: 100%; min-width: 60px; }
+  .filtres .multi-menu { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .filtres .multi-liste button.choix { display: flex; align-items: center; gap: var(--sp-2); width: 100%; margin: 0; padding: 5px 4px; border: 0; background: none; color: var(--ink); font: inherit; font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; text-align: left; cursor: pointer; white-space: nowrap; }
+  .filtres .multi-liste button.choix::before { content: ''; flex: none; box-sizing: border-box; width: 15px; height: 15px; border: 1px solid var(--rule-strong); border-radius: 50%; background: var(--surface); }
+  .filtres .multi-liste button.choix[aria-pressed='true']::before { border: 5px solid var(--navy); }
+  .filtres .multi-liste button.choix:hover { background: var(--surface-hover); }
+  .filtres .multi-liste button.choix.multi-tout { position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--rule); font-weight: 600; }
+  .filtres .multi-liste button.choix:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+  .vide-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-4); border: 1px solid var(--rule-strong); background: var(--surface); }
+  .vide-filtres p, .vide-bloc { margin: 0; color: var(--ink); }
+
+  /* ===== v5 : cases groupées par axe, exactement les cases du Budget réalisé (base.css : .resume-excel .cases .case) ===== */
+  .groupe { margin: 0 0 var(--sp-4); }
+  .groupe-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--sp-3); margin: 0 0 6px; }
+  .groupe-tete h3 { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .groupe-info { font-size: var(--fs-xs); color: var(--muted); }
+  .groupe .cases { margin-bottom: 0; }
+  .groupe .case .micro { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Charges : hausse en rouge, baisse en vert (flèche) ; effectifs : flèche bleue, sans jugement */
+  .groupe .case .variation.hausse > [aria-hidden] { color: var(--red-deep); }
+  .groupe .case .variation.baisse > [aria-hidden] { color: var(--success); }
+  .groupe .cases.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Lignes compactes sous la valeur : libellé à gauche, chiffre (montant puis %) à droite ; chaque chiffre une seule fois */
+  .groupe .case .detail { grid-row: 2; grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(8ch, auto) minmax(17ch, auto); column-gap: var(--sp-3); row-gap: 0; margin: 2px 0 0; font-size: var(--fs-xs); line-height: 1.4; }
+  .groupe .case .parts { grid-row: 2; grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px var(--sp-3); margin: 2px 0 0; font-size: var(--fs-xs); line-height: 1.4; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .groupe .case .parts b { color: var(--ink); font-weight: 600; }
+  .groupe .case .parts b.mt { font-weight: 400; margin-left: 2px; }
+  .groupe .case .detail dt { color: var(--muted); overflow-wrap: anywhere; }
+  .groupe .case .detail dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .groupe .case .detail .hausse { color: var(--red-deep); } .groupe .case .detail .baisse { color: var(--success); }
+  /* Même grille à toutes les largeurs (dans base.css elle n'existe qu'à partir de 900 px) : libellé | valeur, puis le détail */
+  .groupe.resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur'; align-items: center; column-gap: var(--sp-2); row-gap: 0; container-type: inline-size; padding: var(--sp-3) var(--sp-4); }
+  .groupe.resume-excel .cases .case .micro { grid-area: titre; }
+  .groupe.resume-excel .cases .case strong { grid-area: valeur; font-size: min(var(--fs-xl), 6.4cqi); line-height: 1.2; white-space: nowrap; min-height: 0; padding-top: 0; }
+  /* Case Types de charge : « À surveiller » — une ligne par élément (rang, nom, part, effectif, montant, évolution), raison sur le filet */
+  .groupe .case { --fin: 5.6ch 6.6ch 7.6ch; --cols: minmax(0, 1fr) 6.2ch var(--fin); }
+  .groupe .case .top3 { grid-row: 3; grid-column: 1 / -1; margin-top: var(--sp-2); padding-top: 6px; border-top: 1px solid var(--rule); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+  /* Ligne d'évolution de la case : même grille que la liste, écart sous « Montant », flèche + % sous « Évol. » */
+  .groupe .case .detail.vs { grid-template-columns: var(--cols); column-gap: 4px; align-items: baseline; font-variant-numeric: tabular-nums; }
+  .groupe .case .detail.vs .lib { grid-column: 1 / 4; color: var(--muted); }
+  .groupe .case .detail.vs :is(.mt, .ev) { text-align: right; white-space: nowrap; }
+  .groupe .case .detail.vs .ev { color: var(--muted); }
+  .groupe .case .detail.vs .nd { grid-column: 4 / -1; text-align: right; white-space: nowrap; }
+  .groupe .case :is(.top3, .detail.vs) .ev { display: flex; justify-content: space-between; padding-left: .7ch; }
+  .groupe .case .top3 :is(.entete, li) { display: grid; grid-template-columns: var(--cols); column-gap: 4px; align-items: baseline; line-height: 1.3; }
+  .groupe .case .top3 .entete { grid-template-columns: minmax(0, 1fr) auto var(--fin); margin: 0; align-items: end; color: var(--muted); }
+  .groupe .case .top3 p.entete span { font-size: 11px; line-height: 1.15; }
+  .groupe .case .top3 .entete b { grid-column: 1; color: var(--ink); font-weight: 600; }
+  .groupe .case .top3 .entete span, .groupe .case .top3 li > :nth-child(n+2) { text-align: right; white-space: nowrap; }
+  .groupe .case .top3 .grp { margin-top: var(--sp-2); }
+  .groupe .case .top3 .motif { display: flex; align-items: center; gap: var(--sp-2); margin: 0 0 3px; color: var(--muted); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; font-size: 11px; }
+  .groupe .case .top3 .m-poids { --c: var(--navy); } .groupe .case .top3 .m-hausse { --c: var(--red-deep); } .groupe .case .top3 .m-baisse { --c: var(--success); }
+  .groupe .case .top3 ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .groupe .case .top3 .rg { color: var(--muted); }
+  .groupe .case .top3 li.total { margin-top: 2px; padding-top: 4px; border-top: 1px solid var(--rule); font-weight: 600; }
+  .groupe .case .top3 .nom { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+  .groupe .case .top3 .pa, .groupe .case .top3 .pe, .groupe .case .top3 .ev { color: var(--muted); }
+  .groupe .case .top3 .mt { color: var(--ink); }
+  .groupe .case .top3 .fort { font-weight: 700; color: var(--ink); }
+  @media (max-width: 420px) { .groupe .case { --fin: 5.6ch 6.6ch 7.6ch; --cols: minmax(0, 1fr) 6ch var(--fin); } .groupe .case .top3 :is(.entete, li) { column-gap: 4px; } .groupe .case .top3 .nom { white-space: normal; } }
+  /* Case cliquable : ouvre le tableau de son axe */
+  .groupe .case.lien { color: inherit; text-decoration: none; cursor: pointer; }
+  .groupe .case.lien:hover { border-color: var(--navy); }
+  .groupe .case.lien:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .groupe .case.lien .micro::after { content: ' ›'; color: var(--muted); }
+  /* Fil d'Ariane + Retour */
+  .fil-nav { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-4); padding: 0 0 var(--sp-3); border-bottom: 1px solid var(--rule-strong); }
+  .fil-nav nav { min-width: 0; }
+  .fil-sep { width: 1px; height: 24px; background: var(--rule-strong); }
+  .fil-ctx { margin: 0 0 0 auto; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+  .fil-ctx .sep-ctx { margin: 0 .4em; }
+  @media (max-width: 700px) { .fil-nav { flex-wrap: wrap; } .fil-ctx { margin-left: 0; flex-basis: 100%; } .fil-sep { display: none; } }
+  .fil-nav ol { display: flex; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); }
+  .fil-nav li + li::before { content: '›'; margin-right: 4px; color: var(--muted); }
+  .fil-nav a { color: var(--muted); text-decoration: none; } .fil-nav a:hover, .fil-nav a:focus-visible { color: var(--navy); text-decoration: underline; }
+  .fil-nav [aria-current] { font-weight: 600; color: var(--ink); }
+  .axe-titre { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); color: var(--navy); }
+  .axe-table th:not(:first-child), .axe-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  .axe-table tr[data-href] { cursor: pointer; } .axe-table tr[data-href]:hover td, .axe-table tr[data-href]:hover th { background: var(--surface-hover); }
+  .axe-table tfoot th, .axe-table tfoot td { font-weight: 700; border-top: 2px solid var(--navy); }
+  .axe-table .hausse { color: var(--red-deep); } .axe-table .baisse { color: var(--success); }
+  .axe-pied { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--muted); }
+  /* Tableau par axe, v2 : en-têtes groupés, barre de part, ligne entière cliquable, hors total sous le total */
+  .axe-titre { margin-bottom: 2px; }
+  .axe-sous { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--muted); }
+  .axe-table.v2 thead tr.grp th { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; border-bottom: 1px solid rgba(255,255,255,.2); padding-bottom: 4px; }
+  .axe-table.v2 thead tr.grp th.libelle { text-align: left; vertical-align: bottom; font-size: var(--fs-sm); letter-spacing: 0; text-transform: none; font-weight: 600; }
+  .axe-table.v2 thead th.g { border-left: 1px solid rgba(255,255,255,.2); }
+  .axe-table.v2 td.g { border-left: 1px solid var(--rule); }
+  .axe-table.v2 th[scope=row] { border-right: 0; }
+  .axe-table.v2 th[scope=row] a { color: var(--ink); text-decoration: none; }
+  .axe-table.v2 tr[data-href]:hover th[scope=row] a, .axe-table.v2 th[scope=row] a:focus-visible { text-decoration: underline; }
+  .axe-table.v2 td.pa { white-space: nowrap; }
+  .axe-table.v2 .barre { display: inline-block; width: 56px; height: 6px; margin-left: 8px; background: var(--rule); vertical-align: middle; }
+  .axe-table.v2 .barre i { display: block; height: 100%; background: var(--navy); }
+  .axe-table.v2 td.pa:has(.barre) { min-width: 15ch; }
+  .axe-table.v2 td.chev { width: 2ch; padding-left: 0; color: var(--muted); }
+  .axe-table.v2 tr.hors th, .axe-table.v2 tr.hors td { font-weight: 400; color: var(--muted); border-top: 0; font-style: italic; }
+  @media (max-width: 700px) { .axe-table.v2 th[scope=row] { position: sticky; left: 0; background: var(--paper); z-index: 1; } }
+  @media (max-width: 900px) { .groupe .cases.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .groupe .cases.six { grid-template-columns: minmax(0, 1fr); } }
+  .charges-note ul { margin: var(--sp-2) 0 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--muted); }
+/* ---- Tableau dépliable (repris de la v4) ---- */
+  /* Tableau : pas de séparateur vertical (un seul repère vertical, la barre marine de la ligne ouverte) */
+  .charges-corps .panneau table.dense :is(th, td) { border-inline: 0; }
+  .charges-corps table.dense th:first-child { width: 34%; }
+  /* En-tête = même couleur que l'onglet choisi ; colonnes triables ; reste visible au défilement */
+  .charges-corps .panneau-corps > table.dense > thead th { position: sticky; top: 0; z-index: 3; background: var(--surface); color: var(--navy); border-bottom: 2px solid var(--navy); }
+  /* Ligne Total collée en bas de la zone visible */
+  .charges-corps .panneau table.dense tbody.pied { position: sticky; bottom: 0; z-index: 2; }
+
+  /* Ligne dépliable : bouton dans la 1re cellule, toute la ligne reste cliquable à la souris */
+  .charges-corps table.dense tr.ligne { cursor: pointer; }
+  .charges-corps table.dense tr.ligne:hover > * { background: var(--info-soft); }
+  .depli { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+  .chev { display: inline-block; width: 14px; margin-right: 6px; color: var(--navy-3); transition: transform var(--dur-fast) var(--ease); }
+  .depli[aria-expanded='true'] .chev { transform: rotate(90deg); color: var(--navy); }
+  .charges-corps table.dense td.nb { color: var(--navy-3); font-weight: var(--fw-bold); }
+  .mention { font-size: var(--fs-xs); font-style: italic; font-weight: var(--fw-regular); color: var(--muted); }
+  .charges-corps .panneau table.dense tbody tr.ligne.ouverte:nth-child(n) > * { background: var(--info-soft); background-image: none; font-weight: var(--fw-bold); }
+
+  /* Personnes : lignes alignées sous les mêmes colonnes, barre marine continue de la ligne ouverte jusqu'au pied */
+  .charges-corps .panneau table.dense tbody tr:is(.enfant, .enfant-tete, .enfant-pied):nth-child(n) > * { background: var(--surface); background-image: none; font-style: normal; font-weight: var(--fw-regular); color: var(--ink); }
+  .charges-corps .panneau table.dense tbody tr:is(.enfant, .enfant-tete, .enfant-pied):nth-child(n) > :is(.hausse, .baisse) { color: inherit; }
+  .charges-corps .panneau table.dense tbody tr.enfant:nth-child(n) > .hausse { color: var(--red-deep); }
+  .charges-corps .panneau table.dense tbody tr.enfant:nth-child(n) > .baisse { color: var(--success); }
+  .charges-corps .panneau table.dense tbody :is(tr.ligne.ouverte, tr.enfant, tr.enfant-tete, tr.enfant-pied) > :first-child { box-shadow: inset 3px 0 0 var(--navy); }
+  .charges-corps .panneau table.dense tbody tr.enfant > th { padding-left: 38px; }
+  .charges-corps .panneau table.dense tbody tr.enfant-tete > td:first-child, .charges-corps .panneau table.dense tbody tr.enfant-pied > td { padding: 8px 16px 8px 38px; }
+  .charges-corps .panneau table.dense tbody tr.enfant-pied > td { border-bottom: 2px solid var(--navy); }
+  .charges-corps .panneau table.dense tbody tr.enfant-tete > td.lib-part { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; color: var(--muted); vertical-align: bottom; }
+  .ctx { margin-left: 8px; font-size: var(--fs-xs); color: var(--muted); }
+  .etiq { display: inline-block; margin-left: 6px; padding: 0 5px; font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: 1.5; color: var(--navy); background: var(--info-soft); border: 1px solid var(--navy-3); }
+  .detail-tete { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-2); }
+  .detail-tete strong { color: var(--navy); }
+  .detail-tete span { font-size: var(--fs-sm); color: var(--muted); }
+  .detail-pied { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
+  .detail-pied .actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+  /* Recherche : étiquette visible et loupe */
+  .cherche { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--ink); }
+  .champ-loupe { position: relative; display: inline-flex; }
+  /* Filtre Activité de la liste : boutons à bascule, le choix en marine */
+  .outils { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+  .charges-corps .panneau table.dense tbody tr.enfant.sous-total:nth-child(n) > * { background: var(--info-soft); font-weight: var(--fw-bold); }
+  .champ-loupe svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .champ-loupe input { width: 220px; height: 32px; padding-left: 30px; }
+  .charges-corps .note { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--muted); }
+
+  @media (max-width: 700px) { .cherche { flex-wrap: wrap; } .champ-loupe input { width: 100%; } }
+  /* Grand écran : la zone .charges-corps défile, en-tête collé en haut et Total collé en bas */
+  /* Grand écran : la page garde sa structure (titre, filtres, fil d'Ariane fixes) ; seul le tableau défile.
+     flex 0 1 auto : un tableau court garde sa taille, un tableau long rétrécit jusqu'au bas de l'écran puis défile. */
+  @media (min-width: 1100px) {
+    .page-ecran.rapport-excel #contenu, .page-ecran.rapport-excel .charges-corps { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .page-ecran.rapport-excel .charges-corps .panneau { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .page-ecran.rapport-excel .charges-corps .panneau-corps { flex: 0 1 auto; min-height: 0; overflow: auto; }
+    .page-ecran.rapport-excel .charges-corps .note { flex: none; }
+  }
+
+  /* Filtres cliquables de la maquette : un seul choix par filtre (l'appli permet plusieurs) */
+
+  /* Onglet grisé : une seule valeur dans la sélection, rien à répartir */
+
+  /* Colonnes budget ou % FO : la 1re colonne prend la place qui reste */
+  .rapport-excel .charges-corps table.dense.aligne.large :is(th, td) { width: auto; }
+  .rapport-excel .charges-corps table.dense.aligne.large :is(th, td):first-child { width: 20%; }
+  .var-eff { margin-left: 6px; font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--ink); }
+  .depli-ligne { all: unset; display: inline; cursor: pointer; }
+  .depli-ligne:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .vide-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-4); border: 1px solid var(--rule-strong); background: var(--surface); }
+  .vide-filtres p, .vide-bloc { margin: 0; color: var(--ink); }
+  .vide-bloc { padding: var(--sp-4); border: 1px solid var(--rule-strong); border-top: 0; background: var(--surface); }
+  #bloc[hidden], .cases-charges[hidden] { display: none !important; }
+
+  /* ===== v4 : cases sur deux rangées (charges, puis « Autres vues ») ===== */
+  .cases-charges .autres-titre { margin: var(--sp-3) 0 6px; font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .cases-charges .cases.autres { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .cases-charges .variation.neutre { color: var(--navy-3); }
+  /* Deux groupes de cases : argent (charges, CA, exclues) puis personnes (effectifs, activité), séparés par un écart */
+  @media (min-width: 1101px) { .cases-charges .cases.cinq .case[data-fam='eff'] { margin-left: var(--sp-4); width: calc(100% - var(--sp-4)); } }
+  /* Case : même présentation que le Budget réalisé (libellé | valeur, « vs mois » | variation, une info), styles de base.css */
+
+  /* ===== v4 : tableau en arbre, colonnes fixes partagées avec la liste des personnes ===== */
+  .rapport-excel .charges-corps table.dense.aligne.arbre { table-layout: fixed; min-width: 760px; }
+  .rapport-excel .charges-corps table.dense.aligne.large.arbre :is(th, td):first-child { width: 28%; }
+  .charges-corps table.arbre col.c-lib { width: 28%; }
+  .charges-corps table.arbre td.num { white-space: nowrap; }
+  .charges-corps table.arbre .cel-var .pc, .charges-corps table.arbre .cel-bud .pc { display: inline-block; min-width: 4.6em; margin-left: 8px; font-size: var(--fs-sm); text-align: right; }
+  .charges-corps table.arbre .cel-var .hausse, .charges-corps table.arbre .cel-bud .pc.hausse { color: var(--red-deep); }
+  .charges-corps table.arbre .cel-var .baisse { color: var(--success); }
+  .charges-corps table.arbre .cel-bud .pc.hausse { font-weight: var(--fw-bold); }
+  .charges-corps .panneau table.arbre tbody tr.niv1:nth-child(n) > * { background: color-mix(in srgb, var(--info-soft) 45%, var(--surface)); background-image: none; }
+  .charges-corps .panneau table.arbre tbody tr.niv2:nth-child(n) > * { background: var(--surface); background-image: none; }
+  .charges-corps .panneau table.arbre tbody tr.ligne.ouverte:nth-child(n) > * { background: var(--info-soft); }
+  .charges-corps .panneau table.arbre tbody tr.niv1 > th { padding-left: 30px; }
+  .charges-corps .panneau table.arbre tbody tr.niv2 > th { padding-left: 52px; }
+  .charges-corps .panneau table.arbre tbody tr:is(.niv1, .niv2, .ouverte) > :first-child { box-shadow: inset 3px 0 0 var(--navy); }
+
+  /* Liste des personnes : barre (recherche à gauche, pages à droite), défilement interne à 50 et 100 par page */
+  .charges-corps .panneau table.arbre td.cel-liste { padding: 0; background: var(--surface); box-shadow: inset 3px 0 0 var(--navy); }
+  .barre-liste, .pied-liste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-3); padding: 8px 12px 8px 74px; }
+  .barre-liste { border-bottom: 1px solid var(--rule); }
+  .pied-liste { font-size: var(--fs-xs); color: var(--muted); border-top: 1px solid var(--rule); border-bottom: 2px solid var(--navy); }
+  .pagine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; font-size: var(--fs-sm); color: var(--ink); }
+  .pagine .rang { font-variant-numeric: tabular-nums; }
+  .pagine button { min-width: 32px; height: 32px; font: inherit; font-size: var(--fs-md); color: var(--navy); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 8px; cursor: pointer; }
+  .pagine button:hover:not(:disabled) { background: var(--info-soft); }
+  .pagine button:disabled { opacity: .4; cursor: default; }
+  .pagine label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .pagine select { height: 32px; padding: 0 6px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong); }
+  .defile.haut { max-height: 60vh; overflow-y: auto; }
+  .charges-corps .panneau table.arbre.liste-pers { min-width: 0; border: 0; }
+  .charges-corps .panneau table.arbre.liste-pers tbody tr:nth-child(n) > * { background: var(--surface); background-image: none; font-weight: var(--fw-regular); }
+  .charges-corps .panneau table.arbre.liste-pers tbody tr > th { padding-left: 74px; }
+  .jauge { display: inline-block; width: 56px; height: 6px; margin-right: 8px; vertical-align: middle; background: var(--rule); }
+  .jauge > span { display: block; height: 100%; background: var(--navy-3); }
+  .jauge.ok > span { background: var(--success); }
+  @media (max-width: 700px) {
+    .barre-liste, .pied-liste { padding-left: 12px; }
+    .charges-corps .panneau table.arbre.liste-pers tbody tr > th { padding-left: 16px; }
+    .pagine { margin-left: 0; }
+  }
+/* ===== v6 : hiérarchie claire, moins de texte, colonnes alignées d'une carte à l'autre ===== */
+.groupe.resume-excel .case { --v6: minmax(0,1fr) 7ch 1.4em 6.4ch }
+.groupe.resume-excel .cases .case strong { font-size: min(var(--fs-2xl), 8cqi); line-height: 1.1 }
+.groupe.resume-excel .case .sous { grid-column: 1 / -1; display: grid; grid-template-columns: var(--v6); column-gap: 6px; align-items: baseline; margin: 2px 0 8px; font-size: var(--fs-xs); color: var(--muted) }
+.groupe.resume-excel .case .sous .g { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.groupe.resume-excel .case .sous .d { display: contents }
+.groupe.resume-excel .case .sous .ecart { text-align: right; font-variant-numeric: tabular-nums }
+.groupe.resume-excel .case .sous .evo { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums }
+.groupe.resume-excel .case .sous .fle.evo { text-align: center }
+.groupe.resume-excel .case .sous .evo.hausse { color: var(--red-deep) }
+.groupe.resume-excel .case .sous .evo.baisse { color: var(--success) }
+.groupe.resume-excel .case .top3 { grid-column: 1 / -1; border-top: 1px solid var(--rule); padding-top: 6px }
+.groupe.resume-excel .case .top3 .grp + .grp { margin-top: 4px }
+.groupe.resume-excel .case .top3 ol { list-style: none; margin: 0; padding: 0 }
+.groupe.resume-excel .case .top3 ol li { display: grid; grid-template-columns: var(--v6); column-gap: 6px; align-items: baseline; line-height: 1.75; font-size: var(--fs-sm); padding: 0; margin: 0 }
+.groupe.resume-excel .case .top3 li .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; text-transform: none; letter-spacing: 0 }
+.groupe.resume-excel .case .top3 li :is(.mt, .ev) { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--fs-sm); font-weight: 400 }
+.groupe.resume-excel .case .top3 li .fle { text-align: center; color: var(--muted); font-size: var(--fs-xs) }
+.groupe.resume-excel .case .top3 li .ev { display: block; color: var(--muted) }
+.groupe.resume-excel .case .top3 .motif { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: var(--fs-xs); color: var(--muted) }
+.groupe.resume-excel .case .top3 li.alerte { --c: var(--red-deep); margin-inline: calc(-1 * var(--sp-2)); padding-inline: var(--sp-2); box-shadow: inset 3px 0 0 var(--c); background: color-mix(in srgb, var(--c) 7%, transparent) }
+.groupe.resume-excel .case .top3 li.alerte.baisse { --c: var(--success) }
+.groupe.resume-excel .case .top3 li.alerte :is(.ev, .fle) { color: var(--c); font-weight: 700 }
+.groupe.resume-excel .case .top3 { margin-top: 0; padding-top: 8px }
+.groupe.resume-excel .case .top3 ol { gap: 0 }
+.groupe.resume-excel .case .top3 .grp { margin-top: 0 }
+.groupe.resume-excel .case .top3 .grp + .grp { margin-top: 6px }
+.groupe.resume-excel .case .top3 ol li { line-height: 1.55; align-items: center }
+.groupe.resume-excel .case .top3 li .ev { padding-left: 0 }
+.groupe.resume-excel .case .sous { align-items: center; margin-bottom: 10px }
+.groupe.resume-excel .case .sous { height: 22px; line-height: 22px }
+.groupe.resume-excel .case .sous .evo { line-height: 22px }
+
+/* ===== v7 : personnes = vraies lignes du tableau, sans décalage ni case vide ===== */
+.charges-corps .panneau table.arbre tbody tr:is(.pers, .pers-barre, .pers-pied):nth-child(n) > * { background: var(--surface); background-image: none; font-weight: var(--fw-regular); }
+/* Bordures « séparées » : chaque cellule garde ses bordures, qui suivent donc les lignes figées (en « collapse », elles
+   restaient en place et laissaient voir le contenu qui défile). Le rail marine est une ombre interne. */
+.charges-corps .panneau table.arbre { border-collapse: separate; border-spacing: 0; }
+.charges-corps .panneau table.arbre > thead th { box-shadow: 0 -12px 0 0 var(--surface); }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr:is(.niv1, .niv2, .ouverte, .pers, .pers-barre, .pers-pied) > :first-child { box-shadow: inset 3px 0 0 var(--navy); }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.pers-pied > * { border-bottom: 2px solid var(--navy); }
+.charges-corps .panneau table.arbre tr.pers-pied .pied-liste { border-bottom: 0; }
+.charges-corps .panneau table.arbre tr.pers-barre .barre-liste { border-bottom: 0; }
+.charges-corps .panneau table.arbre tbody tr.pers > th { padding-left: 16px; }
+.charges-corps .panneau table.arbre tbody tr.pers:hover > * { background: var(--info-soft); }
+.pers-nom { display: block; color: var(--ink); }
+.pers-mat { display: block; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.charges-corps .panneau table.arbre td.muet { color: var(--muted); }
+.charges-corps .panneau table.arbre td.pers-vide { padding: 16px; color: var(--muted); font-style: italic; }
+.charges-corps .panneau table.arbre tr:is(.pers-barre, .pers-pied) > td { padding: 0; }
+.barre-liste { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 10px 16px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--info-soft) 35%, var(--surface)); }
+.barre-liste .liste-titre { font-size: var(--fs-sm); color: var(--muted); }
+.barre-liste .liste-titre strong { color: var(--navy); }
+.barre-liste .champ-loupe { flex: 1 1 240px; max-width: 360px; }
+.barre-liste .champ-loupe input { width: 100%; }
+.barre-liste #exportListe { margin-left: auto; }
+.legende-poids { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); }
+.legende-poids .poids { width: 32px; min-width: 0; }
+.charges-corps .panneau table.arbre tbody tr.pers { cursor: default; }
+.pied-liste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 8px 16px; font-size: var(--fs-xs); color: var(--muted); border-top: 1px solid var(--rule); border-bottom: 2px solid var(--navy); }
+td.cel-poids { white-space: nowrap; }
+.poids { display: inline-block; width: calc(100% - 7em); min-width: 48px; max-width: 220px; height: 6px; vertical-align: middle; background: var(--rule); }
+.poids > span { display: block; height: 100%; background: var(--navy-3); }
+.etiq.entree { color: var(--success); border-color: var(--success); background: color-mix(in srgb, var(--success) 10%, var(--surface)); }
+.etiq.sortie { color: var(--red-deep); border-color: var(--red-deep); background: color-mix(in srgb, var(--red-deep) 8%, var(--surface)); }
+td.cel-poids .etiq { margin-left: 10px; }
+@media (max-width: 700px) { .barre-liste .champ-loupe { max-width: none; } .barre-liste #exportListe { margin-left: 0; } .poids { display: none; } }
+
+/* Lignes ouvertes réellement collées sous l’en-tête (défilement) : fondues en un seul bloc, rail marine continu. Au repos, séparation normale */
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > * { box-shadow: 0 -2px 0 0 var(--info-soft); }
+/* rail marine continu sur les lignes figées : une seule barre, sans jointure */
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child { box-shadow: 0 -2px 0 0 var(--info-soft); overflow: clip; overflow-clip-margin: 3px; }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child::before { content: ""; position: absolute; left: 0; top: -3px; bottom: -1px; width: 3px; background: var(--navy); pointer-events: none; }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee:has(+ tr.collee) > * { border-bottom-color: var(--info-soft); } /* lignes figées fondues en un seul bloc */
 </style>
 </head>
 <body>
-<div class="maq-top"><div class="maq-top-in">
-  <span><strong>Maquette</strong> · Répartition des charges (R10 à R13) · données fictives</span>
-  <span class="espace"></span>
-  <div class="onglets" role="tablist" aria-label="Variantes" style="margin:0">
-    <button class="onglet" role="tab" aria-selected="true" data-var="A">Variante A</button>
-    <button class="onglet" role="tab" aria-selected="false" data-var="B">Variante B</button>
-    <button class="onglet" role="tab" aria-selected="false" data-var="C">Variante C</button>
+<div class="app layout-ecran">
+<div class="fond" aria-hidden="true"><img alt="" src="../../../frontend/public/images/fond.webp"><div class="fond-voile"></div><div class="fond-grain"></div></div><header class="topbar"><div class="topbar-inner"><a aria-label="Reporting RH, accueil" class="marque" href="/resume"><img class="marque-logo" alt="CFAO" src="../../../frontend/public/images/cfao_logo.png"><h1>Reporting RH</h1></a><button type="button" class="menu-toggle" aria-expanded="false" aria-controls="nav-rapports">Menu</button><nav id="nav-rapports" aria-label="Rapports"><a href="/resume"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Budget réalisé</a><a href="/graphes"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-column" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>Graphes</a><a aria-current="page" class="active" href="/charges"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-pie" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Répartition des charges</a><a href="/individuel"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-round" aria-hidden="true"><circle cx="12" cy="8" r="5"></circle><path d="M20 21a8 8 0 0 0-16 0"></path></svg>Individuel</a><a href="/admin"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>Administration</a></nav><div class="user profil"><div class="cloche"><button type="button" class="cloche-bouton" aria-label="Notifications, 3 non lues" aria-haspopup="true" aria-expanded="false" aria-controls="cloche-liste"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg><span class="cloche-compte" aria-hidden="true">3</span></button></div><span class="profil-barre-nom" title="Administrateur RH">Administrateur RH</span><button type="button" class="profil-bouton" aria-label="Profil" aria-haspopup="true" aria-expanded="false" aria-controls="profil-menu"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-user-round" aria-hidden="true"><path d="M18 20a6 6 0 0 0-12 0"></path><circle cx="12" cy="10" r="4"></circle><circle cx="12" cy="12" r="10"></circle></svg></button></div></div></header>
+<main class="page"><section class="page-ecran page-etroite rapport-excel relais">
+  <div class="titre-rapport"><h2 class="bandeau-titre">RÉPARTITION DES CHARGES</h2>
+    <div class="export-pdf"><button type="button" class="export-bouton" data-export="PDF"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-down" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>Exporter en PDF</button></div></div>
+
+  <div class="filtres filtres-rapport" role="group" aria-label="Filtres">
+    <span class="filtres-titre"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-filter" aria-hidden="true"><path d="M2 5h20"></path><path d="M6 12h12"></path><path d="M9 19h6"></path></svg>Filtres</span>
+    <div class="filtre multi-choix" id="ddPeriode"><span id="lib-per">Période</span><button type="button" class="multi-bouton periode-bouton" aria-haspopup="dialog" aria-expanded="false" aria-labelledby="lib-per valPeriode"><span id="valPeriode"></span></button>
+      <div class="cal" id="cal" role="dialog" aria-label="Choisir la période"></div></div>
+    <span class="fle" aria-hidden="true">↔</span>
+    <div class="filtre multi-choix"><span>Comparer à</span><button type="button" class="multi-bouton periode-bouton" data-statique><span id="valComp"></span></button></div>
+    <div class="filtre multi-choix souple"><span>Département</span><button type="button" class="multi-bouton" data-statique><span>Tous</span></button></div>
+    <div class="filtre multi-choix souple" data-flt="service"><span id="lib-service">Service</span><button type="button" class="multi-bouton" aria-haspopup="true" aria-expanded="false" aria-labelledby="lib-service val-service"><span id="val-service">Tous</span></button></div>
+    <div class="filtre multi-choix"><span>Type de site</span><button type="button" class="multi-bouton" data-statique><span>Tous</span></button></div>
+    <div class="filtre multi-choix souple" data-flt="site"><span id="lib-site">Site</span><button type="button" class="multi-bouton" aria-haspopup="true" aria-expanded="false" aria-labelledby="lib-site val-site"><span id="val-site">Tous</span></button></div>
+    <div class="filtre multi-choix souple" data-flt="activite"><span id="lib-activite">Activité</span><button type="button" class="multi-bouton" aria-haspopup="true" aria-expanded="false" aria-labelledby="lib-activite val-activite"><span id="val-activite">Toutes</span></button></div>
+    <div class="filtre multi-choix" data-flt="contrat"><span id="lib-contrat">Contrat</span><button type="button" class="multi-bouton" aria-haspopup="true" aria-expanded="false" aria-labelledby="lib-contrat val-contrat"><span id="val-contrat">Tous</span></button></div>
+    <div class="filtre multi-choix souple"><span>Poste</span><button type="button" class="multi-bouton" data-statique><span>Tous</span></button></div>
+    <div class="filtre multi-choix souple"><span>Employé</span><button type="button" class="multi-bouton" data-statique><span>Tous</span></button></div>
+    <div class="filtres-actions"><button type="button" class="bouton bouton-secondaire reinitialiser" id="reinit" disabled>Réinitialiser les filtres</button></div>
   </div>
-  <a href="index.html">← Sommaire</a>
-</div></div>
-<section class="maq-variante" id="bandeau-variante" aria-live="polite"></section>
-
-<div class="cadre">
-  <header class="topbar"><div class="topbar-inner">
-    <a class="marque" href="index.html"><img class="marque-logo" src="../../../frontend/public/images/cfao_logo.png" alt="CFAO"><h1>Reporting RH</h1></a>
-    <nav aria-label="Rapports">
-      <a href="budget-realise.html">Budget réalisé</a>
-      <a href="#">Graphes</a>
-      <a class="active" href="charges.html">Répartition des charges</a>
-      <a href="#">Individuel</a>
-      <a href="sites-admin.html">Administration</a>
-    </nav>
-    <div class="user"><span>responsable.rh@cfao.com</span><a href="connexion.html">Déconnexion</a></div>
-  </div></header>
-
-  <main class="page">
-    <div class="entete-page"><h2>Répartition des charges</h2><p class="muted">Un seul écran pour le mois, le cumul ou l'année, selon la période choisie</p></div>
-    <div class="periode-fixe">
-      <span>Période : <b>octobre 2026</b></span><span>Comparée à : <b>même période N-1 (octobre 2025)</b></span><span>Périmètre : <b>tous les sites</b></span>
-      <a href="filtres.html">Barre de filtres : voir la maquette filtres</a>
-    </div>
-    <div id="fil"></div>
-    <div id="niv1"></div>
-    <div id="niv2"></div>
-    <div id="niv3"></div>
-  </main>
+  <div id="controles"></div>
+  <div id="contenu"></div>
+  <div class="charges-note" id="note"></div>
+</section></main>
 </div>
-
-<div class="voile" id="voile"></div>
-<aside class="tiroir" id="tiroir" role="dialog" aria-label="Personnes concernées" aria-hidden="true">
-  <div class="tiroir-entete"><div id="tiroirTitre"></div>
-    <button type="button" class="bouton bouton-secondaire petit" id="tiroirFermer" aria-label="Fermer le panneau">Fermer ×</button></div>
-  <div class="tiroir-corps" id="tiroirCorps"></div>
-</aside>
-
+<div class="toast" id="toast" role="status"></div>
+<p class="sr-only" role="status" id="annonce"></p>
 <script>
-const VARIANTES = {
-  A: { nom: 'détail sous les cartes',
-       pour: 'Tout reste dans la page : on garde les cartes sous les yeux et on change de charge en un clic.',
-       contre: 'La page s\'allonge ; la liste des personnes s\'ajoute en bas et oblige à faire défiler.' },
-  B: { nom: 'personnes en panneau latéral',
-       pour: 'Les noms sont isolés dans un tiroir : plus facile à protéger, à fermer et à ne pas montrer par mégarde.',
-       contre: 'Le tiroir masque une partie de la page ; un panneau de plus à apprendre.' },
-  C: { nom: 'fil d\'Ariane',
-       pour: 'Une seule chose à l\'écran à la fois ; chemin clair « Charges › Primes › Primes sur ventes » et retour en un clic.',
-       contre: 'On perd la vue d\'ensemble des cartes dès qu\'on descend ; plus de clics pour passer d\'une charge à l\'autre.' }
-};
-
-/* ---------- Données fictives (octobre 2026 / octobre 2025), en FCFA ---------- */
+/* ---------- Données fictives (FCFA). Rubrique : [nom, oct. 2026, sept. 2026, personnes, non compris dans le total] ---------- */
 const FAM = [
-  { id: 'sal', nom: 'Salaires', rub: [['Salaire brut garantie', 412380500, 396215000], ['Heures supplémentaires', 38640200, 41205800]] },
-  { id: 'pri', nom: 'Primes', rub: [['Primes sur ventes', 96250000, 84730000], ['Primes sur résultats', 54800000, 58900000], ['Bonus', 31400000, 27650000],
-      ['Productivité Ateliers', 22915600, 19880400], ['Commission', 41320000, 38410000], ['Primes exceptionnelles', 12600000, 18250000]] },
-  { id: 'ava', nom: 'Avantages et frais', rub: [['Frais de mission', 28450000, 25120000], ['Logement site déporté', 17800000, 17800000],
-      ['Carburant véhicule service', 21340500, 23680000], ['Crédit téléphonique', 6920000, 6450000]] },
-  { id: 'soc', nom: 'Charges sociales', rub: [['Charges Patronales', 152640000, 146380000], ['Assurance Maladie', 18930000, 18100000], ['Formation', 7410000, 9860000]] }
+  { id: 'sal', nom: 'Salaires', el: 'Élément de salaire', un: 'élément de salaire', court: 'éléments', rub: [['Brut Réel', 982450000, 951300000, 521, false], ['Salaire brut garantie', 412380500, 396215000, 521, true]] },
+  { id: 'pri', nom: 'Primes', el: 'Type de prime', un: 'type de prime', court: 'primes', rub: [['Primes exceptionnelles', 12600000, 18250000, 15, false], ['Primes sur ventes', 96250000, 84730000, 42, true],
+      ['Primes sur résultats', 54800000, 58900000, 38, true], ['Bonus', 31400000, 27650000, 27, true], ['Productivité Ateliers', 22915600, 19880400, 64, true], ['Commission', 41320000, 38410000, 31, true]] },
+  { id: 'ava', nom: 'Avantages et frais', el: 'Avantage ou frais', un: 'avantage ou frais', court: 'postes', rub: [['Frais de mission', 28450000, 25120000, 58, false], ['Logement site déporté', 17800000, 17800000, 23, false],
+      ['Carburant véhicule service', 21340500, 23680000, 47, false], ['Crédit téléphonique', 6920000, 6450000, 112, false]] },
+  { id: 'soc', nom: 'Charges sociales et autres', el: 'Nature de charge', un: 'nature de charge', court: 'charges', rub: [['Charges Patronales', 152640000, 146380000, 521, false], ['Assurance Maladie', 18930000, 18100000, 498, false], ['Formation', 7410000, 9860000, 74, false], ['TVA & Marge MAD', 9850000, 9420000, 42, false]] }
 ];
-const NB_PERS = { 'Salaire brut garantie': 521, 'Heures supplémentaires': 96, 'Primes sur ventes': 42, 'Primes sur résultats': 38, 'Bonus': 27, 'Productivité Ateliers': 64,
-  'Commission': 31, 'Primes exceptionnelles': 15, 'Frais de mission': 58, 'Logement site déporté': 23, 'Carburant véhicule service': 47, 'Crédit téléphonique': 112,
-  'Charges Patronales': 521, 'Assurance Maladie': 498, 'Formation': 74 };
-const REPARTS = {
-  site: { nom: 'Par site', col: 'Site', items: [['Douala', 38, 39], ['Yaoundé', 27, 27], ['Kribi', 12, 11], ['Garoua', 14, 14], ['Limbé', 9, 9]] },
-  service: { nom: 'Par service et activité', col: 'Service', sub: 'Activité', items: [['Commerce Pièces', 18, 19, 'Pièces de rechange'], ['SAV PL', 27, 27, 'Après-vente'],
-      ['SAV Engins', 16, 15, 'Après-vente'], ['Sites Déportés', 11, 10, 'Après-vente'], ['Pneumatique', 9, 10, 'Pièces de rechange'], ['Administration', 19, 19, 'Support']] },
-  contrat: { nom: 'Par nature de contrat', col: 'Nature de contrat', items: [['CDI', 78, 79], ['CDD', 12, 12], ['MAD', 8, 7], ['Stagiaire', 2, 2]] },
-  marque: { nom: 'Par marque', col: 'Marque', items: [['HINO', 31, 32], ['JCB', 14, 14], ['KING LONG', 9, 9], ['LOVOL', 11, 10], ['Renault Trucks', 17, 17], ['Toyota Material Handling', 8, 8], ['Non rattaché', 10, 10]] }
+const DIMS = {
+  site: { nom: 'Site', items: [['Yaoundé', 22], ['Douala', 30], ['Bertoua', 6], ['Ngaoundéré', 6], ['Garoua', 9], ['Dehane', 7], ['Libongo', 5], ['Njombe', 6], ['Dimon', 4], ['Nkoteng', 5]] },
+  service: { nom: 'Service', items: [['Commerce VN', 6], ['Commerce Pièces', 14], ['Administration', 12], ['SAV PL', 20], ['SAV Engins', 12], ['SAV Chariot', 6], ['Sites Déportés', 9], ['Pneumatique', 7], ['Winpart', 6], ['Motul', 4], ['Autofast', 4]] },
+  activite: { nom: 'Activité', items: [['Front office', 62], ['Back Office', 38]] },
+  contrat: { nom: 'Nature de contrat', items: [['CDI', 78], ['CDD', 12], ['MAD', 8], ['Stage', 2]] }
 };
-const PERS = [['M00418','Mbarga Étienne','Commerce Pièces','Douala'],['M00127','Nguemo Aurélie','SAV PL','Douala'],['M00356','Tchoumi Boris','SAV Engins','Yaoundé'],
-  ['M00582','Fotso Clarisse','Commerce Pièces','Yaoundé'],['M00203','Ateba Roland','Sites Déportés','Kribi'],['M00671','Ndongo Sylvie','Pneumatique','Garoua'],
-  ['M00094','Kamga Patrick','SAV PL','Douala'],['M00449','Essomba Nadège','Administration','Limbé'],['M00315','Biyong Hervé','SAV Engins','Douala'],['M00738','Mvondo Carine','Commerce Pièces','Garoua']];
-const POIDS = [9, 8.2, 7.4, 6.8, 6.1, 5.5, 5, 4.6, 4.2, 3.9];
-const FACT1 = [0.93, 1.08, 0.97, 1.04, 0.88, 1.12, 0.95, 1.0, 1.06, 0.91];
+const PRENOMS = ['Étienne', 'Aurélie', 'Boris', 'Clarisse', 'Roland', 'Sylvie', 'Patrick', 'Nadège', 'Hervé', 'Carine', 'Joël', 'Mireille', 'Serge', 'Prisca', 'Arnaud', 'Linda', 'Fabrice', 'Odile'];
+const NOMS = ['Mbarga', 'Nguemo', 'Tchoumi', 'Fotso', 'Ateba', 'Ndongo', 'Kamga', 'Essomba', 'Biyong', 'Mvondo', 'Eyenga', 'Djomo', 'Abena', 'Nkoulou', 'Owona', 'Tsala', 'Manga', 'Ewane', 'Bilong'];
 
-/* ---------- Formats français ---------- */
-const NBSP = ' ';
-const ent = n => String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+/* Effectif fictif : 521 personnes, réparties selon les pourcentages ci-dessus */
+function tirer(items, h) { let c = 0; for (const it of items) { c += it[1]; if (h < c) return it[0]; } return items[items.length - 1][0]; }
+const POOL = Array.from({ length: 521 }, (_, i) => ({
+  ix: i, mat: 'M' + String(10000 + ((i * 7919) % 89000)).padStart(5, '0'),
+  nom: `${NOMS[(i * 5) % NOMS.length]} ${PRENOMS[(i * 7 + 3) % PRENOMS.length]}`,
+  site: tirer(DIMS.site.items, (i * 37 + 11) % 100), service: tirer(DIMS.service.items, (i * 53 + 7) % 100),
+  activite: tirer(DIMS.activite.items, (i * 29 + 3) % 100), contrat: tirer(DIMS.contrat.items, (i * 61 + 17) % 100),
+  f: 0.86 + ((i * 13) % 27) / 100
+}));
+
+/* ---------- Mois : indice = année*12 + mois-1 ---------- */
+const MOIS = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+const PREMIER = 2024 * 12, DERNIER = 2026 * 12 + 9; /* données de janv. 2024 à oct. 2026 */
+const an = i => Math.floor(i / 12), mo = i => i % 12;
+function libelle(d, f) {
+  if (d === f) return `${MOIS[mo(d)]} ${an(d)}`;
+  if (mo(d) === 0 && mo(f) === 11 && an(d) === an(f)) return `Année ${an(d)}`;
+  if (an(d) === an(f)) return `${MOIS[mo(d)]} → ${MOIS[mo(f)].toLowerCase()} ${an(f)}`;
+  return `${MOIS[mo(d)]} ${an(d)} → ${MOIS[mo(f)].toLowerCase()} ${an(f)}`;
+}
+/* Un mois : comparé au mois précédent, sauf les Primes (saisonnières) comparées au même mois de l'année précédente.
+   Une plage : comparée à la même plage un an plus tôt. */
+const comparee = (d, f, fam) => d === f && fam !== 'pri' ? [d - 1, f - 1] : [d - 12, f - 12];
+const bas = s => s.charAt(0).toLowerCase() + s.slice(1);
+
+/* Montant d'une rubrique sur un mois (oct. et sept. 2026 = valeurs de référence) */
+function mois(r, ri, i) {
+  if (i === DERNIER) return r[1];
+  if (i === DERNIER - 1) return r[2];
+  return Math.round(r[2] * (1 + 0.04 * Math.sin(i * 1.7 + ri)) * (1 - 0.0025 * (DERNIER - 1 - i)));
+}
+const somme = (r, ri, d, f) => { let s = 0; for (let i = d; i <= f; i++) if (i >= PREMIER) s += mois(r, ri, i); return s; };
+
+/* ---------- Formats ---------- */
+const NB = ' ';
+const ent = n => String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NB);
 const mt = n => (n < 0 ? '−' : '') + ent(n);
-const ec = n => n === 0 ? '0' : (n > 0 ? '+' : '−') + ent(n);
-const pc = (n, n1) => n1 === 0 ? null : (n - n1) / n1 * 100;
-const fp = v => v === null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NBSP + '%';
-const part = v => v.toFixed(1).replace('.', ',') + NBSP + '%';
-const cl = n => n > 0 ? 'pos' : n < 0 ? 'neg' : 'nul';
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const ec = n => Math.round(n) === 0 ? '0' : (n > 0 ? '+' : '−') + ent(n);
+const pc = (n, n1) => !n1 ? null : (n - n1) / n1 * 100;
+const fp = v => v === null ? '—' : (v >= 0.05 ? '+' : v <= -0.05 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NB + '%';
+const part = v => v.toFixed(1).replace('.', ',') + NB + '%';
+const pts = v => (v >= 0.05 ? '+' : v <= -0.05 ? '−' : '') + Math.abs(v).toFixed(1).replace('.', ',') + NB + 'pt';
+const sa = v => (Math.round(v) > 0 ? '+' : Math.round(v) < 0 ? '−' : '') + abr(Math.abs(v)); /* écart signé abrégé */
+/* Une charge qui augmente est en rouge, une charge qui baisse en vert (le signe reste affiché) */
+const sens = n => Math.round(n) > 0 ? 'hausse' : Math.round(n) < 0 ? 'baisse' : ''; /* couleur selon la valeur affichée */
+const sensPc = v => v === null || Math.abs(v) < 0.05 ? '' : sens(v);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const sansAccent = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+/* Abrégé sans décimale dès 100 unités (683 K, 1 258 M), avec une décimale en dessous (25,7 K) */
+const abrC = n => { const a = Math.abs(n), u = a >= 1e9 ? [1e9, 'Md'] : a >= 1e6 ? [1e6, 'M'] : a >= 1e3 ? [1e3, 'K'] : [1, ''];
+  return a / u[0] >= 100 ? (n < 0 ? '−' : '') + Math.round(a / u[0]) + (u[1] ? NB + u[1] : '') : abr(n); };
+const SIGLES = { MAD: 'Mise à disposition', CDI: 'Contrat à durée indéterminée', CDD: 'Contrat à durée déterminée' };
+/* Montant abrégé comme les cases du Budget réalisé (3,7 K ; 982,5 M ; 1,4 Md) */
+const abr = n => { const a = Math.abs(n), u = a >= 1e9 ? [1e9, 'Md'] : a >= 1e6 ? [1e6, 'M'] : a >= 1e3 ? [1e3, 'K'] : [1, ''];
+  return (n < 0 ? '−' : '') + (a / u[0]).toFixed(u[1] ? 1 : 0).replace('.', ',') + (u[1] ? NB + u[1] : ''); };
 
-const somme = (rub, i) => rub.reduce((s, r) => s + r[i], 0);
-FAM.forEach(f => { f.n = somme(f.rub, 1); f.n1 = somme(f.rub, 2); });
-const TOTAL = { id: 'tot', nom: 'Total', n: FAM.reduce((s, f) => s + f.n, 0), n1: FAM.reduce((s, f) => s + f.n1, 0) };
+/* ---------- Budget et objectifs fictifs : saisis à partir de janv. 2025, montants par mois ---------- */
+const BUD_DEBUT = 2025 * 12, BUDGET_EMP = 2400000, JO = 22; /* JO : paramètre « jours ouvrés » (22 par défaut) */
+const BUD_RUB = { 'Brut Réel': 975e6, 'Primes exceptionnelles': 15e6, 'Frais de mission': 26e6, 'Logement site déporté': 17.8e6, 'Carburant véhicule service': 22e6, 'Charges Patronales': 150e6, 'Assurance Maladie': 18.5e6, 'Formation': 8.5e6, 'Crédit téléphonique': 6.5e6, 'TVA & Marge MAD': 9.5e6 };
+const ORDRE_RUB = ['Frais de mission', 'Primes exceptionnelles', 'Logement site déporté', 'Carburant véhicule service', 'Crédit téléphonique', 'Brut Réel', 'Charges Patronales', 'Assurance Maladie', 'Formation', 'TVA & Marge MAD'];
+const TYPE_SITE = { 'Yaoundé': 'principal', 'Douala': 'principal', 'Garoua': 'principal', 'Bertoua': 'agence', 'Ngaoundéré': 'agence',
+  'Dehane': 'deporte', 'Libongo': 'deporte', 'Njombe': 'deporte', 'Dimon': 'deporte', 'Nkoteng': 'deporte' };
+const BUD_DIM = { site: { 'Yaoundé': 260e6, 'Douala': 355e6, 'Bertoua': 70e6, 'Ngaoundéré': 70e6, 'Garoua': 105e6, 'Dehane': 80e6, 'Libongo': 55e6, 'Njombe': 65e6 },
+  service: { 'Commerce VN': 70e6, 'Commerce Pièces': 170e6, 'Administration': 150e6, 'SAV PL': 240e6, 'SAV Engins': 145e6, 'SAV Chariot': 70e6, 'Sites Déportés': 110e6, 'Winpart': 75e6 } };
+/* Effectifs : taux mensuels fictifs par nature de contrat [recrutement, départ, absence] */
+const TAUX = { CDI: [0.006, 0.007, 0.025], CDD: [0.05, 0.045, 0.02], MAD: [0.03, 0.03, 0.015], Stage: [0.15, 0.15, 0.01] };
+/* Activité : [valeur d'oct. 2026, objectif par mois] ; le serveur n'a d'objectifs saisis que pour ventes, clients, productivité et factures */
+const IND = { ventes: [1840, 1800], clients: [1215, 1200], or: [2960, null], devis: [1480, null], factures: [1185, 1200], prod: [0.87, 0.9], productifs: [214, null] };
+const CLES = Object.keys(IND);
+/* Activité d'une plage de mois (bloc Activité du Reporting global) : sommes des volumes, moyenne de la productivité.
+   Dépend du périmètre, du service et du site (POOLA), pas des filtres Activité ni Contrat. */
+const actMois = (k, i) => IND[k][0] * (1 + 0.06 * Math.sin(i * 1.3 + k.length) - (DERNIER - i) * 0.002);
+/* CA et marge : saisis au niveau global seulement (comme la v4) */
+const caPossible = () => !st.perim && !Object.values(st.flt).some(Boolean);
+const caMois = i => 6.85e9 * (1 + 0.03 * Math.sin(i)) * (1 - 0.003 * (DERNIER - i));
+const caPer = (d, f) => { let s = 0; for (let i = d; i <= f; i++) if (i >= PREMIER) s += caMois(i); return s; };
+/* Objectifs d'activité atteints : [atteints, suivis], objectifs fixés pour toute l'entreprise */
+const objGlobal = () => !(st.flt.service || st.flt.site || st.perim);
+function atteints(A) {
+  if (st.d < BUD_DEBUT || !objGlobal()) return null;
+  const nb = nbMois(); let ok = 0, n = 0;
+  for (const k of CLES) { const o = IND[k][1]; if (o == null) continue; n++; if (A[k] >= (k === 'prod' ? o : o * nb)) ok++; }
+  return [ok, n];
+}
+function activite(d, f) {
+  if (f < PREMIER) return null;
+  const fa = POOLA.length / POOL.length, nb = f - Math.max(d, PREMIER) + 1, A = {};
+  for (const k of CLES) { let t = 0; for (let i = Math.max(d, PREMIER); i <= f; i++) t += actMois(k, i); A[k] = k === 'prod' ? t / nb : Math.round(t * (k === 'productifs' ? 1 / nb : 1) * fa); }
+  A.objVentes = Math.round(IND.ventes[1] * nb * fa);
+  return A;
+}
 
 /* ---------- État ---------- */
-const st = { v: 'A', fam: null, rub: null, onglet: 'site', sansDroit: false };
+const st = { d: DERNIER, f: DERNIER, cal: null, flt: { service: '', site: '', activite: '', contrat: '' }, perim: false, menu: null, avis: '', ouv: [], fermeAuto: false, feuille: null, cherche: '', page: 0, parPage: 25, effMode: false };
 const $ = id => document.getElementById(id);
-const ligneComp = (n, n1) => `<td class="num">${mt(n1)}</td><td class="num">${mt(n)}</td><td class="num ${cl(n - n1)}">${ec(n - n1)}</td><td class="num ${cl(n - n1)}">${fp(pc(n, n1))}</td>`;
+const nbMois = () => st.f - st.d + 1;
 
-/* ---------- Niveau 1 : cartes ---------- */
-function html1() {
-  const carte = (f, tot) => `<button type="button" class="carte-charge${tot ? ' total' : ''}" data-fam="${f.id}" aria-pressed="${st.fam === f.id}">
-    <span class="nom">${esc(f.nom)}${tot ? ' des charges' : ''}</span>
-    <span class="montant">${mt(f.n)}</span><span class="devise">FCFA</span>
-    <span class="ligne"><span>N-1 : ${mt(f.n1)}</span></span>
-    <span class="ligne ecart ${cl(f.n - f.n1)}"><span>${ec(f.n - f.n1)}</span><span>${fp(pc(f.n, f.n1))}</span></span>
-    <span class="indice">Cliquer pour le détail ›</span></button>`;
-  return `<div class="cartes">${FAM.map(f => carte(f, false)).join('')}${carte(TOTAL, true)}</div>`;
+/* ---------- Filtres de la barre (maquette : un seul choix par filtre, l'appli en permet plusieurs) ---------- */
+const PERIM = 'SAV PL';
+const FLT = { service: { nom: 'Service', tous: 'Tous' }, site: { nom: 'Site', tous: 'Tous' }, activite: { nom: 'Activité', tous: 'Toutes' }, contrat: { nom: 'Contrat', tous: 'Tous' } };
+const UN = { site: 'Un seul site', service: 'Un seul service', activite: 'Une seule activité', contrat: 'Une seule nature de contrat' };
+const valeursFiltre = k => k === 'service' && st.perim ? [PERIM] : DIMS[k].items.map(x => x[0]);
+/* POOLA : périmètre, service et site (base de l'activité) ; POOLF : en plus activité et contrat (base des charges et des effectifs) */
+let POOLF = POOL, POOLA = POOL;
+function filtrer() {
+  const fl = st.flt, base = POOL.filter(p => !st.perim || p.service === PERIM);
+  POOLA = base.filter(p => (!fl.service || p.service === fl.service) && (!fl.site || p.site === fl.site));
+  POOLF = POOLA.filter(p => (!fl.activite || p.activite === fl.activite) && (!fl.contrat || p.contrat === fl.contrat));
+}
+const resumeFiltres = () => [...Object.entries(st.flt).filter(([, v]) => v).map(([k, v]) => `${FLT[k].nom} : ${v}`), ...(st.perim ? [`périmètre ${PERIM}`] : [])].join(', ');
+/* Budget disponible : mêmes règles que le serveur (chargement.py, rapports.py) */
+function dispo() {
+  const fl = st.flt, ac = fl.activite || fl.contrat;
+  return { periode: st.d >= BUD_DEBUT, rub: !fl.service && !fl.site && !st.perim && !ac, site: !fl.service && !st.perim && !ac, service: !fl.site && !ac, total: !fl.contrat };
 }
 
-/* ---------- Niveau 2 : tableau des rubriques puis répartitions ---------- */
-function repartir(items, tot, idx) { // idx : 1 = N, 2 = N-1 (poids en colonnes 1 et 2)
-  let reste = tot; const out = items.map((it, i) => {
-    if (i === items.length - 1) return reste;
-    const v = Math.round(tot * it[idx] / 100); reste -= v; return v;
+function chiffres() {
+  filtrer();
+  const fac = POOLF.length / POOL.length, nbm = nbMois(), B = dispo();
+  const [sd, sf] = comparee(st.d, st.f);
+  const fams = FAM.map((f, fi) => {
+    const [cd, cf] = comparee(st.d, st.f, f.id);
+    const rub = f.rub.map((r, ri) => {
+      const k = ri + fi * 7, b = BUD_RUB[r[0]];
+      return { nom: r[0], n: Math.round(somme(r, k, st.d, st.f) * fac), n1: cf < PREMIER ? null : Math.round(somme(r, k, cd, cf) * fac), n1s: sf < PREMIER ? null : Math.round(somme(r, k, sd, sf) * fac),
+        pers: Math.min(POOLF.length, Math.max(1, Math.round(r[3] * fac))), hors: r[4], bu: B.periode && B.rub && b && !r[4] ? b * nbm : null };
+    });
+    const ok = rub.filter(r => !r.hors), tot = k => ok.reduce((s, r) => s + r[k], 0);
+    return { id: f.id, nom: f.nom, el: f.el, un: f.un, court: f.court, rub, n: tot('n'), n1: cf < PREMIER ? null : tot('n1'), n1s: sf < PREMIER ? null : tot('n1s'), lc: libelle(cd, cf),
+      hors: rub.filter(r => r.hors).reduce((s, r) => s + r.n, 0), nbHors: rub.filter(r => r.hors).length, pers: Math.max(...rub.map(r => r.pers)),
+      bu: ok.every(r => r.bu !== null) ? tot('bu') : null };
   });
-  return out;
+  const T = { id: 'tot', nom: 'Toutes les charges', n: fams.reduce((s, f) => s + f.n, 0), n1: sf < PREMIER ? null : fams.reduce((s, f) => s + f.n1s, 0), lc: libelle(sd, sf), pers: POOLF.length,
+    bu: B.periode && B.total ? BUDGET_EMP * POOLF.length * nbm : null };
+  return { fams, T };
 }
-function html2() {
-  if (!st.fam) return '';
-  if (st.fam === 'tot') {
-    const lignes = FAM.map(f => `<tr class="depliable" data-fam="${f.id}" tabindex="0"><th scope="row"><span class="chev">›</span>${esc(f.nom)}</th>${ligneComp(f.n, f.n1)}</tr>`).join('');
-    return `<section class="section-niv"><div class="panneau"><h3>Total des charges, par type de charge <span class="micro">Octobre 2026</span></h3>
-      <p class="indication" style="padding:8px 12px 0">Cliquer sur une ligne pour ouvrir le détail du type de charge.</p>
-      <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Type de charge</th><th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th></tr></thead>
-      <tbody>${lignes}<tr class="total"><th scope="row">Total</th>${ligneComp(TOTAL.n, TOTAL.n1)}</tr></tbody></table></div></div></section>`;
+/* Personnes derrière une ligne : montants répartis, somme = montant de la ligne.
+   Quelques entrées (rien sur la période comparée) et sorties (rien sur la période) pour montrer leur étiquette. */
+/* Montants arrondis une seule fois, par personne, à partir d'un même groupe de base : les lignes de toutes les vues
+   (site, service, activité, contrat) en sont la somme, donc une même case a le même montant partout.
+   n1 vaut null quand la période comparée n'a aucune donnée. L'écart d'arrondi va à la personne la mieux dotée. */
+function repartir(liste, n, n1) {
+  const m = new Map(liste.map(p => [p.ix, { n: 0, n1: n1 == null ? null : 0 }])), flag = liste.length > 5, rang = new Map(liste.map((p, i) => [p.ix, i]));
+  const ventiler = (cle, tot, ecarte, poids) => {
+    let act = liste.filter(p => !ecarte(p)); if (!act.length) act = liste;
+    const w = act.map(p => poids(p) / (rang.get(p.ix) + 4)), sw = w.reduce((a, b) => a + b, 0);
+    let reste = tot;
+    act.forEach((p, i) => { const v = Math.round(tot * w[i] / sw); m.get(p.ix)[cle] = v; reste -= v; });
+    m.get(act[0].ix)[cle] += reste;
+  };
+  if (!liste.length) return m;
+  ventiler('n', n, p => flag && p.ix % 17 === 8 && p.ix % 13 !== 5, () => 1); /* sorties : rien sur la période */
+  if (n1 != null) ventiler('n1', n1, p => flag && p.ix % 13 === 5, p => p.f); /* entrées : rien sur la période comparée */
+  return m;
+}
+/* Les rubriques comptées, à plat, dans l'ordre du Reporting global */
+const rubPlat = fams => ORDRE_RUB.map(nom => { const fi = fams.findIndex(x => x.rub.some(r => r.nom === nom)), ri = fams[fi].rub.findIndex(r => r.nom === nom); return { r: fams[fi].rub[ri], fi, ri }; });
+
+/* ===== v5 : cartes KPI par axe (famille, type de charge, site, service, activité, contrat, marque) ===== */
+/* Marques fictives (maquette Marques) ; la liste réelle est attendue du client. Rattachement d'une personne par son activité. */
+const MARQUES = [['HINO', 31], ['Renault Trucks', 17], ['JCB', 14], ['LOVOL', 11], ['KING LONG', 9], ['Toyota Material Handling', 8], ['Sans marque (fonctions support)', 10]];
+DIMS.marque = { nom: 'Marque', items: MARQUES };
+POOL.forEach(p => { p.marque = tirer(MARQUES, (p.ix * 43 + 19) % 100); });
+
+/* Budget d'un axe : mêmes règles que le serveur ; renvoie la raison quand il n'est pas affiché */
+function budAxe(k) {
+  const B = dispo();
+  if (!B.periode) return 'Budget saisi à partir de janv. 2025 : la période choisie commence avant.';
+  if (k === 'activite') return 'Budget non suivi par activité.';
+  if (k === 'contrat') return 'Budget non suivi par nature de contrat.';
+  if (k === 'marque') return 'Budget non suivi par marque.';
+  if ((k === 'famille' || k === 'type') && !B.rub) return 'Budget par type de charge saisi pour toute l\'entreprise : masqué avec un filtre Service, Site, Activité ou Contrat, ou pour un compte à périmètre.';
+  if (k === 'site' && !B.site) return 'Budget par site non découpé par service, activité ni contrat : retirer ces filtres pour le voir.';
+  if (k === 'service' && !B.service) return 'Budget par service non découpé par site, activité ni contrat : retirer ces filtres pour le voir.';
+  return null;
+}
+
+/* Cartes de chaque axe. Site, service, activité, contrat, marque : montants répartis par personne à partir du total,
+   donc la somme des cartes d'un axe = « Toutes les charges ». Tri par montant décroissant ; types de charge dans l'ordre du Reporting global. */
+function donneesAxes(fams, T) {
+  const B = dispo(), nbm = nbMois(), rep = repartir(POOLF, T.n, T.n1);
+  const parDim = k => DIMS[k].items.map(([nom]) => {
+    const g = POOLF.filter(p => p[k] === nom); if (!g.length) return null;
+    const s = x => g.reduce((a, p) => a + rep.get(p.ix)[x], 0), b = B.periode && B[k] && BUD_DIM[k] && BUD_DIM[k][nom];
+    return { nom, n: s('n'), n1: T.n1 == null ? null : s('n1'), lc: T.lc, bu: b ? b * nbm : null, pers: g.filter(p => rep.get(p.ix).n > 0).length };
+  }).filter(Boolean).sort((a, b) => b.n - a.n);
+  return {
+    famille: fams.map(f => ({ nom: f.nom, n: f.n, n1: f.n1, lc: f.lc, bu: f.bu, info: f.nbHors ? `+ ${abr(f.hors)} FCFA non compris dans le total (${f.nbHors} ${f.nbHors > 1 ? f.court : f.un})` : '' })),
+    type: rubPlat(fams).map(({ r, fi }) => ({ nom: r.nom, n: r.n, n1: r.n1, lc: fams[fi].lc, bu: r.bu, pers: r.pers })),
+    site: parDim('site'), service: parDim('service'), activite: parDim('activite'), contrat: parDim('contrat'), marque: parDim('marque')
+  };
+}
+
+const fleche = s => !s ? '▬' : s === 'hausse' ? '▲' : '▼';
+const sensVar = (n, n1) => n1 == null ? '' : pc(n, n1) === null ? sens(n - n1) : sensPc(pc(n, n1));
+const signe = v => (v > 0 ? '+' : v < 0 ? '−' : '') + ent(v);
+
+/* Une case compacte : libellé | valeur, puis lignes libellé | chiffre (montant à côté du %) ; aucun chiffre répété dans la case */
+function uneCase(k, nom, val, devise, lignes, bulle, plus = '') {
+  const dl = typeof lignes === 'string' ? lignes : `<dl class="detail">${lignes.map(([t, v, e = '']) => `<dt>${t}</dt><dd>${v}</dd><dd>${e}</dd>`).join('')}</dl>`;
+  return `<a class="tuile case lien" href="#${k}" title="${esc(bulle)}"><span class="micro">${esc(nom)}</span><strong>${val}<span class="devise">${devise}</span></strong>${dl}${plus}</a>`;
+}
+const enC = (v, t) => `<span class="${sens(v)}">${t}</span>`;  /* hausse rouge, baisse verte */
+const fl = (s, couleur = true) => `<span aria-hidden="true"${couleur && s ? ` class="${s}"` : ''}>${fleche(s)}</span>`;
+/* Ligne « vs période » : valeur comparée à gauche, écart en valeur puis en % à droite */
+const ligneVs = (T, v1, txt1, ecart) => [`Évolution depuis ${esc(bas(T.lc))}`, v1 == null ? '—' : txt1, v1 == null ? '<i>pas de données</i>' : ecart];
+const GROUPES = [
+  { k: 'type', nom: 'Types de charge', un: ['type', 'types'] }, { k: 'site', nom: 'Sites', un: ['site', 'sites'] },
+  { k: 'service', nom: 'Services', un: ['service', 'services'] }, { k: 'marque', nom: 'Marques', un: ['marque', 'marques'] },
+  { k: 'act', nom: 'Activité' }, { k: 'eff', nom: 'Effectifs' }
+];
+/* v6 : une seule hiérarchie sur toutes les cartes.
+   1) le grand chiffre, 2) son évolution (la seule couleur de l'en-tête), 3) trois lignes nom | valeur | évolution.
+   Les 2 plus gros, puis la plus forte évolution parmi les autres (part ≥ 2 %) ; elle n'est en couleur que si l'écart est fort (≥ 20 %).
+   Détails secondaires (part, effectif, objectif, entrées/sorties) : au survol de la ligne et dans le tableau au clic. */
+const SEUIL_VAR = 20, PART_MIN = 2;
+function choisir3(l, ev) {
+  const r = l.slice(2).filter(x => ev(x) != null).sort((a, b) => Math.abs(ev(b)) - Math.abs(ev(a)))[0];
+  return r ? [...l.slice(0, 2), { ...r, motif: ev(r) > 0 ? 'hausse' : 'baisse' }] : l.slice(0, 3);
+}
+/* rows : { nom, val, e (évol. %), evTxt?, motif, titre } */
+function liste(rows) {
+  return '<div class="top3">' + ['poids', 'hausse', 'baisse'].filter(m => rows.some(x => x.motif === m)).map(m => {
+    const l = rows.filter(x => x.motif === m), fort = m !== 'poids' && l.some(x => Math.abs(x.e) >= SEUIL_VAR);
+    return `<div class="grp">${m === 'poids' ? '' : `<p class="motif">${fort ? 'Forte' : 'Plus forte'} ${m}</p>`}<ol>${l.map(x =>
+      `<li class="${m === 'poids' ? '' : fort ? 'alerte ' + m : 'remarque'}" title="${esc(x.titre || '')}"><span class="nom">${esc(x.nom)}</span><span class="mt">${x.val}</span>`
+      + (x.e == null ? '<span class="fle"></span><span class="ev">—</span>' : `<span class="fle">${fl(sensPc(x.e), false)}</span><span class="ev">${x.evTxt ?? fp(x.e)}</span>`) + '</li>').join('')}</ol></div>`;
+  }).join('') + '</div>';
+}
+/* Ligne sous le grand chiffre : info discrète à gauche, évolution à droite */
+const sous = (g, d = '') => `<p class="sous"><span class="g">${g}</span>${d ? `<span class="d">${d}</span>` : ''}</p>`;
+const evo = (s, txt, ecart, couleur = true) => `<span class="ecart">${ecart || ''}</span><span class="fle evo${couleur && s ? ' ' + s : ''}">${fl(s, false)}</span><span class="evo${couleur && s ? ' ' + s : ''}">${txt}</span>`;
+const sansDonnees = '<i>pas de données</i>';
+function top3(Lx, T) {
+  const c = T.n1 != null;
+  const tous = Lx.filter(x => x.n > 0).map(x => ({ ...x, p: x.n / T.n * 100, e: c ? pc(x.n, x.n1) : null, motif: 'poids' })).sort((a, b) => b.n - a.n);
+  const L = choisir3(tous, x => x.p >= PART_MIN ? x.e : null);
+  const mx = Math.max(0, T.n, ...L.map(x => x.n)), U = mx >= 1e6 ? [1e6, 'M'] : mx >= 1e3 ? [1e3, 'K'] : [1, ''];
+  const mtU = n => ent(Math.round(n / U[0])) + (U[1] ? NB + U[1] : '');
+  const d = c ? T.n - T.n1 : 0;
+  const rows = L.map(x => ({ nom: x.nom, val: mtU(x.n), e: x.e, motif: x.motif,
+    titre: `${x.nom} : ${mtU(x.n)} FCFA, ${part(x.p)} des charges, ${x.pers ?? '—'} personnes${x.e == null ? '' : `, ${fp(x.e)} depuis ${bas(T.lc)}`}` }));
+  return { tot: mtU(T.n), mtU, droite: c ? evo(sensVar(T.n, T.n1), fp(pc(T.n, T.n1)), (d > 0 ? '+' : d < 0 ? '−' : '') + mtU(Math.abs(d))) : sansDonnees, liste: liste(rows) };
+}
+function caseUnique(G, Lx) {
+  const fem = G.k === 'marque', nom = Lx[0] ? Lx[0].nom : '—';
+  const pq = G.k === 'service' && st.perim ? 'votre périmètre' : st.flt[G.k] ? 'le filtre' : 'la sélection';
+  return uneCase(G.k, G.nom, ent(Lx.length), ' ' + G.un[0], sous(`${esc(nom)} : ${fem ? 'seule' : 'seul'} ${G.un[0]} dans ${pq}`), `Clic : ${nom}, budget et personnes`);
+}
+function caseGroupe(G, D, T) {
+  if (['site', 'service', 'marque'].includes(G.k) && D[G.k].length <= 1) return caseUnique(G, D[G.k]);
+  if (G.k === 'type') {
+    const bulle = [D.hors[1] ? `Non compris dans le total : ${abr(D.hors[0])} FCFA (${D.hors[1]} rubriques)` : '', 'Clic : tous les types, budget et personnes'].filter(Boolean).join('\n');
+    const t3 = top3(D.type, T);
+    return uneCase(G.k, G.nom, t3.tot, ' FCFA', sous('total des charges', t3.droite), bulle, t3.liste);
   }
-  const f = FAM.find(x => x.id === st.fam);
-  const lignes = f.rub.map((r, i) => `<tr class="depliable${st.rub === i ? ' actif' : ''}" data-rub="${i}" tabindex="0"><th scope="row"><span class="chev">›</span>${esc(r[0])}</th>${ligneComp(r[1], r[2])}</tr>`).join('');
-  const tableRub = `<div class="panneau"><h3>${esc(f.nom)} : détail par rubrique <span class="micro">Octobre 2026 · FCFA</span></h3>
-    <p class="indication" style="padding:8px 12px 0">Cliquer sur une ligne pour voir les personnes concernées.</p>
-    <div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Rubrique</th><th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th></tr></thead>
-    <tbody>${lignes}<tr class="total"><th scope="row">Total ${esc(f.nom)}</th>${ligneComp(f.n, f.n1)}</tr></tbody></table></div></div>`;
-  return `<section class="section-niv">${tableRub}</section>`;
-}
-function htmlRepart() {
-  if (!st.fam || st.fam === 'tot') return '';
-  const f = FAM.find(x => x.id === st.fam), R = REPARTS[st.onglet];
-  const vN = repartir(R.items, f.n, 1), v1 = repartir(R.items, f.n1, 2);
-  const lignes = R.items.map((it, i) => `<tr${it[0] === 'Non rattaché' ? ' class="exclu"' : ''}><th scope="row">${esc(it[0])}</th>${R.sub ? `<td>${esc(it[3])}</td>` : ''}${ligneComp(vN[i], v1[i])}<td class="num">${part(vN[i] / f.n * 100)}</td></tr>`).join('');
-  const onglets = Object.entries(REPARTS).map(([k, r]) => `<button type="button" class="onglet" role="tab" data-onglet="${k}" aria-selected="${st.onglet === k}">${r.nom}</button>`).join('');
-  return `<section class="section-niv"><h3 style="margin:var(--sp-3) 0 var(--sp-2);font-size:var(--fs-base)">Répartition de « ${esc(f.nom)} »</h3><div class="onglets" role="tablist">${onglets}</div>
-    <div class="panneau"><div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">${R.col}</th>${R.sub ? `<th class="gauche">${R.sub}</th>` : ''}<th>N-1</th><th>N</th><th>Écart</th><th>Écart %</th><th>Part</th></tr></thead>
-    <tbody>${lignes}<tr class="total"><th scope="row">Total</th>${R.sub ? '<td></td>' : ''}${ligneComp(f.n, f.n1)}<td class="num">${part(100)}</td></tr></tbody></table></div></div></section>`;
-}
-
-/* ---------- Niveau 3 : personnes ---------- */
-function html3(dansTiroir) {
-  if (st.fam === null || st.fam === 'tot' || st.rub === null) return '';
-  const f = FAM.find(x => x.id === st.fam), r = f.rub[st.rub], nbp = NB_PERS[r[0]];
-  const titre = `<h3>${esc(r[0])} : personnes concernées</h3><p class="muted" style="font-size:var(--fs-sm);margin-top:4px">${esc(f.nom)} · octobre 2026 · FCFA</p>`;
-  const note = `<p class="panneau-note">Visible avec le droit nominatif ; sans ce droit : ${nbp} personnes, sans nom.</p>`;
-  let corps;
-  if (st.sansDroit) {
-    corps = `<div class="masque"><div class="alerte-info neutre"><b>${nbp} personnes</b> ont un montant sur cette ligne. Les noms, matricules et montants individuels ne sont pas affichés sans le droit nominatif.</div>
-      <table class="dense"><thead><tr><th class="gauche">Ligne</th><th>N-1</th><th>N</th><th>Écart</th></tr></thead><tbody><tr class="total"><th scope="row">Total (${nbp} personnes)</th><td class="num">${mt(r[2])}</td><td class="num">${mt(r[1])}</td><td class="num ${cl(r[1] - r[2])}">${ec(r[1] - r[2])}</td></tr></tbody></table></div>`;
-  } else {
-    const lim = Math.min(10, nbp);
-    const n = PERS.slice(0, lim).map((p, i) => Math.round(r[1] * POIDS[i] / 100));
-    const n1 = n.map((v, i) => Math.round(v * FACT1[i] * (r[2] / r[1])));
-    const sN = n.reduce((a, b) => a + b, 0), s1 = n1.reduce((a, b) => a + b, 0);
-    const lignes = PERS.slice(0, lim).map((p, i) => `<tr><td>${p[0]}</td><th scope="row">${p[1]}</th><td>${p[2]}</td><td>${p[3]}</td><td class="num">${mt(n1[i])}</td><td class="num">${mt(n[i])}</td><td class="num ${cl(n[i] - n1[i])}">${ec(n[i] - n1[i])}</td></tr>`).join('');
-    const autres = nbp > lim ? `<tr class="exclu"><td colspan="4">Autres personnes (${nbp - lim})</td><td class="num">${mt(r[2] - s1)}</td><td class="num">${mt(r[1] - sN)}</td><td class="num">${ec((r[1] - sN) - (r[2] - s1))}</td></tr>` : '';
-    corps = `<div class="panneau-corps"><table class="dense"><thead><tr><th class="gauche">Matricule</th><th class="gauche">Nom</th><th class="gauche">Service</th><th class="gauche">Site</th><th>N-1</th><th>N</th><th>Écart</th></tr></thead>
-      <tbody>${lignes}${autres}<tr class="total"><td colspan="4">Total (${nbp} personnes)</td><td class="num">${mt(r[2])}</td><td class="num">${mt(r[1])}</td><td class="num ${cl(r[1] - r[2])}">${ec(r[1] - r[2])}</td></tr></tbody></table></div>`;
+  if (G.k === 'site') {
+    const Lx = D.site, t3 = top3(Lx, T), som = {}, nb = {};
+    Lx.forEach(x => { const t = TYPE_SITE[x.nom] ?? 'principal'; som[t] = (som[t] ?? 0) + x.n; nb[t] = (nb[t] ?? 0) + 1; });
+    const types = [['principal', 'principal', 'principaux'], ['agence', 'agence', 'agences'], ['deporte', 'déporté', 'déportés']].filter(([t]) => nb[t]);
+    const bulle = ['Par type de site : ' + types.map(([t, u, p]) => `${nb[t]} ${nb[t] > 1 ? p : u} ${t3.mtU(som[t])}`).join(', '), 'Clic : tous les sites, budget et personnes'].join('\n');
+    return uneCase(G.k, G.nom, ent(Lx.length), Lx.length > 1 ? ' sites' : ' site', sous(types.map(([t, u, p]) => `${nb[t]} ${nb[t] > 1 ? p : u}`).join(' · ')), bulle, t3.liste);
   }
-  if (dansTiroir) return { titre, corps: `${corps}${note}` };
-  return `<section class="section-niv" id="blocPersonnes"><div class="panneau"><h3><span>${esc(r[0])} : personnes concernées <span class="micro">${esc(f.nom)} · octobre 2026</span></span></h3>${corps}${note}</div></section>`;
+  if (G.k === 'service' || G.k === 'marque') {
+    const Lx = D[G.k], t3 = top3(Lx, T);
+    const cmp = Lx.filter(x => x.n1 != null), h = cmp.filter(x => x.n > x.n1), bs = cmp.filter(x => x.n < x.n1), som = l => l.reduce((a, x) => a + x.n - x.n1, 0);
+    const g = cmp.length ? `${h.length} en hausse · ${bs.length} en baisse` : `pas de données depuis ${esc(bas(T.lc))}`;
+    const bulle = [cmp.length ? `En hausse : +${t3.mtU(som(h))} ; en baisse : −${t3.mtU(Math.abs(som(bs)))}` : '', `Clic : tous les ${G.un[1]}, budget et personnes`].filter(Boolean).join('\n');
+    return uneCase(G.k, G.nom, ent(Lx.length), ' ' + G.un[Lx.length > 1 ? 1 : 0], sous(g), bulle, t3.liste);
+  }
+  if (G.k === 'eff') {
+    const rep = repartir(POOLF, T.n, T.n1), c = T.n1 != null, paye = p => rep.get(p.ix).n > 0;
+    const e = POOLF.filter(paye).length, e1 = c ? POOLF.filter(p => rep.get(p.ix).n1 > 0).length : null;
+    const ent_ = l => l.filter(p => rep.get(p.ix).n > 0 && rep.get(p.ix).n1 === 0).length;
+    const sor_ = l => l.filter(p => rep.get(p.ix).n === 0 && rep.get(p.ix).n1 > 0).length;
+    const grp = DIMS.contrat.items.map(([nom]) => POOLF.filter(p => p.contrat === nom)).filter(l => l.some(paye))
+      .map(l => { const a = l.filter(paye).length, b = c ? l.filter(p => rep.get(p.ix).n1 > 0).length : 0;
+        return { nom: l[0].contrat, a, val: ent(a), e: c && b ? pc(a, b) : null, motif: 'poids',
+          titre: `${l[0].contrat}${SIGLES[l[0].contrat] ? ` (${SIGLES[l[0].contrat]})` : ''} : ${a} personnes, ${part(a / e * 100)} de l'effectif${c ? `, ${ent_(l)} entrées, ${sor_(l)} sorties` : ''}` }; })
+      .sort((x, y) => y.a - x.a);
+    const g = c ? `${ent_(POOLF)} entrées · ${sor_(POOLF)} sorties` : '';
+    return uneCase(G.k, G.nom, ent(e), ' pers.', sous(g, c ? evo(sens(e - e1), fp(pc(e, e1)), signe(e - e1), false) : sansDonnees),
+      `${e} personnes payées sur la période\nEntrée : payée sur la période, pas sur la période comparée ; sortie : l'inverse`, liste(choisir3(grp, x => x.e)));
+  }
+  if (G.k === 'act') {
+    const [sd, sf] = comparee(st.d, st.f), A = activite(st.d, st.f), A1 = T.n1 == null ? null : activite(sd, sf), nb = nbMois();
+    const v = T.n / A.ventes, v1 = A1 ? T.n1 / A1.ventes : null;
+    const NOMS = { ventes: 'Ventes', factures: 'Factures', clients: 'Clients', prod: 'Productivité', or: 'Ordres de réparation', devis: 'Devis' }, og = objGlobal();
+    const tous = Object.keys(NOMS).map(k => {
+      const o = IND[k][1] == null || !og ? null : k === 'prod' ? IND[k][1] : IND[k][1] * nb, val = A[k], val1 = A1 ? A1[k] : null, pr = k === 'prod';
+      const fmt = x => pr ? part(x * 100) : ent(x), e = val1 == null ? null : pc(val, val1);
+      return { nom: NOMS[k], val: fmt(val), e, evTxt: pr && val1 != null ? pts((val - val1) * 100) : undefined, motif: 'poids',
+        titre: `${NOMS[k]} : ${fmt(val)}${o ? `, objectif ${fmt(o)} (${Math.round(val / o * 100)}${NB}% atteint)` : ", pas d'objectif"}` };
+    });
+    const at = atteints(A);
+    return uneCase(G.k, 'Coût par vente', abrC(v), ' FCFA', sous(at ? `objectifs atteints : ${at[0]} sur ${at[1]}` : 'charges ÷ ventes', v1 == null ? sansDonnees : evo(sensVar(v, v1), fp(pc(v, v1)), sa(v - v1))),
+      'Coût par vente = charges ÷ nombre de ventes\nClic : ventes, CA, marge et objectifs en détail', liste(choisir3(tous, x => x.e)));
+  }
+  const Lx = D[G.k], raison = budAxe(G.k), n = T.n, n1 = T.n1, s = sensVar(n, n1);  /* même total pour les 4 cases de charges */
+  /* Budget : seulement les éléments qui en ont un (ex. 8 sites sur 10), taux = leur montant ÷ leur budget */
+  const avec = raison ? [] : Lx.filter(x => x.bu), bu = avec.length ? avec.reduce((a, x) => a + x.bu, 0) : null, nbu = avec.reduce((a, x) => a + x.n, 0);
+  const r = bu ? nbu / bu * 100 : null, part_ = avec.length < Lx.length ? ` (${avec.length}/${Lx.length})` : '';
+  const lignes = [ligneVs(T, n1, abr(n1), `${fl(s)} ${enC(n - n1, sa(n - n1))} (${fp(pc(n, n1))})`),
+    bu ? [`Budget${part_}`, abr(bu), `${enC(nbu - bu, sa(nbu - bu))} (<span class="${r > 100 ? 'hausse' : ''}">${Math.round(r)}${NB}%</span>)`] : ['Budget', '—', `<i>${raison ? 'non suivi' : 'non saisi'}</i>`]];
+  if (G.k === 'type' && D.hors[1]) lignes.push(['Hors total', abr(D.hors[0]), `<i>${D.hors[1]} rubriques</i>`]);
+  const bulle = [raison || '', 'Plus gros : ' + Lx.slice().sort((x, y) => y.n - x.n).slice(0, 3).map(x => `${x.nom} ${abr(x.n)}`).join(', ')].filter(Boolean).join('\n');
+  return uneCase(G.k, `${G.nom} (${Lx.length})`, abr(n), ' FCFA', lignes, bulle);
+}
+function rendreGroupes(fams, T) {
+  const D = donneesAxes(fams, T);
+  D.hors = [fams.reduce((a, f) => a + (f.hors || 0), 0), fams.reduce((a, f) => a + (f.nbHors || 0), 0)];
+  return `<section class="groupe resume-excel" aria-label="Indicateurs par groupe"><div class="cases six">${GROUPES.map(G => caseGroupe(G, D, T)).join('')}</div></section>`;
 }
 
-/* ---------- Fil d'Ariane (variante C) ---------- */
-function htmlFil() {
-  if (st.v !== 'C' || !st.fam) return '';
-  const f = st.fam === 'tot' ? { nom: 'Total' } : FAM.find(x => x.id === st.fam);
-  const seg = [];
-  seg.push(st.fam ? '<button type="button" data-fil="0">Charges</button>' : '<span class="courant">Charges</span>');
-  if (st.rub === null) seg.push(`<span class="courant">${esc(f.nom)}</span>`);
-  else { seg.push(`<button type="button" data-fil="1">${esc(f.nom)}</button>`); seg.push(`<span class="courant">${esc(f.rub[st.rub][0])}</span>`); }
-  return `<nav class="fil" aria-label="Fil d'Ariane">${seg.join('<span class="sep" aria-hidden="true">›</span>')}</nav>`;
+/* ---------- Navigation : vue d'ensemble → tableau d'un axe (#site), dépliable sur place ---------- */
+const chemin = () => location.hash.slice(1).split('/').filter(Boolean).map(decodeURIComponent).slice(0, 1);
+const href = (...c) => '#' + c.map(encodeURIComponent).join('/');
+function filAriane(c) {
+  const G = GROUPES.find(x => x.k === c[0]), noms = ['Répartition des charges', G.nom];
+  const li = noms.map((n, i) => i === noms.length - 1 ? `<li aria-current="page">${esc(n)}</li>` : `<li><a href="#">${esc(n)}</a></li>`).join('');
+  const ctx = `${esc(libelle(st.d, st.f))}<span class="sep-ctx">comparé à</span>${esc($('valComp')?.textContent || '')}`;
+  return `<div class="fil-nav"><button type="button" class="bouton bouton-secondaire petit" id="retour">← Retour</button><span class="fil-sep" aria-hidden="true"></span><nav aria-label="Fil d'Ariane"><ol>${li}</ol></nav><p class="fil-ctx">${ctx}</p></div>`;
+}
+const td = (v, cls = '') => `<td${cls ? ` class="${cls}"` : ''}>${v}</td>`;
+const ecartTd = (n, n1, couleur = true) => n1 == null ? td('<i>pas de données</i>') : td(`${fl(sensVar(n, n1), couleur)} ${(t => couleur ? enC(n - n1, t) : t)(Math.abs(n - n1) >= 1e4 ? sa(n - n1) : signe(n - n1))} (${fp(pc(n, n1))})`);
+const tableau = (titre, tete, corps, pied = '', note = '') => `<h2 class="axe-titre" id="axe-titre" tabindex="-1">${titre}</h2>
+  <div class="table-scroll"><table class="dense axe-table"><thead><tr>${tete.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${corps}</tbody>${pied ? `<tfoot>${pied}</tfoot>` : ''}</table></div>${note ? `<p class="axe-pied">${note}</p>` : ''}`;
+
+/* ---------- Tableau dépliable (repris de la v4) ---------- */
+const LOUPE = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>';
+const etiquette = p => p.n1 === 0 ? '<span class="etiq">Entrée</span>' : p.n === 0 ? '<span class="etiq">Sortie</span>' : '';
+const contexte = p => `${p.nom} · matricule ${p.mat} · ${p.service} · ${p.site} · ${p.activite} · ${p.contrat}`;
+const nomsDim = k => DIMS[k].items.map(x => Array.isArray(x) ? x[0] : (x.nom ?? x));
+const cpt = (g, c) => g.reduce((s, p) => s + (p[c] > 0 ? 1 : 0), 0);
+const cptU = (g, c) => new Set(g.filter(p => p[c] > 0).map(p => p.ix)).size;
+const tot = (g, c) => g.reduce((s, p) => s + (p[c] || 0), 0);
+const reduit = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Personnes regroupées par une dimension, dans l'ordre du référentiel */
+function grouper(ps, k) {
+  const m = new Map(nomsDim(k).map(n => [n, []]));
+  ps.forEach(p => { if (!m.has(p[k])) m.set(p[k], []); m.get(p[k]).push(p); });
+  return [...m].filter(([, g]) => g.length).map(([nom, g]) => ({ nom, n: tot(g, 'n'), n1: tot(g, 'n1'), eff: cpt(g, 'n'), eff1: cpt(g, 'n1'), gens: () => g }));
+}
+/* Un seul niveau de détail sous l'axe : l'activité (FO / BO), puis la liste des personnes ; sauté s'il n'a qu'une valeur */
+const niveaux = () => ['activite'];
+function enfants(x, niv) {
+  const ps = x.gens();
+  for (let i = 0; i < niv.length; i++) { const g = grouper(ps, niv[i]); if (g.length > 1) return { k: niv[i], items: g, reste: niv.slice(i + 1) }; }
+  return null;
+}
+const cVar = (n, n1) => {
+  if (!n1) return '<td class="num cel-var">—</td>';
+  const v = pc(n, n1);
+  return `<td class="num cel-var" title="Variation : ${mt(n - n1)} FCFA">${(n >= n1 ? '+' : '') + abr(n - n1)}<span class="pc ${sensPc(v)}">${fp(v)}</span></td>`;
+};
+const cBud = (n, bu) => !bu ? '<td class="num cel-bud">—</td>'
+  : `<td class="num cel-bud" title="Écart budget : ${mt(n - bu)} FCFA">${abr(bu)}<span class="pc ${n > bu ? 'hausse' : ''}">${Math.round(n / bu * 100)}${NB}%</span></td>`;
+const cEff = x => `<td class="num">${ent(x.eff)}<span class="var-eff" title="Écart avec la période comparée">${signe(x.eff - x.eff1)}</span></td>`;
+
+/* Une ligne de l'arbre, mêmes colonnes à tous les niveaux */
+function ligneArbre(x, d, parentN, ouverte, feuilleOuverte) {
+  const effMode = st.effMode;
+  const cl = ['ligne', d === 1 ? 'niv1' : d >= 2 ? 'niv2' : '', ouverte ? 'ouverte' : ''].filter(Boolean).join(' ');
+  const lib = `<th scope="row"><button type="button" class="depli-ligne" aria-expanded="${ouverte}"><span class="chevron" aria-hidden="true">${ouverte ? '▾' : '▸'}</span> ${esc(x.nom)}</button></th>`;
+  const part = `<td class="num">${parentN ? part_(x.n / parentN) : '—'}</td>`;
+  const cellules = effMode
+    ? `<td class="num">${ent(x.eff1)}</td><td class="num">${ent(x.eff)}</td><td class="num">${signe(x.eff - x.eff1)}</td>${part}<td class="num">${ent(x.gens().filter(p => p.n1 === 0).length)}</td><td class="num">${ent(x.gens().filter(p => p.n === 0).length)}</td>`
+    : `<td class="num">${mt(x.n1)}</td><td class="num">${mt(x.n)}</td>${cVar(x.n, x.n1)}${part}${cEff(x)}${cBud(x.n, x.bu)}`;
+  return `<tr class="${cl}" data-d="${d}" data-k="${esc(x.nom)}">${lib}${cellules}</tr>`;
+}
+const part_ = v => (v * 100).toFixed(1).replace('.', ',') + NB + '%';
+function listePersonnes(x, nc) {
+  const effMode = st.effMode, q = sansAccent(st.cherche.trim().toLowerCase());
+  const toutes = x.gens(), ps = q ? toutes.filter(p => sansAccent(`${p.nom} ${p.mat}`.toLowerCase()).includes(q)) : toutes;
+  const pages = Math.max(1, Math.ceil(ps.length / st.parPage));
+  if (st.page >= pages) st.page = pages - 1;
+  const a = st.page * st.parPage, vus = ps.slice(a, a + st.parPage);
+  const max = Math.max(...toutes.map(p => p.n), 1);
+  const statut = p => p.n1 === 0 ? '<span class="etiq entree">Entrée</span>' : p.n === 0 ? '<span class="etiq sortie">Sortie</span>' : '';
+  /* Mêmes colonnes que la ligne parente : aucune case vide, aucun décalage */
+  const lp = p => effMode
+    ? `<td class="num">${p.n1 ? '1' : '—'}</td><td class="num">${p.n ? '1' : '—'}</td><td class="num">${signe(p.n - p.n1)}</td><td class="num">—</td><td class="num">${p.n1 === 0 ? statut(p) : ''}</td><td class="num">${p.n === 0 && p.n1 ? statut(p) : ''}</td>`
+    : `<td class="num">${p.n1 ? mt(p.n1) : '—'}</td><td class="num">${mt(p.n)}</td>${p.n1 ? cVar(p.n, p.n1) : '<td class="num cel-var muet">—</td>'}<td class="num">${x.n ? part_(p.n / x.n) : '—'}</td>
+       <td class="cel-poids" colspan="2"><span class="poids" title="Poids dans ${esc(x.nom)} : ${x.n ? part_(p.n / x.n) : '—'}" aria-hidden="true"><span style="width:${(p.n / max * 100).toFixed(1)}%"></span></span>${statut(p)}</td>`;
+  const corps = vus.length ? vus.map(p => `<tr class="pers"><th scope="row" title="${esc(contexte(p))}"><span class="pers-nom">${esc(p.nom)}</span><span class="pers-mat">${esc(p.mat)}</span></th>${lp(p)}</tr>`).join('')
+    : `<tr class="pers"><td class="pers-vide" colspan="${nc}">Aucune personne ne correspond à « ${esc(st.cherche)} ».</td></tr>`;
+  const opt = [10, 25, 50, 100].map(v => `<option value="${v}"${v === st.parPage ? ' selected' : ''}>${v}</option>`).join('');
+  const rang = ps.length ? `${a + 1}–${a + vus.length} sur ${ent(ps.length)}` : `0 sur ${ent(toutes.length)}`;
+  const nav = pages > 1 || ps.length > 10 ? `<div class="pagine"><span class="rang" aria-live="polite">${rang}</span>
+      <button type="button" data-page="-1" aria-label="Page précédente"${st.page ? '' : ' disabled'}>‹</button>
+      <button type="button" data-page="1" aria-label="Page suivante"${st.page < pages - 1 ? '' : ' disabled'}>›</button>
+      <label for="parPage">Par page <select id="parPage">${opt}</select></label></div>` : '';
+  const recherche = toutes.length >= 10 ? `<span class="champ-loupe">${LOUPE}<input type="search" id="cherche" aria-label="Chercher une personne (nom ou matricule)" placeholder="Chercher un nom ou un matricule" autocomplete="off" value="${esc(st.cherche)}"></span>` : '';
+  const tete = `<tr class="pers-barre"><td colspan="${nc}"><div class="barre-liste">
+      <span class="liste-titre"><strong>${ent(toutes.length)} personne${toutes.length > 1 ? 's' : ''}</strong> · ${esc(x.nom)}</span>${recherche}${effMode ? '' : `<span class="legende-poids"><span class="poids" aria-hidden="true"><span style="width:60%"></span></span>Poids dans ${esc(x.nom)}</span>`}
+      <button type="button" class="bouton bouton-secondaire petit" id="exportListe">Exporter (Excel)</button></div></td></tr>`;
+  const pied = `<tr class="pers-pied"><td colspan="${nc}"><div class="pied-liste"><span>Consultation enregistrée (données nominatives).</span>${nav}</div></td></tr>`;
+  return tete + corps + pied;
+}
+const colgroup = nc => `<colgroup><col class="c-lib">${'<col>'.repeat(nc - 1)}</colgroup>`;
+/* Rendu récursif : ouvrir une ligne referme ses sœurs (st.ouv est un chemin) */
+function arbre(items, d, niv, parentN, nc, out) {
+  if (items.length === 1 && st.ouv[d] === undefined && !st.fermeAuto) st.ouv[d] = items[0].nom;
+  for (const x of items) {
+    const ouverte = st.ouv[d] === x.nom;
+    out.push(ligneArbre(x, d, parentN, ouverte));
+    if (!ouverte) continue;
+    const e = enfants(x, niv);
+    if (e) arbre(e.items, d + 1, e.reste, x.n || x.eff, nc, out);
+    else { st.feuille = x; out.push(listePersonnes(x, nc)); }
+  }
+}
+let figeAttente; const refiger = () => { cancelAnimationFrame(figeAttente); figeAttente = requestAnimationFrame(figer); };
+document.fonts?.ready.then(refiger); window.addEventListener('resize', refiger); /* le zoom navigateur déclenche aussi resize */
+function figer() {
+  const t = document.querySelector('#contenu table.arbre:not(.liste-pers)'); if (!t || !t.tHead) return;
+  [...t.tHead.rows[0].cells].forEach(c => { c.style.zIndex = 4; }); /* l'en-tête reste au-dessus des lignes figées */
+  let top = t.tHead.getBoundingClientRect().height;
+  [...t.tBodies[0].rows].filter(r => r.classList.contains('ouverte')).slice(0, 3).forEach(r => {
+    r.classList.add('fige'); [...r.cells].forEach(c => { c.style.position = 'sticky'; c.style.top = Math.floor(top * devicePixelRatio) / devicePixelRatio + 'px'; c.style.zIndex = 3; });
+    r.dataset.top = top; top += r.getBoundingClientRect().height - 1; /* hauteurs décimales : aucun jour entre deux lignes figées */
+  });
+  marquerCollees();
+}
+/* Une ligne figée est « collée » quand ses cellules ont quitté leur place naturelle (la ligne tr, elle, défile) */
+function marquerCollees() {
+  document.querySelectorAll('tr.fige').forEach(r => r.classList.toggle('collee', r.cells[0].getBoundingClientRect().top - r.getBoundingClientRect().top > 0.5));
+}
+let colleAttente; document.addEventListener('scroll', () => { cancelAnimationFrame(colleAttente); colleAttente = requestAnimationFrame(marquerCollees); }, { capture: true, passive: true });
+/* Amène la ligne cliquée juste sous ses lignes figées */
+function amener(d, k) {
+  const r = [...document.querySelectorAll('#contenu tr.ligne')].find(x => x.dataset.d === String(d) && x.dataset.k === k);
+  if (!r) return;
+  const t = r.closest('table'), haut = r.dataset.top ? +r.dataset.top : t.tHead.offsetHeight;
+  r.style.scrollMarginTop = haut + 'px';
+  r.scrollIntoView({ block: 'start', behavior: reduit() ? 'auto' : 'smooth' });
+  r.querySelector('.depli-ligne').focus({ preventScroll: true });
+}
+const champ = d => d.toutes.length >= 10 ? `<label class="cherche" for="cherche">Chercher<span class="champ-loupe">${LOUPE}<input type="search" id="cherche" placeholder="Nom ou matricule" autocomplete="off" value="${esc(st.cherche)}"></span></label>` : '';
+function ouvrir(d, k) {
+  const ferme = st.ouv[d] === k;
+  st.ouv = ferme ? st.ouv.slice(0, d) : [...st.ouv.slice(0, d), k];
+  if (ferme) st.fermeAuto = true;
+  st.cherche = ''; st.page = 0; rendre(); amener(d, k);
+  annoncer(ferme ? `${k} : détail replié` : `${k} : détail affiché`);
 }
 
-/* ---------- Rendu ---------- */
+/* Tableau d'un axe, présenté comme la v4 : clic sur une ligne = dépliage sur place (activité, puis les personnes) */
+const PREMIER_COL = { type: 'Type de charge', site: 'Site', service: 'Service', marque: 'Marque', eff: 'Service' };
+function racinesAxe(k, D, fams, T) {
+  const bud = !budAxe(k);
+  return D[k].map(x => {
+    let c; const gens = () => c ??= gensDe(k, x.nom, fams, T).map(({ p, n, n1 }) => ({ ...p, n, n1: n1 ?? 0 })).sort((a, b) => b.n - a.n);
+    return { nom: x.nom, n: x.n, n1: x.n1 ?? 0, bu: bud ? x.bu : null, gens, get eff() { return cpt(gens(), 'n'); }, get eff1() { return cpt(gens(), 'n1'); } };
+  });
+}
+/* Effectifs : présence par personne (payée ou non sur chaque période) */
+function presenceEff(T) {
+  const rp = repartir(POOLF, T.n, T.n1);
+  return POOLF.map(p => { const r = rp.get(p.ix); return { ...p, n: r.n > 0 ? 1 : 0, n1: r.n1 > 0 ? 1 : 0 }; });
+}
+function tableArbre(k, D, fams, T) {
+  const G = GROUPES.find(x => x.k === k), effMode = st.effMode = k === 'eff';
+  const pres = effMode ? presenceEff(T) : null;
+  const rs = effMode ? grouper(pres, 'service').sort((a, b) => b.eff - a.eff) : racinesAxe(k, D, fams, T);
+  const titre = `<h2 class="sr-only" id="axe-titre" tabindex="-1">${esc(G.nom)}</h2>`;
+  if (!rs.length) return titre + '<p class="vide-bloc">Aucune donnée pour cette sélection.</p>';
+  const lp = libelle(st.d, st.f), lc = T.lc, premier = PREMIER_COL[k];
+  const tete = effMode
+    ? [premier, `Effectif ${esc(lc)}`, `Effectif ${esc(lp)}`, 'Variation', 'Part', 'Entrées', 'Sorties']
+    : [premier, esc(lc), esc(lp), 'Variation', 'Part', 'Effectif', 'Budget'];
+  const nc = tete.length, out = [];
+  const N = rs.reduce((s, x) => s + (effMode ? x.eff : x.n), 0), N1 = rs.reduce((s, x) => s + (effMode ? x.eff1 : x.n1), 0);
+  st.feuille = null;
+  arbre(rs, 0, niveaux(k), N, nc, out);
+  const raison = effMode ? null : budAxe(k);
+  const buT = !effMode && !raison && rs.every(x => x.bu) ? rs.reduce((s, x) => s + x.bu, 0) : null;
+  const tous = effMode ? pres : rs.flatMap(x => x.gens()), effT = { eff: cptU(tous, 'n'), eff1: cptU(tous, 'n1') };
+  const pied = effMode
+    ? `<tr class="total"><th scope="row">TOTAL</th><td class="num">${ent(N1)}</td><td class="num">${ent(N)}</td><td class="num">${signe(N - N1)}</td><td class="num">100${NB}%</td><td class="num">${ent(pres.filter(p => p.n1 === 0).length)}</td><td class="num">${ent(pres.filter(p => p.n === 0).length)}</td></tr>`
+    : `<tr class="total"><th scope="row">TOTAL</th><td class="num">${mt(N1)}</td><td class="num">${mt(N)}</td>${cVar(N, N1)}<td class="num">100${NB}%</td>${cEff(effT)}${cBud(N, buT)}</tr>`;
+  const notes = [effMode ? 'Effectif : personnes payées sur la période. Entrée = absente de la période comparée ; sortie = absente de la période choisie.' : '',
+    raison || '', k === 'type' && D.hors[1] ? `+ ${abr(D.hors[0])} FCFA non compris dans le total (${D.hors[1]} rubriques).` : ''].filter(Boolean);
+  return titre + `<div class="charges-corps"><section class="panneau" aria-label="${esc(G.nom)}"><div class="panneau-corps"><table class="dense aligne large arbre">${colgroup(nc)}
+    <thead><tr>${tete.map((h, i) => `<th scope="col"${i ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead>
+    <tbody>${out.join('')}</tbody><tbody class="pied">${pied}</tbody></table></div></section></div>${notes.length ? `<p class="axe-pied">${notes.join(' ')}</p>` : ''}`;
+}
+function gensDe(k, nom, fams, T) {
+  if (k === 'type') {
+    const { r } = rubPlat(fams).find(x => x.r.nom === nom), h = [...nom].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const g = POOLF.filter(p => (p.ix * 7 + h) % POOLF.length < r.pers), rp = repartir(g, r.n, r.n1);
+    return g.map(p => ({ p, ...rp.get(p.ix) }));
+  }
+  const rp = repartir(POOLF, T.n, T.n1);
+  return POOLF.filter(p => p[k] === nom).map(p => ({ p, ...rp.get(p.ix) }));
+}
+/* Niveau 1, Activité : les indicateurs du bloc Activité, pas de niveau 2 */
+function tableActivite(T) {
+  const [sd, sf] = comparee(st.d, st.f), A = activite(st.d, st.f), A1 = T.n1 == null ? null : activite(sd, sf), nb = nbMois(), ca = caPossible();
+  const L = [['Ventes', A.ventes, A1 && A1.ventes, A.objVentes, ent], ['Clients', A.clients, A1 && A1.clients, IND.clients[1] * nb, ent], ['Factures atelier', A.factures, A1 && A1.factures, IND.factures[1] * nb, ent],
+    ['Coût par vente (FCFA)', T.n / A.ventes, A1 && T.n1 / A1.ventes, null, mt], ['Masse salariale par facture (FCFA)', T.n / A.factures, A1 && T.n1 / A1.factures, null, mt]];
+  if (ca) { const c = caPer(st.d, st.f), c1 = sf < PREMIER ? null : caPer(sd, sf);
+    L.push(["Chiffre d'affaires (FCFA)", c, c1, null, mt], ['Marge (FCFA)', c * 0.28, c1 && c1 * 0.28, null, mt]); }
+  const corps = L.map(([nom, v, v1, o, f]) => `<tr><th scope="row">${nom}</th>${td(f(v))}${td(v1 == null ? '—' : f(v1))}${v1 == null ? td('—') : ecartTd(v, v1, /FCFA/.test(nom) && !/affaires|Marge/.test(nom))}${td(o ? ent(o) : '—')}${td(o ? `<span class="${v < o ? 'hausse' : ''}">${Math.round(v / o * 100)}${NB}%</span>` : '—')}</tr>`).join('');
+  return tableau(`Activité · ${esc(libelle(st.d, st.f))}`, ['Indicateur', 'Période', bas(T.lc), 'Écart', 'Objectif', 'Réalisé'], corps, '',
+    ca ? 'Coût : une hausse est en rouge. CA et marge saisis pour toute l\'entreprise.' : 'CA et marge saisis pour toute l\'entreprise : masqués avec un filtre ou un compte à périmètre.');
+}
+function rendreDetail(c, fams, T) {
+  if (!GROUPES.some(x => x.k === c[0])) return null;
+  const D = donneesAxes(fams, T); D.hors = [fams.reduce((a, f) => a + (f.hors || 0), 0), fams.reduce((a, f) => a + (f.nbHors || 0), 0)];
+  return filAriane(c) + (c[0] === 'act' ? tableActivite(T) : tableArbre(c[0], D, fams, T));
+}
+
+function notes() {
+  return `<p>▲▼ comparé ${st.d === st.f ? 'au mois précédent' : 'à la même période un an plus tôt'}. Couleur seulement pour les écarts forts (≥ 20 %). Survoler une ligne pour le détail. K = milliers, M = millions de FCFA.</p>`;
+}
+function rendreMenus() {
+  for (const div of document.querySelectorAll('[data-flt]')) {
+    const k = div.dataset.flt, F = FLT[k], b = div.querySelector('.multi-bouton'), ouvert = st.menu === k;
+    $('val-' + k).textContent = st.flt[k] || F.tous;
+    b.setAttribute('aria-expanded', String(ouvert));
+    if (ouvert) b.setAttribute('aria-controls', `${k}-menu`); else b.removeAttribute('aria-controls');
+    div.classList.toggle('ouvert', ouvert);
+    div.querySelector('.multi-menu')?.remove();
+    if (!ouvert) continue;
+    const choix = [['', F.tous], ...valeursFiltre(k).map(v => [v, v])]
+      .map(([v, lib], i) => `<button type="button" class="choix${i ? '' : ' multi-tout'}" data-val="${esc(v)}" aria-pressed="${st.flt[k] === v}">${esc(lib)}</button>`).join('');
+    div.insertAdjacentHTML('beforeend', `<div class="multi-menu" id="${k}-menu" role="group" aria-labelledby="lib-${k}"><p class="multi-compte">Maquette : un seul choix ; l'appli en permet plusieurs.</p><div class="multi-liste">${choix}</div></div>`);
+  }
+}
+const fermerMenu = () => { st.menu = null; rendreMenus(); };
+
+function rendreCal() {
+  const c = st.cal; if (!c) return;
+  const y = c.an, sel = (i) => c.d !== null && i >= c.d && i <= (c.f ?? c.d);
+  $('cal').innerHTML = `<div class="cal-an"><button type="button" data-an="-1" ${y * 12 <= PREMIER ? 'disabled' : ''} aria-label="Année précédente">◀</button>
+      <button type="button" class="an" data-annee="${y}" title="Toute l'année">${y}</button>
+      <button type="button" data-an="1" ${y * 12 + 11 >= DERNIER + 2 ? 'disabled' : ''} aria-label="Année suivante">▶</button></div>
+    <div class="cal-mois">${MOIS.map((m, k) => { const i = y * 12 + k; const bord = c.d !== null && (i === c.d || i === (c.f ?? c.d));
+      return `<button type="button" data-mois="${i}" class="${bord ? 'bord' : sel(i) ? 'dans' : ''}" aria-pressed="${sel(i)}" aria-label="${bas(m)} ${y}" ${i > DERNIER || i < PREMIER ? 'disabled' : ''}>${m}</button>`; }).join('')}</div>
+    <div class="cal-pied"><span>${c.d === null ? 'Choisir un mois ou une plage' : libelle(c.d, c.f ?? c.d)}</span>
+      <button type="button" class="bouton bouton-primaire petit" id="calOk" ${c.d === null ? 'disabled' : ''}>OK</button></div>`;
+}
+
+/* Étape 2 : titre, filtres, puis les cases groupées par axe */
 function rendre() {
-  const C = st.v === 'C';
-  $('fil').innerHTML = htmlFil();
-  $('niv1').innerHTML = (C && st.fam) ? '' : html1();
-  let n2 = '', n3 = '';
-  if (C && st.rub !== null) n3 = html3(false);
-  else if (C) n2 = html2() + htmlRepart();
-  else { n2 = html2(); if (st.v === 'A') n3 = html3(false); n2 += htmlRepart(); }
-  $('niv2').innerHTML = n2;
-  $('niv3').innerHTML = n3;
-  // Variante A : la liste des personnes suit le tableau des rubriques, avant la répartition
-  if (st.v === 'A' && n3) { const t = document.querySelector('#niv2 .section-niv'); if (t) t.after($('blocPersonnes')); }
-  const tiroir = st.v === 'B' && st.rub !== null && st.fam !== 'tot';
-  if (tiroir) { const h = html3(true); $('tiroirTitre').innerHTML = h.titre; $('tiroirCorps').innerHTML = h.corps; }
-  $('tiroir').classList.toggle('ouvert', tiroir); $('voile').classList.toggle('ouvert', tiroir);
-  $('tiroir').setAttribute('aria-hidden', String(!tiroir));
+  const { fams, T } = chiffres();
+  $('valPeriode').textContent = libelle(st.d, st.f);
+  $('valComp').textContent = T.lc;
+  $('reinit').disabled = st.d === DERNIER && st.f === DERNIER && !Object.values(st.flt).some(Boolean);
+  rendreMenus();
+  const c = chemin(), det = POOLF.length && c.length ? rendreDetail(c, fams, T) : null;
+  $('contenu').innerHTML = det || (POOLF.length ? rendreGroupes(fams, T) : `<div class="vide-filtres"><p>Aucune personne ne correspond aux filtres (${esc(resumeFiltres())}).</p><button type="button" class="bouton bouton-secondaire petit" id="reinit2">Réinitialiser les filtres</button></div>`);
+  figer();
+  $('note').innerHTML = POOLF.length && !det ? notes() : '';
+  rendreCal();
 }
-function variante(k) {
-  st.v = k;
-  document.querySelectorAll('.onglet[data-var]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.var === k)));
-  const v = VARIANTES[k];
-  $('bandeau-variante').innerHTML = `<h2>Variante ${k} — ${v.nom}</h2><ul><li class="pour">${v.pour}</li><li class="contre">${v.contre}</li></ul>
-    <label class="coche option" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sansDroit"${st.sansDroit ? ' checked' : ''}> Option de la maquette : voir la page comme un compte sans le droit nominatif</label>`;
-  $('sansDroit').addEventListener('change', e => { st.sansDroit = e.target.checked; rendre(); });
-  rendre();
-}
-function fermerTiroir() { st.rub = null; rendre(); }
-
+const focus = sel => { const e = document.querySelector(sel); if (e) e.focus(); };
+const annoncer = t => { const a = $('annonce'), m = [st.avis && st.avis + '.', t].filter(Boolean).join(' '); st.avis = ''; a.textContent = ''; setTimeout(() => { a.textContent = m; }, 50); };
+function toast(t, ms = 2600) { const e = $('toast'); e.textContent = t; e.classList.add('vu'); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove('vu'), ms); }
+function fermerCal() { st.cal = null; $('ddPeriode').classList.remove('ouvert'); $('ddPeriode').querySelector('.multi-bouton').setAttribute('aria-expanded', 'false'); }
 document.addEventListener('click', e => {
-  const t = e.target;
-  const v = t.closest('[data-var]'); if (v) { variante(v.dataset.var); return; }
-  const c = t.closest('[data-fam]');
-  if (c) { st.fam = c.dataset.fam; st.rub = null; rendre(); if (st.v !== 'C') document.getElementById('niv2').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
-  const r = t.closest('tr[data-rub]'); if (r) { st.rub = +r.dataset.rub; rendre(); const b = $('blocPersonnes'); if (b) b.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); return; }
-  const o = t.closest('[data-onglet]'); if (o) { st.onglet = o.dataset.onglet; rendre(); return; }
-  const f = t.closest('[data-fil]'); if (f) { if (f.dataset.fil === '0') { st.fam = null; st.rub = null; } else st.rub = null; rendre(); return; }
-  if (t.closest('#tiroirFermer') || t.id === 'voile') fermerTiroir();
+  const t = e.target, c = st.cal;
+  if (t.closest('#retour')) { const ch = chemin(), haut = ch.length > 1 && ch[0] !== 'act' ? href(ch[0]) : '#';
+    if (pile.at(-2) === haut) history.back(); else location.hash = haut; return; }  /* Retour = Précédent du navigateur quand on vient du niveau du dessus */
+  if (t.closest('#exportListe')) {
+    const x = st.feuille, lc = $('valComp').textContent; if (!x) return;
+    toast(`Export Excel : ${x.gens().length} personnes de « ${st.ouv.join(' › ')} » (matricule, nom, service, site, activité, contrat, montants ${bas(lc)} et ${bas(libelle(st.d, st.f))}, variation, entrée ou sortie). Consultation enregistrée.`, 4500);
+    return;
+  }
+  if (t.closest('#cherche, .cherche')) return;
+  const l = t.closest('tr.ligne'); if (l) { ouvrir(+l.dataset.d, l.dataset.k); return; }
+  const pg = t.closest('[data-page]'); if (pg) { st.page += +pg.dataset.page; rendre(); focus(`[data-page="${pg.dataset.page}"]:not(:disabled)`); annoncer(document.querySelector('.pagine .rang')?.textContent || ''); return; }
+  if (t.closest('[data-statique]')) { if (st.menu) fermerMenu(); if (c) fermerCal(); toast('Maquette : filtre non simulé (l\'appli le propose).'); return; }
+  const fb = t.closest('[data-flt] > .multi-bouton');
+  if (fb) { const k = fb.parentElement.dataset.flt; if (c) fermerCal(); st.menu = st.menu === k ? null : k; rendreMenus(); if (st.menu) focus(`#${k}-menu [aria-pressed="true"]`); return; }
+  const ch = t.closest('.multi-menu .choix');
+  if (ch) {
+    const k = ch.closest('[data-flt]').dataset.flt;
+    st.flt[k] = ch.dataset.val; st.menu = null; st.ouv = []; st.fermeAuto = false; st.page = 0; rendre(); focus(`[data-flt="${k}"] > .multi-bouton`);
+    annoncer(`Filtre ${FLT[k].nom} : ${st.flt[k] || FLT[k].tous}. ${POOLF.length ? `${POOLF.length} personnes` : 'Aucune personne ne correspond'}.`); return;
+  }
+  if (st.menu && !t.closest('[data-flt]')) fermerMenu();
+  if (t.closest('#ddPeriode > .multi-bouton')) {
+    if (c) fermerCal(); else { st.cal = { an: an(st.f), d: st.d, f: st.f }; $('ddPeriode').classList.add('ouvert'); t.closest('.multi-bouton').setAttribute('aria-expanded', 'true'); rendreCal(); }
+    return;
+  }
+  if (c && t.closest('#cal')) {
+    const b = t.closest('button'); if (!b) return;
+    if (b.dataset.an) { c.an += +b.dataset.an; }
+    else if (b.dataset.annee) { const y = +b.dataset.annee; c.d = y * 12; c.f = Math.min(y * 12 + 11, DERNIER); }
+    else if (b.dataset.mois) {
+      const i = +b.dataset.mois;
+      if (c.d === null || c.f !== null && c.f !== c.d) { c.d = i; c.f = i; }
+      else if (i === c.d) { c.d = null; c.f = null; }
+      else { c.d = Math.min(c.d, i); c.f = Math.max(c.d, i); if (c.f - c.d > 11) c.d = c.f - 11; }
+    } else if (b.id === 'calOk') { st.d = c.d; st.f = c.f; fermerCal(); st.ouv = []; st.fermeAuto = false; st.page = 0; rendre(); focus('#ddPeriode > .multi-bouton'); annoncer(`Période : ${libelle(st.d, st.f)}, comparée à ${$('valComp').textContent}`); return; }
+    rendreCal(); return;
+  }
+  if (c && !t.closest('#ddPeriode')) fermerCal();
+  if (t.closest('#reinit, #reinit2')) {
+    st.d = DERNIER; st.f = DERNIER; for (const k in st.flt) st.flt[k] = ''; st.ouv = []; st.fermeAuto = false; st.page = 0; rendre();
+    focus('#ddPeriode > .multi-bouton'); annoncer(`Filtres réinitialisés : ${POOLF.length} personnes`); return;
+  }
+  if (t.closest('[data-export]')) {
+    const fl = resumeFiltres(), per = `période ${bas(libelle(st.d, st.f))} comparée à ${bas($('valComp').textContent)}`;
+    if (!POOLF.length) { toast(`Export PDF : titre, ${per}, filtres (${fl}), message « aucune donnée pour ces filtres », notes.`, 5500); return; }
+    toast(`Export PDF : titre, ${per}, filtres (${fl || 'aucun'}), puis les cases par axe telles qu'affichées (montant, variation, budget), notes${st.d === st.f ? ' et contrôles du mois' : ''}.`, 5500);
+  }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && st.v === 'B' && st.rub !== null) fermerTiroir();
-  if (e.key === 'Enter' && e.target.matches('tr.depliable')) e.target.click();
+  const tl = e.target.closest && e.target.closest('tr.ligne');
+  if (tl && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); ouvrir(+tl.dataset.d, tl.dataset.k); return; }
+  if (e.key !== 'Escape') return;
+  if (st.menu) { const k = st.menu; fermerMenu(); focus(`[data-flt="${k}"] > .multi-bouton`); }
+  else if (st.cal) { fermerCal(); focus('#ddPeriode > .multi-bouton'); }
+  else if (st.ouv.length) { const d = st.ouv.length - 1, k = st.ouv[d]; st.ouv = st.ouv.slice(0, d); st.fermeAuto = true; rendre(); amener(d, k); }
 });
-variante('A');
+document.addEventListener('input', e => {
+  if (e.target.id !== 'cherche') return;
+  st.cherche = e.target.value; st.page = 0; rendre();
+  const c = $('cherche'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); }
+  annoncer(`${document.querySelectorAll('tr.pers > th').length} personnes trouvées`);
+});
+document.addEventListener('change', e => { if (e.target.id === 'parPage') { st.parPage = +e.target.value; st.page = 0; rendre(); focus('#parPage'); } });
+
+/* Changement d'adresse (clic sur une case, le fil d'Ariane, Retour ou le bouton Précédent du navigateur) */
+const pile = [location.hash || '#'];  /* adresses visitées dans la page, pour que Retour et Précédent restent d'accord */
+window.addEventListener('hashchange', () => { const h0 = location.hash || '#'; if (pile.at(-2) === h0) pile.pop(); else pile.push(h0); st.ouv = []; st.fermeAuto = false; st.page = 0; st.cherche = ''; rendre(); window.scrollTo({ top: $('contenu').offsetTop - 80 }); const h = $('axe-titre'); if (h) h.focus({ preventScroll: true }); else focus('.groupe .case'); });
+rendre();
 </script>
 </body>
 </html>

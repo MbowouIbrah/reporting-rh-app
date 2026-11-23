@@ -65,6 +65,13 @@ def charger_refs(db: Session, type_site: Choix = None, scope: Scope | None = Non
     return Refs(libs(Service), libs(Activite), libs(Site), libs(TypeContrat), rub)
 
 
+def rubriques_paie(db: Session) -> tuple[str, ...]:
+    """Toutes les rubriques de paie, actives ou non, dans l'ordre du référentiel : une rubrique
+    désactivée garde ses montants dans les données et dans le total."""
+    return tuple(db.scalars(select(Rubrique.libelle).where(Rubrique.nature == "paie")
+                            .order_by(Rubrique.ordre)))
+
+
 def charger_params(db: Session, annee: int, mois: int) -> Params:
     d = date(annee, mois, 1)
     valeurs: dict[str, Decimal] = {}

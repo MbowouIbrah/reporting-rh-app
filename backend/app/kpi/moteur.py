@@ -195,7 +195,7 @@ def _avec_objectif(c: dict, cle: str, objectif: Decimal | None,
     """Cellule du réel complétée de son objectif (budget, écart, écart %) ; `budget_partiel` si
     une case attendue de l'objectif manque."""
     out = {**c, **_bud(c["m"], objectif)}
-    return {**out, "budget_partiel": True} if OBJECTIF[cle] in partiel else out
+    return {**out, "budget_partiel": True} if OBJECTIF.get(cle) in partiel else out
 
 
 def _ca_marge(pd: PeriodeData | None) -> dict:
@@ -280,7 +280,7 @@ def _bloc_activite(a: dict, a1: dict, partiel: frozenset[str] = frozenset(),
     def ligne(k: str) -> dict:
         c = _avec_partiel(cell(a[k], a1[k]),
                           any(d in partiel for d in DEPENDANCES_ACTIVITE.get(k, (k,))))
-        if objectifs is not None and k in OBJECTIFS_ACTIVITE:
+        if objectifs is not None and (k in OBJECTIFS_ACTIVITE or k == "ms_par_vente"):
             c = _avec_objectif(c, k, objectifs.get(k), partiel)
             c["realisation"] = _ratio(c["m"], c["budget"])
         return c
@@ -449,6 +449,7 @@ def mensuel(cur: PeriodeData, prev: PeriodeData | None, refs: Refs, params: Para
     # CA et marge se saisissent à part : le mois précédent peut en avoir sans ligne de paie.
     ca1, marge1 = (prev.ca, prev.marge) if prev else (None, None)
     objectifs = _objectifs(cur, budgets, params)
+    objectifs["ms_par_vente"] = _ratio(objectifs["ms"], objectifs["ventes"])
     activite = _bloc_activite(_activite(cur), _activite(prev), cur.partiel, objectifs)
     prev = _ok(prev)
     ms, ms1 = cur.ms, prev.ms if prev else None
@@ -903,6 +904,11 @@ def annuel(
     objectifs_activite = {k: objectif_cumul(k, [m for m, a in activite_n.items()
                                                  if a[k] is not None])
                           for k in OBJECTIFS_ACTIVITE}
+    # Objectif de masse salariale par vente = budget total de la période / objectif de ventes, sur
+    # les seuls mois qui ont un objectif de ventes (mêmes mois au numérateur et au dénominateur)
+    budget_ms = _somme_opt(objectifs_n[m]["ms"] for m in ok if objectifs_n[m]["ms"] is not None
+                           and objectifs_n[m]["ventes"] is not None)
+    objectifs_activite["ms_par_vente"] = _ratio(budget_ms, objectifs_activite["ventes"])
     # Résumé : cumuls N-1 sur la même période, part des MAD et CA par effectif moyen global
     # (docs/QUESTIONS_CLIENT.md C1, C3).
     avec_ca1 = [m for m in sorted(n1) if m <= mois and n1[m].ca is not None]

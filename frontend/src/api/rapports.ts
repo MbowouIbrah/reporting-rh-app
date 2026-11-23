@@ -1,6 +1,6 @@
 import type { Calendrier } from '../lib/exercice'
 import { api, telecharger } from './client'
-import type { Annuel, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
+import type { Annuel, AxeCharge, Charges, ChargesPersonne, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
 
 export interface FiltresPage {
   annee: number
@@ -58,6 +58,13 @@ const paramsAnnuel = (f: FiltresPage) => {
   return reste
 }
 export const getAnnuel = (f: FiltresPage) => api<Annuel>(`/rapports/annuel${qs(paramsAnnuel(f))}`)
+/** Répartition des charges : axes (type, site, service, activité, contrat), effectifs et activité, sur la période choisie (`du`, `au`). */
+export const getCharges = (f: FiltresPage) => api<Charges>(`/rapports/charges${qs(paramsAnnuel(f))}`)
+/** Personnes d'une ligne d'axe (droit nominatif, lecture journalisée) ; `ligneActivite` : sous-ligne d'activité. */
+export const getChargesPersonnes = (f: FiltresPage, axe: AxeCharge, valeur: string, ligneActivite?: string) =>
+  api<ChargesPersonne[]>(
+    `/rapports/charges/personnes${qs({ ...paramsAnnuel(f), axe, valeur, ligne_activite: ligneActivite })}`,
+  )
 /** Graphes d'évolution en classeur Excel : vrais graphiques liés à leurs données (retours N2, point 2). */
 export const exporterGraphes = (f: FiltresPage, ids: string[]) =>
   telecharger(

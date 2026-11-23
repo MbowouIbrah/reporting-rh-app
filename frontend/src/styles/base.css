@@ -1521,6 +1521,9 @@ table.tableau-squelette td { height: 2.1em; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple :is(select, input) { width: 100%; min-width: 72px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple .multi-bouton { width: 100%; min-width: 92px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie { min-width: 0; }
+  /* Filtres à choix multiples (hors Période) : ils rétrécissent avant de faire passer la barre à la ligne */
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: 0 1 auto; min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: 100%; min-width: 60px; }
 }
 .filtres-titre {
   display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px;
@@ -1796,3 +1799,171 @@ body { padding-bottom: var(--bandeau-h, 0px); }
 .rapport-excel .panneau table.activite-tab .jauge { display: inline-block; width: 48px; height: 6px; background: var(--rule); }
 .rapport-excel .panneau table.activite-tab .jauge > span { display: block; height: 100%; background: var(--navy-2); }
 .rapport-excel .panneau table.activite-tab .jauge.atteint > span { background: var(--success); }
+
+/* Répartition des charges : six cartes par axe, puis le tableau de l'axe, dépliable sur place (axe > activité > personnes) */
+/* Hausse d'une charge = rouge, baisse = vert ; le signe et la flèche restent affichés (jamais la couleur seule) */
+.hausse { color: var(--red-deep); }
+.baisse { color: var(--success); }
+.vide-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-4); border: 1px solid var(--rule-strong); background: var(--surface); }
+.vide-filtres p, .vide-bloc { margin: 0; color: var(--ink); }
+.vide-bloc { padding: var(--sp-4); border: 1px solid var(--rule-strong); background: var(--surface); }
+
+/* Cartes : mêmes cases que le Budget réalisé */
+.groupe { margin: 0 0 var(--sp-4); }
+.groupe .cases { margin-bottom: 0; }
+.groupe .case .micro { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.groupe .cases.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.groupe.resume-excel .cases .case { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'titre valeur'; align-items: center; column-gap: var(--sp-2); row-gap: 0; container-type: inline-size; padding: var(--sp-3) var(--sp-4); }
+.groupe.resume-excel .cases .case .micro { grid-area: titre; }
+.groupe.resume-excel .cases .case strong { grid-area: valeur; font-size: min(var(--fs-2xl), 8cqi); line-height: 1.1; white-space: nowrap; min-height: 0; padding-top: 0; }
+.groupe .case { --v6: minmax(0, 1fr) 7ch 1.4em 6.4ch; }
+.groupe .case.lien { color: inherit; text-decoration: none; cursor: pointer; }
+.groupe .case.lien:hover { border-color: var(--navy); }
+.groupe .case.lien:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.groupe .case.lien .micro::after { content: ' ›'; color: var(--muted); }
+.groupe.resume-excel .case .sous { grid-column: 1 / -1; display: grid; grid-template-columns: var(--v6); column-gap: 6px; align-items: center; height: 22px; line-height: 22px; margin: 2px 0 10px; font-size: var(--fs-xs); color: var(--muted); }
+.groupe.resume-excel .case .sous .g { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.groupe.resume-excel .case .sous .d { display: contents; }
+.groupe.resume-excel .case .sous .ecart { text-align: right; font-variant-numeric: tabular-nums; }
+.groupe.resume-excel .case .sous .evo { font-size: var(--fs-sm); font-weight: 700; line-height: 22px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.groupe.resume-excel .case .sous .fle.evo { text-align: center; }
+.groupe.resume-excel .case .sous .evo.hausse { color: var(--red-deep); }
+.groupe.resume-excel .case .sous .evo.baisse { color: var(--success); }
+.groupe.resume-excel .case .top3 { grid-column: 1 / -1; margin-top: 0; padding-top: 8px; border-top: 1px solid var(--rule); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.groupe.resume-excel .case .top3 .grp { margin-top: 0; }
+.groupe.resume-excel .case .top3 .grp + .grp { margin-top: 6px; }
+.groupe.resume-excel .case .top3 ol { display: grid; gap: 0; list-style: none; margin: 0; padding: 0; }
+.groupe.resume-excel .case .top3 ol li { display: grid; grid-template-columns: var(--v6); column-gap: 6px; align-items: center; line-height: 1.55; font-size: var(--fs-sm); padding: 0; margin: 0; }
+.groupe.resume-excel .case .top3 li .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.groupe.resume-excel .case .top3 li :is(.mt, .ev) { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--fs-sm); font-weight: 400; }
+.groupe.resume-excel .case .top3 li .mt { color: var(--ink); }
+.groupe.resume-excel .case .top3 li .fle { text-align: center; color: var(--muted); font-size: var(--fs-xs); }
+.groupe.resume-excel .case .top3 li .ev { display: block; color: var(--muted); padding-left: 0; }
+.groupe.resume-excel .case .top3 .motif { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: var(--fs-xs); color: var(--muted); }
+.groupe.resume-excel .case .top3 li.alerte { --c: var(--red-deep); margin-inline: calc(-1 * var(--sp-2)); padding-inline: var(--sp-2); box-shadow: inset 3px 0 0 var(--c); background: color-mix(in srgb, var(--c) 7%, transparent); }
+.groupe.resume-excel .case .top3 li.alerte.baisse { --c: var(--success); }
+.groupe.resume-excel .case .top3 li.alerte :is(.ev, .fle) { color: var(--c); font-weight: 700; }
+@media (max-width: 900px) { .groupe .cases.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .groupe .cases.six { grid-template-columns: minmax(0, 1fr); } }
+.charges-note p { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--muted); }
+.charges-note .partiel { color: var(--ink); }
+
+/* Fil d'Ariane et retour */
+.fil-nav { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-4); padding: 0 0 var(--sp-3); border-bottom: 1px solid var(--rule-strong); }
+.fil-nav nav { min-width: 0; }
+.fil-sep { width: 1px; height: 24px; background: var(--rule-strong); }
+.fil-ctx { margin: 0 0 0 auto; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+.fil-ctx .sep-ctx { margin: 0 .4em; }
+.fil-nav ol { display: flex; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); }
+.fil-nav li + li::before { content: '›'; margin-right: 4px; color: var(--muted); }
+.fil-nav a { color: var(--muted); text-decoration: none; }
+.fil-nav a:hover, .fil-nav a:focus-visible { color: var(--navy); text-decoration: underline; }
+.fil-nav [aria-current] { font-weight: 600; color: var(--ink); }
+@media (max-width: 700px) { .fil-nav { flex-wrap: wrap; } .fil-ctx { margin-left: 0; flex-basis: 100%; } .fil-sep { display: none; } }
+
+/* Tableau d'un axe */
+.axe-titre { margin: 0 0 2px; font-size: var(--fs-lg); color: var(--navy); }
+.axe-table th:not(:first-child), .axe-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.axe-table .hausse { color: var(--red-deep); }
+.axe-table .baisse { color: var(--success); }
+.axe-pied { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--muted); }
+
+.charges-corps { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-3); align-content: start; }
+.charges-corps > .panneau { flex: 0 0 auto; }
+.charges-corps .panneau-corps { overflow: visible; }
+.charges-corps table.dense { width: 100%; }
+.charges-corps table.dense tr.total :is(th, td) { background: var(--rapport-total); font-weight: var(--fw-bold); }
+/* Pas de séparateur vertical (un seul repère vertical, la barre marine de la ligne ouverte) */
+.charges-corps .panneau table.dense :is(th, td) { border-inline: 0; }
+.charges-corps table.dense th:first-child { width: 34%; }
+/* En-tête visible au défilement, Total collé en bas de la zone visible */
+.charges-corps .panneau-corps > table.dense > thead th { position: sticky; top: 0; z-index: 4; background: var(--surface); color: var(--navy); border-bottom: 2px solid var(--navy); }
+.charges-corps .panneau table.dense tbody.pied { position: sticky; bottom: 0; z-index: 2; }
+
+/* Ligne dépliable : bouton dans la 1re cellule, toute la ligne reste cliquable à la souris */
+.charges-corps table.dense tr.ligne { cursor: pointer; }
+.charges-corps table.dense tr.ligne:hover > * { background: var(--info-soft); }
+.charges-corps .panneau table.dense tbody tr.ligne.ouverte:nth-child(n) > * { background: var(--info-soft); background-image: none; font-weight: var(--fw-bold); }
+.depli-ligne { all: unset; display: inline; cursor: pointer; }
+.depli-ligne:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.var-eff { margin-left: 6px; font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--ink); }
+.etiq { display: inline-block; margin-left: 6px; padding: 0 5px; font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: 1.5; color: var(--navy); background: var(--info-soft); border: 1px solid var(--navy-3); }
+.etiq.entree { color: var(--success); border-color: var(--success); background: color-mix(in srgb, var(--success) 10%, var(--surface)); }
+.etiq.sortie { color: var(--red-deep); border-color: var(--red-deep); background: color-mix(in srgb, var(--red-deep) 8%, var(--surface)); }
+.champ-loupe { position: relative; display: inline-flex; }
+.champ-loupe svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.champ-loupe input { width: 220px; height: 32px; padding-left: 30px; }
+@media (max-width: 700px) { .champ-loupe input { width: 100%; } }
+
+/* Grand écran : la page garde sa structure (titre, filtres, fil d'Ariane fixes) ; seul le tableau défile.
+   flex 0 1 auto : un tableau court garde sa taille, un tableau long rétrécit jusqu'au bas de l'écran puis défile. */
+@media (min-width: 1100px) {
+  .page-ecran.rapport-excel #contenu, .page-ecran.rapport-excel .charges-corps { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .page-ecran.rapport-excel .charges-corps .panneau { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .page-ecran.rapport-excel .charges-corps .panneau-corps { flex: 0 1 auto; min-height: 0; overflow: auto; }
+}
+
+/* Colonnes : la 1re prend la place qui reste ; mêmes colonnes pour l'arbre et la liste des personnes */
+.rapport-excel .charges-corps table.dense.aligne.large :is(th, td) { width: auto; }
+.rapport-excel .charges-corps table.dense.aligne.arbre { table-layout: fixed; min-width: 760px; }
+.rapport-excel .charges-corps table.dense.aligne.large.arbre :is(th, td):first-child { width: 28%; }
+.charges-corps table.arbre col.c-lib { width: 28%; }
+.charges-corps table.arbre td.num { white-space: nowrap; }
+.charges-corps table.arbre .cel-var .pc, .charges-corps table.arbre .cel-bud .pc { display: inline-block; min-width: 4.6em; margin-left: 8px; font-size: var(--fs-sm); text-align: right; }
+.charges-corps table.arbre .cel-var .hausse, .charges-corps table.arbre .cel-bud .pc.hausse { color: var(--red-deep); }
+.charges-corps table.arbre .cel-var .baisse { color: var(--success); }
+.charges-corps table.arbre .cel-bud .pc.hausse { font-weight: var(--fw-bold); }
+.charges-corps .panneau table.arbre tbody tr.niv1:nth-child(n) > * { background: color-mix(in srgb, var(--info-soft) 45%, var(--surface)); background-image: none; }
+.charges-corps .panneau table.arbre tbody tr.niv2:nth-child(n) > * { background: var(--surface); background-image: none; }
+.charges-corps .panneau table.arbre tbody tr.ligne.ouverte:nth-child(n) > * { background: var(--info-soft); }
+.charges-corps .panneau table.arbre tbody tr.niv1 > th { padding-left: 30px; }
+.charges-corps .panneau table.arbre tbody tr.niv2 > th { padding-left: 52px; }
+
+/* Personnes : vraies lignes du tableau, sous la ligne ouverte */
+.charges-corps .panneau table.arbre tbody tr:is(.pers, .pers-barre, .pers-pied):nth-child(n) > * { background: var(--surface); background-image: none; font-weight: var(--fw-regular); }
+/* Bordures « séparées » : chaque cellule garde ses bordures, qui suivent donc les lignes figées. Le rail marine est une ombre interne. */
+.charges-corps .panneau table.arbre { border-collapse: separate; border-spacing: 0; }
+.charges-corps .panneau table.arbre > thead th { box-shadow: 0 -12px 0 0 var(--surface); }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr:is(.niv1, .niv2, .ouverte, .pers, .pers-barre, .pers-pied) > :first-child { box-shadow: inset 3px 0 0 var(--navy); }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.pers-pied > * { border-bottom: 2px solid var(--navy); }
+.charges-corps .panneau table.arbre tr.pers-pied .pied-liste, .charges-corps .panneau table.arbre tr.pers-barre .barre-liste { border-bottom: 0; }
+.charges-corps .panneau table.arbre tbody tr.pers > th { padding-left: 16px; }
+.charges-corps .panneau table.arbre tbody tr.pers:hover > * { background: var(--info-soft); }
+.charges-corps .panneau table.arbre tbody tr.pers { cursor: default; }
+.charges-corps .panneau table.arbre td.muet { color: var(--muted); }
+.charges-corps .panneau table.arbre td.pers-vide { padding: 16px; color: var(--muted); font-style: italic; }
+.charges-corps .panneau table.arbre tr:is(.pers-barre, .pers-pied) > td { padding: 0; }
+.pers-nom { display: block; color: var(--ink); }
+.pers-mat { display: block; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.barre-liste { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: 10px 16px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--info-soft) 35%, var(--surface)); }
+.barre-liste .liste-titre { font-size: var(--fs-sm); color: var(--muted); }
+.barre-liste .liste-titre strong { color: var(--navy); }
+.barre-liste .champ-loupe { flex: 1 1 240px; max-width: 360px; }
+.barre-liste .champ-loupe input { width: 100%; }
+.barre-liste #exportListe { margin-left: auto; }
+.legende-poids { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); }
+.legende-poids .poids { width: 32px; min-width: 0; }
+.pied-liste { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 8px 16px; font-size: var(--fs-xs); color: var(--muted); border-top: 1px solid var(--rule); border-bottom: 2px solid var(--navy); }
+.pagine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; font-size: var(--fs-sm); color: var(--ink); }
+.pagine .rang { font-variant-numeric: tabular-nums; }
+.pagine button { min-width: 32px; height: 32px; font: inherit; font-size: var(--fs-md); color: var(--navy); background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 8px; cursor: pointer; }
+.pagine button:hover:not(:disabled) { background: var(--info-soft); }
+.pagine button:disabled { opacity: .4; cursor: default; }
+.pagine label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.pagine select { height: 32px; padding: 0 6px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule-strong); }
+td.cel-poids { white-space: nowrap; }
+.poids { display: inline-block; width: calc(100% - 7em); min-width: 48px; max-width: 220px; height: 6px; vertical-align: middle; background: var(--rule); }
+.poids > span { display: block; height: 100%; background: var(--navy-3); }
+td.cel-poids .etiq { margin-left: 10px; }
+@media (max-width: 700px) {
+  .barre-liste .champ-loupe { max-width: none; }
+  .barre-liste #exportListe { margin-left: 0; }
+  .poids { display: none; }
+  .pagine { margin-left: 0; }
+}
+
+/* Lignes ouvertes réellement collées sous l'en-tête (défilement) : fondues en un seul bloc, rail marine continu. Au repos, séparation normale */
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > * { box-shadow: 0 -2px 0 0 var(--info-soft); }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child { box-shadow: 0 -2px 0 0 var(--info-soft); overflow: clip; overflow-clip-margin: 3px; }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child::before { content: ""; position: absolute; left: 0; top: -3px; bottom: -1px; width: 3px; background: var(--navy); pointer-events: none; }
+.charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee:has(+ tr.collee) > * { border-bottom-color: var(--info-soft); }

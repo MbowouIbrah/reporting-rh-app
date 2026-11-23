@@ -1,7 +1,8 @@
 import {
-  anneeEntiere, calendrierDe, cliqueMois, defautCmp, indice, libelle, libelleExercicePeriode, longueur, lireTexte, migrer,
+  anneeEntiere, calendrierDe, cliqueMois, defautCmp, indice, libelle, libelleExercicePeriode, longueur, lireTexte, migrer, migrerComparaison,
   mois, plage, versTexte,
 } from './periode'
+import { depuisMensuel } from '../components/VersCharges'
 
 const OCT_26 = indice(2026, 10)
 const JANV_23 = indice(2023, 1)
@@ -82,4 +83,28 @@ test('anciens filtres : cumul, mois, trimestre, année, plage, exercice fiscal',
   expect(migrer({ vue: 'plage', debut: '2', fin: '4' }, der, indice(2026, 5))).toEqual({ type: 'plage', d: indice(2026, 2), f: indice(2026, 4) })
   expect(migrer({ vue: 'annee', calendrier: 'fiscal', exercice: '2025' }, der, indice(2026, 5)))
     .toEqual({ type: 'plage', d: indice(2025, 4), f: indice(2026, 3) })
+})
+
+test('mois partagé (admin) : ne fixe pas la période, seule l’ancienne adresse /mensuel le traduit', () => {
+  const der = { annee: 2026, mois: 5 }
+  expect(migrer({ annee: '2025', mois: '3' }, der, indice(2026, 5))).toEqual(migrer({ annee: '2025' }, der, indice(2026, 5)))
+  expect(migrer({ mois: '3' }, der, indice(2026, 5))).toBeNull()
+  // Mensuel était en année civile, même si « fiscal » a été choisi ailleurs.
+  expect(depuisMensuel('?annee=2025&mois=2&calendrier=fiscal&exercice=2025')).toBe('?annee=2025&calendrier=fiscal&exercice=2025&periode=2025-02')
+  expect(depuisMensuel('?annee=2025&mois=3&cmp_periode=2025-1')).toBe('?annee=2025&periode=2025-03&comparee=2025-01')
+  expect(depuisMensuel('?annee=2025')).toBe('?annee=2025')
+})
+
+test('ancienne clé de comparaison de la page Mensuel : le mois comparé', () => {
+  expect(migrerComparaison({ cmp_periode: '2025-01' }, mois(indice(2025, 3)))).toEqual(mois(indice(2025, 1)))
+  expect(migrerComparaison({ cmp_periode: '2025-1' }, mois(indice(2025, 3)))).toEqual(mois(indice(2025, 1)))
+  expect(migrerComparaison({ cmp_periode: '2025-01' }, plage(indice(2025, 1), indice(2025, 3)))).toBeNull()
+  expect(migrerComparaison({ cmp_periode: 'x' }, mois(indice(2025, 3)))).toBeNull()
+})
+
+test('libellé d’une période écrite AAAA-MM, avec mois abrégés', async () => {
+  const { libelleTexte } = await import('./periode')
+  expect(libelleTexte('2026-01', '2026-01')).toBe('Janv. 2026')
+  expect(libelleTexte('2025-01', '2025-03')).toBe('Janv. → mars 2025')
+  expect(libelleTexte(undefined, undefined)).toBe('')
 })

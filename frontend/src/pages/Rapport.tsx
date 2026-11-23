@@ -4,15 +4,14 @@ import { type ComponentType, lazy, Suspense, useEffect, useRef, useState } from 
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { usePartage } from '../hooks/useFiltres'
-import { sectionsPermises, type IdSection } from '../lib/sectionsRapport'
-import Annuel from './Annuel'
+import { idsSections, sectionsPermises, type IdSection } from '../lib/sectionsRapport'
+import Charges from './Charges'
 import Individuel from './Individuel'
-import Mensuel from './Mensuel'
 import Resume from './Resume'
 
 const Graphes = lazy(() => import('./Graphes'))
 
-const PAGES: Record<IdSection, ComponentType> = { resume: Resume, graphes: Graphes, annuel: Annuel, mensuel: Mensuel, individuel: Individuel }
+const PAGES: Record<IdSection, ComponentType> = { resume: Resume, graphes: Graphes, charges: Charges, individuel: Individuel }
 
 /** Hauteur utile d'une page A4 paysage (210 mm moins 2 × 10 mm de marge), en px CSS, avec une marge de sécurité. */
 const PAGE_H = (190 * 96) / 25.4 - 12
@@ -49,7 +48,7 @@ export default function Rapport() {
   const [sp] = useSearchParams()
   const { can } = useAuth()
   const { partage: p } = usePartage()
-  const ids = (sp.get('sections') ?? '').split(',')
+  const ids = idsSections(sp.get('sections'))
   const parties = sectionsPermises(can).filter((s) => ids.includes(s.id))
   const occupe = useIsFetching() > 0
   const [pret, setPret] = useState(false)

@@ -296,11 +296,11 @@ async function parcoursAdmin(page) {
     await attente(400)
   } else cocher('N2-10 Cloche de notifications', false, 'bouton absent')
 
-  // Mensuel
-  if (await ouvrir(page, 'Mensuel', menu(page, 'Mensuel'), '1. Reporting global')) {
-    await controler(page, 'Mensuel')
+  // Répartition des charges (carte Total : reporting global et répartitions)
+  if (await ouvrir(page, 'Répartition des charges', menu(page, 'Répartition des charges'), '1. Reporting global')) {
+    await controler(page, 'Répartition des charges')
     await montrer(page, page.getByText('Période', { exact: true }).locator('xpath=ancestor::*[.//select or .//button][1]'), 'Filtres : période, comparaison, service, site, activité…', 2200)
-    await capture(page, 'mensuel')
+    await capture(page, 'charges')
     const sites = page.getByText('2. Répartition par site').first()
     cocher('N2-6 Détail par site présenté comme les services', await montrer(page, sites.locator('xpath=ancestor::*[.//table][1]'), 'N2-6 Sites présentés comme les services (mêmes colonnes, totaux)', 3000))
     const masse = page.locator('table.repartition tr.activite td.masse .part-badge').first()
@@ -319,16 +319,8 @@ async function parcoursAdmin(page) {
     const chariot = page.locator('table').getByText('SAV Chariot').first()
     cocher('N2-7 Service SAV Chariot présent dans les tableaux', await montrer(page, chariot, 'N2-7 Nouveau service : SAV Chariot', 2400), (await chariot.count()) ? '' : 'pas de ligne ce mois-ci')
     const fb = page.getByText('Front / Back office').first()
-    cocher('N2-3 Ratio front / back office (Mensuel)', await montrer(page, fb.locator('xpath=..'), 'N2-3 Ratio front office / back office, en pourcentage', 3200))
+    cocher('N2-3 Ratio front / back office (Répartition des charges)', await montrer(page, fb.locator('xpath=..'), 'N2-3 Ratio front office / back office, en pourcentage', 3200))
     await capture(page, 'front-back')
-  }
-
-  // Annuel
-  if (await ouvrir(page, 'Annuel', menu(page, 'Annuel'), '1. Reporting global')) {
-    await controler(page, 'Annuel')
-    const fb = page.getByText('Front / Back office').first()
-    cocher('N2-3 Ratio front / back office (Annuel)', await montrer(page, fb.locator('xpath=..'), 'N2-3 Le même ratio sur l’année', 2600))
-    await capture(page, 'annuel')
   }
 
   // Graphes + export Excel
@@ -452,7 +444,7 @@ async function liensPublics(page) {
 
 async function parcoursDop(page) {
   if (!(await connexion(page, 'dop.equipment', 'DOP Equipment'))) return
-  if (await ouvrir(page, 'Mensuel (DOP Equipment)', menu(page, 'Mensuel'), '1. Reporting global')) {
+  if (await ouvrir(page, 'Répartition des charges (DOP Equipment)', menu(page, 'Répartition des charges'), '1. Reporting global')) {
     const services = await page.locator('table').first().evaluate(() => document.body.innerText)
     const interdits = ['Commerce VN', 'Administration'].filter((s) => services.includes(s))
     const service = page.locator('xpath=//label[normalize-space(text()[1])="Service"]/select').first()
@@ -460,8 +452,8 @@ async function parcoursDop(page) {
     await montrer(page, service, `N2-9 Services visibles : ${options.filter((o) => o !== 'Tous').join(', ')}`, 3600)
     cocher('N2-9 DOP Equipment : seulement Equipment + Winpart', !interdits.length && !options.some((o) => /Commerce VN|Administration/.test(o)),
       interdits.length ? `voit aussi : ${interdits.join(', ')}` : `${options.length - 1} service(s)`)
-    await controler(page, 'Mensuel (DOP Equipment)')
-    await capture(page, 'dop-mensuel')
+    await controler(page, 'Répartition des charges (DOP Equipment)')
+    await capture(page, 'dop-charges')
 
     // Largeurs portable et téléphone
     for (const [w, h, nom] of [[1280, 720, 'portable'], [390, 844, 'téléphone']]) {
@@ -469,8 +461,8 @@ async function parcoursDop(page) {
       await annoncer(page, `Largeur ${nom} (${w} px)`)
       await attente(1200)
       await parcourirPage(page, 3)
-      await controler(page, `Mensuel (${nom})`)
-      await capture(page, `mensuel-${w}`)
+      await controler(page, `Répartition des charges (${nom})`)
+      await capture(page, `charges-${w}`)
     }
   }
   await deconnexion(page)

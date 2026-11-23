@@ -27,3 +27,5 @@ tools/recette/mail-liens.local.html
 
 # Dossier de dépôt de la paie (données réelles)
 /import/
+
+.impeccable/

@@ -110,10 +110,11 @@ Le calcul serveur existant (`_front_back`, par activité de la ligne) est étend
 - **Niveau 2** : clic sur une carte → tableau détaillé de cette charge (rubriques, colonnes N-1 / N / Écart / Écart %, comme les autres tableaux) puis les répartitions existantes (site, service et activité, nature de contrat, marque).
 - **Niveau 3** : clic sur une ligne de charge → liste des personnes qui ont un montant sur cette ligne (matricule, nom, service, site, montant, comparaison). Seulement pour les comptes qui ont le droit nominatif ; les autres voient le nombre de personnes, sans nom.
 - Variantes : détail dans la page sous les cartes (A), panneau latéral pour les personnes (B), navigation par fil d'Ariane (C).
+- **Remplacé par `docs/etude-repartition-charges.md`** (§ 4 et § 7, 18/11) : familles « Charges employeur » et carte « Toutes les charges », personnes dépliées sous la ligne (pas de tiroir), détail pour tous dans leur périmètre, marque non reprise. Ce paragraphe garde la demande d'origine.
 
 ### Variantes retenues (18/11)
 - Filtres : **A**, barre en ligne.
-- Répartition des charges : **B**, détail sous les cartes et liste des personnes dans un tiroir latéral.
+- Répartition des charges : **B**, détail sous les cartes et liste des personnes dans un tiroir latéral ; puis, décision du 18/11, personnes dépliées sous la ligne au lieu du tiroir (`docs/etude-repartition-charges.md` § 7).
 - Front / back office dans Budget réalisé : ni A ni B. On reprend la ligne déjà utilisée dans la carte Effectif global (3e ligne en pourcentage, détail au survol), pour rester cohérent.
 - Connexion : **A**, aplat navy avec motif discret.
 

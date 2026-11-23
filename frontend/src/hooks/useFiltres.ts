@@ -8,7 +8,7 @@ import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { type Calendrier, DEBUT_FISCAL, exerciceDe } from '../lib/exercice'
 import {
-  anneeDe, calendrierDe, defautCmp, indice, longueur, lireTexte, migrer, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
+  anneeDe, calendrierDe, defautCmp, indice, longueur, lireTexte, migrer, migrerComparaison, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
 } from '../lib/periode'
 import {
   abonnerPartage,
@@ -157,7 +157,7 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
   const periode: PeriodeChoisie | null = (() => {
     if (comparaison !== 'annee' || !derniere || min === undefined || max === undefined) return null
     const sel = lireTexte(p.periode, max) ?? migrer(p, derniere, max) ?? moisSel(max)
-    const cmp = lireTexte(p.comparee, max)
+    const cmp = lireTexte(p.comparee, max) ?? (lireTexte(p.periode, max) ? null : migrerComparaison(p, sel))
     return { sel, cmp: cmp && longueur(cmp) === longueur(sel) ? cmp : defautCmp(sel), min, max }
   })()
   const calendrier: Calendrier = periode
@@ -166,7 +166,7 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
   const fiscal = calendrier === 'fiscal' ? calendrier : undefined
   const exDerniere = derniere && exerciceDe(derniere.annee, derniere.mois, calendrier)
   // En fiscal, l'année est celle du début de l'exercice (2026 = avril 2026 → mars 2027), partagée
-  // sous sa propre clé : `annee` reste une année civile pour les autres pages (Mensuel).
+  // sous sa propre clé : `annee` reste une année civile pour les autres pages (mois choisi).
   const annee = periode ? anneeDe(periode.sel.d) : Number(fiscal ? p.exercice : p.annee) || exDerniere
   const finExercice = fiscal ? DEBUT_FISCAL - 1 : 12
   const moisDefaut = (annee === exDerniere ? derniere?.mois : finExercice) || finExercice
@@ -183,15 +183,17 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
 
   // Anciennes clés des pages annuelles (vue, mois de début et de fin, comparaison) : traduites en
   // période une fois, puis retirées.
-  const anciennes = ['vue', 'debut', 'fin', 'cmp', 'cmp_annee'] as const
+  const anciennes = ['vue', 'debut', 'fin', 'cmp', 'cmp_annee', 'cmp_periode'] as const
   const aMigrer = !!periode && anciennes.some((k) => p[k])
   const texteSel = periode && versTexte(periode.sel)
   const periodeLue = max !== undefined && !!lireTexte(p.periode, max)
+  const texteCmp = periode && versTexte(periode.cmp)
+  const cmpMigree = !!p.cmp_periode && !lireTexte(p.comparee, max)
   useEffect(() => {
     if (!aMigrer || !texteSel) return
     set({
       ...Object.fromEntries(anciennes.map((k) => [k, undefined])),
-      ...(!periodeLue && { periode: texteSel, comparee: p.comparee }),
+      ...(!periodeLue && { periode: texteSel, comparee: cmpMigree ? texteCmp ?? undefined : p.comparee }),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aMigrer, texteSel, periodeLue])

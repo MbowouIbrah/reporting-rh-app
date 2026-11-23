@@ -25,7 +25,7 @@ from app.security.policy import is_allowed
 LOG = logging.getLogger("app.notifications")
 
 LIEN_IMPORT = "/admin/saisie"
-LIEN_RAPPORT = "/mensuel"
+LIEN_RAPPORT = "/charges"
 
 
 def _de(mois: int, annee: int) -> str:

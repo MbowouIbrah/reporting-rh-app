@@ -11,8 +11,9 @@ from app.exports import graphiques as graphes_xlsx
 from app.exports import xlsx
 from app.imports.regles import norm
 from app.kpi import chargement as ch
+from app.kpi import charges as charges_kpi
 from app.kpi import exercice as ex
-from app.kpi import moteur
+from app.kpi import formules, moteur
 from app.kpi.exercice import Calendrier
 from app.models.donnees import Periode, Salarie
 from app.models.referentiel import Departement, Rubrique, Service
@@ -74,7 +75,7 @@ def _sans_marge(x):
     return x
 
 
-def _sortie(p: Principal, data: dict) -> dict:
+def _sortie(p: Principal, data: dict | list) -> dict | list:
     return jsonable(data if is_allowed(p, "marge:read") else _sans_marge(data))
 
 
@@ -213,9 +214,16 @@ def _params(db, crit: dict, annee: int, mois: int):
     return params
 
 
+def _calcul_mensuel(db, scope, cur, prev, annee, mois, service, site, type_site, crit) -> dict:
+    """Tableaux du mois (contrôles de cohérence compris) pour des données déjà filtrées."""
+    return moteur.mensuel(cur, prev, ch.charger_refs(db, type_site, scope),
+                          _params(db, crit, annee, mois),
+                          ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
+
+
 def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
              type_site=None, poste=None, matricule=None, activite=None, type_contrat=None,
-             departement=None) -> dict:
+             departement=None) -> dict | list:
     authorize(p, "report:read")
     service, site, type_site, poste, activite, type_contrat, departement = map(
         _liste, (service, site, type_site, poste, activite, type_contrat, departement))
@@ -227,10 +235,8 @@ def _mensuel(db, p, annee, mois, service, site, ref_annee=None, ref_mois=None,
         raise HTTPException(404, "Aucune donnée pour cette période")
     ref = _reference(annee, mois, ref_annee, ref_mois)
     prev = ch.filtrer(ch.charger_periode(db, scope, *ref), service, site, **crit)
-    params = _params(db, crit, annee, mois)
-    res = moteur.mensuel(cur, prev, ch.charger_refs(db, type_site, scope), params,
-                         ch.charger_budgets(db, scope, annee, mois, service, site, **crit))
-    return _sortie(p, res)
+    return _sortie(p, _calcul_mensuel(db, scope, cur, prev, annee, mois, service, site, type_site,
+                                      crit))
 
 
 @router.get("/mensuel")
@@ -312,13 +318,65 @@ def _plage(du, au, cmp_du, cmp_au):
     return a // 12, depart, a, b, c
 
 
-def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
-            matricule=None, activite=None, type_contrat=None,
-            calendrier: Calendrier = "civil", departement=None, debut=None, cmp="",
-            du=None, au=None, cmp_du=None, cmp_au=None) -> dict:
-    """`annee` : début de l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de
-    l'exercice) ; `debut` : vrai mois de début (None : début de l'exercice). `cmp` : vide = même
-    période de `ref_annee`, `prec` = les mêmes nombre de mois juste avant, `aucune`. Le moteur
+def _criteres(db, p, service, site, type_site, poste, matricule, activite, type_contrat,
+              departement):
+    """Filtres de l'utilisateur (valeurs multiples « A|B ») et périmètre restreint au département :
+    (périmètre, service, site, type de site, autres critères de `ch.filtrer`)."""
+    service, site, type_site, poste, activite, type_contrat, departement = map(
+        _liste, (service, site, type_site, poste, activite, type_contrat, departement))
+    scope = restreindre(db, scope_for(db, p), departement)
+    crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
+            "activite": activite, "type_contrat": type_contrat}
+    return scope, service, site, type_site, crit
+
+
+def _charger_mois(db, scope, service, site, crit, mois_reels) -> dict[int, moteur.PeriodeData]:
+    """Données filtrées des mois donnés, `(rang, (année, mois))` ; les mois absents sont omis."""
+    out = {}
+    for r, (y, m) in mois_reels:
+        pd = ch.filtrer(ch.charger_periode(db, scope, y, m), service, site, **crit)
+        if pd is not None:
+            out[r] = pd
+    return out
+
+
+def _mois_comptes(db, p, service, site, type_site, poste, matricule, activite, type_contrat,
+                  departement, du, au, cmp_du, cmp_au):
+    """Mois de la période choisie (`du`, `au`), de sa comparaison et, pour un mois seul comparé au
+    mois d'avant, du même mois un an plus tôt (comparaison des primes) : un `PeriodeData` ou None
+    par mois, dans l'ordre, puis la période servie. Mêmes règles de période que `/annuel` ; 404
+    sans aucune donnée."""
+    authorize(p, "report:read")
+    _, _, a, b, c = _plage(du, au, cmp_du, cmp_au)
+    scope, service, site, _, crit = _criteres(
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+    nb = b - a + 1
+
+    def mois(debut: int) -> list[moteur.PeriodeData | None]:
+        pds = _charger_mois(db, scope, service, site, crit,
+                            ((i, ((debut + i) // 12, (debut + i) % 12 + 1)) for i in range(nb)))
+        return [pds.get(i) for i in range(nb)]
+
+    n, n1 = mois(a), mois(c)
+    if not moteur.avec_donnees(dict(enumerate(n))):
+        raise HTTPException(404, "Aucune donnée pour cette période")
+    # mois seul comparé au mois d'avant : les primes se comparent au même mois un an plus tôt
+    primes = a == b and c == a - 1
+    n1_primes = mois(a - 12) if primes else None
+    return n, n1, {"du": ex.texte(a), "au": ex.texte(b),
+                   "cmp_du": ex.texte(c), "cmp_au": ex.texte(c + nb - 1),
+                   "cmp_primes_du": ex.texte(a - 12) if primes else None,
+                   "cmp_primes_au": ex.texte(a - 12) if primes else None}, n1_primes
+
+
+def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
+                   matricule=None, activite=None, type_contrat=None,
+                   calendrier: Calendrier = "civil", departement=None, debut=None, cmp="",
+                   du=None, au=None, cmp_du=None, cmp_au=None) -> dict:
+    """Cumul de la période, montants en `Decimal` (comme `_calcul_mensuel`). `annee` : début de
+    l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de l'exercice) ; `debut` : vrai
+    mois de début (None : début de l'exercice). `cmp` : vide = même période de `ref_annee`, `prec`
+    = les mêmes nombre de mois juste avant, `aucune`. Le moteur
     reçoit des rangs 1 à 12 (kpi/exercice.py). `du` et `au` (« AAAA-MM »), quand ils sont fournis,
     remplacent `annee`, `mois`, `debut`, `calendrier`, `ref_annee` et `cmp` ; `cmp_du` et `cmp_au`
     : période comparée (mêmes mois 12 mois plus tôt si absents)."""
@@ -329,19 +387,11 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
         mois, debut, ref_annee, cmp = b % 12 + 1, a % 12 + 1, None, ""
     elif annee is None:
         raise HTTPException(422, "L'année ou la période (du, au) est obligatoire")
-    service, site, type_site, poste, activite, type_contrat, departement = map(
-        _liste, (service, site, type_site, poste, activite, type_contrat, departement))
-    scope = restreindre(db, scope_for(db, p), departement)
-    crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
-            "activite": activite, "type_contrat": type_contrat}
+    scope, service, site, type_site, crit = _criteres(
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
 
     def pds(mois_reels) -> dict[int, moteur.PeriodeData]:
-        out = {}
-        for r, (y, m) in mois_reels:
-            pd = ch.filtrer(ch.charger_periode(db, scope, y, m), service, site, **crit)
-            if pd is not None:
-                out[r] = pd
-        return out
+        return _charger_mois(db, scope, service, site, crit, mois_reels)
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
         return pds(enumerate(ex.mois_exercice(a, calendrier), 1))
@@ -381,7 +431,11 @@ def _annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, p
     res |= {"du": ex.texte(debut_reel), "au": ex.texte(debut_reel + fin - d),
             "cmp_du": None if k is None else ex.texte(k),
             "cmp_au": None if k is None else ex.texte(k + fin - d)}
-    return _sortie(p, res)
+    return res
+
+
+def _annuel(db, p, *args, **kwargs) -> dict:
+    return _sortie(p, _calcul_annuel(db, p, *args, **kwargs))
 
 
 @router.get("/annuel")
@@ -475,6 +529,142 @@ def annuel_export(
     return _xlsx(xlsx.annuel(res, annee, res.get("mois_fin") or mois_fin, ref_annee, calendrier,
                             debut, cmp),
                  f"reporting-annuel-{annee}{suffixe}.xlsx")
+
+
+def _contexte_charges(db, p, service, site, type_site, crit, debut: int, departement):
+    """Filtres actifs et périmètre du compte (sans le filtre Département, qui est un filtre et non
+    un périmètre), de quoi expliquer l'absence de budget (kpi/charges.py)."""
+    compte = scope_for(db, p)
+    return charges_kpi.Contexte(
+        debut=debut, service=bool(service), site=bool(site or type_site),
+        activite=bool(crit["activite"]), contrat=bool(crit["type_contrat"]),
+        poste=bool(crit["poste"] or crit["salarie_id"]), perimetre=not compte.unrestricted,
+        perim_service=bool(compte.rules.get("service")), perim_site=bool(compte.rules.get("site")),
+        departement=bool(_liste(departement)))
+
+
+def _bloc_activite_charges(res: dict, total: dict, masque: bool, debut: int) -> dict:
+    """Carte Activité : lignes d'activité du moteur (réel N, N-1, objectif), coût par vente
+    (charges / ventes) et nombre d'objectifs atteints. Les objectifs sont masqués avec un filtre
+    Service ou Site ou un compte à périmètre (ils sont saisis pour toute l'entreprise)."""
+    lignes = res.get("activite")
+    if lignes is not None and masque:
+        lignes = [{**{k: v for k, v in x.items() if k != "budget_partiel"},
+                   **{k: None for k in ("budget", "ecart", "ecart_pct", "realisation")
+                      if k in x}} for x in lignes]
+    ventes = next((x for x in lignes or [] if x["cle"] == "ventes"), None)
+
+    def par_vente(charges: Decimal | None, nb: Decimal | None) -> Decimal | None:
+        return None if charges is None or not nb else charges / nb
+
+    suivis = [x for x in lignes or [] if x["cle"] in moteur.OBJECTIFS_ACTIVITE
+              and x.get("budget") is not None]
+    atteints = None
+    if not masque and debut >= charges_kpi.BUD_DEBUT and suivis:
+        atteints = [sum(1 for x in suivis if x["realisation"] is not None
+                        and x["realisation"] >= 1), len(suivis)]
+    cout = par_vente(total["m"], ventes["m"] if ventes else None)
+    cout1 = par_vente(total["m1"], ventes["m1"] if ventes else None)
+    return {
+        "activite": lignes,
+        "lignes_ca_marge": res.get("lignes_ca_marge"),
+        "cout_par_vente": {"n": cout, "n1": cout1, "var": formules.variation(cout, cout1),
+                           "var_pct": formules.variation_pct(cout, cout1)},
+        "objectifs_atteints": atteints,
+    }
+
+
+@router.get("/charges")
+def charges(
+    du: str = Query(pattern=MOIS_AAAA_MM),
+    au: str = Query(pattern=MOIS_AAAA_MM),
+    cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
+    matricule: str | None = Query(None, max_length=30),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Répartition des charges de la période choisie, comparée à la période de comparaison :
+    total, axes (type de charge, site, service, activité, contrat) avec effectifs, entrées,
+    sorties, budget et réalisation, carte Activité et effectifs par contrat. Un mois seul comparé
+    au mois d'avant compare ses primes au même mois un an plus tôt."""
+    n, n1, periode, n1_primes = _mois_comptes(
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
+        du, au, cmp_du, cmp_au)
+    scope, svc, st, ts, crit = _criteres(
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+    debut = ex.indice(du)
+    ctx = _contexte_charges(db, p, svc, st, ts, crit, debut, departement)
+    # budgets de chaque mois de la période qui a des données (rien avant leur saisie)
+    budgets = [ch.charger_budgets(db, scope, (debut + i) // 12, (debut + i) % 12 + 1, svc, st,
+                                  **crit)
+               if pd is not None and pd.lignes and debut + i >= charges_kpi.BUD_DEBUT else None
+               for i, pd in enumerate(n)]
+    out = {**periode,
+           **charges_kpi.rapport(n, n1, ch.rubriques_paie(db), budgets, ctx, n1_primes)}
+    # carte Activité : seuls le périmètre, le service, le site et le type de site s'appliquent
+    res = _calcul_annuel(db, p, None, None, service, site, None, type_site, None, None, None, None,
+                         "civil", departement, None, "", du, au, cmp_du, cmp_au)
+    masque = bool(svc or st or ts or ctx.perimetre or ctx.departement)
+    out |= _bloc_activite_charges(res, out["total"], masque, debut)
+    if du == au:
+        # un seul mois : les mêmes contrôles de cohérence que le rapport mensuel
+        res = _calcul_mensuel(db, scope, n[0], n1[0], int(du[:4]), int(du[5:]), svc, st, ts, crit)
+        out["controles"] = res["controles"]
+    return _sortie(p, out)
+
+
+@router.get("/charges/personnes")
+def charges_personnes(
+    axe: Literal["type", "site", "service", "activite", "contrat"],
+    valeur: str = Query(min_length=1, max_length=200),
+    du: str = Query(pattern=MOIS_AAAA_MM),
+    au: str = Query(pattern=MOIS_AAAA_MM),
+    ligne_activite: str | None = Query(None, max_length=200),
+    cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    service: str | None = Query(None, max_length=MAX_MULTI),
+    site: str | None = Query(None, max_length=MAX_MULTI),
+    type_site: str | None = Query(None, max_length=200, pattern=TYPES_SITE),
+    poste: str | None = Query(None, max_length=MAX_MULTI),
+    matricule: str | None = Query(None, max_length=30),
+    activite: str | None = Query(None, max_length=MAX_MULTI),
+    type_contrat: str | None = Query(None, max_length=MAX_MULTI),
+    departement: str | None = Query(None, max_length=MAX_MULTI),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Salariés du périmètre ayant un montant compté sur la ligne `valeur` de l'axe (N ou N-1),
+    et sur son activité `ligne_activite` si elle est donnée : noms et montants individuels, donc
+    droit nominatif et lecture journalisée. `activite` reste le filtre de la barre."""
+    authorize(p, "nominatif:read")
+    n, n1, periode, n1_primes = _mois_comptes(
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
+        du, au, cmp_du, cmp_au)
+    # rubriques de paie du référentiel (actives ou non) et celles que les données portent
+    lignes = charges_kpi.personnes(n, n1, ch.rubriques_paie(db), axe, valeur, ligne_activite,
+                                   n1_primes)
+    if lignes is None:
+        raise HTTPException(422, "Rubrique inconnue")
+    ids = {x["salarie_id"] for x in lignes}
+    identite = {i: (mat, nom) for i, mat, nom in db.execute(
+        select(Salarie.id, Salarie.matricule, Salarie.nom).where(Salarie.id.in_(ids)))} \
+        if ids else {}
+    audit.record(db, p.user_id, "lecture_charges_personnes", axe, valeur, None,
+                 {**periode, "ligne_activite": ligne_activite, "service": service, "site": site,
+                  "type_site": type_site, "poste": poste, "matricule": matricule,
+                  "activite": activite, "type_contrat": type_contrat, "departement": departement})
+    db.commit()
+    return _sortie(p, [{"matricule": identite[x["salarie_id"]][0],
+                        "nom": identite[x["salarie_id"]][1],
+                        **{k: v for k, v in x.items() if k != "salarie_id"}} for x in lignes])
 
 
 @router.get("/individuel/tous")

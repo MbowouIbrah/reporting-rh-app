@@ -4,9 +4,9 @@ import { afterEach, expect, test, vi } from 'vitest'
 import type { Lot } from '../../../api/saisie'
 import ApercuLot from './ApercuLot'
 
-// Les tableaux du Reporting mensuel sont testés avec Mensuel : ici on vérifie seulement ce qu'ils reçoivent.
-vi.mock('../../Mensuel', () => ({
-  Contenu: ({ lib }: { lib: { prec: string; cour: string } }) => <p>Tableaux {lib.cour} / {lib.prec}</p>,
+// Les tableaux du Reporting mensuel sont testés à part : ici on vérifie seulement ce qu'ils reçoivent.
+vi.mock('../../../components/TableauxMensuel', () => ({
+  default: ({ lib }: { lib: { prec: string; cour: string } }) => <p>Tableaux {lib.cour} / {lib.prec}</p>,
 }))
 
 afterEach(() => vi.restoreAllMocks())

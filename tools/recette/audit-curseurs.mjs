@@ -25,7 +25,7 @@ const URL = (process.env.AUDIT_URL || 'http://localhost:8090').replace(/\/$/, ''
 const COMPTES = process.env.AUDIT_COMPTES || resolve('..', 'tools', 'recette', 'comptes.local.csv')
 const SORTIE = process.env.AUDIT_SORTIE || 'C:/tmp/audit-curseurs'
 const REGLES = resolve('src', 'styles', 'interactions.css')
-const ECRANS = ['/resume', '/graphes', '/mensuel', '/annuel', '/individuel', '/admin/donnees', '/admin/employes',
+const ECRANS = ['/resume', '/graphes', '/charges', '/individuel', '/admin/donnees', '/admin/employes',
   '/admin/referentiels', '/admin/utilisateurs', '/admin/colonnes', '/admin/correspondance', '/admin/saisie']
 const NAVIGATEURS = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',

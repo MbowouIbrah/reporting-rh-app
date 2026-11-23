@@ -238,6 +238,80 @@ export interface SerieMois {
   objectifs?: Objectifs
 }
 
+export type AxeCharge = 'type' | 'site' | 'service' | 'activite' | 'contrat'
+
+/** Ligne d'un axe : montants sur la période et la période comparée, part, effectif, budget. */
+export interface LigneChargeBase extends Cell {
+  libelle: string
+  part: Val
+  effectif: number
+  effectif1: number | null
+  /** Écart d'effectif et son pourcentage (ratio), calculés par le serveur. */
+  effectif_var: number | null
+  effectif_var_pct: Val
+  entrees: number | null
+  sorties: number | null
+  budget: Dec | null
+  /** Écart au budget et part du budget consommée (ratio), calculés par le serveur ; null sans budget. */
+  ecart_budget: Dec | null
+  realisation: Val
+  type_site?: string
+  /** Rubriques de primes d'un mois seul : comparées au même mois un an plus tôt. */
+  cmp_primes?: boolean
+}
+export interface LigneCharge extends LigneChargeBase { enfants?: LigneChargeBase[] }
+/** Budget de l'axe entier (somme des lignes), écart et réalisation du total ; null sans budget complet. */
+export interface BudgetAxe { budget: Dec; ecart_budget: Dec | null; realisation: Val }
+export interface AxeLignes { lignes: LigneCharge[]; budget_raison: string | null; budget_total: BudgetAxe | null }
+export interface EffectifContrat {
+  libelle: string
+  n: number
+  n1: number | null
+  var: number | null
+  var_pct: Val
+  /** Part de l'effectif total (ratio), calculée par le serveur. */
+  part: Val
+  entrees: number | null
+  sorties: number | null
+}
+/** Page « Répartition des charges » : total et axes sur la période, comparés à la période d'avant. */
+export interface Charges {
+  du: string
+  au: string
+  cmp_du?: string
+  cmp_au?: string
+  /** Période de comparaison des rubriques de primes d'un mois seul (même mois un an plus tôt). */
+  cmp_primes_du?: string | null
+  cmp_primes_au?: string | null
+  partiel: boolean
+  total: Cell
+  effectif: { n: number; n1: number | null; var: number | null; var_pct: Val }
+  entrees: number | null
+  sorties: number | null
+  hors_total: { montant: Dec; nb_rubriques: number }
+  axes: Record<AxeCharge, AxeLignes>
+  effectifs_contrat: EffectifContrat[]
+  activite: LigneActivite[] | null
+  lignes_ca_marge: { ca: CellPartiel; marge: CellPartiel } | null
+  cout_par_vente: { n: Val; n1: Val; var: Val; var_pct: Val }
+  objectifs_atteints: [number, number] | null
+  controles?: Controle[]
+}
+/** Personne d'une ligne d'axe (droit nominatif) : montants, entrée ou sortie sur la période. */
+export interface ChargesPersonne extends Cell {
+  matricule: string
+  nom: string
+  service: string
+  site: string
+  activite: string
+  contrat: string
+  poste: string
+  entree: boolean
+  sortie: boolean
+  /** Part de la personne dans la ligne (ratio), calculée par le serveur. */
+  part: Val
+}
+
 export interface Annuel {
   serie_n: SerieMois[]
   serie_n1: SerieMois[]
