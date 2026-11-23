@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import mail
+from app import mail, mail_modeles
 from app.api.admin import (
     PorteeIn,
     _check_droits,
@@ -179,8 +179,8 @@ def lien(db: Session, args: argparse.Namespace) -> None:
     adresse = liens.url(args.base or settings.APP_URL, jeton)
     print(adresse)
     if args.envoyer:
-        envoye = mail.envoyer(u.email, "Votre accès à Reporting RH",
-                              liens.texte_mail(adresse, u.email, args.jours))
+        c = mail_modeles.invitation(adresse, u.email, args.jours)
+        envoye = mail.envoyer(u.email, c.sujet, c.texte, html=c.html)
         print(f"Mail envoyé à {u.email}" if envoye else "Mail non envoyé : SMTP_HOST non réglé")
 
 

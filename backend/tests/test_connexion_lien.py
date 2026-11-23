@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app import comptes
+from app import comptes, mail_modeles
 from app.main import app
 from app.models.auth import AuditEvent, LienConnexion, Utilisateur
 from app.security import liens
@@ -57,7 +57,7 @@ def test_lien_a_usage_unique_et_mot_de_passe_a_choisir(db):
 
 
 def test_texte_du_mail_explique_l_usage_unique():
-    t = liens.texte_mail("https://x/connexion-rapide#jeton=abc", "a@b.c", 3)
+    t = mail_modeles.invitation("https://x/connexion-rapide#jeton=abc", "a@b.c", 3).texte
     assert "https://x/connexion-rapide#jeton=abc" in t and "qu'une seule fois" in t
     assert "a@b.c" in t and "3 jours" in t and "mot de passe" in t
 

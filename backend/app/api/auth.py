@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import mail
+from app import mail, mail_modeles
 from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models.auth import AuditEvent, PreferenceUtilisateur, Utilisateur
@@ -133,9 +133,9 @@ def refresh(
     return {"status": "ok"}
 
 
-def _envoyer(dest: str, sujet: str, texte: str) -> None:
+def _envoyer(dest: str, c: mail_modeles.Courriel) -> None:
     try:
-        mail.envoyer(dest, sujet, texte)
+        mail.envoyer(dest, c.sujet, c.texte, html=c.html)
     except Exception:
         log.exception("Envoi de l'e-mail de réinitialisation impossible")
 
@@ -168,11 +168,6 @@ def _traiter_oubli(email: str) -> None:
         jeton = make_token(user.id, "reset", pwd=empreinte(user.password_hash))
         # Fragment (#) : le jeton n'est jamais envoyé au serveur, donc absent des journaux d'accès.
         lien = f"{settings.APP_URL.rstrip('/')}/reinitialiser#jeton={jeton}"
-        texte = (
-            "Bonjour,\n\nPour choisir un nouveau mot de passe, ouvrez ce lien "
-            f"(valable {settings.RESET_TOKEN_MINUTES} minutes, usage unique) :\n{lien}\n\n"
-            "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message."
-        )
         audit.record(db, user.id, "reinit_demande", "utilisateur", user.id)
         if not settings.SMTP_HOST:
             if settings.ENV != "prod":
@@ -180,7 +175,7 @@ def _traiter_oubli(email: str) -> None:
             audit.record(db, user.id, "reinit_non_envoye", "utilisateur", user.id)
         db.commit()
         if settings.SMTP_HOST:
-            _envoyer(user.email, f"{settings.APP_NAME} : réinitialisation du mot de passe", texte)
+            _envoyer(user.email, mail_modeles.reinitialisation(lien, settings.RESET_TOKEN_MINUTES))
 
 
 @router.post("/reinitialiser")

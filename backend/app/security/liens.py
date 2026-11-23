@@ -67,28 +67,6 @@ def utiliser(db: Session, jeton: str) -> Utilisateur | None:
     return user
 
 
-def texte_mail(adresse: str, email: str, jours: int) -> str:
-    """Mail d'invitation : explique l'usage unique pour éviter « ça ne marche plus » au 2e clic."""
-    pluriel = "s" if jours > 1 else ""
-    return "\n".join([
-        "Bonjour,",
-        "",
-        "Un accès à l'application Reporting RH vous a été ouvert.",
-        "",
-        f"1. Cliquez sur ce lien personnel : {adresse}",
-        f"   Il ne fonctionne qu'une seule fois et expire dans {jours} jour{pluriel}.",
-        "2. Choisissez ensuite votre mot de passe (au moins 8 caractères).",
-        f"3. Les fois suivantes, connectez-vous avec votre adresse ({email})",
-        "   et ce mot de passe : le lien ne servira plus.",
-        "",
-        "Lien déjà utilisé ou expiré, mot de passe oublié : utilisez « Mot de passe oublié »",
-        "sur la page de connexion, ou demandez un nouveau lien à l'administrateur.",
-        "",
-        "Ne transférez pas ce message : le lien ouvre votre compte.",
-        "",
-    ])
-
-
 def revoquer(db: Session, user: Utilisateur | None = None) -> int:
     """Révoque les liens encore actifs (d'un compte, ou de tous) ; rend leur nombre."""
     q = update(LienConnexion).where(LienConnexion.revoque_le.is_(None))
