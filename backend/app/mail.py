@@ -39,9 +39,15 @@ def _message(dest: str, sujet: str, texte: str, html: str | None) -> EmailMessag
 def envoyer(dest: str, sujet: str, texte: str, html: str | None = None) -> bool:
     """Envoie un e-mail (texte, plus HTML si fourni).
 
-    False si SMTP_HOST est vide ; les erreurs SMTP remontent.
+    False si SMTP_HOST est vide ou le destinataire hors MAIL_DESTINATAIRES_AUTORISES ;
+    les erreurs SMTP remontent.
     """
     if not settings.SMTP_HOST:
+        return False
+    autorises = {a.strip().lower() for a in settings.MAIL_DESTINATAIRES_AUTORISES.split(",")
+                 if a.strip()}
+    if autorises and dest.strip().lower() not in autorises:
+        log.warning("E-mail non envoyé : destinataire hors liste autorisée")
         return False
     msg = _message(dest, sujet, texte, html)
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
@@ -50,4 +56,5 @@ def envoyer(dest: str, sujet: str, texte: str, html: str | None = None) -> bool:
         if settings.SMTP_USER:
             smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         smtp.send_message(msg)
+    log.info("E-mail envoyé : %s", sujet)
     return True

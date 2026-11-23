@@ -215,3 +215,21 @@ def donnees_disponibles(periode: str, lien: str, desabonnement: str) -> Courriel
         apercu=f"Le rapport {p} est consultable.",
     )
     return Courriel(sujet, texte, html)
+
+
+def fichier_recu(fichier: str, etat: str, lien: str) -> Courriel:
+    """Alerte administrateur : un fichier de paie déposé attend la vérification."""
+    appli = settings.APP_NAME
+    sujet = f"{appli} : fichier reçu ({fichier})"
+    texte = (f"Bonjour,\n\nLe fichier {fichier} a été reçu et attend votre vérification.\n"
+             f"{etat}.\n\nOuvrir la saisie :\n{lien}")
+    html = _composer(
+        sujet=sujet, bandeau="Import", titre=f"Fichier reçu : {escape(fichier)}",
+        paragraphes=[f"Le fichier {escape(fichier)} a été reçu. Il ne sera visible des "
+                     "utilisateurs qu'après votre publication."],
+        bouton="Vérifier le fichier", url=lien,
+        bloc=_encadre(escape(etat)),
+        securite="Vous recevez ce message car vous administrez les imports de paie.",
+        apercu=f"{etat}.",
+    )
+    return Courriel(sujet, texte, html)

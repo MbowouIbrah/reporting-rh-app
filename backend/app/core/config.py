@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     SMTP_TLS: bool = True
+    # Recette : seules adresses (virgules) autorisées à recevoir un e-mail. Vide : aucune limite.
+    MAIL_DESTINATAIRES_AUTORISES: str = ""
 
     # Dossier où la paie dépose BrutFinalMMAA.csv (lecture seule). Vide : surveillance coupée.
     IMPORT_DIR: str = ""

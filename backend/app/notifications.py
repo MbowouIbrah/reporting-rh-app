@@ -54,8 +54,18 @@ def notifier(db: Session, ids: list[int], type: str, titre: str, texte: str,
 def lot_recu(db: Session, lot: LotImport) -> None:
     n = lot.nb_bloquants or 0
     texte = f"{n} problème{'s' if n > 1 else ''} à régler" if n else "Prêt pour l’aperçu"
-    notifier(db, admins(db), "lot_recu", f"Fichier reçu : {lot.fichier_nom}", texte,
-             LIEN_IMPORT, lot.id)
+    ids = admins(db)
+    notifier(db, ids, "lot_recu", f"Fichier reçu : {lot.fichier_nom}", texte, LIEN_IMPORT, lot.id)
+    if not settings.SMTP_HOST:
+        return
+    c = mail_modeles.fichier_recu(lot.fichier_nom, texte,
+                                  f"{settings.APP_URL.rstrip('/')}{LIEN_IMPORT}")
+    for u in db.scalars(select(Utilisateur).where(Utilisateur.id.in_(ids))):
+        if u.notif_mail:
+            try:
+                mail.envoyer(u.email, c.sujet, c.texte, c.html)
+            except Exception:
+                LOG.exception("E-mail « fichier reçu » impossible (utilisateur %s)", u.id)
 
 
 def _en_scope(scope: Scope, service: str | None, site: str | None) -> bool:

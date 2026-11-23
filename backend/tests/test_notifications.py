@@ -84,6 +84,28 @@ def test_fichier_recu_notifie_les_admins(db, lot):
     assert recu[0].texte == "Prêt pour l’aperçu" and recu[0].lien == notifications.LIEN_IMPORT
 
 
+def test_fichier_recu_mail_aux_admins_abonnes(db, make_client, lot, monkeypatch):
+    envoyes = []
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.exemple.invalid")
+    monkeypatch.setattr(mail, "envoyer",
+                        lambda dest, sujet, texte, html=None: envoyes.append((dest, sujet)) or True)
+    make_client(ADMIN).put(f"{API}/notifications/preferences", json={"notif_mail": True})
+    notifications.lot_recu(db, db.get(LotImport, lot))
+    assert [d for d, _ in envoyes] == [ADMIN]  # DRH admin non abonné : rien
+    assert "fichier reçu" in envoyes[0][1]
+
+
+def test_mail_bloque_hors_liste_autorisee(monkeypatch):
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.exemple.invalid")
+    monkeypatch.setattr(settings, "MAIL_DESTINATAIRES_AUTORISES", " Seul@Exemple.com ")
+
+    def interdit(*a, **k):
+        raise AssertionError("aucune connexion SMTP attendue")
+
+    monkeypatch.setattr(mail.smtplib, "SMTP", interdit)
+    assert mail.envoyer("autre@exemple.com", "s", "t") is False
+
+
 def test_lire_marquer_lue_et_tout_lu(db, make_client, lot):
     publier(make_client, lot)
     c = make_client(SAV)
