@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Répartition des charges</title>
+<link rel="stylesheet" href="../../../frontend/src/styles/tokens.css">
+<link rel="stylesheet" href="../../../frontend/node_modules/@fontsource/dm-sans/latin-400.css">
+<link rel="stylesheet" href="../../../frontend/node_modules/@fontsource/dm-sans/latin-500.css">
+<link rel="stylesheet" href="../../../frontend/node_modules/@fontsource/dm-sans/latin-600.css">
+<link rel="stylesheet" href="../../../frontend/node_modules/@fontsource/dm-sans/latin-700.css">
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); color: var(--ink); background: var(--paper); font-size: 13.5px; line-height: 1.5; }
+  .page { width: 297mm; height: 210mm; padding: 14mm 16mm 12mm; display: flex; flex-direction: column; page-break-after: always; position: relative; }
+  .page:last-child { page-break-after: auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 3px solid var(--navy); padding-bottom: 6px; margin-bottom: 14px; }
+  .menu { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .menu b { color: var(--red); }
+  h1 { font-family: var(--font-display); font-size: 26px; margin: 0; color: var(--navy); text-transform: uppercase; letter-spacing: .01em; }
+  h2 { font-size: 16px; margin: 0 0 4px; color: var(--navy); }
+  .intro { color: var(--navy-3); margin: 0 0 14px; font-size: 13px; max-width: 230mm; }
+  .cols { display: grid; grid-template-columns: 1.15fr 1fr 0.85fr; gap: 10px; align-items: start; }
+  .col { border: 1px solid var(--rule-strong); background: var(--paper-2); }
+  .col h3 { margin: 0; padding: 7px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #fff; }
+  .fait h3 { background: var(--success); }
+  .decide h3 { background: var(--navy); }
+  .reste h3 { background: var(--red); }
+  .col ul { margin: 0; padding: 12px 14px 12px 28px; display: flex; flex-direction: column; gap: 8px; }
+  .col li::marker { color: var(--muted-2); }
+  .tag { display: inline-block; font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--rule-strong); padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+  .capture { flex: 1; display: flex; gap: 14px; min-height: 0; }
+  .capture figure { margin: 0; flex: 1; min-height: 0; }
+  .capture img { display: block; max-width: 100%; max-height: 100%; border: 1px solid var(--rule-strong); }
+  .notes { width: 62mm; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .note { border-left: 3px solid var(--navy); background: var(--paper-3); padding: 7px 10px; }
+  .note b { color: var(--navy); }
+  footer { position: absolute; bottom: 6mm; left: 16mm; right: 16mm; display: flex; justify-content: space-between; font-size: 10px; color: var(--muted-2); }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <header><h1>Répartition des charges</h1><span class="menu">Menu : Mensuel + Annuel → <b>Répartition des charges</b></span></header>
+  <p class="intro">Les pages Mensuel et Annuel sont réunies en une seule page. On voit d'abord l'essentiel en six cartes ; un clic ouvre le détail, puis la liste des personnes concernées.</p>
+  <div class="cols">
+    <div class="col fait"><h3>Fait</h3><ul>
+      <li>Mensuel et Annuel fusionnés en une page unique.<span class="tag">R10</span></li>
+      <li>Premier aperçu en 6 cartes : Types de charge, Sites, Services, Marques, Coût par vente, Effectifs. Chaque carte donne le total, la variation et les éléments qui comptent le plus.<span class="tag">R11</span></li>
+      <li>Clic sur une carte : tableau détaillé (période comparée, période, variation, part, effectif, budget), dépliable par activité front / back office et par contrat.<span class="tag">R12</span></li>
+      <li>Clic sur une ligne : liste des personnes concernées, avec recherche, pagination et export Excel. Chaque consultation est enregistrée.<span class="tag">R13</span></li>
+      <li>Tous les filtres de la barre s'appliquent (période, comparaison, département, service, site, activité, contrat, poste, employé).</li>
+      <li>Export PDF des cartes.</li>
+    </ul></div>
+    <div class="col decide"><h3>Décidé</h3><ul>
+      <li>Comparaison par défaut : un mois → le mois précédent ; une plage → la même plage l'année d'avant. Les primes se comparent au même mois N-1. Un « Comparer à » choisi passe avant.</li>
+      <li>Couleur seulement pour les écarts forts (≥ 20 %).</li>
+      <li>Budget affiché seulement là où il est saisi ; pas de budget au niveau poste, contrat ou employé.</li>
+      <li>Objectifs d'activité masqués dès qu'un filtre Service ou Site est actif.</li>
+      <li>Absentéisme = absences ÷ (effectif fin de mois × 22 jours × nombre de mois).</li>
+      <li>La liste des personnes est visible par chacun dans son périmètre.</li>
+    </ul></div>
+    <div class="col reste"><h3>Reste à faire</h3><ul>
+      <li>Marques : carte en place, en attente de votre liste des marques.</li>
+      <li>À confirmer de votre côté : accès à la liste nominative pour tous ; Winpart, Motul et Autofast traités comme des services ; regroupement DOP Equipment + Winpart.</li>
+      <li>Mise en ligne sur le site de démonstration après votre validation.</li>
+      <li>Plus tard : regroupement par département et graphiques combinés.</li>
+    </ul></div>
+  </div>
+  <footer><span>Reporting RH · point d'avancement</span><span>Retours de la réunion du 17/11</span></footer>
+</section>
+
+<section class="page">
+  <header><h1>Premier aperçu : six cartes</h1><span class="menu">Répartition des charges</span></header>
+  <div class="capture">
+    <figure><img src="1-cartes.png" alt="Page Répartition des charges, six cartes"></figure>
+    <div class="notes">
+      <div class="note"><b>Une carte par groupe.</b> Total de la période, écart avec la période comparée, puis les éléments les plus importants et la plus forte hausse ou baisse.</div>
+      <div class="note"><b>Survol</b> d'une ligne : montants exacts et détail.</div>
+      <div class="note"><b>Clic</b> sur le titre d'une carte : ouvre le tableau détaillé de ce groupe.</div>
+      <div class="note"><b>Coût par vente</b> : charges ÷ ventes, avec les objectifs atteints.</div>
+      <div class="note"><b>Marques</b> : en attente de votre liste.</div>
+    </div>
+  </div>
+  <footer><span>Reporting RH · point d'avancement</span><span>Données fictives</span></footer>
+</section>
+
+<section class="page">
+  <header><h1>Détail et liste des personnes</h1><span class="menu">Répartition des charges › Sites</span></header>
+  <div class="capture">
+    <figure><img src="3-personnes.png" alt="Vue Sites dépliée jusqu'à la liste des personnes"></figure>
+    <div class="notes">
+      <div class="note"><b>Tableau par axe</b> : site, service, type de charge, contrat… avec la même colonne de comparaison que les autres rapports.</div>
+      <div class="note"><b>Arbre</b> : site › front / back office › contrat. Les lignes ouvertes restent visibles en haut pendant le défilement.</div>
+      <div class="note"><b>Personnes</b> : clic sur une ligne. Recherche par nom ou matricule, part de chacun, export Excel.</div>
+      <div class="note"><b>Retour</b> ou fil d'Ariane pour revenir aux cartes ; les filtres sont conservés.</div>
+    </div>
+  </div>
+  <footer><span>Reporting RH · point d'avancement</span><span>Données fictives</span></footer>
+</section>
+
+</body>
+</html>
