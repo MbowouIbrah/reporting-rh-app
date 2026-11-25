@@ -1973,3 +1973,11 @@ td.cel-poids .etiq { margin-left: 10px; }
 .periode-titre strong { color: var(--navy); font-weight: 700; }
 .charges-excel .panneau table.dense thead th,
 .charges-excel .panneau table.repartition thead th:not(.gouttiere) { background: var(--navy); color: #fff; }
+/* Résumé : mois du suivi hors de la période choisie (non comptés dans le total). */
+.suivi tr.hors-periode :is(th, td) { color: var(--muted); background: var(--gris-etiq); font-weight: 400; }
+.suivi tr.hors-periode td.saisi { background: var(--gris-etiq); }
+.hors-mention { margin-left: 6px; font-size: var(--fs-xs); font-weight: 400; font-style: italic; }
+.periode-pied { margin: var(--sp-2) 0 0; font-size: var(--fs-sm, 13px); }
+/* En-têtes de colonnes : période en petit sous le libellé. */
+th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }
+th[title] { cursor: help; }
