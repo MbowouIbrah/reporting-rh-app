@@ -1981,3 +1981,4 @@ td.cel-poids .etiq { margin-left: 10px; }
 /* En-têtes de colonnes : période en petit sous le libellé. */
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }
 th[title] { cursor: help; }
+.rapport-excel .panneau table.dense thead th[title] { height: auto; white-space: normal; vertical-align: bottom; line-height: 1.25; }
