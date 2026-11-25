@@ -83,7 +83,7 @@ function Ligne({ x, niveau, ouverte, ouvrable, eff, onBascule }: LigneProps) {
   )
 }
 
-/** Tableau d'un axe, dépliable sur place : ligne, puis activité, puis personnes. */
+/** Tableau d'un axe, dépliable sur place : ligne, puis activité (service pour un site), puis personnes. */
 export default function VueAxe({ d, axe, filtres, lib, peutNominatif }: Props) {
   const eff = axe === 'eff'
   const nom = NOM_AXE[axe]

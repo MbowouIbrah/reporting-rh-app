@@ -227,6 +227,11 @@ def test_personnes_par_axe_et_sous_ligne_activite(charge, make_client):
     assert [x["matricule"] for x in pers(drh, "service", "SAV PL", **FEV,
                                          ligne_activite="Front office").json()] == ["E1", "E4"]
     assert pers(drh, "service", "SAV PL", **FEV, ligne_activite="Back Office").json() == []
+    # site : la sous-ligne est un service
+    assert [x["matricule"] for x in pers(drh, "site", "Yaoundé", **FEV,
+                                         ligne_activite="Commerce VN").json()] == ["E2"]
+    assert [x["matricule"] for x in pers(drh, "site", "Yaoundé", **FEV,
+                                         ligne_activite="Administration").json()] == ["E3"]
     assert pers(drh, "site", "Inconnu", **FEV).json() == []
     # `activite` reste le filtre de la barre
     assert pers(drh, "type", BR, **FEV, activite="Back Office").status_code == 404
@@ -386,8 +391,9 @@ def test_axes_contenu(charge):
     assert all(x["type_site"] in ("principal", "agence") for x in lignes_axe(r, "site"))
     yaounde = axe(r, "site", "Yaoundé")
     assert D(yaounde["m"]) == 6270 and yaounde["effectif"] == 2 and yaounde["effectif1"] is None
-    assert [(e["libelle"], D(e["m"]), D(e["part"])) for e in yaounde["enfants"]] == [
-        ("Front office", D(6270), D(1))]
+    # Site détaillé par service (et non par activité).
+    assert [(e["libelle"], D(e["m"])) for e in yaounde["enfants"]] == [
+        ("Administration", D(4070)), ("Commerce VN", D(2200))]
     assert [x["libelle"] for x in lignes_axe(r, "service")] == [
         "Administration", "Commerce VN", "SAV PL"]
     assert [x["libelle"] for x in lignes_axe(r, "contrat")] == ["CDI", "CDD"]

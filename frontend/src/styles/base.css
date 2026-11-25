@@ -1967,3 +1967,9 @@ td.cel-poids .etiq { margin-left: 10px; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child { box-shadow: 0 -2px 0 0 var(--info-soft); overflow: clip; overflow-clip-margin: 3px; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child::before { content: ""; position: absolute; left: 0; top: -3px; bottom: -1px; width: 3px; background: var(--navy); pointer-events: none; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee:has(+ tr.collee) > * { border-bottom-color: var(--info-soft); }
+
+/* Répartition des charges : période lue d'abord, en-têtes de détail en bleu nuit comme les autres sections. */
+.periode-titre { margin: 0 0 var(--sp-3); font-size: var(--fs-md, 15px); color: var(--muted); }
+.periode-titre strong { color: var(--navy); font-weight: 700; }
+.charges-excel .panneau table.dense thead th,
+.charges-excel .panneau table.repartition thead th:not(.gouttiere) { background: var(--navy); color: #fff; }

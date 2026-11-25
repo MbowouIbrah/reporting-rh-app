@@ -48,7 +48,7 @@ export default function Charges() {
   }, [axe])
 
   return (
-    <section className={`page-ecran rapport-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}`} aria-busy={maj || premier || undefined}>
+    <section className={`page-ecran rapport-excel charges-excel${maj ? ' maj' : ''}${relais || relaisMaj ? ' relais' : ''}`} aria-busy={maj || premier || undefined}>
       <TitreRapport titre="RÉPARTITION DES CHARGES" />
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} periode={f.periode} onChange={f.set} />
@@ -77,6 +77,7 @@ export default function Charges() {
           ) : (
             <>
               <BandeauControles controles={d.controles} />
+              <p className="periode-titre">Chiffres de <strong>{lib.cour}</strong>, évolution par rapport à <strong>{lib.prec}</strong></p>
               <Cartes d={d} f={f.filtres} lib={lib} search={search} />
             </>
           )}
