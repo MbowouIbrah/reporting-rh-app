@@ -68,7 +68,7 @@ export default function Correspondance() {
   return (
     <section className="page-ecran rapport-excel admin-excel">
       <AdminNav />
-      <Panneau titre="Correspondance de la paie">
+      <Panneau titre="Colonnes de paie et rubriques">
         <p className="note">
           Chaque colonne du fichier de paie listée ici est additionnée dans la rubrique choisie. Plusieurs colonnes peuvent aller
           dans la même rubrique ; les colonnes qui ne sont pas listées sont ignorées.

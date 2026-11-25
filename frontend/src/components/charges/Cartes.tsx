@@ -110,7 +110,7 @@ export default function Cartes({ d, f, lib, search }: { d: Charges; f: FiltresPa
       <section className="groupe resume-excel" aria-label="Indicateurs par groupe">
         <div className="cases six">
           <Tuile k="type" nom={NOM_AXE.type} valeur={t3type.tot} devise=" FCFA" search={search} bulle={bulleType}>
-            <Sous g={`évolution par rapport à ${lib.prec}`}>{t3type.droite ? <EvoCase e={t3type.droite} /> : <SansDonnees />}</Sous>
+            <Sous g={`Évolution par rapport à ${lib.prec}`}>{t3type.droite ? <EvoCase e={t3type.droite} /> : <SansDonnees />}</Sous>
             <ListeRangs rows={t3type.rows} />
           </Tuile>
 

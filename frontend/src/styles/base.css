@@ -815,7 +815,9 @@ html, body { overscroll-behavior: none; }
 /* Dossier de paie : liste des fichiers déposés, au-dessus des deux façons de renseigner */
 .dossier-paie { margin-top: var(--sp-4); }
 .dossier-paie-entete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-.dossier-paie-entete .saisie-sous-bandeau { margin: 0; }
+.dossier-paie .dossier-paie-entete .saisie-sous-bandeau { margin: 0; }
+.dossier-paie-actions { display: inline-flex; align-items: center; gap: var(--sp-4); }
+.admin-excel .dossier-paie-actions .admin-case { margin-top: 0; height: auto; font-size: var(--fs-sm); }
 .dossier-paie .note { margin: 0 0 var(--sp-3); }
 .dossier-paie-mois { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .dossier-paie-mois input[type="number"] { width: 6em; }
@@ -1522,8 +1524,8 @@ table.tableau-squelette td { height: 2.1em; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple .multi-bouton { width: 100%; min-width: 92px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie { min-width: 0; }
   /* Filtres à choix multiples (hors Période) : ils rétrécissent avant de faire passer la barre à la ligne */
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: 0 1 auto; min-width: 0; }
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: 100%; min-width: 60px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: 0 1 auto; min-width: min-content; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: 100%; min-width: 84px; }
 }
 .filtres-titre {
   display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px;
@@ -1542,7 +1544,7 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-onglets a:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
 .admin-excel .admin-entete { margin: 0 0 var(--sp-3); }
 .admin-excel .admin-entete .bandeau-titre { margin: 0 0 2px; }
-.admin-excel .admin-entete p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.admin-entete p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .admin-excel .panneau { flex: 0 1 auto; margin-bottom: var(--sp-3); }
 .admin-excel .panneau table.dense thead th { text-align: left; }
 .admin-excel .panneau table.dense tbody th[scope='row'] { text-align: left; font-weight: var(--fw-bold); color: var(--navy); }
@@ -1571,13 +1573,15 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .renommer p { flex-basis: 100%; margin: 0; white-space: normal; }
 .admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
+.admin-excel .admin-duo .panneau-corps { overflow-x: auto; }
+.admin-excel .admin-duo table.dense td select { max-width: 104px; }
 /* Sites, services et colonnes : sites et services, puis la liste fixe des contrats sous les services (écran moyen)
    ou en troisième colonne plus étroite (grand écran) ; elle garde sa hauteur, jamais étirée */
 .admin-trio { grid-template-areas: "site service" "site contrat"; grid-template-rows: auto 1fr; }
 .admin-trio > :nth-child(1) { grid-area: site; }
 .admin-trio > :nth-child(2) { grid-area: service; }
 .admin-trio > .ref-contrats { grid-area: contrat; align-self: start; }
-.ref-contrats .note { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
+.ref-contrats .note, .admin-excel .panneau-corps > .note:first-child { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
 /* Colonnes (rubriques) : pleine largeur sous les sites et services */
 .admin-excel .ref-colonnes { margin-top: var(--sp-4); margin-bottom: 0; }
 .ref-colonnes-tete { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); padding: var(--sp-2) 12px; border-bottom: 1px solid var(--rule); }
@@ -1596,16 +1600,26 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .fiche-compte .panneau-corps { overflow: visible; }
 /* Grand écran : les deux colonnes remplissent la hauteur restante et chacune défile seule (cadres étirés, jamais de lignes vides) */
 @media (min-width: 1360px) {
-  .admin-excel :is(.admin-duo, .comptes-duo) { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
-  .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
-  .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
+  .admin-excel .comptes-duo { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .admin-excel .comptes-duo .panneau .panneau-corps { overflow: auto; }
+  .admin-excel .comptes-duo .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
+  /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
+  .admin-excel .comptes-duo .fiche-barre { bottom: 0; }
+  /* Écran pas assez haut pour partager la hauteur : la page Sites, services et colonnes défile seule. */
+  .page-ecran:has(> .admin-duo) { overflow-y: auto; }
+  .page-ecran:has(> .admin-duo) > * { flex-shrink: 0; }
+}
+/* Sites, services et Colonnes se partagent la hauteur seulement si l'écran est assez haut ;
+   sinon la page défile normalement (évite que les cadres écrasés se chevauchent). */
+@media (min-width: 1360px) and (min-height: 1000px) {
+  .admin-excel .admin-duo { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .admin-excel .admin-duo .panneau { overflow: hidden; }
+  .admin-excel .admin-duo .panneau .panneau-corps { overflow: auto; }
+  .admin-excel .admin-duo .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
   .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
-  /* Sites, services et Colonnes se partagent la hauteur ; chaque cadre défile seul */
   .admin-excel .ref-colonnes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .admin-excel .ref-colonnes .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
   .admin-excel .ref-colonnes table.dense thead th { position: sticky; top: 0; z-index: 1; }
-  /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
-  .admin-excel :is(.admin-duo, .comptes-duo) .fiche-barre { bottom: 0; }
 }
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
 .bouton-copier { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--navy); cursor: pointer; }
@@ -1982,3 +1996,12 @@ td.cel-poids .etiq { margin-left: 10px; }
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }
 th[title] { cursor: help; }
 .rapport-excel .panneau table.dense thead th[title] { height: auto; white-space: normal; vertical-align: bottom; line-height: 1.25; }
+
+/* Téléphone : filtres des rapports sur deux colonnes, pour ne pas occuper tout le premier écran. */
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(.filtres-titre, .filtres-actions, .choix-salarie, :has(.periode-bouton)) { grid-column: 1 / -1; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(label, .filtre) { width: auto; min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport :is(select, input, .multi-bouton) { width: 100%; max-width: none; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie input { width: 100%; }
+}
