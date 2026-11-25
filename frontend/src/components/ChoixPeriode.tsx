@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
-  anneeDe, anneeEntiere, cliqueMois, indice, libelle, longueur as nbMois, moisDe, MOIS_GRILLE, mois as moisSel, plage, type Sel,
+  anneeDe, anneeEntiere, cliqueMois, indice, libelle, longueur as nbMois, MAX_MOIS, moisDe, MOIS_GRILLE, mois as moisSel, plage, type Sel,
 } from '../lib/periode'
 
 interface Props {
@@ -74,7 +74,7 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
     : mauvaiseLongueur
       ? `Il faut ${longueur} mois, comme la période`
       : brouillon.type === 'mois' && !moisSeul && longueur === undefined
-        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période</>
+        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période ({MAX_MOIS} mois au plus)</>
         : <strong>{libelle(brouillon)}</strong>
 
   const appliquer = () => {
@@ -84,6 +84,7 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
   }
   const apercu = (i: number) => {
     if (moisSeul || survol === null || !brouillon || brouillon.type !== 'mois') return false
+    if (Math.abs(survol - brouillon.d) + 1 > MAX_MOIS) return false
     return i !== brouillon.d && i >= Math.min(brouillon.d, survol) && i <= Math.max(brouillon.d, survol)
   }
 

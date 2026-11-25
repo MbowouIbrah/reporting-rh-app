@@ -44,6 +44,17 @@ test('clics sur les mois : sélection, plage, désélection', () => {
   expect(cliqueMois(anneeEntiere(2025, JANV_23, OCT_26), a)).toEqual(mois(a))
 })
 
+test('clic sur un mois : plage à cheval sur deux ans, jamais plus de 12 mois', () => {
+  const oct25 = indice(2025, 10)
+  // octobre 2025 → septembre 2026 : 12 mois, acceptés et relus tels quels
+  const p = cliqueMois(mois(oct25), indice(2026, 9))
+  expect(p).toEqual({ type: 'plage', d: oct25, f: indice(2026, 9) })
+  expect(lireTexte(versTexte(p!))).toEqual(p)
+  // octobre 2025 → octobre 2026 : 13 mois, refusés par le serveur ; le clic recommence au mois cliqué
+  expect(cliqueMois(mois(oct25), indice(2026, 10))).toEqual(mois(indice(2026, 10)))
+  expect(cliqueMois(mois(indice(2026, 10)), oct25)).toEqual(mois(oct25))
+})
+
 test('texte d\'URL : aller-retour et valeurs refusées', () => {
   expect(versTexte(mois(OCT_26))).toBe('2026-10')
   const s = plage(indice(2025, 4), indice(2026, 3))

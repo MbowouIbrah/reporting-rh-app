@@ -54,10 +54,14 @@ export function libelle(s: Sel) {
 /** Comparaison par défaut : le mois d'avant, ou les mêmes mois de l'année d'avant. */
 export const defautCmp = (s: Sel): Sel => (s.type === 'mois' ? mois(s.d - 1) : { type: s.type, d: s.d - 12, f: s.f - 12 })
 
-/** Clic sur un mois : le sélectionne, forme une plage avec le mois déjà choisi, ou le désélectionne (null). */
+/** Clic sur un mois : le sélectionne, forme une plage avec le mois déjà choisi (12 mois au plus, sinon
+ *  la sélection recommence au mois cliqué), ou le désélectionne (null). */
 export function cliqueMois(b: Sel | null, i: number, max?: number): Sel | null {
   if (!b || b.type === 'annee') return mois(i)
-  if (b.type === 'mois') return b.d === i ? null : plage(b.d, i, max)
+  if (b.type === 'mois') {
+    if (b.d === i) return null
+    return Math.abs(i - b.d) + 1 > MAX_MOIS ? mois(i) : plage(b.d, i, max)
+  }
   if (i === b.d) return mois(b.f)
   if (i === b.f) return mois(b.d)
   return mois(i)

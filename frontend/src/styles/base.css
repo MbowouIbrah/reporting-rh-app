@@ -1998,7 +1998,8 @@ td.cel-poids .etiq { margin-left: 10px; }
 /* Résumé : mois du suivi hors de la période choisie (non comptés dans le total). */
 .suivi tr.hors-periode :is(th, td) { color: var(--muted); background: var(--gris-etiq); font-weight: 400; }
 .suivi tr.hors-periode td.saisi { background: var(--gris-etiq); }
-.suivi tr.en-periode th[scope='row'] { box-shadow: inset 3px 0 0 var(--navy); }
+.suivi tr.en-periode :is(th, td), .suivi tr.en-periode td.saisi { background: var(--info-soft); }
+.suivi tr.en-periode th[scope='row'] { box-shadow: inset 4px 0 0 var(--navy); color: var(--navy); font-weight: 700; }
 /* Écran peu haut : le tableau garde au moins l'en-tête, quelques mois et les totaux ; la page défile */
 @media (min-width: 1360px) {
   .resume-excel > .table-scroll { min-height: min(calc(10 * 1.9rem), 22rem); }
