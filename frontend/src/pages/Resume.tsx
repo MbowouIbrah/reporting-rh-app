@@ -3,7 +3,7 @@ import { Info } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { BulleCases, useBulleCase } from '../components/BulleCases'
 import { getAnnuel } from '../api/rapports'
-import type { Annuel, Cell, Val } from '../api/types'
+import type { Annuel, Cell, SerieMois, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
 import Etat, { etatErreur } from '../components/Etat'
 import FiltresPeriode, { libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
@@ -155,6 +155,16 @@ export default function Resume() {
   const iFinCmp = finN && a?.mois_fin && du !== null && cmpDu !== null ? indice(finN, a.mois_fin) + cmpDu - du : null
   const finCmp = iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
   const parRapport = (x: string) => `Évolution par rapport à ${x}`
+  // Le suivi montre 12 mois depuis le début de la période : les mois hors période sont grisés,
+  // l'année est ajoutée au mois quand la série couvre deux années civiles.
+  const auI = lireMois(f.filtres?.au)
+  const dansPeriode = (l: SerieMois) =>
+    l.annee == null || du === null || auI === null || (indice(l.annee, l.mois) >= du && indice(l.annee, l.mois) <= auI)
+  const deuxAnnees = new Set(a?.serie_n.map((l) => l.annee)).size > 1
+  const horsPeriode = !!a?.serie_n.some((l) => !dansPeriode(l))
+  const titrePeriode = an && (
+    <>Chiffres de <strong>{an}</strong>{n1 && <>, évolution par rapport à <strong>{n1}</strong></>}</>
+  )
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -173,6 +183,7 @@ export default function Resume() {
         <>
           {/* Disposition du 16/10 : CA, commissions, masse salariale, MAD ; puis marge, primes,
               effectif global, CA par salarié. Effectifs = fin du dernier mois saisi. */}
+          {titrePeriode && <p className="periode-titre">{titrePeriode}</p>}
           <div className="cases">
             {sansCa && indispo('Chiffre d’affaires')}
             {aCa && !sansCa && (
@@ -299,8 +310,11 @@ export default function Resume() {
               </thead>
               <tbody>
                 {a.serie_n.map((l) => (
-                  <tr key={l.mois}>
-                    <th scope="row">{MOIS[l.mois - 1]}</th>
+                  <tr key={`${l.annee ?? ''}-${l.mois}`} className={dansPeriode(l) ? undefined : 'hors-periode'}>
+                    <th scope="row">
+                      {MOIS[l.mois - 1]}{deuxAnnees && l.annee ? ` ${l.annee}` : ''}
+                      {!dansPeriode(l) && <span className="hors-mention">hors période</span>}
+                    </th>
                     {aCa && <td className="num saisi">{montrer(l.ca)}</td>}
                     {aCa && <td className={`${cls(l.marge)} saisi`}>{montrer(l.marge)}</td>}
                     {aCa && <td className={cls(l.taux_marge)}>{l.taux_marge == null ? '—' : pct(l.taux_marge)}</td>}
@@ -327,6 +341,11 @@ export default function Resume() {
               </tfoot>
             </table>
           </div>
+          {titrePeriode && (
+            <p className="periode-titre periode-pied">
+              Total : {titrePeriode}.{horsPeriode && ' Mois grisés : hors période sélectionnée, non comptés dans le total.'}
+            </p>
+          )}
         </>
       )}
       </BulleCases>
