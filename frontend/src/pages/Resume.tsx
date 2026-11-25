@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { BulleCases, useBulleCase } from '../components/BulleCases'
 import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, SerieMois, Val } from '../api/types'
@@ -13,7 +13,7 @@ import { useGabarit } from '../lib/gabarit'
 import { useFiltres } from '../hooks/useFiltres'
 import { cls, compact, fcfa, MOIS, MOIS_COURTS, pct, SEP, valeurBrute } from '../lib/format'
 import { ordreMois, type Calendrier } from '../lib/exercice'
-import { anneeDe, indice, lireMois, moisDe } from '../lib/periode'
+import { anneeDe, indice, libelleTexte, lireMois, moisDe } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 
 type Detail = [string, string][]
@@ -80,6 +80,8 @@ function Case({
 
 /** Réponse sans valeurs, dessinée par le rendu normal au tout premier chargement (pas encore de gabarit) :
  *  mêmes cases, libellés, mois et ligne TOTAL que la page chargée. CA et marge selon le droit « marge:read ». */
+const MOIS_3 = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
 function reponseVide(avecCa: boolean, calendrier: Calendrier | undefined): Annuel {
   const cell = { m: null, m1: null, var: null, var_pct: null }
   const ca = avecCa ? { ca_ytd: null, marge_ytd: null, taux_marge_ytd: null, ca_cumul: cell, ca_par_effectif: cell } : {}
@@ -155,16 +157,38 @@ export default function Resume() {
   const iFinCmp = finN && a?.mois_fin && du !== null && cmpDu !== null ? indice(finN, a.mois_fin) + cmpDu - du : null
   const finCmp = iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
   const parRapport = (x: string) => `Évolution par rapport à ${x}`
-  // Le suivi montre 12 mois depuis le début de la période : les mois hors période sont grisés,
-  // l'année est ajoutée au mois quand la série couvre deux années civiles.
-  const auI = lireMois(f.filtres?.au)
+  // Suivi mensuel (réunion du 23/11) : les 12 mois du cadre, ceux hors période grisés ; chaque mois
+  // porte son année (mois en trois lettres dans une case de largeur fixe, années alignées).
+  const iDu = lireMois(a?.du ?? f.filtres?.du)
+  const iAu = lireMois(a?.au ?? f.filtres?.au)
   const dansPeriode = (l: SerieMois) =>
-    l.annee == null || du === null || auI === null || (indice(l.annee, l.mois) >= du && indice(l.annee, l.mois) <= auI)
-  const deuxAnnees = new Set(a?.serie_n.map((l) => l.annee)).size > 1
+    l.annee == null || iDu === null || iAu === null || (indice(l.annee, l.mois) >= iDu && indice(l.annee, l.mois) <= iAu)
   const horsPeriode = !!a?.serie_n.some((l) => !dansPeriode(l))
+  const nomLigne = (annee: number | undefined, m: number) => (annee
+    ? <><span className="mois-3">{MOIS_3[m - 1]}</span> {annee}</>
+    : MOIS[m - 1])
   const titrePeriode = an && (
     <>Chiffres de <strong>{an}</strong>{n1 && <>, évolution par rapport à <strong>{n1}</strong></>}</>
   )
+  const perTab = libelleTexte(a?.du, a?.au) || an
+  const perCmp = libelleTexte(a?.cmp_du, a?.cmp_au) || n1
+  /** Écart de taux de marge, en points. */
+  const ecartPts = (t: Val | undefined, t1: Val | undefined) => {
+    if (vide(t) || vide(t1)) return <td className="num">—</td>
+    const d = (Number(t) - Number(t1)) * 100
+    return <td className={d < 0 ? 'num neg' : 'num'}>{d > 0 ? '+' : ''}{dec(String(d))}{SEP}pt</td>
+  }
+  const evol = (c: Cell | undefined) => <td className="num"><Variation v={c?.var_pct} /></td>
+  // Le premier mois de la période en haut du tableau : jamais caché sous les totaux figés
+  const defile = useRef<HTMLDivElement>(null)
+  const cle = `${a?.du ?? ''}-${a?.serie_n[0]?.annee ?? ''}-${a?.serie_n[0]?.mois ?? ''}`
+  useEffect(() => {
+    const zone = defile.current
+    const ligne = zone?.querySelector<HTMLElement>('tbody tr.en-periode')
+    if (!zone || !ligne) return
+    const entete = zone.querySelector('thead')?.getBoundingClientRect().height ?? 0
+    zone.scrollTop = ligne.offsetTop - entete
+  }, [cle])
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -286,7 +310,7 @@ export default function Resume() {
       {a && (
         <>
           <div className="titre-ligne">
-            <h3 className="bandeau-titre">SUIVI MENSUEL</h3>
+            <h3 className="bandeau-titre">SUIVI MENSUEL{perTab && ` · ${perTab.toUpperCase()}`}</h3>
             {(aCa || sansCa || sansMarge) && (
               <button type="button" className="info" aria-label="À propos du suivi mensuel" aria-describedby="note-suivi">
                 <Info aria-hidden="true" size={16} strokeWidth={2} />
@@ -303,17 +327,17 @@ export default function Resume() {
               </button>
             )}
           </div>
-          <div className="table-scroll">
+          <div className="table-scroll" ref={defile}>
             <table className="dense suivi">
               <thead>
                 <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
               </thead>
               <tbody>
                 {a.serie_n.map((l) => (
-                  <tr key={`${l.annee ?? ''}-${l.mois}`} className={dansPeriode(l) ? undefined : 'hors-periode'}>
+                  <tr key={`${l.annee ?? ''}-${l.mois}`} className={dansPeriode(l) ? (horsPeriode ? 'en-periode' : undefined) : 'hors-periode'}>
                     <th scope="row">
-                      {MOIS[l.mois - 1]}{deuxAnnees && l.annee ? ` ${l.annee}` : ''}
-                      {!dansPeriode(l) && <span className="hors-mention">hors période</span>}
+                      {nomLigne(l.annee, l.mois)}
+                      {!dansPeriode(l) && <span className="sr-only"> (hors période)</span>}
                     </th>
                     {aCa && <td className="num saisi">{montrer(l.ca)}</td>}
                     {aCa && <td className={`${cls(l.marge)} saisi`}>{montrer(l.marge)}</td>}
@@ -328,7 +352,7 @@ export default function Resume() {
               </tbody>
               <tfoot>
                 <tr>
-                  <th scope="row">TOTAL</th>
+                  <th scope="row" title="Total de la période choisie">TOTAL {perTab.toUpperCase()}</th>
                   {aCa && <td className="num">{montrer(a.ca_ytd)}</td>}
                   {aCa && <td className={cls(a.marge_ytd)}>{montrer(a.marge_ytd)}</td>}
                   {aCa && <td className={cls(a.taux_marge_ytd)}>{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</td>}
@@ -338,12 +362,38 @@ export default function Resume() {
                   <td className="num">{fcfa(a.frais_mission_ytd)}</td>
                   <td className="num">{fcfa(a.logement_ytd)}</td>
                 </tr>
+                {perCmp && (
+                  <tr className="cmp">
+                    <th scope="row" title="Total de la période comparée">TOTAL {perCmp.toUpperCase()}</th>
+                    {aCa && <td className="num">{montrer(a.ca_cumul?.m1)}</td>}
+                    {aCa && <td className={cls(a.lignes_ca_marge?.marge.m1)}>{montrer(a.lignes_ca_marge?.marge.m1)}</td>}
+                    {aCa && <td className={cls(a.taux_marge_cmp)}>{vide(a.taux_marge_cmp) ? '—' : pct(a.taux_marge_cmp)}</td>}
+                    <td className="num">{montrer(a.cumul_ytd.m1)}</td>
+                    <td className="num">{montrer(a.commissions_cumul.m1)}</td>
+                    <td className="num">{montrer(a.primes_cumul.m1)}</td>
+                    <td className="num">{montrer(a.frais_mission?.m1)}</td>
+                    <td className="num">{montrer(a.logement_cumul?.m1)}</td>
+                  </tr>
+                )}
+                {perCmp && (
+                  <tr className="evol">
+                    <th scope="row" title={`Évolution de ${perTab} par rapport à ${perCmp}`}>ÉVOLUTION</th>
+                    {aCa && evol(a.ca_cumul)}
+                    {aCa && evol(a.lignes_ca_marge?.marge)}
+                    {aCa && ecartPts(a.taux_marge_ytd, a.taux_marge_cmp)}
+                    {evol(a.cumul_ytd)}
+                    {evol(a.commissions_cumul)}
+                    {evol(a.primes_cumul)}
+                    {evol(a.frais_mission)}
+                    {evol(a.logement_cumul)}
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>
-          {titrePeriode && (
+          {horsPeriode && (
             <p className="periode-titre periode-pied">
-              Total : {titrePeriode}.{horsPeriode && ' Mois grisés : hors période sélectionnée, non comptés dans le total.'}
+              Mois grisés : hors période, non comptés dans les totaux.
             </p>
           )}
         </>

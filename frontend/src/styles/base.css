@@ -315,6 +315,16 @@ table.dense td.num { text-align: right; }
 .suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tfoot :is(th, td) { background: var(--gris-etiq); border-top: 1px solid var(--rule-strong); font-weight: 700; color: var(--navy); }
+/* Suivi mensuel : totaux figés en bas du tableau (réunion du 23/11) */
+.suivi tfoot { position: sticky; bottom: 0; z-index: 2; }
+/* Bordures fusionnées non déplacées avec les cellules figées : séparateurs dessinés en ombre, sinon les mois transparaissent */
+.suivi tfoot :is(th, td) { border-block: 0; box-shadow: inset 0 -1px 0 var(--rule); }
+.suivi tfoot tr:first-child :is(th, td) { box-shadow: inset 0 1px 0 var(--rule-strong), inset 0 -1px 0 var(--rule); }
+.suivi .mois-3 { display: inline-block; width: 2.6em; }
+.suivi tbody th { font-variant-numeric: tabular-nums; }
+.suivi tfoot th[scope='row'] { text-align: left; white-space: nowrap; }
+.suivi tfoot tr.cmp :is(th, td) { font-weight: 600; color: var(--muted); border-top: 0; }
+.suivi tfoot tr.evol :is(th, td) { font-weight: 600; border-top: 0; }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
 /* Résumé : filtre d'année */
 .filtre-annee { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: var(--sp-3); }
@@ -337,8 +347,7 @@ table.dense td.num { text-align: right; }
   .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
   .resume-excel .cases .case strong { font-size: var(--fs-xl); min-height: 0; padding-top: 0; }
   .resume-excel .regle { padding: calc(var(--v) * .4) 14px; font-size: var(--fs-xs); }
-  .resume-excel > .table-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; margin: 0; }
-  .resume-excel .suivi { height: 100%; }
+  .resume-excel > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: none; overflow: auto; margin: 0; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: clamp(0px, .4vh, 4px); line-height: 1.2; font-size: var(--fs-sm); }
 }
 
@@ -1300,12 +1309,11 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   :root { --ligne-max: 2.25rem; }
 
   .resume-excel .regle { margin-bottom: 0; }
-  /* Le tableau occupe toute la hauteur restante, les 12 mois se partagent l'espace à parts égales */
-  .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(14 * 3rem); }
+  /* Le tableau garde sa taille (mois de la période seulement) ; défilement au-delà, totaux figés */
+  .resume-excel > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: calc(14 * 3rem); }
   /* Cases plus hautes quand l'écran est haut (24'') : la page se répartit sur toute la hauteur */
   .resume-excel .cases .case { padding-block: clamp(var(--sp-3), 2.2vh, 28px); }
   .resume-excel { padding-bottom: var(--v); }
-  .resume-excel .suivi { height: 100%; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: var(--ligne-pad); line-height: 1.35; }
 
   /* Mensuel, Annuel, DONNEES, Individuel : même hauteur de ligne que le Résumé dans toutes les sections */
@@ -1990,7 +1998,12 @@ td.cel-poids .etiq { margin-left: 10px; }
 /* Résumé : mois du suivi hors de la période choisie (non comptés dans le total). */
 .suivi tr.hors-periode :is(th, td) { color: var(--muted); background: var(--gris-etiq); font-weight: 400; }
 .suivi tr.hors-periode td.saisi { background: var(--gris-etiq); }
-.hors-mention { margin-left: 6px; font-size: var(--fs-xs); font-weight: 400; font-style: italic; }
+.suivi tr.en-periode th[scope='row'] { box-shadow: inset 3px 0 0 var(--navy); }
+/* Écran peu haut : le tableau garde au moins l'en-tête, quelques mois et les totaux ; la page défile */
+@media (min-width: 1360px) {
+  .resume-excel > .table-scroll { min-height: min(calc(10 * 1.9rem), 22rem); }
+  .layout-ecran:has(.resume-excel) > .page { overflow-y: auto; }
+}
 .periode-pied { margin: var(--sp-2) 0 0; font-size: var(--fs-sm, 13px); }
 /* En-têtes de colonnes : période en petit sous le libellé. */
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }

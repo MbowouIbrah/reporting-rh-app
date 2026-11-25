@@ -915,6 +915,7 @@ def annuel(
     ca1 = sum((n1[m].ca for m in avec_ca1), ZERO) if avec_ca1 else None
     avec_marge1 = [m for m in avec_ca1 if n1[m].marge is not None]
     marge1 = sum((n1[m].marge for m in avec_marge1), ZERO) if avec_marge1 else None
+    ca_avec_marge1 = sum((n1[m].ca for m in avec_marge1), ZERO) if avec_marge1 else None
     eff = blocs["effectif_global"]
     partiel_n = frozenset().union(*(n[m].partiel for m in n if m <= mois))
     obj_ca, obj_marge = objectif_cumul("ca", avec_ca), objectif_cumul("marge", avec_marge)
@@ -997,6 +998,10 @@ def annuel(
             sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES_TOUTES), ZERO) if ok1 else None),
         "frais_mission_ytd": cumul_rub(FRAIS_MISSION),
         "logement_ytd": cumul_rub(LOGEMENT),
+        # Suivi mensuel du Résumé : ligne « total de la période comparée » (réunion du 23/11).
+        "logement_cumul": cell(cumul_rub(LOGEMENT),
+                               sum((n1[m].rubrique(LOGEMENT) for m in ok1), ZERO) if ok1 else None),
+        "taux_marge_cmp": f.taux_marge(ca_avec_marge1, marge1),
         "effectif_moyen": eff,
         "mois_fin": der,
         "effectif_fin": eff_fin_total,

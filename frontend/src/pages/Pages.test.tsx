@@ -138,7 +138,7 @@ test('Résumé : part des MAD d’abord, sites déportés dessous, nombres dans 
 test('Résumé : tableau avec frais de mission, logement et ligne de total', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()
-  await screen.findByText('TOTAL')
+  await waitFor(() => expect(document.querySelector('.suivi tfoot')).toHaveTextContent('TOTAL'))
   const entetes = [...document.querySelectorAll('.suivi thead th')].map((t) => t.textContent)
   expect(entetes).toEqual(['MOIS', 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.', 'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ'])
   expect(document.querySelector('.suivi tfoot')).toHaveTextContent(/TOTAL.*7.*3/)
@@ -304,6 +304,8 @@ test('Résumé : au tout premier chargement, le squelette a les cases, les mois 
   expect(zone.querySelectorAll('.cases')).toHaveLength(2)
   expect(zone.querySelectorAll('.cases .case')).toHaveLength(8)
   expect(zone.querySelectorAll('.cases .case .second-libelle')).toHaveLength(8)
+  // Réunion du 23/11 : les 12 mois du cadre, ceux hors période grisés
   expect(zone.querySelectorAll('.suivi tbody tr')).toHaveLength(12)
+  expect(zone).toHaveTextContent('SUIVI MENSUEL')
   expect(zone.querySelector('.suivi tfoot')).toHaveTextContent('TOTAL')
 })

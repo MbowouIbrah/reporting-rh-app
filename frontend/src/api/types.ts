@@ -330,6 +330,10 @@ export interface Annuel {
   primes_cumul: Cell
   frais_mission_ytd: Dec | null
   logement_ytd: Dec | null
+  /** Suivi mensuel : logement de la période et de la période comparée. */
+  logement_cumul?: Cell
+  /** Taux de marge de la période comparée ; absent sans le droit « marge ». */
+  taux_marge_cmp?: Val
   effectif_moyen: Cell
   /** Dernier mois saisi de la période : base de l'effectif de fin. */
   mois_fin: number | null
