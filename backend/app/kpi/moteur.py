@@ -670,8 +670,9 @@ def _controle(libelle: str, *valeurs: Decimal) -> dict:
     return {"controle": libelle, "ecart": ecart, "bloquant": ecart > f.TOLERANCE}
 
 
-def avec_donnees(pds: dict[int, PeriodeData], jusqu_au: int = 12) -> list[int]:
-    return [m for m in sorted(pds) if m <= jusqu_au and _ok(pds[m])]
+def avec_donnees(pds: dict[int, PeriodeData], jusqu_au: int | None = None) -> list[int]:
+    """Rangs qui ont des données (jusqu'au rang `jusqu_au` ; absent : tous)."""
+    return [m for m in sorted(pds) if (jusqu_au is None or m <= jusqu_au) and _ok(pds[m])]
 
 
 def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
@@ -807,13 +808,13 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 def annuel(
     n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
     budgets: dict[int, Budgets] | None = None, params_mois: dict[int, Params] | None = None,
-    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None,
+    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None, nb_rangs: int = 12,
 ) -> dict:
     """n, n1 : mois -> données de l'année N et N-1. Cumul des mois `debut` à `mois`. `budgets` et
     `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
     défaut). `comparaison` : données comparées au cumul, rangées sur les mois de N (période
     précédente ; vide : aucune comparaison) ; absent : les mêmes mois de N-1. Les séries mensuelles
-    restent les deux années entières."""
+    restent les deux cadres entiers (`nb_rangs` mois : 12, ou la période si elle est plus longue)."""
     refs = _contrats_vus(refs, *n.values(), *n1.values(), *(comparaison or {}).values())
     n_tout, n1_tout = n, n1
     n = {m: pd for m, pd in n_tout.items() if m >= debut}
@@ -852,7 +853,7 @@ def annuel(
                  **_ca_marge(pds.get(m)),
                  "activite": _activite(pds.get(m)),
                  **({"objectifs": objectifs[m]} if objectifs is not None else {})}
-                for m in range(1, 13)]
+                for m in range(1, nb_rangs + 1)]
 
     def cumul(pds):
         mois_ok = avec_donnees(pds, mois)
@@ -883,7 +884,8 @@ def annuel(
     complet1 = sum((n1_tout[m].ms for m in avec_donnees(n1_tout)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
     objectifs_n = {m: _objectifs(n_tout.get(m), (budgets or {}).get(m, Budgets()),
-                                 (params_mois or {}).get(m, params)) for m in range(1, 13)}
+                                 (params_mois or {}).get(m, params))
+                   for m in range(1, nb_rangs + 1)}
 
     manque: set[str] = set()
 

@@ -179,6 +179,8 @@ TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
 Comparaison = Literal["", "prec", "aucune"]
 # Période choisie au calendrier : mois « AAAA-MM » de début et de fin, et de la comparaison
 MOIS_AAAA_MM = r"^\d{4}-(0[1-9]|1[0-2])$"
+# Plus longue période acceptée (docs/etude-periode-libre.md) : borne le nombre de mois chargés
+MAX_MOIS = 60
 
 
 def _liste(v: str | None) -> frozenset[str] | None:
@@ -295,9 +297,12 @@ def mensuel_export(
 
 def _plage(du, au, cmp_du, cmp_au):
     """Période choisie au calendrier (`du`, `au`, `cmp_du`, `cmp_au` : « AAAA-MM ») ->
-    (début d'exercice, premier mois de l'exercice, indices de mois du début et de la fin, indice du
-    début de la comparaison). Les 12 rangs du moteur démarrent en janvier si la période tient dans
-    une année civile, sinon au mois `du`. Sans comparaison choisie : mêmes mois 12 mois plus tôt."""
+    (début du cadre, premier mois du cadre, indices de mois du début et de la fin, indice du début
+    de la comparaison, nombre de rangs du cadre, années de décalage de la comparaison par défaut).
+    Le cadre du moteur fait 12 rangs, à partir de janvier si la période tient dans une année civile,
+    sinon du mois `du` ; une période de plus de 12 mois est son propre cadre. Sans comparaison
+    choisie : mêmes mois, décalés du nombre d'années entières qui couvre la période (sans
+    chevauchement, janvier contre janvier)."""
     if (du is None) != (au is None):
         raise HTTPException(422, "Le début et la fin de la période vont ensemble")
     if (cmp_du is None) != (cmp_au is None):
@@ -305,17 +310,19 @@ def _plage(du, au, cmp_du, cmp_au):
     a, b = ex.indice(du), ex.indice(au)
     if a > b:
         raise HTTPException(422, "Le début de la période est après sa fin")
-    if b - a + 1 > 12:
-        raise HTTPException(422, "La période ne peut pas dépasser 12 mois")
+    nb = b - a + 1
+    if nb > MAX_MOIS:
+        raise HTTPException(422, f"La période ne peut pas dépasser {MAX_MOIS} mois")
+    ans = -(-nb // 12)
     if cmp_du is None:
-        c = a - 12
+        c = a - 12 * ans
     else:
         c = ex.indice(cmp_du)
         if ex.indice(cmp_au) - c != b - a:
             raise HTTPException(
                 422, "La comparaison doit couvrir le même nombre de mois que la période")
     depart = 1 if a // 12 == b // 12 else a % 12 + 1
-    return a // 12, depart, a, b, c
+    return a // 12, depart, a, b, c, max(12, nb), ans
 
 
 def _criteres(db, p, service, site, type_site, poste, matricule, activite, type_contrat,
@@ -347,7 +354,7 @@ def _mois_comptes(db, p, service, site, type_site, poste, matricule, activite, t
     par mois, dans l'ordre, puis la période servie. Mêmes règles de période que `/annuel` ; 404
     sans aucune donnée."""
     authorize(p, "report:read")
-    _, _, a, b, c = _plage(du, au, cmp_du, cmp_au)
+    _, _, a, b, c, _, _ = _plage(du, au, cmp_du, cmp_au)
     scope, service, site, _, crit = _criteres(
         db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
     nb = b - a + 1
@@ -379,11 +386,13 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     = les mêmes nombre de mois juste avant, `aucune`. Le moteur
     reçoit des rangs 1 à 12 (kpi/exercice.py). `du` et `au` (« AAAA-MM »), quand ils sont fournis,
     remplacent `annee`, `mois`, `debut`, `calendrier`, `ref_annee` et `cmp` ; `cmp_du` et `cmp_au`
-    : période comparée (mêmes mois 12 mois plus tôt si absents)."""
+    : période comparée (règle de `_plage` si absents). Une période de plus de 12 mois a autant de
+    rangs que de mois."""
     authorize(p, "report:read")
     plage = None
+    nb_rangs, ans = 12, 1
     if du is not None or au is not None:
-        annee, calendrier, a, b, c = plage = _plage(du, au, cmp_du, cmp_au)
+        annee, calendrier, a, b, c, nb_rangs, ans = plage = _plage(du, au, cmp_du, cmp_au)
         mois, debut, ref_annee, cmp = b % 12 + 1, a % 12 + 1, None, ""
     elif annee is None:
         raise HTTPException(422, "L'année ou la période (du, au) est obligatoire")
@@ -394,14 +403,19 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
         return _charger_mois(db, scope, service, site, crit, mois_reels)
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
-        return pds(enumerate(ex.mois_exercice(a, calendrier), 1))
+        return pds(enumerate(ex.mois_exercice(a, calendrier, nb_rangs), 1))
 
-    reels = ex.mois_exercice(annee, calendrier)
-    fin = 12 if mois is None else ex.rang(mois, calendrier)
-    d = 1 if debut is None else ex.rang(debut, calendrier)
+    reels = ex.mois_exercice(annee, calendrier, nb_rangs)
+    if plage is not None:
+        # rangs dans le cadre (il peut dépasser 12 mois : `ex.rang` ne s'applique plus)
+        cadre = annee * 12 + ex.premier_mois(calendrier) - 1
+        d, fin = plage[2] - cadre + 1, plage[3] - cadre + 1
+    else:
+        fin = 12 if mois is None else ex.rang(mois, calendrier)
+        d = 1 if debut is None else ex.rang(debut, calendrier)
     if d > fin:
         raise HTTPException(422, "Le début de la période est après sa fin")
-    ref = ref_annee or annee - 1
+    ref = ref_annee or annee - ans
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
@@ -425,8 +439,8 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
         y, m = ex.mois_exercice(ref, calendrier)[d - 1]
         k = y * 12 + m - 1
     res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois, d,
-                        comparaison)
-    res = ex.en_mois_reels(res, annee, ref, calendrier)
+                        comparaison, nb_rangs)
+    res = ex.en_mois_reels(res, annee, ref, calendrier, nb_rangs)
     # période et comparaison effectives, au format du calendrier (« AAAA-MM »)
     res |= {"du": ex.texte(debut_reel), "au": ex.texte(debut_reel + fin - d),
             "cmp_du": None if k is None else ex.texte(k),

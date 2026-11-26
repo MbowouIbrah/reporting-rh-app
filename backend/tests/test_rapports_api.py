@@ -198,10 +198,26 @@ def test_annuel_periode_au_calendrier(charge):
     assert get(charge, "annuel", du="2020-01", au="2020-02").status_code == 404
 
 
+def test_annuel_periode_de_plus_de_12_mois(charge):
+    # 14 mois : le cadre est la période elle-même, comparée aux mêmes mois deux ans plus tôt
+    r = get(charge, "annuel", du="2025-01", au="2026-02").json()
+    assert D(r["cumul_ytd"]["m"]) == D("10700.5") and r["cumul_ytd"]["nb_mois"] == 2
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == (
+        "2025-01", "2026-02", "2023-01", "2024-02")
+    assert [(x["annee"], x["mois"]) for x in r["serie_n"]] == (
+        [(2025, m) for m in range(1, 13)] + [(2026, 1), (2026, 2)])
+    assert [(x["annee"], x["mois"]) for x in r["serie_n1"]][0] == (2023, 1)
+    assert len(r["serie_n1"]) == 14 and (r["annee_fin"], r["mois_fin"]) == (2026, 2)
+    # 60 mois acceptés, comparaison choisie de même durée
+    r = get(charge, "annuel", du="2022-03", au="2027-02", cmp_du="2017-03", cmp_au="2022-02").json()
+    assert len(r["serie_n"]) == 60 and D(r["cumul_ytd"]["m"]) == D("10700.5")
+    assert get(charge, "annuel/export", du="2025-01", au="2026-02").status_code == 200
+
+
 def test_annuel_periode_au_calendrier_refus(charge):
     mess = get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01", cmp_au="2025-01")
     assert mess.status_code == 422 and "même nombre de mois" in mess.json()["detail"]
-    assert get(charge, "annuel", du="2025-01", au="2026-01").status_code == 422  # 13 mois
+    assert get(charge, "annuel", du="2021-01", au="2026-01").status_code == 422  # 61 mois
     assert get(charge, "annuel", du="2026-03", au="2026-02").status_code == 422
     assert get(charge, "annuel", du="2026-01").status_code == 422
     assert get(charge, "annuel", du="2026-01", au="2026-02", cmp_du="2025-01").status_code == 422

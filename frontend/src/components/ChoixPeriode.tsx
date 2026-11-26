@@ -74,7 +74,7 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
     : mauvaiseLongueur
       ? `Il faut ${longueur} mois, comme la période`
       : brouillon.type === 'mois' && !moisSeul && longueur === undefined
-        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période ({MAX_MOIS} mois au plus)</>
+        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période, sur cette année ou une autre (◀ ▶), {MAX_MOIS} mois au plus</>
         : <strong>{libelle(brouillon)}</strong>
 
   const appliquer = () => {

@@ -11,8 +11,8 @@ export interface Sel { type: TypeSel; d: number; f: number }
 /** Période et comparaison affichées, avec les mois disponibles (indices) : bornes du calendrier. */
 export interface PeriodeChoisie { sel: Sel; cmp: Sel; min: number; max: number }
 
-/** Plus longue période acceptée par le serveur. */
-export const MAX_MOIS = 12
+/** Plus longue période acceptée par le serveur (docs/etude-periode-libre.md). */
+export const MAX_MOIS = 60
 
 export const indice = (annee: number, mois: number) => annee * 12 + mois - 1
 export const anneeDe = (i: number) => Math.floor(i / 12)
@@ -51,10 +51,15 @@ export function libelle(s: Sel) {
   return `${nom(s.d)} → ${nomMois(s.f)} ${anneeDe(s.f)}`
 }
 
-/** Comparaison par défaut : le mois d'avant, ou les mêmes mois de l'année d'avant. */
-export const defautCmp = (s: Sel): Sel => (s.type === 'mois' ? mois(s.d - 1) : { type: s.type, d: s.d - 12, f: s.f - 12 })
+/** Comparaison par défaut : le mois d'avant, ou les mêmes mois décalés du nombre d'années entières
+ *  qui couvre la période (l'année d'avant jusqu'à 12 mois ; sans chevauchement au-delà, comme le serveur). */
+export function defautCmp(s: Sel): Sel {
+  if (s.type === 'mois') return mois(s.d - 1)
+  const decalage = 12 * Math.ceil(longueur(s) / 12)
+  return { type: s.type, d: s.d - decalage, f: s.f - decalage }
+}
 
-/** Clic sur un mois : le sélectionne, forme une plage avec le mois déjà choisi (12 mois au plus, sinon
+/** Clic sur un mois : le sélectionne, forme une plage avec le mois déjà choisi (MAX_MOIS au plus, sinon
  *  la sélection recommence au mois cliqué), ou le désélectionne (null). */
 export function cliqueMois(b: Sel | null, i: number, max?: number): Sel | null {
   if (!b || b.type === 'annee') return mois(i)
@@ -78,7 +83,7 @@ export function lireMois(t: string | undefined): number | null {
   return m && n >= 1 && n <= 12 ? indice(Number(m[1]), n) : null
 }
 
-/** Relit un texte d'URL ; null s'il est absent, illisible, à l'envers ou de plus de 12 mois. */
+/** Relit un texte d'URL ; null s'il est absent, illisible, à l'envers ou de plus de MAX_MOIS mois. */
 export function lireTexte(t: string | undefined, max?: number): Sel | null {
   const [a, b = a, reste] = (t ?? '').split('..')
   if (!t || reste !== undefined) return null

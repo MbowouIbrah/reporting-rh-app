@@ -157,7 +157,7 @@ export default function Resume() {
   const iFinCmp = finN && a?.mois_fin && du !== null && cmpDu !== null ? indice(finN, a.mois_fin) + cmpDu - du : null
   const finCmp = iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
   const parRapport = (x: string) => `Évolution par rapport à ${x}`
-  // Suivi mensuel (réunion du 23/11) : les 12 mois du cadre, ceux hors période grisés ; chaque mois
+  // Suivi mensuel (réunion du 23/11) : les mois du cadre, ceux hors période grisés ; chaque mois
   // porte son année (mois en trois lettres dans une case de largeur fixe, années alignées).
   const iDu = lireMois(a?.du ?? f.filtres?.du)
   const iAu = lireMois(a?.au ?? f.filtres?.au)

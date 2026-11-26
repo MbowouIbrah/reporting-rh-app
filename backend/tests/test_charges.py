@@ -163,7 +163,8 @@ def test_charges_periode_invalide_et_sans_donnee(charge):
     assert get(charge, "charges").status_code == 422
     assert get(charge, "charges", du="2026-01").status_code == 422
     assert get(charge, "charges", du="2026-03", au="2026-02").status_code == 422
-    assert get(charge, "charges", du="2025-01", au="2026-01").status_code == 422  # 13 mois
+    assert get(charge, "charges", du="2021-01", au="2026-01").status_code == 422  # 61 mois
+    assert get(charge, "charges", du="2025-01", au="2026-02").status_code == 200  # 14 mois
     assert get(charge, "charges", du="2026-01", au="2026-02", cmp_du="2025-01",
                cmp_au="2025-01").status_code == 422
     assert get(charge, "charges", du="2020-01", au="2020-02").status_code == 404
