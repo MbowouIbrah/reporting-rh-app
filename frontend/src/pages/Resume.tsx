@@ -6,7 +6,7 @@ import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, SerieMois, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
 import Etat, { etatErreur } from '../components/Etat'
-import FiltresPeriode, { libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
+import FiltresPeriode, { LIBELLE_TYPE_SITE, libelleComparaison, libelleCourant } from '../components/FiltresPeriode'
 import { Variation } from '../components/Tuile'
 import { useAttente } from '../hooks/useAttente'
 import { useGabarit } from '../lib/gabarit'
@@ -56,8 +56,8 @@ const ecartPoints = (t: Val | undefined, t1: Val | undefined) => (vide(t) || vid
 const textePoints = (d: number) => `${d > 0 ? '+' : ''}${dec(String(d))}${SEP}pt`
 const texteEcart = (d: number | null) => (d === null ? '—' : textePoints(d))
 /** Écart de taux en points, avec flèche et couleur (vert en hausse, rouge en baisse). */
-const evolutionPoints = (d: number | null): ReactNode =>
-  d === null ? '—' : <span className={d === 0 ? 'bc-neutre' : d > 0 ? 'bc-bon' : 'bc-mal'}>{d < 0 ? '▼' : d > 0 ? '▲' : '■'} {textePoints(d)}</span>
+const evolutionPoints = (d: number | null, couleur = true): ReactNode =>
+  d === null ? '—' : <span className={d === 0 || !couleur ? 'bc-neutre' : d > 0 ? 'bc-bon' : 'bc-mal'}>{d < 0 ? '▼' : d > 0 ? '▲' : '■'} {textePoints(d)}</span>
 /** Parts par type de contrat : valeur et part du total (les lignes sans part sont écartées). */
 const partsContrat = (d: Record<string, Cell & { part: Val }> | undefined, fmt: (v: Val | undefined) => string) =>
   Object.entries(d ?? {})
@@ -117,7 +117,7 @@ function reponseVide(avecCa: boolean, calendrier: Calendrier | undefined): Annue
 }
 
 export default function Resume() {
-  const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true })
+  const f = useFiltres({ avecMois: false, comparaison: 'annee', avecCalendrier: true, selections: true })
   // Résumé annuel : cumul de l'année jusqu'au dernier mois saisi. Poste et employé ne s'appliquent pas ici.
   const base = f.filtres && {
     annee: f.filtres.annee,
@@ -132,6 +132,8 @@ export default function Resume() {
     type_site: f.filtres.type_site,
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
+    cmp_dim: f.filtres.cmp_dim,
+    cmp_val: f.filtres.cmp_val,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
   const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat))
@@ -144,8 +146,12 @@ export default function Resume() {
   const [premier, relais] = useAttente(ann.isLoading)
   const [maj, relaisMaj] = useAttente(ann.isPlaceholderData)
   const gab = useGabarit('annuel', ann.data, !ann.isPlaceholderData)
-  const an = f.filtres ? libelleCourant(f.filtres) : ''
-  const n1 = f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
+  // R9 : deux sélections comparées sur la même période : A et B remplacent les deux périodes.
+  const sel = f.selection
+  const nomSel = (v: string) => (sel?.dim === 'type_site' ? LIBELLE_TYPE_SITE[v] ?? v : v)
+  const periodeSel = f.filtres ? libelleCourant(f.filtres) : ''
+  const an = sel ? nomSel(sel.a) : periodeSel
+  const n1 = sel ? nomSel(sel.b) : f.filtres ? libelleComparaison(f.filtres, 'annee') : ''
   const erreur = premier ? null : ann.error
   const peutCa = usePeut('marge:read')
   // Premier chargement : la page à la forme de la dernière réponse (sinon d'une réponse vide), valeurs en squelette.
@@ -177,13 +183,13 @@ export default function Resume() {
   // Dernier mois saisi avec sa vraie année (en fiscal, l'exercice 2025-26 finit en 2026).
   const finN = f.filtres && a?.mois_fin ? (a.annee_fin ?? f.filtres.annee) : undefined
   const moisFin = finN && a?.mois_fin ? MOIS_COURTS[a.mois_fin - 1] : ''
-  const finAn = finN ? `${finN}` : an
+  const finAn = finN ? `${finN}` : periodeSel
   // Fin de la période comparée : le dernier mois saisi, décalé comme la comparaison l'est de la période.
   const du = lireMois(f.filtres?.du)
   const cmpDu = lireMois(f.filtres?.cmp_du)
   const iFinCmp = finN && a?.mois_fin && du !== null && cmpDu !== null ? indice(finN, a.mois_fin) + cmpDu - du : null
-  const finCmp = iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
-  const parRapport = (x: string) => `Évolution par rapport à ${x}`
+  const finCmp = sel ? n1 : iFinCmp !== null ? `${MOIS_COURTS[moisDe(iFinCmp) - 1]} ${anneeDe(iFinCmp)}` : n1
+  const parRapport = (x: string) => (sel ? `Écart avec ${x}` : `Évolution par rapport à ${x}`)
   // Suivi mensuel (réunion du 23/11) : les mois du cadre, ceux hors période grisés ; chaque mois
   // porte son année (mois en trois lettres dans une case de largeur fixe, années alignées).
   const iDu = lireMois(a?.du ?? f.filtres?.du)
@@ -194,16 +200,19 @@ export default function Resume() {
   const nomLigne = (annee: number | undefined, m: number) => (annee
     ? <><span className="mois-3">{MOIS_3[m - 1]}</span> {annee}</>
     : MOIS[m - 1])
-  const titrePeriode = an && (
+  const titrePeriode = sel ? (
+    <>Chiffres de <strong>{an}</strong> comparés à <strong>{n1}</strong>{periodeSel && <>, {periodeSel}</>}</>
+  ) : an && (
     <>Chiffres de <strong>{an}</strong>{n1 && <>, évolution par rapport à <strong>{n1}</strong></>}</>
   )
-  const perTab = libelleTexte(a?.du, a?.au) || an
-  const perCmp = libelleTexte(a?.cmp_du, a?.cmp_au) || n1
+  const perTab = libelleTexte(a?.du, a?.au) || periodeSel
+  const perCmp = sel ? n1 : libelleTexte(a?.cmp_du, a?.cmp_au) || n1
+  const totTab = sel ? an : perTab
   /** Écart de taux de marge, en points. */
   const ecartPts = (t: Val | undefined, t1: Val | undefined) => {
     const d = ecartPoints(t, t1)
     if (d === null) return <td className="num">—</td>
-    return <td className={d < 0 ? 'num neg' : 'num'}>{textePoints(d)}</td>
+    return <td className={d < 0 && !sel ? 'num neg' : 'num'}>{textePoints(d)}</td>
   }
   const periodes = `${an} · comparé à ${n1}`
   /** Mini-courbe d'un indicateur mensuel : mois de la période, valeurs brutes de la série (Number() pour tracer seulement). */
@@ -234,7 +243,7 @@ export default function Resume() {
     }]
   const sectionContrats = (titre: string, parts: ReturnType<typeof partsContrat>): Section[] =>
     parts.length ? [{ type: 'parts', titre, parts }] : []
-  const evol = (c: Cell | undefined) => <td className="num"><Variation v={c?.var_pct} /></td>
+  const evol = (c: Cell | undefined) => <td className="num"><Variation v={c?.var_pct} neutre={!!sel} /></td>
   // Le premier mois de la période en haut du tableau : jamais caché sous les totaux figés
   const defile = useRef<HTMLDivElement>(null)
   const cle = `${a?.du ?? ''}-${a?.serie_n[0]?.annee ?? ''}-${a?.serie_n[0]?.mois ?? ''}`
@@ -255,7 +264,7 @@ export default function Resume() {
       <BulleCases inactif={premier || maj}>
       <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} onChange={f.set} />
+        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} />
       )}
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
@@ -272,7 +281,7 @@ export default function Resume() {
                   titre: 'Chiffre d’affaires',
                   periodes,
                   sections: [
-                    comparaison(a.ca_cumul, an, n1, true),
+                    comparaison(a.ca_cumul, an, n1, !sel),
                     courbe(a, 'ca'),
                     ...parFront('CA', a.ca_par_front),
                     {
@@ -283,7 +292,7 @@ export default function Resume() {
                   ],
                 }}
               >
-                <Variation v={a.ca_cumul?.var_pct} vs="" />
+                <Variation v={a.ca_cumul?.var_pct} vs="" neutre={!!sel} />
                 {ligneFront(a.ca_par_front)}
               </Case>
             )}
@@ -298,7 +307,7 @@ export default function Resume() {
                 ],
               }}
             >
-              <Variation v={a.commissions_cumul.var_pct} vs="" />
+              <Variation v={a.commissions_cumul.var_pct} vs="" neutre={!!sel} />
             </Case>
             <Case
               titre="Masse salariale"
@@ -316,7 +325,7 @@ export default function Resume() {
                 ],
               }}
             >
-              <Variation v={a.cumul_ytd.var_pct} vs="" />
+              <Variation v={a.cumul_ytd.var_pct} vs="" neutre={!!sel} />
               {msFb && <span className="ratio-fb">Front office {pct(msFb.front_pct)} · Back office {pct(msFb.back_pct)}</span>}
             </Case>
             <Case titre="Part des MAD" valeur={vide(a.part_mad.m) ? '—' : taux(a.part_mad.m)} devise={false}
@@ -379,7 +388,7 @@ export default function Resume() {
                         { k: `Marge ${an}`, v: exact(a.marge_ytd), fort: true },
                         { k: `Taux de marge ${an}`, v: taux(a.taux_marge_ytd), fort: true },
                         { k: `Taux de marge ${n1}`, v: taux(a.taux_marge_cmp) },
-                        { k: 'Écart de taux', v: evolutionPoints(ecartPoints(a.taux_marge_ytd, a.taux_marge_cmp)), sep: true },
+                        { k: 'Écart de taux', v: evolutionPoints(ecartPoints(a.taux_marge_ytd, a.taux_marge_cmp), !sel), sep: true },
                       ],
                     },
                     courbe(a, 'marge'),
@@ -411,7 +420,7 @@ export default function Resume() {
                 ],
               }}
             >
-              <Variation v={a.primes_cumul.var_pct} vs="" />
+              <Variation v={a.primes_cumul.var_pct} vs="" neutre={!!sel} />
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
               libelle2={parRapport(finCmp)}
@@ -438,7 +447,7 @@ export default function Resume() {
                 ],
               }}
             >
-              <Variation v={a.effectif_fin.var_pct} vs="" />
+              <Variation v={a.effectif_fin.var_pct} vs="" neutre={!!sel} />
               {/* Productif / administratif : part de l'effectif de fin en front et en back office. */}
               {fb && <span className="ratio-fb">Front office {pct(fb.front_pct)} · Back office {pct(fb.back_pct)}</span>}
             </Case>
@@ -449,7 +458,7 @@ export default function Resume() {
                   titre: 'CA par salarié',
                   periodes,
                   sections: [
-                    comparaison(a.ca_par_effectif, an, n1, true),
+                    comparaison(a.ca_par_effectif, an, n1, !sel),
                     {
                       type: 'lignes',
                       titre: 'Calcul',
@@ -462,7 +471,7 @@ export default function Resume() {
                   ],
                 }}
               >
-                <Variation v={a.ca_par_effectif?.var_pct} vs="" />
+                <Variation v={a.ca_par_effectif?.var_pct} vs="" neutre={!!sel} />
               </Case>
             )}
           </div>
@@ -513,7 +522,7 @@ export default function Resume() {
               </tbody>
               <tfoot>
                 <tr>
-                  <th scope="row" title="Total de la période choisie">TOTAL {perTab.toUpperCase()}</th>
+                  <th scope="row" title={sel ? `Total de la sélection A, ${perTab}` : 'Total de la période choisie'}>TOTAL {totTab.toUpperCase()}</th>
                   {aCa && <td className="num">{montrer(a.ca_ytd)}</td>}
                   {aCa && <td className={cls(a.marge_ytd)}>{montrer(a.marge_ytd)}</td>}
                   {aCa && <td className={cls(a.taux_marge_ytd)}>{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</td>}
@@ -525,7 +534,7 @@ export default function Resume() {
                 </tr>
                 {perCmp && (
                   <tr className="cmp">
-                    <th scope="row" title="Total de la période comparée">TOTAL {perCmp.toUpperCase()}</th>
+                    <th scope="row" title={sel ? `Total de la sélection B, ${perTab}` : 'Total de la période comparée'}>TOTAL {perCmp.toUpperCase()}</th>
                     {aCa && <td className="num">{montrer(a.ca_cumul?.m1)}</td>}
                     {aCa && <td className={cls(a.lignes_ca_marge?.marge.m1)}>{montrer(a.lignes_ca_marge?.marge.m1)}</td>}
                     {aCa && <td className={cls(a.taux_marge_cmp)}>{vide(a.taux_marge_cmp) ? '—' : pct(a.taux_marge_cmp)}</td>}
@@ -538,7 +547,7 @@ export default function Resume() {
                 )}
                 {perCmp && (
                   <tr className="evol">
-                    <th scope="row" title={`Évolution de ${perTab} par rapport à ${perCmp}`}>ÉVOLUTION</th>
+                    <th scope="row" title={sel ? `Écart de ${an} par rapport à ${n1}` : `Évolution de ${perTab} par rapport à ${perCmp}`}>{sel ? 'ÉCART' : 'ÉVOLUTION'}</th>
                     {aCa && evol(a.ca_cumul)}
                     {aCa && evol(a.lignes_ca_marge?.marge)}
                     {aCa && ecartPts(a.taux_marge_ytd, a.taux_marge_cmp)}

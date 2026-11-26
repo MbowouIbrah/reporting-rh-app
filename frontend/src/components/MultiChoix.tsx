@@ -6,8 +6,12 @@ const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').t
 /** Filtre à sélection multiple (R4), à la manière d'Excel : toutes les cases cochées par défaut (= tous),
  *  une ligne « Tout sélectionner / Tout désélectionner » en tête de liste, recherche dans les longues listes.
  *  Valeur : choix séparés par « | » ; vide : tous. Aucune case cochée n'est qu'un état de saisie :
- *  à la fermeture, le filtre revient à tous. */
-export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true }: {
+ *  à la fermeture, le filtre revient à tous.
+ *  R9 : avec `comparer`, deux boutons « Cumuler / Comparer » en tête de liste ; en « Comparer », on coche
+ *  deux valeurs, la 1re est A, la 2e est B (ordre de clic gardé dans la valeur). */
+export type ModeListe = 'cumuler' | 'comparer' | 'effacer'
+
+export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true, comparer }: {
   libelle: string
   /** Résumé au-delà de deux choix : « 3 sites ». */
   pluriel: string
@@ -17,6 +21,13 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   onChange: (v: string) => void
   nomOption?: (v: string) => string
   souple?: boolean
+  comparer?: {
+    /** Cette liste est en mode « Comparer ». */
+    actif: boolean
+    /** Libellé d'une autre liste en comparaison (passer celle-ci en « Comparer » l'efface). */
+    autre?: string
+    onMode: (m: ModeListe) => void
+  }
 }) {
   const id = useId()
   const racine = useRef<HTMLDivElement>(null)
@@ -26,8 +37,9 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   const [saisie, setSaisie] = useState('')
   const [aucun, setAucun] = useState(false)
   const choisis = valeurs(valeur)
-  // cases cochées : toutes quand le filtre vaut « tous »
-  const coches = aucun ? [] : choisis.length ? choisis : options
+  const cmp = !!comparer?.actif
+  // cases cochées : toutes quand le filtre vaut « tous » (sauf en comparaison : seulement les choisies)
+  const coches = cmp ? choisis.slice(0, 2) : aucun ? [] : choisis.length ? choisis : options
 
   useEffect(() => {
     if (!ouvert && aucun) {
@@ -45,7 +57,8 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
     return () => document.removeEventListener('mousedown', dehors)
   }, [ouvert])
 
-  const resume = aucun ? 'Aucun'
+  const resume = cmp ? (coches.length === 2 ? `⇄ ${coches.map(nomOption).join(' / ')}` : '⇄ Cochez 2 valeurs')
+    : aucun ? 'Aucun'
     : choisis.length === 0 ? tous
     : choisis.length <= 2 ? choisis.map(nomOption).join(', ')
     : `${choisis.length} ${pluriel}`
@@ -58,6 +71,11 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
     onChange(garde.length === options.length ? '' : garde.join('|'))
   }
   const basculer = (o: string) => {
+    if (cmp) {
+      // ordre de clic : la 1re cochée est A, la 2e est B
+      const reste = coches.includes(o) ? coches.filter((x) => x !== o) : [...coches, o].slice(0, 2)
+      return onChange(reste.join('|'))
+    }
     const s = new Set(coches)
     if (s.has(o)) s.delete(o)
     else s.add(o)
@@ -86,12 +104,12 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
       <button
         ref={bouton}
         type="button"
-        className="multi-bouton"
+        className={`multi-bouton${cmp ? ' cmp' : ''}`}
         aria-haspopup="true"
         aria-expanded={ouvert}
         aria-controls={`${id}-menu`}
         aria-labelledby={`${id}-lib ${id}-val`}
-        title={choisis.length > 2 ? choisis.map(nomOption).join(', ') : undefined}
+        title={!cmp && choisis.length > 2 ? choisis.map(nomOption).join(', ') : undefined}
         onClick={() => {
           setSaisie('')
           setOuvert(!ouvert)
@@ -101,6 +119,19 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
       </button>
       {ouvert && (
         <div id={`${id}-menu`} className="multi-menu" role="group" aria-labelledby={`${id}-lib`}>
+          {comparer && (
+            <>
+              <div className="multi-mode" role="group" aria-label="Mode du filtre">
+                <button type="button" aria-pressed={!cmp} onClick={() => cmp && comparer.onMode('cumuler')}>Cumuler</button>
+                <button type="button" aria-pressed={cmp} onClick={() => !cmp && comparer.onMode('comparer')}>Comparer</button>
+              </div>
+              <p className="multi-aide">
+                {cmp ? 'Cochez 2 valeurs : A et B côte à côte, même période.'
+                  : comparer.autre ? `Une seule comparaison à la fois : « Comparer » ici efface la comparaison ${comparer.autre}.`
+                  : 'Les valeurs cochées sont additionnées.'}
+              </p>
+            </>
+          )}
           {options.length > 8 && (
             <input
               type="search"
@@ -113,11 +144,11 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
             />
           )}
           <p className="multi-compte" aria-live="polite">
-            {aucun ? 'Cochez au moins une valeur' : `${coches.length} sur ${options.length}`}
+            {cmp ? `${coches.length} sur 2` : aucun ? 'Cochez au moins une valeur' : `${coches.length} sur ${options.length}`}
           </p>
           <div className="multi-liste">
             {visibles.length === 0 && <p className="choix-vide">Aucun résultat</p>}
-            {visibles.length > 0 && (
+            {visibles.length > 0 && !cmp && (
               <label className="multi-tout">
                 <input
                   type="checkbox"
@@ -130,13 +161,27 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
                 {tousVisibles ? 'Tout désélectionner' : 'Tout sélectionner'}
               </label>
             )}
-            {visibles.map((o) => (
-              <label key={o}>
-                <input type="checkbox" checked={coches.includes(o)} onChange={() => basculer(o)} />
-                {nomOption(o)}
-              </label>
-            ))}
+            {visibles.map((o) => {
+              const rang = cmp ? coches.indexOf(o) : -1
+              return (
+                <label key={o}>
+                  <input
+                    type="checkbox"
+                    checked={coches.includes(o)}
+                    disabled={cmp && rang < 0 && coches.length >= 2}
+                    onChange={() => basculer(o)}
+                  />
+                  {nomOption(o)}
+                  {rang >= 0 && <span className={`multi-rep rep-${rang ? 'b' : 'a'}`} aria-label={rang ? 'sélection B' : 'sélection A'}>{rang ? 'B' : 'A'}</span>}
+                </label>
+              )
+            })}
           </div>
+          {comparer && (
+            <div className="multi-pied">
+              <button type="button" className="btn-link" onClick={() => comparer.onMode('effacer')}>Effacer</button>
+            </div>
+          )}
         </div>
       )}
     </div>

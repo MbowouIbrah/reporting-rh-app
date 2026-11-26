@@ -74,3 +74,47 @@ test('Échap et clic à l’extérieur ferment le panneau ; recherche sans accen
   fireEvent.mouseDown(document.body)
   expect(screen.queryByRole('checkbox')).toBeNull()
 })
+
+function BancComparer({ autre }: { autre?: string }) {
+  const [v, setV] = useState('Kribi|Douala|Limbé')
+  const [actif, setActif] = useState(false)
+  return (
+    <>
+      <MultiChoix
+        libelle="Site" pluriel="sites" options={['Douala', 'Kribi', 'Limbé']} valeur={v} onChange={setV}
+        comparer={{
+          actif, autre,
+          onMode: (m) => {
+            if (m === 'comparer') { setActif(true); setV(v.split('|').slice(0, 2).join('|')) }
+            else if (m === 'cumuler') setActif(false)
+            else { setActif(false); setV('') }
+          },
+        }}
+      />
+      <output>{v}</output>
+    </>
+  )
+}
+
+test('R9 : mode Comparer, deux valeurs A puis B dans l’ordre de clic, les autres grisées', () => {
+  render(<BancComparer autre="Département" />)
+  fireEvent.click(screen.getByRole('button', { name: /^Site/ }))
+  expect(screen.getByText(/efface la comparaison Département/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cumuler' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Comparer' }))
+  // les deux premières valeurs sont gardées ; pas de « Tout sélectionner »
+  expect(screen.getByRole('status')).toHaveTextContent(/^Kribi\|Douala$/)
+  expect(screen.queryByText(/Tout (dé)?sélectionner/)).toBeNull()
+  expect(screen.getByText('Cochez 2 valeurs : A et B côte à côte, même période.')).toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: /Limbé/ })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /^Site/ })).toHaveTextContent('⇄ Kribi / Douala')
+  // décocher A : Douala devient A, puis Limbé est B
+  fireEvent.click(screen.getByRole('checkbox', { name: /Kribi/ }))
+  expect(screen.getByRole('button', { name: /^Site/ })).toHaveTextContent('⇄ Cochez 2 valeurs')
+  fireEvent.click(screen.getByRole('checkbox', { name: /Limbé/ }))
+  expect(screen.getByRole('status')).toHaveTextContent(/^Douala\|Limbé$/)
+  // Effacer : liste vidée, retour au cumul
+  fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  expect(screen.getByRole('button', { name: 'Cumuler' })).toHaveAttribute('aria-pressed', 'true')
+})

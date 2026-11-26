@@ -509,3 +509,35 @@ def test_filtre_departement(charge, make_client):
     ex = charge.get(f"{API}/rapports/annuel/export",
                     params={"annee": 2026, "mois": 2, "departement": "Equipment"})
     assert ex.status_code == 200
+
+
+def test_annuel_comparaison_de_deux_selections(charge):
+    # R9 : sélection A (service SAV PL) contre sélection B (Commerce VN), même période
+    a = get(charge, "annuel", du="2026-01", au="2026-02", service="SAV PL").json()
+    b = get(charge, "annuel", du="2026-01", au="2026-02", service="Commerce VN").json()
+    r = get(charge, "annuel", du="2026-01", au="2026-02", service="SAV PL",
+            cmp_dim="service", cmp_val="Commerce VN").json()
+    assert D(r["cumul_ytd"]["m"]) == D(a["cumul_ytd"]["m"]) == D("2600.5")
+    assert D(r["cumul_ytd"]["m1"]) == D(b["cumul_ytd"]["m"]) == D("4100")
+    assert (r["du"], r["au"], r["cmp_du"], r["cmp_au"]) == ("2026-01", "2026-02", "2026-01", "2026-02")
+    assert r["cmp_sel"] == {"dim": "service", "val": "Commerce VN"}
+    assert [x["ms"] for x in r["serie_n1"]] == [x["ms"] for x in b["serie_n"]]
+    # les autres filtres s'appliquent aux deux sélections
+    r = get(charge, "annuel", du="2026-01", au="2026-02", service="SAV PL", site="Yaoundé",
+            cmp_dim="service", cmp_val="Commerce VN")
+    assert r.status_code == 404 or D(r.json()["cumul_ytd"]["m1"]) == D("4100")
+    # sans comparaison de sélections : pas de champ
+    assert get(charge, "annuel", du="2026-01", au="2026-02").json()["cmp_sel"] is None
+
+
+def test_annuel_comparaison_de_selections_perimetre(make_client, charge):
+    r = get(make_client(EQUIP), "annuel", du="2026-01", au="2026-02",
+            cmp_dim="service", cmp_val="Administration").json()
+    assert D(r["cumul_ytd"]["m"]) > 0 and r["cumul_ytd"]["m1"] is None
+
+
+def test_annuel_comparaison_de_selections_refus(charge):
+    for p in ({"cmp_dim": "service"}, {"cmp_val": "SAV PL"}, {"cmp_dim": "matricule", "cmp_val": "E1"},
+              {"cmp_dim": "service", "cmp_val": "SAV PL|Commerce VN"}):
+        assert get(charge, "annuel", du="2026-01", au="2026-02", **p).status_code == 422, p
+    assert get(charge, "annuel", annee=2026, mois=2, cmp_dim="service", cmp_val="SAV PL").status_code == 422

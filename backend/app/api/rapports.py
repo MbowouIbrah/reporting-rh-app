@@ -177,6 +177,9 @@ MAX_MULTI = 4000
 TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
 # Comparaison du rapport annuel : vide = même période d'un autre exercice (ref_annee)
 Comparaison = Literal["", "prec", "aucune"]
+# R9 : filtre dont une seconde valeur (sélection B) est comparée à la sélection A
+DimComparee = Literal["departement", "service", "site", "type_site", "activite", "type_contrat",
+                      "poste"]
 # Période choisie au calendrier : mois « AAAA-MM » de début et de fin, et de la comparaison
 MOIS_AAAA_MM = r"^\d{4}-(0[1-9]|1[0-2])$"
 # Plus longue période acceptée (docs/etude-periode-libre.md) : borne le nombre de mois chargés
@@ -379,7 +382,8 @@ def _mois_comptes(db, p, service, site, type_site, poste, matricule, activite, t
 def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
                    matricule=None, activite=None, type_contrat=None,
                    calendrier: Calendrier = "civil", departement=None, debut=None, cmp="",
-                   du=None, au=None, cmp_du=None, cmp_au=None) -> dict:
+                   du=None, au=None, cmp_du=None, cmp_au=None,
+                   cmp_dim: DimComparee | None = None, cmp_val: str | None = None) -> dict:
     """Cumul de la période, montants en `Decimal` (comme `_calcul_mensuel`). `annee` : début de
     l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de l'exercice) ; `debut` : vrai
     mois de début (None : début de l'exercice). `cmp` : vide = même période de `ref_annee`, `prec`
@@ -387,8 +391,15 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     reçoit des rangs 1 à 12 (kpi/exercice.py). `du` et `au` (« AAAA-MM »), quand ils sont fournis,
     remplacent `annee`, `mois`, `debut`, `calendrier`, `ref_annee` et `cmp` ; `cmp_du` et `cmp_au`
     : période comparée (règle de `_plage` si absents). Une période de plus de 12 mois a autant de
-    rangs que de mois."""
+    rangs que de mois. `cmp_dim` et `cmp_val` (R9) : la comparaison devient la sélection B, mêmes
+    mois et mêmes filtres que A, le filtre `cmp_dim` valant `cmp_val`."""
     authorize(p, "report:read")
+    if (cmp_dim is None) != (cmp_val is None):
+        raise HTTPException(422, "cmp_dim et cmp_val vont ensemble")
+    if cmp_val is not None and (not cmp_val.strip() or "|" in cmp_val):
+        raise HTTPException(422, "La sélection B est une seule valeur")
+    if cmp_dim is not None and du is None:
+        raise HTTPException(422, "La comparaison de deux sélections demande une période (du, au)")
     plage = None
     nb_rangs, ans = 12, 1
     if du is not None or au is not None:
@@ -396,11 +407,22 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
         mois, debut, ref_annee, cmp = b % 12 + 1, a % 12 + 1, None, ""
     elif annee is None:
         raise HTTPException(422, "L'année ou la période (du, au) est obligatoire")
-    scope, service, site, type_site, crit = _criteres(
-        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+    filtres = {"service": service, "site": site, "type_site": type_site, "poste": poste,
+               "activite": activite, "type_contrat": type_contrat, "departement": departement}
+
+    def criteres(f: dict):
+        return _criteres(db, p, f["service"], f["site"], f["type_site"], f["poste"], matricule,
+                         f["activite"], f["type_contrat"], f["departement"])
+
+    scope, service, site, type_site, crit = criteres(filtres)
 
     def pds(mois_reels) -> dict[int, moteur.PeriodeData]:
         return _charger_mois(db, scope, service, site, crit, mois_reels)
+
+    def pds_b(mois_reels) -> dict[int, moteur.PeriodeData]:
+        # sélection B : même périmètre (filtre de dépôt), le filtre comparé remplacé
+        sc, sv, st, _, cr = criteres(filtres | {cmp_dim: cmp_val})
+        return _charger_mois(db, sc, sv, st, cr, mois_reels)
 
     def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
         return pds(enumerate(ex.mois_exercice(a, calendrier, nb_rangs), 1))
@@ -428,7 +450,12 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     comparaison = None
     debut_reel = reels[d - 1][0] * 12 + reels[d - 1][1] - 1
     k = None  # indice de mois du début de la période comparée ; None : aucune comparaison
-    if cmp == "aucune":
+    serie_ref = None
+    if cmp_dim is not None:
+        k, ref = debut_reel, annee
+        comparaison = pds_b((d + i, ((k + i) // 12, (k + i) % 12 + 1)) for i in range(fin - d + 1))
+        serie_ref = pds_b(enumerate(reels, 1))
+    elif cmp == "aucune":
         comparaison = {}
     elif plage is not None or cmp == "prec":
         # les mois comparés, rangés dans l'ordre sur les mois de la période : la période choisie
@@ -438,13 +465,15 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     else:
         y, m = ex.mois_exercice(ref, calendrier)[d - 1]
         k = y * 12 + m - 1
-    res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois, d,
-                        comparaison, nb_rangs)
+    n1 = annee_pds(ref) if serie_ref is None else serie_ref
+    res = moteur.annuel(n, n1, fin, refs, params_fin, budgets, params_mois, d, comparaison,
+                        nb_rangs)
     res = ex.en_mois_reels(res, annee, ref, calendrier, nb_rangs)
     # période et comparaison effectives, au format du calendrier (« AAAA-MM »)
     res |= {"du": ex.texte(debut_reel), "au": ex.texte(debut_reel + fin - d),
             "cmp_du": None if k is None else ex.texte(k),
-            "cmp_au": None if k is None else ex.texte(k + fin - d)}
+            "cmp_au": None if k is None else ex.texte(k + fin - d),
+            "cmp_sel": None if cmp_dim is None else {"dim": cmp_dim, "val": cmp_val}}
     return res
 
 
@@ -472,12 +501,14 @@ def annuel(
     au: str | None = Query(None, pattern=MOIS_AAAA_MM),
     cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
     cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_dim: DimComparee | None = None,
+    cmp_val: str | None = Query(None, max_length=200),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
                    activite, type_contrat, calendrier, departement, debut, cmp,
-                   du, au, cmp_du, cmp_au)
+                   du, au, cmp_du, cmp_au, cmp_dim, cmp_val)
 
 
 @router.get("/annuel/export")

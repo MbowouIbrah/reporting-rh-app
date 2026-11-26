@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'reac
 import { useSearchParams } from 'react-router-dom'
 import { queryRetry } from '../api/client'
 import { usePeut } from '../auth/AuthContext'
-import { type FiltresPage, getFiltres, getPeriodes } from '../api/rapports'
+import { DIMS_COMPAREES, type FiltresPage, getFiltres, getPeriodes } from '../api/rapports'
 import type { Periode } from '../api/types'
 import { ecrireCache, lireCache } from '../lib/cacheSession'
 import { type Calendrier, DEBUT_FISCAL, exerciceDe } from '../lib/exercice'
@@ -131,10 +131,12 @@ interface Options {
   comparaison?: 'annee' | 'periode'
   /** La page suit le choix « année civile / fiscale » (pages annuelles) ; sinon toujours civile. */
   avecCalendrier?: boolean
+  /** R9 : la page sait comparer deux valeurs d'un filtre (mode « Comparer » des listes). */
+  selections?: boolean
 }
 
 /** Filtres des pages de reporting. Défaut : dernière période disponible dans le périmètre de l'utilisateur. */
-export function useFiltres({ avecMois = true, comparaison, avecCalendrier = false }: Options = {}) {
+export function useFiltres({ avecMois = true, comparaison, avecCalendrier = false, selections = false }: Options = {}) {
   const { partage: p, set } = usePartage()
   const nominatif = usePeut('nominatif:read')
   const periodes = useQuery({
@@ -218,6 +220,12 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleEcartes])
 
+  // R9 : une liste en mode « Comparer » (pages annuelles). Avec deux valeurs cochées, la 1re est A
+  // (filtre appliqué), la 2e est B (sélection comparée, même période) ; sinon la comparaison de période reste.
+  const cmpDim = selections && periode ? DIMS_COMPAREES.find((d) => d === p.cmp_dim) ?? null : null
+  const ab = cmpDim ? valeurs(choix[cmpDim]) : []
+  const selection = cmpDim && ab.length === 2 ? { dim: cmpDim, a: ab[0], b: ab[1] } : null
+
   const filtres: FiltresPage | null = annee === undefined ? null : {
     annee,
     mois: periode ? moisDe(periode.sel.f) : mois,
@@ -236,6 +244,7 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     type_contrat: choix.type_contrat,
     // Un matricule partagé (lien, autre page) n'est transmis qu'avec le droit nominatif : sinon 403.
     matricule: nominatif ? choix.matricule : undefined,
+    ...(selection && { [selection.dim]: selection.a, cmp_dim: selection.dim, cmp_val: selection.b }),
     ...ref,
     ...(fiscal && { calendrier: fiscal }),
   }
@@ -257,6 +266,9 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     calendrier,
     /** Pages annuelles : période, comparaison et mois disponibles (bornes du calendrier). */
     periode,
+    /** R9 : filtre en mode « Comparer » (null : aucun ; undefined : page sans ce mode), et les deux valeurs une fois cochées. */
+    cmpDim: selections ? cmpDim : undefined,
+    selection,
     annees: [...new Set(periodes.data?.map((x) => exerciceDe(x.annee, x.mois, calendrier)))],
     // Filtre « Département » proposé seulement quand le périmètre en couvre plusieurs.
     departements: (options.data?.departements?.length ?? 0) > 1

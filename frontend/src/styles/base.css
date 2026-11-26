@@ -768,6 +768,21 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .filtres .multi-liste label.multi-tout:hover { background: var(--surface-hover); }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
 .multi-liste .choix-vide { margin: 0; padding: 5px 4px; color: var(--muted); }
+/* R9 : mode « Cumuler / Comparer » en tête de liste, repères A (marine) et B (gris pointillé) */
+.multi-bouton.cmp { background: var(--info-soft); }
+.multi-bouton:disabled { color: var(--muted); cursor: default; }
+.multi-bouton:disabled::after { content: none; }
+.multi-mode { display: flex; }
+.multi-mode button { flex: 1; height: 28px; border: 1px solid var(--rule-strong); border-radius: 0; background: var(--surface); color: var(--navy); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.multi-mode button:first-child { border-radius: 8px 0 0 8px; }
+.multi-mode button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
+.multi-mode button[aria-pressed='true'] { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 600; }
+.multi-aide { margin: 0; color: var(--muted); font-size: var(--fs-xs); white-space: normal; }
+.multi-liste label:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
+.multi-rep { margin-left: auto; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.multi-rep.rep-a { background: var(--navy); color: #fff; }
+.multi-rep.rep-b { border: 1px dashed var(--muted); color: var(--muted); }
+.multi-pied { border-top: 1px solid var(--rule); padding-top: 6px; }
 /* Grille de saisie : valeurs proposées sous une cellule Poste, Site, Service… (sobre, angles droits) */
 .liste-choix { position: fixed; z-index: var(--z-menu); max-height: 240px; max-width: 360px; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 4px 0; list-style: none; background: var(--surface); border: 1px solid var(--rule); box-shadow: var(--shadow-2); font-size: var(--fs-sm); color: var(--ink); }
 .liste-choix li { padding: 6px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border-left: 2px solid transparent; }
