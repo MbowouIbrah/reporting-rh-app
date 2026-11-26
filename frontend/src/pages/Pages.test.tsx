@@ -178,6 +178,21 @@ test('Résumé : Échap ferme la carte, le focus clavier l’ouvre aussitôt', a
   expect(document.querySelector('.bulle-case.visible')).toBeNull()
 })
 
+test('Résumé : pas de carte de détail pendant le chargement (valeurs pas encore à jour)', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  // Lu dans le même passage que l'état occupé : en test, la réponse arrive aussitôt après.
+  const tuile = await waitFor(() => {
+    expect(document.querySelector('.page-ecran[aria-busy="true"]')).not.toBeNull()
+    return screen.getByText('Commissions', { selector: '.micro' }).closest('.tuile')!
+  })
+  expect(tuile).not.toHaveAttribute('data-carte-case')
+  fireEvent.focus(tuile)
+  expect(document.querySelector('.bulle-case.visible')).toBeNull()
+  await waitFor(() => expect(document.querySelector('.page-ecran[aria-busy="true"]')).toBeNull())
+  fireEvent.focus(tuile)
+  expect(bulle().querySelector('h2')).toHaveTextContent('Commissions')
+})
+
 test('Résumé : un clic ailleurs ferme la carte', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()

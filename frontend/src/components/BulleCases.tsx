@@ -146,7 +146,7 @@ function SectionCarte({ s }: { s: Section }) {
  * reste ouverte tant que le pointeur est sur la case ou sur la carte (WCAG 1.4.13), se ferme par Échap,
  * un clic ailleurs ou en quittant. Positionnée en `fixed` sous la case, au-dessus s'il manque de place.
  */
-export function BulleCases({ children }: { children: ReactNode }) {
+export function BulleCases({ children, inactif = false }: { children: ReactNode; inactif?: boolean }) {
   const id = useId()
   const [etat, setEtat] = useState<Etat | null>(null)
   const [visible, setVisible] = useState(false)
@@ -213,6 +213,11 @@ export function BulleCases({ children }: { children: ReactNode }) {
     else ouvrir(cle, el, carte)
   }, [fermer, ouvrir])
 
+  // Chargement en cours : valeurs pas encore à jour, la carte se ferme et ne s'ouvre plus jusqu'à la réponse.
+  useEffect(() => {
+    if (inactif) fermer()
+  }, [inactif, fermer])
+
   // Contenu ou case changés : la carte est replacée une fois sa hauteur connue.
   useLayoutEffect(() => {
     if (etat) placer()
@@ -250,7 +255,7 @@ export function BulleCases({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <BulleCtx.Provider value={{ id, actif: visible ? (etat?.cle ?? null) : null, survoler, ouvrir, basculer, fermerBientot }}>
+    <BulleCtx.Provider value={inactif ? null : { id, actif: visible ? (etat?.cle ?? null) : null, survoler, ouvrir, basculer, fermerBientot }}>
       {children}
       {etat &&
         createPortal(
