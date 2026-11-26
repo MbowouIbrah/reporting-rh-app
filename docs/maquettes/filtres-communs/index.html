@@ -49,6 +49,23 @@ select.actif { border-color: var(--navy); box-shadow: inset 3px 0 0 var(--navy);
 .pastille-a { background: var(--navy); }
 .pastille-b { background: repeating-linear-gradient(90deg, var(--muted-2) 0 3px, transparent 3px 5px); border: 1px solid var(--muted-2); }
 
+/* Liste à choix multiples avec mode Cumuler / Comparer (comme le menu de filtre d'Excel) */
+.mc-wrap { position: relative; }
+.mc { display: flex; justify-content: space-between; gap: 8px; align-items: center; min-width: 130px; max-width: 220px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); padding: 5px 8px; cursor: pointer; text-align: left; }
+.mc-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc.actif { border-color: var(--navy); box-shadow: inset 3px 0 0 var(--navy); }
+.mc.cmp { background: var(--info-soft); }
+.mc-pop { position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; width: min(270px, calc(100vw - 32px)); background: var(--paper); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgb(14 17 38 / 18%); padding: 10px; display: grid; gap: 8px; }
+.mc-pop .mode { display: flex; } .mc-pop .mode button { flex: 1; }
+.bascule button:disabled { color: var(--muted-2); cursor: not-allowed; }
+.mc-aide { margin: 0; font-size: var(--fs-xs); color: var(--muted); }
+.mc-liste { display: grid; gap: 2px; max-height: 220px; overflow: auto; border-top: 1px solid var(--rule); padding-top: 6px; }
+.mc-liste label { display: flex; gap: 8px; align-items: center; padding: 3px 2px; cursor: pointer; }
+.mc-liste label.off { color: var(--muted-2); cursor: not-allowed; }
+.mc-liste b { margin-left: auto; font-size: 11px; padding: 0 6px; }
+.ab-a { background: var(--navy); color: #fff; } .ab-b { border: 1px dashed var(--muted); color: var(--muted); }
+.mc-pied { border-top: 1px solid var(--rule); padding-top: 6px; }
+
 .rappel { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; color: var(--muted); margin: 0 0 10px; }
 .rappel strong { color: var(--navy); }
 .masques { font-size: var(--fs-xs); }
@@ -108,7 +125,7 @@ dialog footer { display: flex; gap: 8px; padding: 12px 16px; align-items: center
 <body>
 <main>
   <h1>Filtres sur la personne, affichage par compte, comparaison de deux sélections</h1>
-  <p class="consigne">Maquette des points R4, R5 et R9 de la réunion du 23/11 (chiffres fictifs). À essayer : « Plus de filtres », « Comparer à → Une autre sélection », le bouton « Affichage », et Sexe = Femmes + Âge = 55 ans et plus (sélection trop petite).</p>
+  <p class="consigne">Maquette des points R4, R5 et R9 de la réunion du 23/11 (chiffres fictifs). À essayer : ouvrir la liste Département, passer en « Comparer » et cocher Equipment puis Winpart ; « Plus de filtres » ; le bouton « Affichage » ; et Sexe = Femmes + Âge = 55 ans et plus (sélection trop petite).</p>
 
   <div class="onglets" role="tablist" aria-label="Pages">
     <button role="tab" aria-selected="true" data-page="resume">Budget réalisé</button>
@@ -120,26 +137,11 @@ dialog footer { display: flex; gap: 8px; padding: 12px 16px; align-items: center
     <div class="ligne-f">
       <span class="titre-f">Filtres</span>
       <label class="champ"><span>Période</span><select id="periode"><option>janv. → oct. 2026</option><option>janv. → déc. 2025</option></select></label>
-      <div class="champ"><span>Comparer à</span>
-        <div class="bascule" role="group" aria-label="Comparer à">
-          <button type="button" aria-pressed="true" data-cmp="periode">La période précédente</button>
-          <button type="button" aria-pressed="false" data-cmp="selection">Une autre sélection</button>
-        </div>
-      </div>
+      <label class="champ"><span>Comparer à</span><select id="cmp-periode"></select></label>
       <span id="dims-principales" style="display:contents"></span>
       <span class="espace"></span>
       <button type="button" class="btn" id="plus" aria-expanded="false" aria-controls="ligne-personne">Plus de filtres <span class="pastille" id="nb-perso" hidden>0</span></button>
       <button type="button" class="btn" id="ouvrir-affichage">Affichage</button>
-    </div>
-    <div class="ligne-f" id="ligne-cmp" hidden>
-      <span class="titre-f">Comparer</span>
-      <div class="cmp-sel">
-        <label class="champ"><span>Filtre comparé</span><select id="cmp-dim"></select></label>
-        <label class="champ"><span><i class="pastille-a"></i>Sélection A</span><select id="cmp-a"></select></label>
-        <span class="contre">contre</span>
-        <label class="champ"><span><i class="pastille-b"></i>Sélection B</span><select id="cmp-b"></select></label>
-      </div>
-      <span class="consigne" style="margin:0;align-self:center;font-size:var(--fs-xs)">Même période pour A et B ; les autres filtres s'appliquent aux deux.</span>
     </div>
     <div class="ligne-f" id="ligne-personne" hidden>
       <span class="titre-f">Personne</span>
@@ -189,7 +191,7 @@ dialog footer { display: flex; gap: 8px; padding: 12px 16px; align-items: center
       <li><b>R4</b> : « Plus de filtres » déplie la ligne « Personne » (Sexe, Âge, Ancienneté, Catégorie). Le bouton compte les filtres actifs ; la ligne reste ouverte tant que l'un d'eux filtre. Valeur « Non renseigné » pour une donnée absente du fichier de paie.</li>
       <li><b>Confidentialité</b> : sous 3 personnes, montants masqués (sauf comptes qui voient déjà le nominatif).</li>
       <li><b>R5</b> : « Affichage » choisit, page par page, les indicateurs, sections, rubriques et filtres visibles. Un rappel signale ce qui est masqué.</li>
-      <li><b>R9</b> : « Comparer à → Une autre sélection » : un filtre, deux valeurs (A contre B), même période. Le filtre comparé quitte la barre. Écarts en neutre (ni vert ni rouge entre deux sélections).</li>
+      <li><b>R9</b> : en haut de chaque liste de filtre, « Cumuler » (comme aujourd'hui : valeurs additionnées) ou « Comparer » (2 valeurs cochées, A contre B, même période). Aucune place prise dans la barre. Une seule comparaison à la fois : « Comparer » est grisé dans les autres listes. « Comparer à » affiche alors « Sélection B ». Écarts en neutre.</li>
     </ol>
   </section>
 </main>
@@ -224,8 +226,9 @@ const RUBRIQUES = [
 ]
 const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.']
 
-const etat = { page: 'resume', cmp: 'periode', cmpDim: 'departement', cmpA: 'Equipment', cmpB: 'Winpart',
-  filtres: Object.fromEntries(Object.keys(DIMS).map((d) => [d, ''])),
+// cmpDim : filtre en mode « Comparer » (un seul) ; cmp / cmpA / cmpB sont recalculés dans tout().
+const etat = { page: 'resume', cmp: 'periode', cmpDim: null, cmpA: '', cmpB: '',
+  filtres: Object.fromEntries(Object.keys(DIMS).map((d) => [d, []])),
   affichage: { kpi: KPI.map((k) => k.id), sections: SECTIONS.map((s) => s.id), rubriques: RUBRIQUES.map((r) => r[1]), perso: ['sexe', 'age', 'anciennete', 'categorie'] } }
 const ORIGINE = JSON.parse(JSON.stringify(etat.affichage))
 
@@ -233,12 +236,12 @@ const ORIGINE = JSON.parse(JSON.stringify(etat.affichage))
 function hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 9973; return h }
 function part(f) {
   let p = 1
-  for (const [d, v] of Object.entries(f)) if (v) { const n = DIMS[d].vals.length; p *= (0.6 + (hash(d + v) % 80) / 100) / n }
+  for (const [d, v] of Object.entries(f)) if (v.length) { const n = DIMS[d].vals.length; p *= v.reduce((s, x) => s + (0.6 + (hash(d + x) % 80) / 100) / n, 0) }
   return Math.min(1, p)
 }
 function effectif(f) { return Math.round(214 * part(f)) }
 function tropPetit(f) {
-  if (f.sexe === 'Femmes' && f.age === '55 ans et plus') return true
+  if (f.sexe.join() === 'Femmes' && f.age.join() === '55 ans et plus') return true
   return effectif(f) < 3
 }
 
@@ -260,48 +263,68 @@ function ecart(k, a, b) {
   return (pct >= 0 ? '+' : '') + fmt.format(pct) + ' %'
 }
 
-function filtresA() { const f = { ...etat.filtres }; if (etat.cmp === 'selection') f[etat.cmpDim] = etat.cmpA; return f }
-function filtresB() { const f = { ...etat.filtres }; f[etat.cmpDim] = etat.cmpB; return f }
+function filtresA() { const f = { ...etat.filtres }; if (etat.cmp === 'selection') f[etat.cmpDim] = [etat.cmpA]; return f }
+function filtresB() { const f = { ...etat.filtres }; f[etat.cmpDim] = [etat.cmpB]; return f }
 
 function optionsDe(sel, vals, tous, choisi) {
   sel.innerHTML = (tous ? `<option value="">${tous}</option>` : '') + vals.map((v) => `<option${v === choisi ? ' selected' : ''}>${v}</option>`).join('')
 }
 
+let ouvert = null // liste dépliée
+function texteBouton(d) {
+  const v = etat.filtres[d]
+  if (etat.cmpDim === d) return v.length === 2 ? `⇄ ${v[0]} / ${v[1]}` : '⇄ Cochez 2 valeurs'
+  if (!v.length) return ['activite', 'anciennete'].includes(d) ? 'Toutes' : 'Tous'
+  return v.length === 1 ? v[0] : `${v.length} cumulés`
+}
+function liste(d) {
+  const def = DIMS[d], v = etat.filtres[d], cmp = etat.cmpDim === d, autre = etat.cmpDim && !cmp
+  const pop = ouvert !== d ? '' : `<div class="mc-pop" role="dialog" aria-label="${def.lib}">
+    <div class="bascule mode" role="group" aria-label="Mode du filtre">
+      <button type="button" data-mode="cumul" aria-pressed="${!cmp}">Cumuler</button>
+      <button type="button" data-mode="comparer" aria-pressed="${cmp}"${autre ? ` disabled title="Une seule comparaison à la fois"` : ''}>Comparer</button>
+    </div>
+    <p class="mc-aide">${cmp ? 'Cochez 2 valeurs : A et B côte à côte, même période.' : autre ? `Une seule comparaison à la fois : ${DIMS[etat.cmpDim].lib} est déjà comparé.` : 'Les valeurs cochées sont additionnées.'}</p>
+    <div class="mc-liste">${def.vals.map((x) => {
+      const i = v.indexOf(x), plein = cmp && v.length >= 2 && i < 0
+      return `<label class="${plein ? 'off' : ''}"><input type="checkbox" value="${x}"${i >= 0 ? ' checked' : ''}${plein ? ' disabled' : ''}>${x}${cmp && i >= 0 ? `<b class="ab-${i ? 'b' : 'a'}">${i ? 'B' : 'A'}</b>` : ''}</label>`
+    }).join('')}</div>
+    <div class="mc-pied"><button type="button" class="btn lien" data-effacer>Effacer</button></div>
+  </div>`
+  return `<div class="champ mc-wrap" data-dim="${d}"><span>${def.lib}</span>
+    <button type="button" class="mc${v.length ? ' actif' : ''}${cmp ? ' cmp' : ''}" aria-expanded="${ouvert === d}"><span class="mc-t">${texteBouton(d)}</span><span aria-hidden="true">▾</span></button>${pop}</div>`
+}
 function rendreFiltres() {
   for (const zone of ['dims-principales', 'dims-personne']) {
-    const el = document.getElementById(zone)
     const perso = zone === 'dims-personne'
-    el.innerHTML = ''
-    for (const [d, def] of Object.entries(DIMS)) {
-      if (def.perso !== perso) continue
-      if (perso && !etat.affichage.perso.includes(d)) continue
-      if (etat.cmp === 'selection' && d === etat.cmpDim) continue
-      const lab = document.createElement('label'); lab.className = 'champ'
-      lab.innerHTML = `<span>${def.lib}</span>`
-      const s = document.createElement('select')
-      optionsDe(s, def.vals, def.lib === 'Activité' || def.lib === 'Ancienneté' ? 'Toutes' : 'Tous', etat.filtres[d])
-      if (etat.filtres[d]) s.classList.add('actif')
-      s.addEventListener('change', () => { etat.filtres[d] = s.value; tout() })
-      lab.append(s); el.append(lab)
-    }
+    document.getElementById(zone).innerHTML = Object.keys(DIMS)
+      .filter((d) => DIMS[d].perso === perso && (!perso || etat.affichage.perso.includes(d))).map(liste).join('')
   }
-  const nb = Object.entries(etat.filtres).filter(([d, v]) => v && DIMS[d].perso).length
+  document.querySelectorAll('.mc-wrap').forEach((w) => {
+    const d = w.dataset.dim
+    w.querySelector('.mc').onclick = () => { ouvert = ouvert === d ? null : d; tout() }
+    w.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => {
+      if (b.dataset.mode === 'comparer') { etat.cmpDim = d; etat.filtres[d] = etat.filtres[d].slice(0, 2) }
+      else if (etat.cmpDim === d) etat.cmpDim = null
+      tout()
+    } })
+    w.querySelectorAll('input').forEach((i) => { i.onchange = () => {
+      const v = etat.filtres[d]; etat.filtres[d] = i.checked ? [...v, i.value] : v.filter((x) => x !== i.value); tout()
+    } })
+    const eff = w.querySelector('[data-effacer]')
+    if (eff) eff.onclick = () => { etat.filtres[d] = []; if (etat.cmpDim === d) etat.cmpDim = null; tout() }
+  })
+  const nb = Object.entries(etat.filtres).filter(([d, v]) => v.length && DIMS[d].perso).length
   const pas = document.getElementById('nb-perso'); pas.hidden = !nb; pas.textContent = nb
   const plus = document.getElementById('plus'), ligne = document.getElementById('ligne-personne')
   if (nb) { ligne.hidden = false; plus.setAttribute('aria-expanded', 'true') }
-  document.querySelectorAll('[data-cmp]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmp === etat.cmp)))
-  document.getElementById('ligne-cmp').hidden = etat.cmp !== 'selection'
-  if (etat.cmp === 'selection') {
-    const dim = document.getElementById('cmp-dim')
-    dim.innerHTML = Object.entries(DIMS).map(([d, def]) => `<option value="${d}"${d === etat.cmpDim ? ' selected' : ''}>${def.lib}</option>`).join('')
-    const vals = DIMS[etat.cmpDim].vals
-    optionsDe(document.getElementById('cmp-a'), vals.filter((v) => v !== etat.cmpB), '', etat.cmpA)
-    optionsDe(document.getElementById('cmp-b'), vals.filter((v) => v !== etat.cmpA), '', etat.cmpB)
-  }
+  const cp = document.getElementById('cmp-periode'), sel = etat.cmp === 'selection'
+  cp.disabled = sel
+  cp.innerHTML = sel ? `<option>Sélection B : ${etat.cmpB}</option>` : '<option>Même période 2025</option>'
 }
 
 function libSel(f) {
-  const parts = Object.entries(f).filter(([, v]) => v).map(([d, v]) => v)
+  const parts = Object.entries(f).filter(([d, v]) => v.length && d !== etat.cmpDim).map(([, v]) => v.join(' + '))
   return parts.length ? parts.join(' · ') : 'Tout le périmètre'
 }
 
@@ -315,7 +338,8 @@ function rendreRappel() {
   if (etat.cmp === 'selection') {
     r.innerHTML = `<span><i class="pastille-a"></i><strong>${etat.cmpA}</strong> contre <i class="pastille-b"></i><strong>${etat.cmpB}</strong>, ${per}</span><span>${libSel(etat.filtres)}</span>${txtM}`
   } else {
-    r.innerHTML = `<span><strong>${per}</strong> contre <strong>même période 2025</strong></span><span>${libSel(etat.filtres)}</span>${txtM}`
+    const att = etat.cmpDim ? `<span class="masques">Comparaison ${DIMS[etat.cmpDim].lib} : cochez 2 valeurs</span>` : ''
+    r.innerHTML = `<span><strong>${per}</strong> contre <strong>même période 2025</strong></span><span>${libSel(etat.filtres)}</span>${att}${txtM}`
   }
   r.querySelector('[data-ouvrir]')?.addEventListener('click', ouvrirAffichage)
 }
@@ -399,6 +423,8 @@ function rendreGraphes() {
 }
 
 function tout() {
+  const v = etat.cmpDim ? etat.filtres[etat.cmpDim] : []
+  etat.cmp = v.length === 2 ? 'selection' : 'periode'; etat.cmpA = v[0]; etat.cmpB = v[1]
   rendreFiltres(); rendreRappel()
   for (const p of ['resume', 'charges', 'graphes']) document.getElementById('page-' + p).hidden = etat.page !== p
   if (etat.page === 'resume') rendreResume()
@@ -437,7 +463,7 @@ document.getElementById('aff-annuler').addEventListener('click', () => document.
 document.getElementById('aff-origine').addEventListener('click', () => { brouillon = JSON.parse(JSON.stringify(ORIGINE)); rendreAffichage() })
 document.getElementById('aff-ok').addEventListener('click', () => {
   etat.affichage = brouillon
-  for (const d of Object.keys(DIMS)) if (DIMS[d].perso && !brouillon.perso.includes(d)) etat.filtres[d] = ''
+  for (const d of Object.keys(DIMS)) if (DIMS[d].perso && !brouillon.perso.includes(d)) { etat.filtres[d] = []; if (etat.cmpDim === d) etat.cmpDim = null }
   document.getElementById('affichage').close(); tout()
 })
 
@@ -445,23 +471,14 @@ document.querySelectorAll('[role=tab]').forEach((b) => b.addEventListener('click
   document.querySelectorAll('[role=tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)))
   etat.page = b.dataset.page; tout()
 }))
-document.querySelectorAll('[data-cmp]').forEach((b) => b.addEventListener('click', () => {
-  etat.cmp = b.dataset.cmp
-  if (etat.cmp === 'selection') etat.filtres[etat.cmpDim] = ''
-  tout()
-}))
+document.addEventListener('click', (e) => { if (ouvert && !e.target.closest('.mc-wrap')) { ouvert = null; tout() } })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ouvert) { ouvert = null; tout() } })
 document.getElementById('plus').addEventListener('click', (e) => {
   const ligne = document.getElementById('ligne-personne')
-  const nb = Object.entries(etat.filtres).filter(([d, v]) => v && DIMS[d].perso).length
+  const nb = Object.entries(etat.filtres).filter(([d, v]) => v.length && DIMS[d].perso).length
   if (!ligne.hidden && nb) return // reste ouverte tant qu'un filtre « Personne » est actif
   ligne.hidden = !ligne.hidden; e.currentTarget.setAttribute('aria-expanded', String(!ligne.hidden))
 })
-document.getElementById('cmp-dim').addEventListener('change', (e) => {
-  etat.cmpDim = e.target.value; const v = DIMS[etat.cmpDim].vals
-  etat.cmpA = v[0]; etat.cmpB = v[1]; etat.filtres[etat.cmpDim] = ''; tout()
-})
-document.getElementById('cmp-a').addEventListener('change', (e) => { etat.cmpA = e.target.value; tout() })
-document.getElementById('cmp-b').addEventListener('change', (e) => { etat.cmpB = e.target.value; tout() })
 document.getElementById('periode').addEventListener('change', tout)
 tout()
 </script>

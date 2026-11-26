@@ -89,12 +89,15 @@ Aujourd'hui, choisir Equipment et Winpart **additionne** les deux (cumul). La de
 | Option | Pour | Contre |
 |---|---|---|
 | A. Deux barres de filtres complètes (sélection A, sélection B) | Totalement libre | Lourd, déroutant ; dépasse « une seule comparaison » |
-| **B. Bascule « Cumul / Comparer » dans « Comparer à » : on choisit un filtre (Département, Service, Site, Activité, Contrat, Sexe, Âge, Ancienneté, Catégorie) puis deux valeurs, A et B** | Un seul geste ; réutilise la place de la comparaison actuelle ; lisible (« Equipment contre Winpart ») | Une seule dimension comparée à la fois (voulu en V1) |
-| C. Bouton « Comparer » dans chaque liste de filtre | Proche du filtre | Plusieurs comparaisons possibles en même temps, contraire à la V1 |
+| B. Bascule « Une autre sélection » dans « Comparer à » + 2e ligne (filtre, A, B) | Lisible | Prend une ligne de plus : **refusé par l'utilisateur (manque de place)** |
+| **C. Mode « Cumuler / Comparer » en haut de chaque liste de filtre (comme le menu de filtre d'Excel)** | Aucune place en plus dans la barre ; le geste reste dans la liste qu'on utilise déjà | Plusieurs comparaisons possibles : réglé en grisant « Comparer » dans les autres listes |
 
-**Choix : B.** « Comparer à » propose : « La période précédente » (aujourd'hui) **ou** « Une autre sélection ». En mode sélection :
+**Choix : C** (demande de l'utilisateur, 26/11). Chaque liste à choix multiples s'ouvre sur deux boutons : « Cumuler » (aujourd'hui : valeurs additionnées, par défaut) et « Comparer » :
+- En « Comparer », on coche 2 valeurs : la 1re est A, la 2e est B (repères A / B dans la liste) ; les autres cases sont grisées. Le bouton affiche « ⇄ Equipment / Winpart ».
+- Une seule comparaison à la fois : « Comparer » est grisé dans les autres listes. Revenir à « Cumuler » ou « Effacer » arrête la comparaison.
+- Tant que 2 valeurs ne sont pas cochées, la comparaison de période reste active et le rappel indique « cochez 2 valeurs ».
+- « Comparer à » affiche « Sélection B : Winpart » (grisé) pendant la comparaison.
 - Même période pour A et B ; les autres filtres s'appliquent aux deux.
-- Le filtre comparé disparaît de la barre (il est porté par A et B), pour éviter les contradictions.
 - Budget réalisé : chaque case montre A et l'écart avec B ; la colonne « comparaison » du tableau mensuel devient B ; la carte de détail montre A et B.
 - Répartition des charges : colonnes « · Equipment » et « · Winpart » au lieu de « · période » / « · comparaison » (lien avec R7).
 - Graphiques : deux courbes ou deux barres, A en bleu marine, B en gris pointillé (même code que la comparaison actuelle).
@@ -116,7 +119,7 @@ Serveur : `/rapports/annuel` reçoit en plus `cmp_dim` et `cmp_val` ; il calcule
 | Q2 | Tranches d'âge et d'ancienneté | Client | Celles du §3 |
 | Q3 | Seuil de confidentialité (3 personnes) | Client | 3, sauf `nominatif:read` |
 | Q4 | Affichage choisi par l'utilisateur (et non par l'admin) | Décidé | Option A du §4 |
-| Q5 | Comparaison : une dimension, deux valeurs | Décidé (réunion) | Option B du §5 |
+| Q5 | Comparaison : une dimension, deux valeurs, choisie dans la liste du filtre | Décidé (réunion + utilisateur 26/11) | Option C du §5 |
 
 ## 8. Découpage proposé
 
