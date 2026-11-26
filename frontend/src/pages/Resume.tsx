@@ -197,6 +197,9 @@ export default function Resume() {
   const dansPeriode = (l: SerieMois) =>
     l.annee == null || iDu === null || iAu === null || (indice(l.annee, l.mois) >= iDu && indice(l.annee, l.mois) <= iAu)
   const horsPeriode = !!a?.serie_n.some((l) => !dansPeriode(l))
+  // Répartition front / back affichée seulement si elle apprend quelque chose (0 % / 100 % = sélection
+  // d'un seul côté, ex. Activité = Back Office) : la ligne de plus réduisait le tableau sans rien dire.
+  const partageUtile = (p: Val) => { const n = Number(p); return p !== null && p !== 'n/a' && n > 0 && n < 1 }
   const nomLigne = (annee: number | undefined, m: number) => (annee
     ? <><span className="mois-3">{MOIS_3[m - 1]}</span> {annee}</>
     : MOIS[m - 1])
@@ -251,8 +254,16 @@ export default function Resume() {
     const zone = defile.current
     const ligne = zone?.querySelector<HTMLElement>('tbody tr.en-periode')
     if (!zone || !ligne) return
-    const entete = zone.querySelector('thead')?.getBoundingClientRect().height ?? 0
-    zone.scrollTop = ligne.offsetTop - entete
+    // Recalé aussi quand la zone change de hauteur (fenêtre redimensionnée, cases qui changent de taille
+    // en passant en comparaison) : la période choisie reste en vue au lieu des mois grisés.
+    const recale = () => {
+      const entete = zone.querySelector('thead')?.getBoundingClientRect().height ?? 0
+      zone.scrollTop = ligne.offsetTop - entete
+    }
+    recale()
+    const obs = new ResizeObserver(recale)
+    obs.observe(zone)
+    return () => obs.disconnect()
   }, [cle])
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
@@ -326,7 +337,7 @@ export default function Resume() {
               }}
             >
               <Variation v={a.cumul_ytd.var_pct} vs="" neutre={!!sel} />
-              {msFb && <span className="ratio-fb">Front office {pct(msFb.front_pct)} · Back office {pct(msFb.back_pct)}</span>}
+              {msFb && partageUtile(msFb.front_pct) && <span className="ratio-fb">Front office {pct(msFb.front_pct)} · Back office {pct(msFb.back_pct)}</span>}
             </Case>
             <Case titre="Part des MAD" valeur={vide(a.part_mad.m) ? '—' : taux(a.part_mad.m)} devise={false}
               libelle2="Pourcentage MAD sites déportés"
@@ -449,7 +460,7 @@ export default function Resume() {
             >
               <Variation v={a.effectif_fin.var_pct} vs="" neutre={!!sel} />
               {/* Productif / administratif : part de l'effectif de fin en front et en back office. */}
-              {fb && <span className="ratio-fb">Front office {pct(fb.front_pct)} · Back office {pct(fb.back_pct)}</span>}
+              {fb && partageUtile(fb.front_pct) && <span className="ratio-fb">Front office {pct(fb.front_pct)} · Back office {pct(fb.back_pct)}</span>}
             </Case>
             {sansCaEff && indispo('CA par salarié')}
             {aCa && !sansCaEff && (
@@ -496,6 +507,7 @@ export default function Resume() {
                 </span>
               </button>
             )}
+            {horsPeriode && <span className="periode-legende">Mois grisés : hors période, non comptés dans les totaux.</span>}
           </div>
           <div className="table-scroll" ref={defile}>
             <table className="dense suivi">
@@ -561,11 +573,6 @@ export default function Resume() {
               </tfoot>
             </table>
           </div>
-          {horsPeriode && (
-            <p className="periode-titre periode-pied">
-              Mois grisés : hors période, non comptés dans les totaux.
-            </p>
-          )}
         </>
       )}
       </BulleCases>

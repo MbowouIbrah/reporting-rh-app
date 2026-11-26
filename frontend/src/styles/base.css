@@ -2048,7 +2048,7 @@ td.cel-poids .etiq { margin-left: 10px; }
   .resume-excel > .table-scroll { min-height: min(calc(10 * 1.9rem), 22rem); }
   .layout-ecran:has(.resume-excel) > .page { overflow-y: auto; }
 }
-.periode-pied { margin: var(--sp-2) 0 0; font-size: var(--fs-sm, 13px); }
+.periode-legende { margin-left: auto; font-size: var(--fs-sm, 13px); color: var(--muted); }
 /* En-têtes de colonnes : période en petit sous le libellé. */
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }
 th[title] { cursor: help; }
