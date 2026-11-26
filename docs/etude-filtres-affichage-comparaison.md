@@ -90,11 +90,11 @@ Aujourd'hui, choisir Equipment et Winpart **additionne** les deux (cumul). La de
 |---|---|---|
 | A. Deux barres de filtres complètes (sélection A, sélection B) | Totalement libre | Lourd, déroutant ; dépasse « une seule comparaison » |
 | B. Bascule « Une autre sélection » dans « Comparer à » + 2e ligne (filtre, A, B) | Lisible | Prend une ligne de plus : **refusé par l'utilisateur (manque de place)** |
-| **C. Mode « Cumuler / Comparer » en haut de chaque liste de filtre (comme le menu de filtre d'Excel)** | Aucune place en plus dans la barre ; le geste reste dans la liste qu'on utilise déjà | Plusieurs comparaisons possibles : réglé en grisant « Comparer » dans les autres listes |
+| **C. Mode « Cumuler / Comparer » en haut de chaque liste de filtre (comme le menu de filtre d'Excel)** | Aucune place en plus dans la barre ; le geste reste dans la liste qu'on utilise déjà | Plusieurs comparaisons possibles : réglé, la plus récente efface la précédente |
 
 **Choix : C** (demande de l'utilisateur, 26/11). Chaque liste à choix multiples s'ouvre sur deux boutons : « Cumuler » (aujourd'hui : valeurs additionnées, par défaut) et « Comparer » :
 - En « Comparer », on coche 2 valeurs : la 1re est A, la 2e est B (repères A / B dans la liste) ; les autres cases sont grisées. Le bouton affiche « ⇄ Equipment / Winpart ».
-- Une seule comparaison à la fois : « Comparer » est grisé dans les autres listes. Revenir à « Cumuler » ou « Effacer » arrête la comparaison.
+- Une seule comparaison à la fois : passer une autre liste en « Comparer » efface la comparaison précédente (ses valeurs sont décochées). Revenir à « Cumuler » ou « Effacer » arrête la comparaison.
 - Tant que 2 valeurs ne sont pas cochées, la comparaison de période reste active et le rappel indique « cochez 2 valeurs ».
 - « Comparer à » affiche « Sélection B : Winpart » (grisé) pendant la comparaison.
 - Même période pour A et B ; les autres filtres s'appliquent aux deux.

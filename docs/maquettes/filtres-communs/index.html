@@ -191,7 +191,7 @@ dialog footer { display: flex; gap: 8px; padding: 12px 16px; align-items: center
       <li><b>R4</b> : « Plus de filtres » déplie la ligne « Personne » (Sexe, Âge, Ancienneté, Catégorie). Le bouton compte les filtres actifs ; la ligne reste ouverte tant que l'un d'eux filtre. Valeur « Non renseigné » pour une donnée absente du fichier de paie.</li>
       <li><b>Confidentialité</b> : sous 3 personnes, montants masqués (sauf comptes qui voient déjà le nominatif).</li>
       <li><b>R5</b> : « Affichage » choisit, page par page, les indicateurs, sections, rubriques et filtres visibles. Un rappel signale ce qui est masqué.</li>
-      <li><b>R9</b> : en haut de chaque liste de filtre, « Cumuler » (comme aujourd'hui : valeurs additionnées) ou « Comparer » (2 valeurs cochées, A contre B, même période). Aucune place prise dans la barre. Une seule comparaison à la fois : « Comparer » est grisé dans les autres listes. « Comparer à » affiche alors « Sélection B ». Écarts en neutre.</li>
+      <li><b>R9</b> : en haut de chaque liste de filtre, « Cumuler » (comme aujourd'hui : valeurs additionnées) ou « Comparer » (2 valeurs cochées, A contre B, même période). Aucune place prise dans la barre. Une seule comparaison à la fois : « Comparer » dans une autre liste efface la précédente. « Comparer à » affiche alors « Sélection B ». Écarts en neutre.</li>
     </ol>
   </section>
 </main>
@@ -282,9 +282,9 @@ function liste(d) {
   const pop = ouvert !== d ? '' : `<div class="mc-pop" role="dialog" aria-label="${def.lib}">
     <div class="bascule mode" role="group" aria-label="Mode du filtre">
       <button type="button" data-mode="cumul" aria-pressed="${!cmp}">Cumuler</button>
-      <button type="button" data-mode="comparer" aria-pressed="${cmp}"${autre ? ` disabled title="Une seule comparaison à la fois"` : ''}>Comparer</button>
+      <button type="button" data-mode="comparer" aria-pressed="${cmp}">Comparer</button>
     </div>
-    <p class="mc-aide">${cmp ? 'Cochez 2 valeurs : A et B côte à côte, même période.' : autre ? `Une seule comparaison à la fois : ${DIMS[etat.cmpDim].lib} est déjà comparé.` : 'Les valeurs cochées sont additionnées.'}</p>
+    <p class="mc-aide">${cmp ? 'Cochez 2 valeurs : A et B côte à côte, même période.' : autre ? `Une seule comparaison à la fois : « Comparer » ici efface la comparaison ${DIMS[etat.cmpDim].lib}.` : 'Les valeurs cochées sont additionnées.'}</p>
     <div class="mc-liste">${def.vals.map((x) => {
       const i = v.indexOf(x), plein = cmp && v.length >= 2 && i < 0
       return `<label class="${plein ? 'off' : ''}"><input type="checkbox" value="${x}"${i >= 0 ? ' checked' : ''}${plein ? ' disabled' : ''}>${x}${cmp && i >= 0 ? `<b class="ab-${i ? 'b' : 'a'}">${i ? 'B' : 'A'}</b>` : ''}</label>`
@@ -304,7 +304,7 @@ function rendreFiltres() {
     const d = w.dataset.dim
     w.querySelector('.mc').onclick = () => { ouvert = ouvert === d ? null : d; tout() }
     w.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => {
-      if (b.dataset.mode === 'comparer') { etat.cmpDim = d; etat.filtres[d] = etat.filtres[d].slice(0, 2) }
+      if (b.dataset.mode === 'comparer') { if (etat.cmpDim && etat.cmpDim !== d) etat.filtres[etat.cmpDim] = []; etat.cmpDim = d; etat.filtres[d] = etat.filtres[d].slice(0, 2) }
       else if (etat.cmpDim === d) etat.cmpDim = null
       tout()
     } })
