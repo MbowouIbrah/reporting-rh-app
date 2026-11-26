@@ -11,6 +11,8 @@ import Resume from './Resume'
 
 // Série mensuelle avec CA et marge renseignés (droit marge).
 let serieCa = false
+// Cumuls CA renseignés (comparaison avec évolution positive, CA par salarié en baisse).
+let cumulCa = false
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -54,7 +56,9 @@ function routes(avecMarge: boolean, perms: string[]) {
         effectif_moyen_mad: cell('3'), part_mad: { m: '0.2', m1: '0.25' },
         mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
         ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
-        ...(avecMarge ? { ca_ytd: null, marge_ytd: null, ca_cumul: cell(null), ca_par_effectif: cell(null) } : {}),
+        ...(avecMarge ? (cumulCa
+          ? { ca_ytd: '10000', marge_ytd: null, ca_cumul: { m: '10000', m1: '8000', var: '2000', var_pct: '0.25' }, ca_par_effectif: { m: '2500', m1: '3000', var: '-500', var_pct: '-0.1667' } }
+          : { ca_ytd: null, marge_ytd: null, ca_cumul: cell(null), ca_par_effectif: cell(null) }) : {}),
         activite: null,
         a_type_charge: [], b_service_activite: [], c_site: [],
         d_contrat: { effectifs: [], indicateurs: [{ contrat: 'TOTAL', debut: null, recrutements: null, departs: null, fin: 0, taux_rotation: null, absences: '0', taux_absenteisme: null }], ventilation: [], total: cell('0') },
@@ -82,8 +86,14 @@ function rendu(ui: ReactNode, chemin: string, perms: string[], avecMarge = false
 
 afterEach(() => vi.restoreAllMocks())
 
-/** Bulle unique des cases, affichée. */
+/** Carte de détail unique des cases, affichée. */
 const bulle = () => document.querySelector<HTMLElement>('.bulle-case.visible')!
+/** Survol d'une case : la carte s'ouvre après un court délai. */
+async function survoler(el: Element) {
+  fireEvent.pointerEnter(el)
+  await waitFor(() => expect(document.querySelector('.bulle-case.visible')).not.toBeNull())
+}
+const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** Le squelette a la structure de la page : attendre la fin du chargement avant de lire les valeurs. */
 async function chargee() {
@@ -103,36 +113,131 @@ test('Résumé : marge vide (jamais 0) quand le CA est absent', async () => {
   expect(screen.queryByText(/Masse salariale \d{4}/)).toBeNull()
 })
 
-test('Résumé : effectif global de fin, évolution et répartition par contrat en bulle', async () => {
+test('Résumé : effectif global de fin, évolution et répartition par contrat dans la carte', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()
   const tuile = (await screen.findByText('Effectif global', { selector: '.micro' })).closest('.tuile')!
   expect(tuile).toHaveTextContent(/Effectif global4Évolution par rapport à Janv\. 2026/)
-  fireEvent.mouseEnter(tuile)
-  expect(bulle()).toHaveTextContent(/CDI3 \(75\s%\)MAD1 \(25\s%\)/)
-  expect(bulle()).not.toHaveTextContent(/Effectif fin/)
+  await survoler(tuile)
+  expect(bulle().querySelector('h2')).toHaveTextContent('Effectif global')
+  expect(bulle().querySelector('header p')).toHaveTextContent(/Fin Févr. 2026 · comparé à Janv\. 2026/)
+  expect(bulle()).toHaveTextContent(/Par type de contrat.*CDI3MAD1/)
+  expect(bulle()).toHaveTextContent(/Salariés présents à la fin du dernier mois saisi/)
   expect(tuile).toHaveAttribute('aria-describedby', bulle().id)
+  expect(bulle()).toHaveAttribute('role', 'tooltip')
+  expect([...bulle().querySelectorAll('section > h3')].map((h) => h.textContent)).toEqual(
+    expect.arrayContaining(['Comparaison', 'Par type de contrat', 'Calcul']),
+  )
   expect(document.querySelector('.cases')).not.toHaveTextContent(/mois saisi/)
   expect(screen.queryByText('CA par salarié', { selector: '.micro' })).toBeNull()
 })
 
-test('Résumé : part des MAD d’abord, sites déportés dessous, nombres dans la bulle, masse salariale par contrat', async () => {
+test('Résumé : part des MAD d’abord, sites déportés dessous, détail dans la carte, masse salariale par contrat', async () => {
   rendu(<Resume />, '/resume', ['report:read'])
   await chargee()
   const tuile = (await screen.findByText('Pourcentage MAD sites déportés')).closest('.tuile')!
   expect(tuile).toHaveTextContent(/Part des MAD20\s%Pourcentage MAD sites déportés1 · 50\s%/)
-  fireEvent.mouseEnter(tuile)
-  expect(bulle()).toHaveTextContent(/Effectif moyen MAD3/)
-  expect(bulle()).toHaveTextContent(/MAD sites déportés1Part des MAD globaux50\s%/)
+  await survoler(tuile)
+  expect(bulle()).toHaveTextContent(/MAD3Total4/)
+  expect(bulle()).toHaveTextContent(/dont sites déportés1 · 1Part des sites déportés50\s%/)
   const ms = screen.getByText('Masse salariale', { selector: '.micro' }).closest('.tuile')!
-  fireEvent.mouseLeave(tuile)
-  fireEvent.mouseEnter(ms)
-  // Une seule bulle pour toutes les cases : elle passe d'une case à l'autre.
+  fireEvent.pointerLeave(tuile)
+  fireEvent.pointerEnter(ms)
+  // Une seule carte pour toutes les cases : elle passe d'une case à l'autre.
+  await waitFor(() => expect(bulle().querySelector('h2')).toHaveTextContent('Masse salariale'))
   expect(document.querySelectorAll('.bulle-case')).toHaveLength(1)
-  expect(bulle()).toHaveTextContent(/MAD500\sFCFA \(25\s%\)/)
-  expect(bulle()).not.toHaveTextContent(/Écart|Mois saisis/)
+  expect(bulle()).toHaveTextContent(/MAD500\sFCFA\s25,0\s%/)
+  expect(bulle()).toHaveTextContent(/Moyenne par mois/)
+  expect(bulle()).not.toHaveTextContent(/Mois saisis/)
   expect(tuile).not.toHaveAttribute('aria-describedby')
   expect(screen.queryByText(/MOYENNE MENSUELLE/)).toBeNull()
+})
+
+test('Résumé : la carte reste ouverte sous le pointeur, se ferme en le quittant', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  const tuile = (await screen.findByText('Commissions', { selector: '.micro' })).closest('.tuile')!
+  await survoler(tuile)
+  // Passage de la case à la carte : la fermeture différée est annulée.
+  fireEvent.pointerLeave(tuile)
+  fireEvent.pointerEnter(bulle())
+  await attendre(350)
+  expect(bulle()).not.toBeNull()
+  fireEvent.pointerLeave(bulle())
+  await waitFor(() => expect(document.querySelector('.bulle-case.visible')).toBeNull(), { timeout: 1500 })
+})
+
+test('Résumé : Échap ferme la carte, le focus clavier l’ouvre aussitôt', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  const tuile = (await screen.findByText('Commissions', { selector: '.micro' })).closest('.tuile')!
+  expect(document.querySelector('.bulle-case.visible')).toBeNull()
+  fireEvent.focus(tuile)
+  expect(bulle().querySelector('h2')).toHaveTextContent('Commissions')
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(document.querySelector('.bulle-case.visible')).toBeNull()
+})
+
+test('Résumé : un clic ailleurs ferme la carte', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  const tuile = (await screen.findByText('Commissions', { selector: '.micro' })).closest('.tuile')!
+  fireEvent.focus(tuile)
+  expect(bulle()).not.toBeNull()
+  fireEvent.pointerDown(bulle())
+  expect(bulle()).not.toBeNull()
+  fireEvent.pointerDown(document.body)
+  expect(document.querySelector('.bulle-case.visible')).toBeNull()
+})
+
+test('Résumé : au toucher, la case ouvre la carte, un second toucher la ferme', async () => {
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  const tuile = (await screen.findByText('Commissions', { selector: '.micro' })).closest('.tuile')!
+  // jsdom n'a pas de PointerEvent : une version minimale porte le type de pointeur.
+  const original = window.PointerEvent
+  class PointerEventTest extends MouseEvent {
+    pointerType: string
+    constructor(type: string, init?: PointerEventInit) {
+      super(type, init)
+      this.pointerType = init?.pointerType ?? ''
+    }
+  }
+  window.PointerEvent = PointerEventTest as unknown as typeof PointerEvent
+  try {
+    fireEvent.pointerDown(tuile, { pointerType: 'touch' })
+    fireEvent.click(tuile)
+    expect(bulle().querySelector('h2')).toHaveTextContent('Commissions')
+    fireEvent.pointerDown(tuile, { pointerType: 'touch' })
+    fireEvent.click(tuile)
+    expect(document.querySelector('.bulle-case.visible')).toBeNull()
+  } finally {
+    window.PointerEvent = original
+  }
+})
+
+test('Résumé : variation neutre sur les commissions, verte ou rouge sur le CA et le CA par salarié', async () => {
+  cumulCa = true
+  try {
+    rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
+    await chargee()
+    const ouvrir = async (titre: string) => {
+      const t = (await screen.findByText(titre, { selector: '.micro' })).closest('.tuile')!
+      fireEvent.focus(t)
+      await waitFor(() => expect(bulle().querySelector('h2')).toHaveTextContent(titre))
+      return bulle()
+    }
+    const ca = await ouvrir('Chiffre d’affaires')
+    expect(ca.querySelector('.bc-bon')).toHaveTextContent(/▲ \+25\s%/)
+    expect(ca.querySelector('.bc-neutre')).toBeNull()
+    const parSalarie = await ouvrir('CA par salarié')
+    expect(parSalarie.querySelector('.bc-mal')).toHaveTextContent(/▼/)
+    const com = await ouvrir('Commissions')
+    expect(com.querySelector('.bc-neutre')).not.toBeNull()
+    expect(com.querySelector('.bc-bon, .bc-mal')).toBeNull()
+  } finally {
+    cumulCa = false
+  }
 })
 
 test('Résumé : tableau avec frais de mission, logement et ligne de total', async () => {

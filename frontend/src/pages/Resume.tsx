@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { BulleCases, useBulleCase } from '../components/BulleCases'
+import { BulleCases, useBulleCase, type Carte, type Section } from '../components/BulleCases'
 import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, SerieMois, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
@@ -16,8 +16,6 @@ import { ordreMois, type Calendrier } from '../lib/exercice'
 import { anneeDe, indice, libelleTexte, lireMois, moisDe } from '../lib/periode'
 import { TitreRapport } from '../components/ExportPdf'
 
-type Detail = [string, string][]
-
 const NF2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 })
 /** Bulles : une division par zéro est dite en clair, la case reste « — ». */
 const NC = 'Non calculable'
@@ -31,22 +29,47 @@ const exact = (v: Val | undefined) => {
 /** Effectifs moyens et taux : affichage seulement, deux décimales. */
 const dec = (v: Val | undefined) => (vide(v) ? (v === 'n/a' ? NC : '—') : NF2.format(Number(v)).replace(/ /g, SEP))
 const taux = (v: Val | undefined) => (vide(v) ? (v === 'n/a' ? NC : '—') : `${dec(String(Number(v) * 100))}${SEP}%`)
-const comparaison = (c: Cell | undefined, an: string, n1: string): Detail => [
-  [an, exact(c?.m)],
-  [n1, exact(c?.m1)],
-  ['Écart', exact(c?.var)],
-  ['Évolution', taux(c?.var_pct)],
-]
-/** Une ligne de bulle par type de contrat : valeur et part du total. */
-const parContrat = (d: Record<string, Cell & { part: Val }> | undefined, fmt: (v: Val | undefined) => string): Detail =>
-  Object.entries(d ?? {}).map(([c, x]) => [c, `${fmt(x.m)} (${taux(x.part)})`])
+/** Évolution en pourcentage avec sa flèche ; vert / rouge seulement quand `couleur` (CA, marge, CA par salarié), sinon neutre. */
+const evolution = (v: Val | undefined, couleur: boolean): ReactNode => {
+  if (vide(v)) return taux(v)
+  const n = Number(v)
+  const classe = !couleur || n === 0 ? 'bc-neutre' : n > 0 ? 'bc-bon' : 'bc-mal'
+  return <span className={classe}>{n < 0 ? '▼' : n > 0 ? '▲' : '■'} {n > 0 ? '+' : ''}{taux(v)}</span>
+}
+/** Section commune « Comparaison » : période, comparaison, écart, évolution. */
+const comparaison = (
+  c: Cell | undefined, an: string, n1: string, couleur: boolean, f: (v: Val | undefined) => string = exact,
+): Section => ({
+  type: 'lignes',
+  titre: 'Comparaison',
+  lignes: [
+    { k: an, v: f(c?.m), fort: true },
+    { k: n1, v: f(c?.m1) },
+    { k: 'Écart', v: f(c?.var), sep: true },
+    { k: 'Évolution', v: evolution(c?.var_pct, couleur) },
+  ],
+})
+/** Ratio (0 à 1) de l'API en pourcentage de 0 à 100, pour la largeur des barres de part. */
+const enPourcent = (v: Val | undefined) => Number(v) * 100
+/** Écart de taux en points ; null si l'un des deux taux manque. */
+const ecartPoints = (t: Val | undefined, t1: Val | undefined) => (vide(t) || vide(t1) ? null : (Number(t) - Number(t1)) * 100)
+const textePoints = (d: number) => `${d > 0 ? '+' : ''}${dec(String(d))}${SEP}pt`
+const texteEcart = (d: number | null) => (d === null ? '—' : textePoints(d))
+/** Écart de taux en points, avec flèche et couleur (vert en hausse, rouge en baisse). */
+const evolutionPoints = (d: number | null): ReactNode =>
+  d === null ? '—' : <span className={d === 0 ? 'bc-neutre' : d > 0 ? 'bc-bon' : 'bc-mal'}>{d < 0 ? '▼' : d > 0 ? '▲' : '■'} {textePoints(d)}</span>
+/** Parts par type de contrat : valeur et part du total (les lignes sans part sont écartées). */
+const partsContrat = (d: Record<string, Cell & { part: Val }> | undefined, fmt: (v: Val | undefined) => string) =>
+  Object.entries(d ?? {})
+    .filter(([, x]) => !vide(x.part))
+    .map(([c, x]) => ({ nom: c, valeur: fmt(x.m), part: enPourcent(x.part) }))
 
 function Case({
   titre,
   valeur,
   devise = true,
   libelle2,
-  detail,
+  carte,
   partiel,
   children,
 }: {
@@ -55,15 +78,15 @@ function Case({
   devise?: boolean
   /** Libellé de l'élément secondaire, à gauche sous le titre ; sa valeur (children) sous la valeur. */
   libelle2?: string
-  /** Chiffres exacts affichés au survol (ou au focus clavier), comme les bulles des graphiques. */
-  detail?: Detail
+  /** Carte de détail affichée au survol, au focus clavier ou au toucher. */
+  carte?: Carte
   /** Total incomplet : une case attendue n'est pas renseignée. */
   partiel?: boolean
   children?: ReactNode
 }) {
-  const bulle = useBulleCase(titre, detail)
+  const bulle = useBulleCase(titre, carte)
   return (
-    <div className="tuile case" tabIndex={detail ? 0 : undefined} {...bulle}>
+    <div className="tuile case" tabIndex={carte ? 0 : undefined} {...bulle}>
       <span className="micro">
         {titre}
         {partiel && <span className="partiel-mention" title="Total incomplet : une case attendue n’est pas renseignée">partiel</span>}
@@ -141,10 +164,14 @@ export default function Resume() {
   const fb = a?.front_back && a.front_back.total > 0 ? a.front_back : null
   // R9 : front / back office sur la masse salariale, le CA et la marge (3e ligne, détail au survol).
   const msFb = a?.ms_front_back && !vide(a.ms_front_back.front_pct) ? a.ms_front_back : null
-  const parFront = (titre: string, v: Val | undefined): Detail => vide(v) ? [] : [
-    [`${titre} par employé front office`, exact(v)],
-    ['Effectif moyen front office', dec(a?.effectif_moyen_front)],
-  ]
+  const parFront = (titre: string, v: Val | undefined): Section[] => vide(v) ? [] : [{
+    type: 'lignes',
+    titre: 'Front office',
+    lignes: [
+      { k: `${titre} par employé front office`, v: exact(v) },
+      { k: 'Effectif moyen front office', v: dec(a?.effectif_moyen_front) },
+    ],
+  }]
   const ligneFront = (v: Val | undefined) => !vide(v) && <span className="ratio-fb">Par employé front office {compact(v)}</span>
   const montrer = (v: Val | undefined) => (v === undefined || v === null ? '—' : fcfa(v))
   // Dernier mois saisi avec sa vraie année (en fiscal, l'exercice 2025-26 finit en 2026).
@@ -174,10 +201,39 @@ export default function Resume() {
   const perCmp = libelleTexte(a?.cmp_du, a?.cmp_au) || n1
   /** Écart de taux de marge, en points. */
   const ecartPts = (t: Val | undefined, t1: Val | undefined) => {
-    if (vide(t) || vide(t1)) return <td className="num">—</td>
-    const d = (Number(t) - Number(t1)) * 100
-    return <td className={d < 0 ? 'num neg' : 'num'}>{d > 0 ? '+' : ''}{dec(String(d))}{SEP}pt</td>
+    const d = ecartPoints(t, t1)
+    if (d === null) return <td className="num">—</td>
+    return <td className={d < 0 ? 'num neg' : 'num'}>{textePoints(d)}</td>
   }
+  const periodes = `${an} · comparé à ${n1}`
+  /** Mini-courbe d'un indicateur mensuel : mois de la période, valeurs brutes de la série (Number() pour tracer seulement). */
+  const courbe = (x: Annuel, champ: 'ca' | 'marge' | 'ms' | 'commissions' | 'primes' | 'effectif'): Section => {
+    const idx = x.serie_n.flatMap((l, i) => (dansPeriode(l) ? [i] : []))
+    const valeur = (l: SerieMois | undefined) => {
+      const v = l?.[champ]
+      return v == null || v === 'n/a' ? null : Number(v)
+    }
+    return {
+      type: 'courbe',
+      mois: idx.map((i) => MOIS[x.serie_n[i].mois - 1][0]),
+      n: idx.map((i) => valeur(x.serie_n[i])),
+      n1: idx.map((i) => valeur(x.serie_n1?.[i])),
+      legendeN: an,
+      legendeN1: n1,
+    }
+  }
+  /** Parts front / back office (0 à 100) d'un montant ou d'un effectif. */
+  const partsFrontBack = (front: string, back: string, fpct: Val | undefined, bpct: Val | undefined): Section[] =>
+    vide(fpct) || vide(bpct) ? [] : [{
+      type: 'parts',
+      titre: 'Front / back office',
+      parts: [
+        { nom: 'Front office', valeur: front, part: enPourcent(fpct) },
+        { nom: 'Back office', valeur: back, part: enPourcent(bpct), bo: true },
+      ],
+    }]
+  const sectionContrats = (titre: string, parts: ReturnType<typeof partsContrat>): Section[] =>
+    parts.length ? [{ type: 'parts', titre, parts }] : []
   const evol = (c: Cell | undefined) => <td className="num"><Variation v={c?.var_pct} /></td>
   // Le premier mois de la période en haut du tableau : jamais caché sous les totaux figés
   const defile = useRef<HTMLDivElement>(null)
@@ -211,41 +267,94 @@ export default function Resume() {
           <div className="cases">
             {sansCa && indispo('Chiffre d’affaires')}
             {aCa && !sansCa && (
-              <Case titre="Chiffre d’affaires" partiel={a.lignes_ca_marge?.ca.partiel} valeur={compact(a.ca_ytd)} libelle2={parRapport(n1)} detail={[...comparaison(a.ca_cumul, an, n1), ...parFront('CA', a.ca_par_front)]}>
+              <Case titre="Chiffre d’affaires" partiel={a.lignes_ca_marge?.ca.partiel} valeur={compact(a.ca_ytd)} libelle2={parRapport(n1)}
+                carte={{
+                  titre: 'Chiffre d’affaires',
+                  periodes,
+                  sections: [
+                    comparaison(a.ca_cumul, an, n1, true),
+                    courbe(a, 'ca'),
+                    ...parFront('CA', a.ca_par_front),
+                    {
+                      type: 'calcul',
+                      texte: 'Somme des CA saisis sur les mois de la période.',
+                      mention: a.lignes_ca_marge?.ca.partiel ? 'Total incomplet : une case attendue n’est pas renseignée' : undefined,
+                    },
+                  ],
+                }}
+              >
                 <Variation v={a.ca_cumul?.var_pct} vs="" />
                 {ligneFront(a.ca_par_front)}
               </Case>
             )}
-            <Case titre="Commissions" valeur={compact(a.commissions_ytd)} libelle2={parRapport(n1)} detail={comparaison(a.commissions_cumul, an, n1)}>
+            <Case titre="Commissions" valeur={compact(a.commissions_ytd)} libelle2={parRapport(n1)}
+              carte={{
+                titre: 'Commissions',
+                periodes,
+                sections: [
+                  comparaison(a.commissions_cumul, an, n1, false),
+                  courbe(a, 'commissions'),
+                  { type: 'calcul', texte: 'Somme des commissions des fichiers de paie de la période.' },
+                ],
+              }}
+            >
               <Variation v={a.commissions_cumul.var_pct} vs="" />
             </Case>
             <Case
               titre="Masse salariale"
               valeur={compact(a.cumul_ytd.m)}
               libelle2={parRapport(n1)}
-              detail={[
-                ...parContrat(a.ms_contrat, exact),
-                ...(msFb ? [
-                  ['Front office (productif)', `${exact(msFb.front)} · ${pct(msFb.front_pct)}`],
-                  ['Back office (administratif)', `${exact(msFb.back)} · ${pct(msFb.back_pct)}`],
-                ] as Detail : []),
-              ]}
+              carte={{
+                titre: 'Masse salariale',
+                periodes,
+                sections: [
+                  comparaison(a.cumul_ytd, an, n1, false),
+                  courbe(a, 'ms'),
+                  ...sectionContrats('Par type de contrat', partsContrat(a.ms_contrat, exact)),
+                  ...(msFb ? partsFrontBack(exact(msFb.front), exact(msFb.back), msFb.front_pct, msFb.back_pct) : []),
+                  { type: 'calcul', texte: `Somme des masses salariales mensuelles. Moyenne par mois : ${exact(a.moyenne_mensuelle?.m)}.` },
+                ],
+              }}
             >
               <Variation v={a.cumul_ytd.var_pct} vs="" />
               {msFb && <span className="ratio-fb">Front office {pct(msFb.front_pct)} · Back office {pct(msFb.back_pct)}</span>}
             </Case>
             <Case titre="Part des MAD" valeur={vide(a.part_mad.m) ? '—' : taux(a.part_mad.m)} devise={false}
               libelle2="Pourcentage MAD sites déportés"
-              detail={[
-                ['Effectif moyen MAD', dec(a.effectif_moyen_mad.m)],
-                ['Effectif moyen total', dec(a.effectif_moyen.m)],
-                [`Part des MAD ${n1}`, taux(a.part_mad.m1)],
-                [`MAD globaux ${moisFin} ${finAn}`, dec(a.mad_fin.m)],
-                [`MAD globaux ${finCmp}`, dec(a.mad_fin.m1)],
-                ['MAD sites déportés', dec(a.mad_deportes_fin.m)],
-                ['Part des MAD globaux', taux(a.mad_deportes_fin.part)],
-                [`MAD sites déportés ${finCmp}`, dec(a.mad_deportes_fin.m1)],
-              ]}
+              carte={{
+                titre: 'Part des MAD',
+                periodes,
+                sections: [
+                  {
+                    type: 'lignes',
+                    titre: 'Part des MAD dans l’effectif moyen',
+                    lignes: [
+                      { k: an, v: taux(a.part_mad.m), fort: true },
+                      { k: n1, v: taux(a.part_mad.m1) },
+                      { k: 'Écart', v: texteEcart(ecartPoints(a.part_mad.m, a.part_mad.m1)), sep: true },
+                    ],
+                  },
+                  {
+                    type: 'lignes',
+                    titre: `Effectifs moyens (${an})`,
+                    lignes: [
+                      { k: 'MAD', v: dec(a.effectif_moyen_mad.m) },
+                      { k: 'Total', v: dec(a.effectif_moyen.m) },
+                    ],
+                  },
+                  {
+                    type: 'lignes',
+                    titre: 'Fin de période',
+                    lignes: [
+                      { k: '', v: <><b>{moisFin} {finAn}</b> · {finCmp}</> },
+                      { k: 'MAD globaux', v: <><b>{dec(a.mad_fin.m)}</b> · {dec(a.mad_fin.m1)}</> },
+                      { k: 'dont sites déportés', v: <><b>{dec(a.mad_deportes_fin.m)}</b> · {dec(a.mad_deportes_fin.m1)}</> },
+                      { k: 'Part des sites déportés', v: <b>{taux(a.mad_deportes_fin.part)}</b> },
+                    ],
+                  },
+                  { type: 'calcul', texte: 'Effectif moyen MAD ÷ effectif moyen total.' },
+                ],
+              }}
             >
               <span className="second">
                 {a.mad_deportes_fin.m == null
@@ -259,34 +368,75 @@ export default function Resume() {
             {aCa && !sansMarge && (
               // Pas d'évolution sur la marge : le taux prend sa place, en second plan.
               <Case titre="Marge" partiel={a.lignes_ca_marge?.marge.partiel} valeur={compact(a.marge_ytd)} libelle2="Taux de marge"
-                detail={[
-                  ['Marge cumulée', exact(a.marge_ytd)],
-                  ['CA des mois avec marge', exact(a.ca_avec_marge)],
-                  ['Taux de marge', taux(a.taux_marge_ytd)],
-                  ['Mois saisis', a.nb_mois_marge ? `${a.nb_mois_marge}` : '—'],
-                  ...parFront('Marge', a.marge_par_front),
-                ]}
+                carte={{
+                  titre: 'Marge',
+                  periodes,
+                  sections: [
+                    {
+                      type: 'lignes',
+                      titre: 'Comparaison',
+                      lignes: [
+                        { k: `Marge ${an}`, v: exact(a.marge_ytd), fort: true },
+                        { k: `Taux de marge ${an}`, v: taux(a.taux_marge_ytd), fort: true },
+                        { k: `Taux de marge ${n1}`, v: taux(a.taux_marge_cmp) },
+                        { k: 'Écart de taux', v: evolutionPoints(ecartPoints(a.taux_marge_ytd, a.taux_marge_cmp)), sep: true },
+                      ],
+                    },
+                    courbe(a, 'marge'),
+                    {
+                      type: 'lignes',
+                      titre: 'Base',
+                      lignes: [
+                        { k: 'CA des mois avec marge', v: exact(a.ca_avec_marge) },
+                        { k: 'Mois saisis', v: a.nb_mois_marge ? `${a.nb_mois_marge}` : '—' },
+                        ...(vide(a.marge_par_front) ? [] : [{ k: 'Marge par employé front office', v: exact(a.marge_par_front) }]),
+                      ],
+                    },
+                    { type: 'calcul', texte: 'Taux = marge cumulée ÷ CA des mois où la marge est saisie.' },
+                  ],
+                }}
               >
                 <span className="second">{a.taux_marge_ytd == null ? '—' : pct(a.taux_marge_ytd)}</span>
                 {ligneFront(a.marge_par_front)}
               </Case>
             )}
-            <Case titre="Primes de productivité" valeur={compact(a.primes_ytd)} libelle2={parRapport(n1)} detail={comparaison(a.primes_cumul, an, n1)}>
+            <Case titre="Primes de productivité" valeur={compact(a.primes_ytd)} libelle2={parRapport(n1)}
+              carte={{
+                titre: 'Primes de productivité',
+                periodes,
+                sections: [
+                  comparaison(a.primes_cumul, an, n1, false),
+                  courbe(a, 'primes'),
+                  { type: 'calcul', texte: 'Somme des primes de productivité des fichiers de paie de la période.' },
+                ],
+              }}
+            >
               <Variation v={a.primes_cumul.var_pct} vs="" />
             </Case>
             <Case titre="Effectif global" valeur={montrer(a.effectif_fin.m)} devise={false}
               libelle2={parRapport(finCmp)}
-              detail={[
-                // R9 : chaque contrat avec sa répartition front / back office.
-                ...parContrat(a.effectif_fin_contrat, dec).map(([c, v]): [string, string] => {
-                  const x = fb?.par_contrat?.[c]
-                  return [c, x ? `${v} · FO ${x.front} · BO ${x.back}` : v]
-                }),
-                ...(fb ? [
-                  ['Front office (productif)', `${dec(String(fb.front))} · ${pct(fb.front_pct)}`],
-                  ['Back office (administratif)', `${dec(String(fb.back))} · ${pct(fb.back_pct)}`],
-                ] as Detail : []),
-              ]}
+              carte={{
+                titre: 'Effectif global',
+                periodes: `Fin ${moisFin} ${finAn} · comparé à ${finCmp}`,
+                sections: [
+                  comparaison(a.effectif_fin, `Fin ${moisFin} ${finAn}`, finCmp, false, dec),
+                  courbe(a, 'effectif'),
+                  // R9 : chaque contrat avec sa répartition front / back office.
+                  ...(Object.keys(a.effectif_fin_contrat).length ? [{
+                    type: 'lignes' as const,
+                    titre: 'Par type de contrat',
+                    lignes: [
+                      { k: '', v: 'Total · FO · BO' },
+                      ...Object.entries(a.effectif_fin_contrat).map(([c, x]) => {
+                        const r = fb?.par_contrat?.[c]
+                        return { k: c, v: r ? <><b>{dec(x.m)}</b> · {r.front} · {r.back}</> : <b>{dec(x.m)}</b> }
+                      }),
+                    ],
+                  }] : []),
+                  ...(fb ? partsFrontBack(dec(String(fb.front)), dec(String(fb.back)), fb.front_pct, fb.back_pct) : []),
+                  { type: 'calcul', texte: `Salariés présents à la fin du dernier mois saisi (${moisFin} ${finAn}). Effectif moyen de la période : ${dec(a.effectif_moyen.m)}.` },
+                ],
+              }}
             >
               <Variation v={a.effectif_fin.var_pct} vs="" />
               {/* Productif / administratif : part de l'effectif de fin en front et en back office. */}
@@ -295,11 +445,22 @@ export default function Resume() {
             {sansCaEff && indispo('CA par salarié')}
             {aCa && !sansCaEff && (
               <Case titre="CA par salarié" valeur={compact(a.ca_par_effectif?.m)} libelle2={parRapport(n1)}
-                detail={[
-                  ...comparaison(a.ca_par_effectif, an, n1),
-                  ['CA cumulé', exact(a.ca_ytd)],
-                  ['Effectif moyen', dec(a.effectif_moyen.m)],
-                ]}
+                carte={{
+                  titre: 'CA par salarié',
+                  periodes,
+                  sections: [
+                    comparaison(a.ca_par_effectif, an, n1, true),
+                    {
+                      type: 'lignes',
+                      titre: 'Calcul',
+                      lignes: [
+                        { k: 'CA cumulé', v: exact(a.ca_ytd) },
+                        { k: '÷ Effectif moyen', v: dec(a.effectif_moyen.m) },
+                        { k: '= CA par salarié', v: exact(a.ca_par_effectif?.m), fort: true, sep: true },
+                      ],
+                    },
+                  ],
+                }}
               >
                 <Variation v={a.ca_par_effectif?.var_pct} vs="" />
               </Case>
