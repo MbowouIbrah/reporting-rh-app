@@ -1,10 +1,10 @@
-# Étude : indicateurs de Budget réalisé regroupés par type, groupe « Personne »
+# Étude : indicateurs de Budget réalisé regroupés par type, groupe « Profil des salariés »
 
 ## 1. Besoin (27/11)
 
 - Regrouper les indicateurs de Budget réalisé par type.
 - Un filtre « Types d'indicateurs » choisit les groupes affichés.
-- Nouveau groupe **Personne** : sexe, âge, ancienneté (durée depuis l'embauche).
+- Nouveau groupe **Profil des salariés** : sexe, âge, ancienneté (durée depuis l'embauche).
 
 ## 2. Existant
 
@@ -16,16 +16,18 @@
 | Données personne | `imports/paie.py` | Civilité, Date de naissance, Date d'embauche **ignorées** à l'import (`etude-import-paie.md` §3a). Nature du contrat est déjà lue. |
 | Règles déjà décidées | `etude-filtres-affichage-comparaison.md` §3-4 | Tranches d'âge et d'ancienneté, seuil de 3 personnes sauf `nominatif:read`, masquer n'est pas un droit. |
 
-## 3. Groupes proposés
+## 3. Groupes retenus (validés le 27/11)
 
-| Groupe | Cartes | Colonnes du tableau |
-|---|---|---|
-| Activité | CA, Marge, Commissions, CA par salarié | CA, Marge, % marge |
-| Masse salariale | Masse salariale, Primes de productivité | Masse salariale, Commissions, Primes, Frais de mission, Logement |
-| Effectif | Effectif global, Part des MAD | — |
-| Personne (nouveau) | Sexe, Âge, Ancienneté, Type de contrat | — |
+Références : ISO 30414 (familles d'indicateurs RH : coûts, productivité, effectifs, diversité) et chapitre « Emploi » du bilan social / BDESE. Noms repris du vocabulaire déjà affiché dans l'application.
 
-Les groupes de 2 cartes partagent une ligne : l'écran garde ses lignes de 4 cartes. Commissions va dans Activité (suit les ventes) ; elle reste dans les colonnes de paie du tableau.
+| Groupe | Cartes | Colonnes du tableau | Référence |
+|---|---|---|---|
+| Activité et productivité | CA, Marge, CA par salarié | CA, Marge, % marge | ISO 30414 productivité |
+| Masse salariale | Masse salariale, Commissions, Primes de productivité | Masse salariale, Commissions, Primes, Frais de mission, Logement | ISO 30414 coûts ; bilan social rémunérations |
+| Effectif | Effectif global, Part des MAD, Type de contrat | — | ISO 30414 effectifs ; bilan social emploi |
+| Profil des salariés (nouveau) | Sexe, Âge, Ancienneté | — | ISO 30414 diversité ; bilan social structure des effectifs |
+
+4 groupes de 3 cartes, une ligne par groupe (grille de 3). Commissions = rémunération (paie), Type de contrat = composition de l'effectif.
 
 ## 4. Options pour le filtre
 
@@ -37,7 +39,7 @@ Les groupes de 2 cartes partagent une ligne : l'écran garde ses lignes de 4 car
 
 **Choix : A.** Par défaut tout est coché. Le choix n'est pas mis dans l'adresse (préférence personnelle, pas un filtre de données). Un rappel « 1 type masqué » évite de croire qu'une donnée manque.
 
-## 5. Calculs du groupe Personne (serveur)
+## 5. Calculs (Profil des salariés et Type de contrat) (serveur)
 
 - Base : salariés présents au dernier mois de la période (même base que « Effectif global »), filtre de périmètre dans la couche dépôt.
 - Sexe : Civilité M. → H, Mme / Mlle → F.
