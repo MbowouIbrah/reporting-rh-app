@@ -71,9 +71,10 @@ Références : ISO 30414 (familles d'indicateurs RH : coûts, productivité, eff
 | Groupe | Filtres |
 |---|---|
 | Activité et productivité | Activité (front / back office) |
-| Masse salariale | Poste |
 | Effectif | Département, Service, Type de site, Site, Contrat |
-| Profil des salariés | Sexe, Tranche d'âge, Tranche d'ancienneté |
+| Profil des salariés | Poste, Sexe, Tranche d'âge, Tranche d'ancienneté |
+
+Poste décrit le salarié (rangé dans Profil des salariés à la demande de l'utilisateur, 27/11) ; le filtre Poste est proposé sur toutes les pages, Budget réalisé compris. Le groupe Masse salariale n'a pas de filtre.
 
 **Options comparées pour les filtres de profil.**
 

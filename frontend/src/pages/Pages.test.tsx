@@ -316,8 +316,10 @@ test('Filtrer par : champs rangés par groupe, filtres de profil envoyés au ser
   const menu = await screen.findByRole('group', { name: 'Filtrer par' })
   const textes = [...menu.querySelectorAll('.filtres-choix-groupe, label')].map((e) => e.textContent)
   expect(textes.indexOf('Profil des salariés')).toBeGreaterThan(textes.indexOf('Effectif'))
-  expect(textes.indexOf('Sexe')).toBe(textes.indexOf('Profil des salariés') + 1)
-  expect(textes).toEqual(expect.arrayContaining(['Masse salariale', 'Poste', "Tranche d'âge", "Tranche d'ancienneté"]))
+  expect(textes.indexOf('Poste')).toBe(textes.indexOf('Profil des salariés') + 1)
+  expect(textes.indexOf('Sexe')).toBe(textes.indexOf('Poste') + 1)
+  expect(textes).not.toContain('Masse salariale')
+  expect(textes).toEqual(expect.arrayContaining(["Tranche d'âge", "Tranche d'ancienneté"]))
   fireEvent.click(screen.getByRole('checkbox', { name: 'Sexe' }))
   fireEvent.click(await screen.findByRole('button', { name: /^Sexe/ }))
   // tout est coché par défaut : décocher Femmes garde Hommes et Non renseigné

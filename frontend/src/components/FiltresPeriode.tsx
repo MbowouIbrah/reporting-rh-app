@@ -75,7 +75,7 @@ const PROFIL: { id: DimProfil; libelle: string; pluriel: string; valeurs: [strin
 
 /** Groupes du menu « Filtrer par », dans l'ordre des groupes d'indicateurs. */
 const GROUPE: Record<DimComparee | DimProfil, string> = {
-  activite: 'Activité et productivité', poste: 'Masse salariale',
+  activite: 'Activité et productivité', poste: 'Profil des salariés',
   departement: 'Effectif', service: 'Effectif', type_site: 'Effectif', site: 'Effectif', type_contrat: 'Effectif',
   sexe: 'Profil des salariés', age: 'Profil des salariés', anciennete: 'Profil des salariés',
 }
@@ -298,10 +298,10 @@ export default function FiltresPeriode({
   // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
   const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
   const dispo = ([
-    [avecActivite, 'activite', LIBELLE_DIM.activite], [avecPoste, 'poste', LIBELLE_DIM.poste],
+    [avecActivite, 'activite', LIBELLE_DIM.activite],
     [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
     [avecType, 'type_site', LIBELLE_DIM.type_site], [!!sites, 'site', LIBELLE_DIM.site],
-    [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat],
+    [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat], [avecPoste, 'poste', LIBELLE_DIM.poste],
     ...PROFIL.map((f) => [!!avecProfil, f.id, f.libelle] as const),
   ] as const).filter(([ok]) => ok).map(([, d, nom]) => ({ id: d, nom, groupe: GROUPE[d] }))
   const voir = (d: DimComparee | DimProfil) => affiches.includes(d) || !!filtres[d] || cmpDim === d
