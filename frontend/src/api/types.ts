@@ -312,24 +312,6 @@ export interface ChargesPersonne extends Cell {
   part: Val
 }
 
-/** Tranche d'une répartition (âge ou ancienneté) : `cle` vaut « <25 », « 25-34 »… ou « <1 », « 1-3 »… */
-export interface Tranche {
-  cle: string
-  n: number
-}
-
-/** Moyenne en années (texte décimal) et répartition par tranche, `nr` personnes sans date. */
-export interface RepartitionProfil {
-  moyenne: Dec | null
-  tranches: Tranche[]
-  nr: number
-}
-
-/** Profil d'un effectif ; `masque` : moins de 3 personnes, rien d'autre n'est servi. */
-export type Profil =
-  | { effectif: number; sexe: { H: number; F: number; nr: number }; age: RepartitionProfil; anciennete: RepartitionProfil; masque?: undefined }
-  | { effectif: number; masque: true }
-
 export interface Annuel {
   serie_n: SerieMois[]
   serie_n1: SerieMois[]
@@ -367,10 +349,6 @@ export interface Annuel {
   front_back1?: FrontBack | null
   front_back_var?: { front: Val; back: Val } | null
   effectif_fin_contrat: Record<string, Cell & { part: Val; part1?: Val }>
-  /** Profil des salariés à la fin de la période (null : rien à calculer pour ce côté). */
-  profil?: { m: Profil | null; m1: Profil | null }
-  /** Effectif de fin par grande famille de contrat, avec sa part du total. */
-  contrat_fin?: Record<'CDI' | 'CDD' | 'autres', Cell & { part: Val; part1: Val }>
   effectif_moyen_mad: Cell
   part_mad: { m: Val; m1: Val }
   mad_fin: Cell
