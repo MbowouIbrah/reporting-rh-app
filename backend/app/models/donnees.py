@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 import sqlalchemy as sa
@@ -5,6 +6,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     ForeignKey,
     Index,
     Integer,
@@ -72,6 +74,10 @@ class Salarie(Base):
         ForeignKey("type_contrat.id"), nullable=True
     )
     actif: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa.true())
+    # Profil (facultatif, lu à l'import) : sexe « H » ou « F », dates de naissance et d'embauche.
+    sexe: Mapped[str | None] = mapped_column(String(1), nullable=True)
+    date_naissance: Mapped[date | None] = mapped_column(Date, nullable=True)
+    date_embauche: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class SituationMensuelle(Base):

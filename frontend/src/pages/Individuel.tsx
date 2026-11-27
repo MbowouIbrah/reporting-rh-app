@@ -8,6 +8,7 @@ import { Panneau } from '../components/BlocsRapport'
 import BoutonReinitialiser from '../components/BoutonReinitialiser'
 import ConfirmerColonne from '../components/ConfirmerColonne'
 import Etat, { etatErreur } from '../components/Etat'
+import MultiChoix from '../components/MultiChoix'
 import { ChoixAnnee, ChoixCalendrier, ChoixEmploye, ChoixPoste, ChoixTypeSite, TitreFiltres } from '../components/FiltresPeriode'
 import { useAttente } from '../hooks/useAttente'
 import { useFiltres } from '../hooks/useFiltres'
@@ -199,27 +200,11 @@ export default function Individuel() {
           <TitreFiltres />
           <ChoixCalendrier filtres={f.filtres} onChange={f.set} />
           <ChoixAnnee filtres={f.filtres} annees={f.annees} onChange={f.set} />
-          <label className="souple">
-            Service
-            <select value={service ?? ''} onChange={(e) => f.set({ service: e.target.value })}>
-              <option value="">Tous</option>
-              {f.services.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
+          <MultiChoix libelle="Service" pluriel="services" options={f.services} valeur={service ?? ''} onChange={(v) => f.set({ service: v })} />
           {f.typesSite.length > 0 && (
             <ChoixTypeSite valeur={typeSite ?? ''} types={f.typesSite} onChange={(v) => f.set({ type_site: v })} />
           )}
-          <label className="souple">
-            Site
-            <select value={site ?? ''} onChange={(e) => f.set({ site: e.target.value })}>
-              <option value="">Tous</option>
-              {f.sites.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </label>
+          <MultiChoix libelle="Site" pluriel="sites" options={f.sites} valeur={site ?? ''} onChange={(v) => f.set({ site: v })} />
           {f.postes.length > 0 && (
             <ChoixPoste valeur={poste ?? ''} postes={f.postes} onChange={(v) => f.set({ poste: v })} />
           )}

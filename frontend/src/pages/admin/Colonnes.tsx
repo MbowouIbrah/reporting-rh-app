@@ -96,7 +96,7 @@ export default function Colonnes() {
             </select>
           )}
         </Champ>
-        <p className="note">Une colonne de paie ajoutée commence hors total ; on la glisse dans le total depuis DONNEES.</p>
+        <p className="note">Une colonne de paie ajoutée commence hors total ; on la glisse dans le total depuis l’écran Données.</p>
       </div>
       {erreur && <p className="champ-erreur admin-erreur admin-erreur-bloc" role="alert">{erreur}</p>}
       {d.colonnes.length === 0 ? (

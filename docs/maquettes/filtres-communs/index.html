@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filtres, affichage, comparaison</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #e3001b; --red-deep: #b40015; --navy: #1a1f3c; --navy-2: #2a3157; --navy-3: #3d4470; --ink: #0e1126;
+  --paper: #fff; --paper-2: #fafafa; --paper-3: #f5f5f5; --rule: #e7e7ea; --rule-strong: #cfd0d8;
+  --muted: #6b6f82; --muted-2: #9499ab; --success: #14663a; --info-soft: #e6eefc; --warn-bg: #fff4d6; --warn: #8a5a00;
+  --fs-xs: max(12px, .75rem); --fs-sm: max(12.5px, .8125rem); --fs-md: .875rem; --fs-xl: clamp(1.25rem, 1.1rem + .6vw, 1.5rem);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper-2); color: var(--ink); font: 400 var(--fs-md)/1.45 'DM Sans', system-ui, sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: var(--fs-xl); color: var(--navy); margin: 0 0 4px; letter-spacing: .02em; }
+.consigne { color: var(--muted); margin: 0 0 16px; max-width: 90ch; }
+button { font: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+
+.onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--rule-strong); margin-bottom: 16px; flex-wrap: wrap; }
+.onglets button { border: 1px solid transparent; border-bottom: 0; background: none; padding: 8px 14px; color: var(--muted); font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0; }
+.onglets button[aria-selected='true'] { background: var(--paper); border-color: var(--rule-strong); color: var(--navy); margin-bottom: -1px; }
+
+/* Barre de filtres */
+.filtres { background: var(--paper); border: 1px solid var(--rule); padding: 10px 12px; margin-bottom: 12px; }
+.ligne-f { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.ligne-f + .ligne-f { margin-top: 10px; padding-top: 10px; border-top: 1px dotted var(--rule-strong); }
+.titre-f { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; align-self: center; min-width: 70px; }
+.champ { display: grid; gap: 2px; }
+.champ > span { font-size: var(--fs-xs); color: var(--muted); font-weight: 600; }
+select { font: inherit; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); padding: 5px 8px; min-width: 120px; border-radius: 0; }
+select.actif { border-color: var(--navy); box-shadow: inset 3px 0 0 var(--navy); }
+.btn { border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); padding: 5px 12px; font-weight: 600; cursor: pointer; border-radius: 8px; display: inline-flex; gap: 6px; align-items: center; }
+.btn:hover { border-color: var(--navy-3); }
+.btn[aria-expanded='true'] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.btn .pastille { background: var(--red); color: #fff; font-size: 11px; padding: 0 6px; min-width: 18px; text-align: center; }
+.btn.prim { background: var(--navy); color: #fff; border-color: var(--navy); }
+.btn.lien { border: 0; background: none; padding: 0; color: var(--navy-3); text-decoration: underline; font-weight: 500; }
+.espace { flex: 1; }
+.bascule { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; }
+.bascule button { border: 0; background: var(--paper); color: var(--navy); padding: 5px 12px; cursor: pointer; font-weight: 600; }
+.bascule button[aria-pressed='true'] { background: var(--navy); color: #fff; }
+.cmp-sel { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; padding: 6px 8px; background: var(--info-soft); }
+.cmp-sel .contre { color: var(--muted); align-self: center; font-weight: 600; }
+.pastille-a, .pastille-b { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: middle; }
+.pastille-a { background: var(--navy); }
+.pastille-b { background: repeating-linear-gradient(90deg, var(--muted-2) 0 3px, transparent 3px 5px); border: 1px solid var(--muted-2); }
+
+/* Liste à choix multiples avec mode Cumuler / Comparer (comme le menu de filtre d'Excel) */
+.mc-wrap { position: relative; }
+.mc { display: flex; justify-content: space-between; gap: 8px; align-items: center; min-width: 130px; max-width: 220px; border: 1px solid var(--rule-strong); background: var(--paper); color: var(--navy); padding: 5px 8px; cursor: pointer; text-align: left; }
+.mc-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc.actif { border-color: var(--navy); box-shadow: inset 3px 0 0 var(--navy); }
+.mc.cmp { background: var(--info-soft); }
+.mc-pop { position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; width: min(270px, calc(100vw - 32px)); background: var(--paper); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgb(14 17 38 / 18%); padding: 10px; display: grid; gap: 8px; }
+.mc-pop .mode { display: flex; } .mc-pop .mode button { flex: 1; }
+.bascule button:disabled { color: var(--muted-2); cursor: not-allowed; }
+.mc-aide { margin: 0; font-size: var(--fs-xs); color: var(--muted); }
+.mc-liste { display: grid; gap: 2px; max-height: 220px; overflow: auto; border-top: 1px solid var(--rule); padding-top: 6px; }
+.mc-liste label { display: flex; gap: 8px; align-items: center; padding: 3px 2px; cursor: pointer; }
+.mc-liste label.off { color: var(--muted-2); cursor: not-allowed; }
+.mc-liste b { margin-left: auto; font-size: 11px; padding: 0 6px; }
+.ab-a { background: var(--navy); color: #fff; } .ab-b { border: 1px dashed var(--muted); color: var(--muted); }
+.mc-pied { border-top: 1px solid var(--rule); padding-top: 6px; }
+
+.rappel { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; color: var(--muted); margin: 0 0 10px; }
+.rappel strong { color: var(--navy); }
+.masques { font-size: var(--fs-xs); }
+
+/* Cases */
+.cases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 900px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .cases { grid-template-columns: 1fr; } }
+.case { background: var(--paper); border: 1px solid var(--rule); padding: 12px 16px; display: grid; gap: 2px; align-content: start; }
+.case .micro { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; }
+.case strong { font-size: var(--fs-xl); color: var(--navy); font-variant-numeric: tabular-nums; }
+.case .lib2 { font-size: var(--fs-xs); color: var(--muted); }
+.case .var { font-size: var(--fs-sm); font-weight: 600; }
+.hausse { color: var(--success); } .baisse { color: var(--red-deep); } .neutre { color: var(--navy); }
+.case .ab { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; font-variant-numeric: tabular-nums; align-items: baseline; }
+.case .ab .v { text-align: right; }
+.case .ab .va { font-size: var(--fs-xl); color: var(--navy); font-weight: 700; }
+.case .ab .vb { color: var(--muted); font-weight: 600; }
+.case .ab .n { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.bloc { background: var(--paper); border: 1px solid var(--rule); margin-bottom: 12px; }
+.bloc h2 { margin: 0; padding: 10px 16px; font-size: var(--fs-md); color: var(--navy); border-bottom: 1px solid var(--rule); background: var(--paper-3); }
+.defile { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 12px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; background: var(--paper); }
+thead th abbr { text-decoration: none; border-bottom: 1px dotted var(--muted-2); cursor: help; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.total td { font-weight: 700; color: var(--navy); background: var(--paper-3); }
+
+.trop-petit { background: var(--warn-bg); color: var(--warn); border: 1px solid #f0d58a; padding: 12px 16px; margin-bottom: 12px; font-weight: 600; }
+.trop-petit p { margin: 4px 0 0; font-weight: 400; }
+
+.graphe svg { display: block; width: 100%; height: 240px; }
+.graphe .leg { display: flex; gap: 16px; padding: 0 16px 12px; color: var(--muted); font-size: var(--fs-sm); flex-wrap: wrap; }
+
+/* Fenêtre Affichage */
+dialog { border: 1px solid var(--rule-strong); padding: 0; width: min(560px, calc(100vw - 32px)); box-shadow: 0 12px 32px rgb(14 17 38 / 20%); }
+dialog::backdrop { background: rgb(14 17 38 / 35%); }
+dialog header { padding: 12px 16px; border-bottom: 1px solid var(--rule); background: var(--paper-3); }
+dialog header h2 { margin: 0; font-size: var(--fs-md); color: var(--navy); }
+dialog header p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-xs); }
+dialog fieldset { border: 0; margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
+dialog legend { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 0; margin-bottom: 6px; }
+.coches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+@media (max-width: 480px) { .coches { grid-template-columns: 1fr; } }
+.coches label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+dialog footer { display: flex; gap: 8px; padding: 12px 16px; align-items: center; }
+
+.notes { margin-top: 32px; background: var(--paper); border: 1px solid var(--rule); padding: 16px 20px; max-width: 900px; }
+.notes h2 { margin: 0 0 8px; font-size: var(--fs-md); color: var(--navy); }
+.notes ol { margin: 0; padding-left: 20px; } .notes li { margin-bottom: 4px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Filtres sur la personne, affichage par compte, comparaison de deux sélections</h1>
+  <p class="consigne">Maquette des points R4, R5 et R9 de la réunion du 23/11 (chiffres fictifs). À essayer : ouvrir la liste Département, passer en « Comparer » et cocher Equipment puis Winpart ; « Plus de filtres » ; le bouton « Affichage » ; et Sexe = Femmes + Âge = 55 ans et plus (sélection trop petite).</p>
+
+  <div class="onglets" role="tablist" aria-label="Pages">
+    <button role="tab" aria-selected="true" data-page="resume">Budget réalisé</button>
+    <button role="tab" aria-selected="false" data-page="charges">Répartition des charges</button>
+    <button role="tab" aria-selected="false" data-page="graphes">Graphiques</button>
+  </div>
+
+  <section class="filtres" role="group" aria-label="Filtres">
+    <div class="ligne-f">
+      <span class="titre-f">Filtres</span>
+      <label class="champ"><span>Période</span><select id="periode"><option>janv. → oct. 2026</option><option>janv. → déc. 2025</option></select></label>
+      <label class="champ"><span>Comparer à</span><select id="cmp-periode"></select></label>
+      <span id="dims-principales" style="display:contents"></span>
+      <span class="espace"></span>
+      <button type="button" class="btn" id="plus" aria-expanded="false" aria-controls="ligne-personne">Plus de filtres <span class="pastille" id="nb-perso" hidden>0</span></button>
+      <button type="button" class="btn" id="ouvrir-affichage">Affichage</button>
+    </div>
+    <div class="ligne-f" id="ligne-personne" hidden>
+      <span class="titre-f">Personne</span>
+      <span id="dims-personne" style="display:contents"></span>
+    </div>
+  </section>
+
+  <p class="rappel" id="rappel"></p>
+
+  <div id="page-resume">
+    <div id="trop-petit-r" class="trop-petit" hidden>Sélection trop petite (moins de 3 personnes)<p>Les montants ne sont pas affichés pour protéger la paie de chacun. Élargissez un filtre (sexe, âge, site…).</p></div>
+    <div class="cases" id="cases"></div>
+    <section class="bloc" id="bloc-mensuel">
+      <h2>Suivi mensuel</h2>
+      <div class="defile"><table id="mensuel"></table></div>
+    </section>
+    <section class="bloc" id="bloc-fb">
+      <h2>Front / back office</h2>
+      <div class="defile"><table id="fb"></table></div>
+    </section>
+  </div>
+
+  <div id="page-charges" hidden>
+    <div id="trop-petit-c" class="trop-petit" hidden>Sélection trop petite (moins de 3 personnes)<p>Les montants ne sont pas affichés pour protéger la paie de chacun.</p></div>
+    <section class="bloc"><h2>Répartition des charges</h2><div class="defile"><table id="charges"></table></div></section>
+  </div>
+
+  <div id="page-graphes" hidden>
+    <div id="trop-petit-g" class="trop-petit" hidden>Sélection trop petite (moins de 3 personnes)<p>Les montants ne sont pas affichés pour protéger la paie de chacun.</p></div>
+    <section class="bloc graphe"><h2>Masse salariale par mois</h2><svg id="courbe" viewBox="0 0 800 240" role="img" aria-label="Courbe de la masse salariale"></svg><div class="leg" id="leg"></div></section>
+  </div>
+
+  <dialog id="affichage" aria-labelledby="aff-titre">
+    <header><h2 id="aff-titre">Affichage de cette page</h2><p>Votre choix, gardé sur tous vos postes. Masquer n'enlève rien aux totaux ni aux exports.</p></header>
+    <div id="aff-contenu"></div>
+    <footer>
+      <button type="button" class="btn lien" id="aff-origine">Rétablir l'affichage d'origine</button>
+      <span class="espace"></span>
+      <button type="button" class="btn" id="aff-annuler">Annuler</button>
+      <button type="button" class="btn prim" id="aff-ok">Enregistrer</button>
+    </footer>
+  </dialog>
+
+  <section class="notes">
+    <h2>Ce que montre la maquette</h2>
+    <ol>
+      <li><b>R4</b> : « Plus de filtres » déplie la ligne « Personne » (Sexe, Âge, Ancienneté, Catégorie). Le bouton compte les filtres actifs ; la ligne reste ouverte tant que l'un d'eux filtre. Valeur « Non renseigné » pour une donnée absente du fichier de paie.</li>
+      <li><b>Confidentialité</b> : sous 3 personnes, montants masqués (sauf comptes qui voient déjà le nominatif).</li>
+      <li><b>R5</b> : « Affichage » choisit, page par page, les indicateurs, sections, rubriques et filtres visibles. Un rappel signale ce qui est masqué.</li>
+      <li><b>R9</b> : en haut de chaque liste de filtre, « Cumuler » (comme aujourd'hui : valeurs additionnées) ou « Comparer » (2 valeurs cochées, A contre B, même période). Aucune place prise dans la barre. Une seule comparaison à la fois : « Comparer » dans une autre liste efface la précédente. « Comparer à » affiche alors « Sélection B ». Écarts en neutre.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+const DIMS = {
+  departement: { lib: 'Département', vals: ['Equipment', 'Winpart'], perso: false },
+  service: { lib: 'Service', vals: ['SAV PL', 'SAV Engins', 'Magasin', 'Commercial', 'Administration'], perso: false },
+  site: { lib: 'Site', vals: ['Douala', 'Yaoundé', 'Garoua', 'Kribi'], perso: false },
+  activite: { lib: 'Activité', vals: ['Front office', 'Back office'], perso: false },
+  contrat: { lib: 'Contrat', vals: ['CDI', 'CDD', 'MAD'], perso: false },
+  sexe: { lib: 'Sexe', vals: ['Hommes', 'Femmes', 'Non renseigné'], perso: true },
+  age: { lib: 'Âge', vals: ['Moins de 25 ans', '25-34 ans', '35-44 ans', '45-54 ans', '55 ans et plus', 'Non renseigné'], perso: true },
+  anciennete: { lib: 'Ancienneté', vals: ["Moins d'1 an", '1-3 ans', '3-5 ans', '5-10 ans', '10 ans et plus', 'Non renseigné'], perso: true },
+  categorie: { lib: 'Catégorie', vals: ['Cadre', 'Agent de maîtrise', 'Employé', 'Ouvrier', 'Non renseigné'], perso: true },
+}
+const KPI = [
+  { id: 'ca', lib: "Chiffre d'affaires", base: 4.82e9, devise: true, signe: true },
+  { id: 'com', lib: 'Commissions', base: 61.4e6, devise: true },
+  { id: 'ms', lib: 'Masse salariale', base: 912e6, devise: true },
+  { id: 'mad', lib: 'Part des MAD', base: 0.184, taux: true },
+  { id: 'marge', lib: 'Marge', base: 1.21e9, devise: true, signe: true },
+  { id: 'primes', lib: 'Primes de productivité', base: 38.7e6, devise: true },
+  { id: 'eff', lib: 'Effectif global', base: 214, entier: true },
+  { id: 'caps', lib: 'CA par salarié', base: 22.5e6, devise: true, signe: true },
+]
+const SECTIONS = [{ id: 'mensuel', lib: 'Suivi mensuel' }, { id: 'fb', lib: 'Front / back office' }]
+const RUBRIQUES = [
+  ['Salaire', 'Brut Réel', 0.62], ['Salaire', 'Salaire brut garanti', 0.48], ['Primes', 'Bonus', 0.05], ['Primes', 'Primes exceptionnelles', 0.03],
+  ['Avantages et frais', 'Frais de mission', 0.04], ['Avantages et frais', 'Logement', 0.06], ['Avantages et frais', 'Carburant', 0.02],
+  ['Charges', 'Charges patronales', 0.19],
+]
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.']
+
+// cmpDim : filtre en mode « Comparer » (un seul) ; cmp / cmpA / cmpB sont recalculés dans tout().
+const etat = { page: 'resume', cmp: 'periode', cmpDim: null, cmpA: '', cmpB: '',
+  filtres: Object.fromEntries(Object.keys(DIMS).map((d) => [d, []])),
+  affichage: { kpi: KPI.map((k) => k.id), sections: SECTIONS.map((s) => s.id), rubriques: RUBRIQUES.map((r) => r[1]), perso: ['sexe', 'age', 'anciennete', 'categorie'] } }
+const ORIGINE = JSON.parse(JSON.stringify(etat.affichage))
+
+// Part fictive d'une sélection dans l'ensemble (stable pour une même sélection).
+function hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 9973; return h }
+function part(f) {
+  let p = 1
+  for (const [d, v] of Object.entries(f)) if (v.length) { const n = DIMS[d].vals.length; p *= v.reduce((s, x) => s + (0.6 + (hash(d + x) % 80) / 100) / n, 0) }
+  return Math.min(1, p)
+}
+function effectif(f) { return Math.round(214 * part(f)) }
+function tropPetit(f) {
+  if (f.sexe.join() === 'Femmes' && f.age.join() === '55 ans et plus') return true
+  return effectif(f) < 3
+}
+
+const fmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
+function compact(v) {
+  if (Math.abs(v) >= 1e9) return fmt.format(v / 1e9) + ' Md'
+  if (Math.abs(v) >= 1e6) return fmt.format(v / 1e6) + ' M'
+  return new Intl.NumberFormat('fr-FR').format(Math.round(v))
+}
+function valeur(k, f, decal = 1) {
+  if (k.taux) return Math.min(0.9, k.base * (0.7 + (hash(JSON.stringify(f) + k.id) % 60) / 100))
+  if (k.entier) return effectif(f)
+  return k.base * part(f) * decal * (0.92 + (hash(JSON.stringify(f) + k.id) % 16) / 100)
+}
+function montrer(k, v) { return k.taux ? fmt.format(v * 100) + ' %' : k.entier ? String(v) : compact(v) }
+function ecart(k, a, b) {
+  if (!b) return ''
+  const pct = (a - b) / Math.abs(b) * 100
+  return (pct >= 0 ? '+' : '') + fmt.format(pct) + ' %'
+}
+
+function filtresA() { const f = { ...etat.filtres }; if (etat.cmp === 'selection') f[etat.cmpDim] = [etat.cmpA]; return f }
+function filtresB() { const f = { ...etat.filtres }; f[etat.cmpDim] = [etat.cmpB]; return f }
+
+function optionsDe(sel, vals, tous, choisi) {
+  sel.innerHTML = (tous ? `<option value="">${tous}</option>` : '') + vals.map((v) => `<option${v === choisi ? ' selected' : ''}>${v}</option>`).join('')
+}
+
+let ouvert = null // liste dépliée
+function texteBouton(d) {
+  const v = etat.filtres[d]
+  if (etat.cmpDim === d) return v.length === 2 ? `⇄ ${v[0]} / ${v[1]}` : '⇄ Cochez 2 valeurs'
+  if (!v.length) return ['activite', 'anciennete'].includes(d) ? 'Toutes' : 'Tous'
+  return v.length === 1 ? v[0] : `${v.length} cumulés`
+}
+function liste(d) {
+  const def = DIMS[d], v = etat.filtres[d], cmp = etat.cmpDim === d, autre = etat.cmpDim && !cmp
+  const pop = ouvert !== d ? '' : `<div class="mc-pop" role="dialog" aria-label="${def.lib}">
+    <div class="bascule mode" role="group" aria-label="Mode du filtre">
+      <button type="button" data-mode="cumul" aria-pressed="${!cmp}">Cumuler</button>
+      <button type="button" data-mode="comparer" aria-pressed="${cmp}">Comparer</button>
+    </div>
+    <p class="mc-aide">${cmp ? 'Cochez 2 valeurs : A et B côte à côte, même période.' : autre ? `Une seule comparaison à la fois : « Comparer » ici efface la comparaison ${DIMS[etat.cmpDim].lib}.` : 'Les valeurs cochées sont additionnées.'}</p>
+    <div class="mc-liste">${def.vals.map((x) => {
+      const i = v.indexOf(x), plein = cmp && v.length >= 2 && i < 0
+      return `<label class="${plein ? 'off' : ''}"><input type="checkbox" value="${x}"${i >= 0 ? ' checked' : ''}${plein ? ' disabled' : ''}>${x}${cmp && i >= 0 ? `<b class="ab-${i ? 'b' : 'a'}">${i ? 'B' : 'A'}</b>` : ''}</label>`
+    }).join('')}</div>
+    <div class="mc-pied"><button type="button" class="btn lien" data-effacer>Effacer</button></div>
+  </div>`
+  return `<div class="champ mc-wrap" data-dim="${d}"><span>${def.lib}</span>
+    <button type="button" class="mc${v.length ? ' actif' : ''}${cmp ? ' cmp' : ''}" aria-expanded="${ouvert === d}"><span class="mc-t">${texteBouton(d)}</span><span aria-hidden="true">▾</span></button>${pop}</div>`
+}
+function rendreFiltres() {
+  for (const zone of ['dims-principales', 'dims-personne']) {
+    const perso = zone === 'dims-personne'
+    document.getElementById(zone).innerHTML = Object.keys(DIMS)
+      .filter((d) => DIMS[d].perso === perso && (!perso || etat.affichage.perso.includes(d))).map(liste).join('')
+  }
+  document.querySelectorAll('.mc-wrap').forEach((w) => {
+    const d = w.dataset.dim
+    w.querySelector('.mc').onclick = () => { ouvert = ouvert === d ? null : d; tout() }
+    w.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => {
+      if (b.dataset.mode === 'comparer') { if (etat.cmpDim && etat.cmpDim !== d) etat.filtres[etat.cmpDim] = []; etat.cmpDim = d; etat.filtres[d] = etat.filtres[d].slice(0, 2) }
+      else if (etat.cmpDim === d) etat.cmpDim = null
+      tout()
+    } })
+    w.querySelectorAll('input').forEach((i) => { i.onchange = () => {
+      const v = etat.filtres[d]; etat.filtres[d] = i.checked ? [...v, i.value] : v.filter((x) => x !== i.value); tout()
+    } })
+    const eff = w.querySelector('[data-effacer]')
+    if (eff) eff.onclick = () => { etat.filtres[d] = []; if (etat.cmpDim === d) etat.cmpDim = null; tout() }
+  })
+  const nb = Object.entries(etat.filtres).filter(([d, v]) => v.length && DIMS[d].perso).length
+  const pas = document.getElementById('nb-perso'); pas.hidden = !nb; pas.textContent = nb
+  const plus = document.getElementById('plus'), ligne = document.getElementById('ligne-personne')
+  if (nb) { ligne.hidden = false; plus.setAttribute('aria-expanded', 'true') }
+  const cp = document.getElementById('cmp-periode'), sel = etat.cmp === 'selection'
+  cp.disabled = sel
+  cp.innerHTML = sel ? `<option>Sélection B : ${etat.cmpB}</option>` : '<option>Même période 2025</option>'
+}
+
+function libSel(f) {
+  const parts = Object.entries(f).filter(([d, v]) => v.length && d !== etat.cmpDim).map(([, v]) => v.join(' + '))
+  return parts.length ? parts.join(' · ') : 'Tout le périmètre'
+}
+
+function rendreRappel() {
+  const r = document.getElementById('rappel')
+  const per = document.getElementById('periode').value
+  const masques = (KPI.length - etat.affichage.kpi.length) + (SECTIONS.length - etat.affichage.sections.length)
+  const mRub = RUBRIQUES.length - etat.affichage.rubriques.length
+  const nbM = etat.page === 'resume' ? masques : etat.page === 'charges' ? mRub : 0
+  const txtM = nbM ? `<span class="masques">${nbM} élément${nbM > 1 ? 's' : ''} masqué${nbM > 1 ? 's' : ''} · <button class="btn lien" data-ouvrir>Affichage</button></span>` : ''
+  if (etat.cmp === 'selection') {
+    r.innerHTML = `<span><i class="pastille-a"></i><strong>${etat.cmpA}</strong> contre <i class="pastille-b"></i><strong>${etat.cmpB}</strong>, ${per}</span><span>${libSel(etat.filtres)}</span>${txtM}`
+  } else {
+    const att = etat.cmpDim ? `<span class="masques">Comparaison ${DIMS[etat.cmpDim].lib} : cochez 2 valeurs</span>` : ''
+    r.innerHTML = `<span><strong>${per}</strong> contre <strong>même période 2025</strong></span><span>${libSel(etat.filtres)}</span>${att}${txtM}`
+  }
+  r.querySelector('[data-ouvrir]')?.addEventListener('click', ouvrirAffichage)
+}
+
+function rendreResume() {
+  const A = filtresA(), B = etat.cmp === 'selection' ? filtresB() : null
+  const petit = tropPetit(A) || (B && tropPetit(B))
+  document.getElementById('trop-petit-r').hidden = !petit
+  const cases = document.getElementById('cases')
+  cases.hidden = petit
+  document.getElementById('bloc-mensuel').hidden = petit || !etat.affichage.sections.includes('mensuel')
+  document.getElementById('bloc-fb').hidden = petit || !etat.affichage.sections.includes('fb')
+  if (petit) return
+  cases.innerHTML = KPI.filter((k) => etat.affichage.kpi.includes(k.id)).map((k) => {
+    const a = valeur(k, A)
+    if (B) {
+      const b = valeur(k, B)
+      return `<div class="case"><span class="micro">${k.lib}</span>
+        <div class="ab"><span class="n"><i class="pastille-a"></i>${etat.cmpA}</span><span class="v va">${montrer(k, a)}</span>
+        <span class="n"><i class="pastille-b"></i>${etat.cmpB}</span><span class="v vb">${montrer(k, b)}</span></div>
+        <span class="var neutre">Écart A / B : ${k.taux ? fmt.format((a - b) * 100) + ' pt' : ecart(k, a, b)}</span></div>`
+    }
+    const p = valeur(k, A, 0.91)
+    const e = (a - p) / p
+    const cls = k.signe ? (e >= 0 ? 'hausse' : 'baisse') : 'neutre'
+    return `<div class="case"><span class="micro">${k.lib}</span><strong>${montrer(k, a)}</strong>
+      <span class="lib2">par rapport à 2025</span><span class="var ${cls}">${k.taux ? '' : ecart(k, a, p)}</span></div>`
+  }).join('') || '<div class="case"><span class="micro">Aucun indicateur affiché</span><span class="lib2">Choisissez-en dans « Affichage ».</span></div>'
+
+  const k = KPI[2]
+  const lA = B ? etat.cmpA : 'Période', lB = B ? etat.cmpB : 'Comparaison'
+  let tot = [0, 0]
+  const lignes = MOIS.map((m, i) => {
+    const a = valeur(k, A) / 10 * (0.95 + (i % 3) * 0.03), b = (B ? valeur(k, B) : valeur(k, A, 0.91)) / 10 * (0.96 + (i % 4) * 0.02)
+    tot[0] += a; tot[1] += b
+    return `<tr><td>${m} 2026</td><td>${compact(a)}</td><td>${compact(b)}</td><td>${ecart(k, a, b)}</td></tr>`
+  }).join('')
+  document.getElementById('mensuel').innerHTML = `<thead><tr><th>Mois</th><th>Masse salariale · ${lA}</th><th>Masse salariale · ${lB}</th><th>Écart</th></tr></thead>
+    <tbody>${lignes}<tr class="total"><td>Total</td><td>${compact(tot[0])}</td><td>${compact(tot[1])}</td><td>${ecart(k, tot[0], tot[1])}</td></tr></tbody>`
+  const fb = ['Front office', 'Back office'].map((x, i) => {
+    const ea = Math.round(effectif(A) * (i ? 0.42 : 0.58)), eb = B ? Math.round(effectif(B) * (i ? 0.37 : 0.63)) : Math.round(effectif(A) * (i ? 0.44 : 0.56))
+    return `<tr><td>${x}</td><td>${ea}</td><td>${eb}</td></tr>`
+  }).join('')
+  document.getElementById('fb').innerHTML = `<thead><tr><th></th><th>Effectif · ${lA}</th><th>Effectif · ${lB}</th></tr></thead><tbody>${fb}</tbody>`
+}
+
+function rendreCharges() {
+  const A = filtresA(), B = etat.cmp === 'selection' ? filtresB() : null
+  const petit = tropPetit(A) || (B && tropPetit(B))
+  document.getElementById('trop-petit-c').hidden = !petit
+  const t = document.getElementById('charges'); t.hidden = petit
+  if (petit) return
+  const lA = B ? etat.cmpA : 'période', lB = B ? etat.cmpB : 'comparaison'
+  const ms = KPI[2]
+  const rows = RUBRIQUES.filter((r) => etat.affichage.rubriques.includes(r[1])).map(([fam, lib, q]) => {
+    const a = valeur(ms, A) * q, b = (B ? valeur(ms, B) : valeur(ms, A, 0.91)) * q * (0.95 + (hash(lib) % 10) / 100)
+    return `<tr><td>${lib} <span style="color:var(--muted);font-size:var(--fs-xs)">${fam}</span></td><td>${compact(a)}</td><td>${compact(b)}</td><td class="neutre">${ecart(ms, a, b)}</td></tr>`
+  }).join('')
+  t.innerHTML = `<thead><tr><th>Rubrique</th><th><abbr title="${B ? 'Sélection A : ' + etat.cmpA : 'Période de travail : ' + document.getElementById('periode').value}">Montant · ${lA}</abbr></th><th><abbr title="${B ? 'Sélection B : ' + etat.cmpB : 'Même période un an plus tôt'}">Montant · ${lB}</abbr></th><th>Écart</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Aucune rubrique affichée : choisissez-en dans « Affichage ».</td></tr>'}</tbody>`
+}
+
+function rendreGraphes() {
+  const A = filtresA(), B = etat.cmp === 'selection' ? filtresB() : null
+  const petit = tropPetit(A) || (B && tropPetit(B))
+  document.getElementById('trop-petit-g').hidden = !petit
+  const svg = document.getElementById('courbe'); svg.parentElement.hidden = petit
+  if (petit) return
+  const k = KPI[2]
+  const sa = MOIS.map((_, i) => valeur(k, A) / 10 * (0.93 + Math.sin(i) * 0.04 + i * 0.006))
+  const sb = MOIS.map((_, i) => (B ? valeur(k, B) : valeur(k, A, 0.91)) / 10 * (0.95 + Math.cos(i) * 0.03 + i * 0.004))
+  const max = Math.max(...sa, ...sb) * 1.1, x = (i) => 50 + i * 80, y = (v) => 210 - v / max * 190
+  const ligne = (s) => s.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join('')
+  svg.innerHTML = `<line x1="40" x2="790" y1="210" y2="210" stroke="var(--rule-strong)"/>
+    ${MOIS.map((m, i) => `<text x="${x(i)}" y="230" text-anchor="middle" font-size="12" fill="var(--muted)">${m}</text>`).join('')}
+    <path d="${ligne(sb)}" fill="none" stroke="var(--muted-2)" stroke-width="2" stroke-dasharray="6 4"/>
+    <path d="${ligne(sa)}" fill="none" stroke="var(--navy)" stroke-width="2.5"/>
+    ${sa.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="var(--navy)"><title>${MOIS[i]} : ${compact(v)}</title></circle>`).join('')}`
+  document.getElementById('leg').innerHTML = B
+    ? `<span><i class="pastille-a"></i>${etat.cmpA}</span><span><i class="pastille-b"></i>${etat.cmpB}</span>`
+    : `<span><i class="pastille-a"></i>2026</span><span><i class="pastille-b"></i>2025</span>`
+}
+
+function tout() {
+  const v = etat.cmpDim ? etat.filtres[etat.cmpDim] : []
+  etat.cmp = v.length === 2 ? 'selection' : 'periode'; etat.cmpA = v[0]; etat.cmpB = v[1]
+  rendreFiltres(); rendreRappel()
+  for (const p of ['resume', 'charges', 'graphes']) document.getElementById('page-' + p).hidden = etat.page !== p
+  if (etat.page === 'resume') rendreResume()
+  if (etat.page === 'charges') rendreCharges()
+  if (etat.page === 'graphes') rendreGraphes()
+}
+
+// Fenêtre Affichage : copie du réglage, appliquée par « Enregistrer ».
+let brouillon = null
+function coches(nom, items, choisis) {
+  return `<div class="coches">${items.map(([id, lib]) => `<label><input type="checkbox" data-groupe="${nom}" value="${id}"${choisis.includes(id) ? ' checked' : ''}>${lib}</label>`).join('')}</div>`
+}
+function rendreAffichage() {
+  const c = document.getElementById('aff-contenu')
+  const perso = Object.entries(DIMS).filter(([, d]) => d.perso).map(([id, d]) => [id, d.lib])
+  let html = ''
+  if (etat.page === 'resume') {
+    html += `<fieldset><legend>Indicateurs</legend>${coches('kpi', KPI.map((k) => [k.id, k.lib]), brouillon.kpi)}</fieldset>`
+    html += `<fieldset><legend>Sections</legend>${coches('sections', SECTIONS.map((s) => [s.id, s.lib]), brouillon.sections)}</fieldset>`
+  } else if (etat.page === 'charges') {
+    html += `<fieldset><legend>Rubriques</legend>${coches('rubriques', RUBRIQUES.map((r) => [r[1], r[1]]), brouillon.rubriques)}</fieldset>`
+  }
+  html += `<fieldset><legend>Filtres « Personne »</legend>${coches('perso', perso, brouillon.perso)}</fieldset>`
+  c.innerHTML = html
+  c.querySelectorAll('input').forEach((i) => i.addEventListener('change', () => {
+    const g = i.dataset.groupe
+    brouillon[g] = i.checked ? [...brouillon[g], i.value] : brouillon[g].filter((v) => v !== i.value)
+  }))
+}
+function ouvrirAffichage() {
+  brouillon = JSON.parse(JSON.stringify(etat.affichage))
+  rendreAffichage(); document.getElementById('affichage').showModal()
+}
+document.getElementById('ouvrir-affichage').addEventListener('click', ouvrirAffichage)
+document.getElementById('aff-annuler').addEventListener('click', () => document.getElementById('affichage').close())
+document.getElementById('aff-origine').addEventListener('click', () => { brouillon = JSON.parse(JSON.stringify(ORIGINE)); rendreAffichage() })
+document.getElementById('aff-ok').addEventListener('click', () => {
+  etat.affichage = brouillon
+  for (const d of Object.keys(DIMS)) if (DIMS[d].perso && !brouillon.perso.includes(d)) { etat.filtres[d] = []; if (etat.cmpDim === d) etat.cmpDim = null }
+  document.getElementById('affichage').close(); tout()
+})
+
+document.querySelectorAll('[role=tab]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[role=tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)))
+  etat.page = b.dataset.page; tout()
+}))
+document.addEventListener('click', (e) => { if (ouvert && !e.target.closest('.mc-wrap')) { ouvert = null; tout() } })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ouvert) { ouvert = null; tout() } })
+document.getElementById('plus').addEventListener('click', (e) => {
+  const ligne = document.getElementById('ligne-personne')
+  const nb = Object.entries(etat.filtres).filter(([d, v]) => v.length && DIMS[d].perso).length
+  if (!ligne.hidden && nb) return // reste ouverte tant qu'un filtre « Personne » est actif
+  ligne.hidden = !ligne.hidden; e.currentTarget.setAttribute('aria-expanded', String(!ligne.hidden))
+})
+document.getElementById('periode').addEventListener('change', tout)
+tout()
+</script>
+</body>
+</html>

@@ -9,7 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.imports.lecture import MAX_OCTETS, Feuille, FichierIllisible, norm
-from app.imports.regles import MOIS, nombre, texte
+from app.imports.regles import (
+    CIVILITE_COLONNE,
+    EMBAUCHE_COLONNE,
+    MOIS,
+    NAISSANCE_COLONNE,
+    nombre,
+    texte,
+)
 from app.models.referentiel import CorrespondancePaie, Rubrique
 
 RE_NOM_FICHIER = re.compile(r"brutfinal(\d{2})(\d{2})(?!\d)", re.IGNORECASE)
@@ -18,6 +25,10 @@ RE_NOM_FICHIER = re.compile(r"brutfinal(\d{2})(\d{2})(?!\d)", re.IGNORECASE)
 SOURCES = {"matricule": "Matricule", "nom": "Nom", "prenom": "Prénom", "emploi occupe": "Emploi occupé",
            "nature du contrat": "Nature du contrat", "intitule etablissement": "Intitulé établissement",
            "intitule service": "Intitulé service"}
+# Colonnes facultatives du profil : en-tête de paie normalisé -> colonne de l'application. Reportées dans la
+# feuille seulement si le CSV les contient (sinon les valeurs déjà connues ne sont pas touchées).
+PROFIL = {"civilite": CIVILITE_COLONNE, "date de naissance": NAISSANCE_COLONNE,
+          "date d'embauche": EMBAUCHE_COLONNE, "date d’embauche": EMBAUCHE_COLONNE}
 # Colonne facultative : département de la ligne, retenu pour rattacher un service créé par l'import.
 DEPARTEMENT = "intitule departement"
 # En-têtes de la feuille ramenée aux colonnes de l'application (avant les rubriques).
@@ -102,6 +113,11 @@ def lire_csv(contenu: bytes, rubriques: list[str], liens: dict[str, str], annee:
             vu = True
         return total if vu else None
 
+    # Une colonne du profil par colonne de l'application (la première rencontrée).
+    profil: dict[str, int] = {}
+    for cle, canon in PROFIL.items():
+        if cle in position:
+            profil.setdefault(canon, position[cle])
     sortie = []
     departements: dict[str, str] = {}
     for num, row in lignes:
@@ -113,5 +129,6 @@ def lire_csv(contenu: bytes, rubriques: list[str], liens: dict[str, str], annee:
         sortie.append((num, (
             annee, MOIS[mois - 1], v["matricule"] or None, noms or None, v["emploi occupe"] or None,
             v["nature du contrat"] or None, None, v["intitule etablissement"] or None,
-            v["intitule service"] or None, *(montant(row, par_rubrique[r]) for r in rubriques))))
-    return Feuille(1, [*ENTETES, *rubriques], sortie, None, {}, departements)
+            v["intitule service"] or None, *(montant(row, par_rubrique[r]) for r in rubriques),
+            *(_cellule(row, j) or None for j in profil.values()))))
+    return Feuille(1, [*ENTETES, *rubriques, *profil], sortie, None, {}, departements)

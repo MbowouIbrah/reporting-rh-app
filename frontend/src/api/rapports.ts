@@ -2,6 +2,10 @@ import type { Calendrier } from '../lib/exercice'
 import { api, telecharger } from './client'
 import type { Annuel, AxeCharge, Charges, ChargesPersonne, Filtres, Individuel, IndividuelTous, Me, Mensuel, Periode, Salarie } from './types'
 
+/** Filtres où l'on peut comparer deux valeurs (R9). */
+export const DIMS_COMPAREES = ['departement', 'service', 'site', 'type_site', 'activite', 'type_contrat', 'poste'] as const
+export type DimComparee = (typeof DIMS_COMPAREES)[number]
+
 export interface FiltresPage {
   annee: number
   mois: number
@@ -13,6 +17,10 @@ export interface FiltresPage {
   poste?: string
   activite?: string
   type_contrat?: string
+  /** Profil des salariés (« A|B », « nr » : non renseigné) : H/F, tranche d'âge, tranche d'ancienneté. */
+  sexe?: string
+  age?: string
+  anciennete?: string
   /** Employé (réservé à nominatif:read). */
   matricule?: string
   /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */
@@ -23,6 +31,9 @@ export interface FiltresPage {
   au?: string
   cmp_du?: string
   cmp_au?: string
+  /** R9 : comparaison de deux sélections. La dimension `cmp_dim` vaut A dans les filtres, `cmp_val` est B. */
+  cmp_dim?: DimComparee
+  cmp_val?: string
   /** Pages annuelles : `fiscal` quand la période est un exercice d'avril à mars ; absent = civil. */
   calendrier?: Calendrier
 }

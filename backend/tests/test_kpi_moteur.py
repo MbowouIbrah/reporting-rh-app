@@ -492,6 +492,24 @@ def test_front_back_office_masse_ca_marge_et_contrats():
     assert vide["ms_front_back"] is None and vide["ca_par_front"] is None
 
 
+def test_parts_de_la_periode_comparee():
+    """34-f : la carte de détail montre les parts des deux côtés (front / back, contrats)."""
+    n = {1: pd(L(1, Brut_Réel=600), L(2, act="Back Office", ctr="CDD", Brut_Réel=400))}
+    n1 = {1: pd(L(1, Brut_Réel=300), L(2, act="Back Office", ctr="CDD", Brut_Réel=100))}
+    r = annuel(n, n1, 1, REFS, Params())
+    ms = r["ms_front_back"]
+    assert (ms["front1"], ms["back1"]) == (300, 100)
+    assert ms["front_pct1"] == D(300) / D(400) and ms["back_pct1"] == D(100) / D(400)
+    assert r["ms_contrat"]["CDD"]["part1"] == D(100) / D(400)
+    assert r["front_back1"]["front"] == 1 and r["front_back1"]["back"] == 1
+    assert ms["front_var_pct"] == D(1) and ms["back_var_pct"] == D(3)
+    assert r["front_back_var"] == {"front": 0, "back": 0}
+    sans = annuel(n, {}, 1, REFS, Params())
+    assert sans["ms_front_back"]["front1"] is None and sans["front_back1"] is None
+    assert sans["ms_contrat"]["CDD"]["part1"] is None
+    assert sans["front_back_var"] is None and sans["ms_front_back"]["front_var_pct"] is None
+
+
 def test_parts_d_effectif_par_service_et_par_site():
     """Retours N2 (4, 6) : % de chaque activité dans son service / site, % du service / site
     dans l'effectif global ; les sites sont ventilés par activité comme les services."""

@@ -1,5 +1,6 @@
 """Lecture des données (toujours filtrées par périmètre) vers les structures du moteur."""
 
+import calendar
 from collections import defaultdict
 from collections.abc import Collection
 from datetime import date
@@ -12,6 +13,8 @@ from app.kpi import niveaux as nv
 from app.kpi.moteur import (
     CA_INDIVIDUEL,
     MARGE_INDIVIDUELLE,
+    TRANCHES_AGE,
+    TRANCHES_ANCIENNETE,
     Budgets,
     Ligne,
     Params,
@@ -20,6 +23,7 @@ from app.kpi.moteur import (
     Saisie,
     exclusions_ligne,
     total_ligne,
+    tranche,
 )
 from app.models.donnees import Montant, Periode, Salarie, SituationMensuelle
 from app.models.pilotage import Budget, Parametre
@@ -86,12 +90,13 @@ def charger_params(db: Session, annee: int, mois: int) -> Params:
 def charger_budgets(db: Session, scope: Scope, annee: int, mois: int,
                     service: Choix, site: Choix, *, type_site: Choix = None,
                     poste: Choix = None, salarie_id: int | None = None,
-                    activite: Choix = None, type_contrat: Choix = None) -> Budgets:
+                    activite: Choix = None, type_contrat: Choix = None, sexe: Choix = None,
+                    age: Choix = None, anciennete: Choix = None) -> Budgets:
     """Budgets de la période visibles pour ce périmètre et ces filtres : un budget n'est montré
     que si le réel correspondant est complet (pas de budget par rubrique hors périmètre global).
     Aucun budget pour un poste, une activité ou une personne ; un type de site ne garde que les
-    budgets site."""
-    if poste or activite or type_contrat or salarie_id is not None:
+    budgets site. Pas de budget non plus par sexe, âge ou ancienneté."""
+    if poste or activite or type_contrat or sexe or age or anciennete or salarie_id is not None:
         return Budgets()
     pid = db.scalar(select(Periode.id).where(Periode.annee == annee, Periode.mois == mois))
     if pid is None:
@@ -141,7 +146,9 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
     q = apply_scope(
         select(SituationMensuelle.id, SituationMensuelle.salarie_id, Service.libelle,
                Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle,
-               SituationMensuelle.reference_activite, Service.productif)
+               SituationMensuelle.reference_activite, Service.productif,
+               Salarie.sexe, Salarie.date_naissance, Salarie.date_embauche)
+        .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
         .join(Service, Service.id == SituationMensuelle.service_id)
         .join(Site, Site.id == SituationMensuelle.site_id)
         .join(Activite, Activite.id == SituationMensuelle.activite_id)
@@ -161,11 +168,13 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
             # jamais une rubrique d'activité
             (montants if nature == "paie" else indicateurs)[sid][rub] = Decimal(str(val))
     lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste,
-                         indicateurs.get(sid, {}), ref, bool(prod))
-                   for sid, sal, srv, site, act, ctr, tsite, poste, ref, prod in rows)
+                         indicateurs.get(sid, {}), ref, bool(prod), sexe, naiss, emb)
+                   for (sid, sal, srv, site, act, ctr, tsite, poste, ref, prod,
+                        sexe, naiss, emb) in rows)
     saisies, vides = _saisies_visibles(db, scope, periode.id)
+    fin = date(annee, mois, calendar.monthrange(annee, mois)[1])
     return PeriodeData(lignes, exclues_a_date(db, annee, mois), ca=_total(saisies, "ca"),
-                       marge=_total(saisies, "marge"), saisies=saisies, vides=vides)
+                       marge=_total(saisies, "marge"), saisies=saisies, vides=vides, fin=fin)
 
 
 def _saisies_visibles(db: Session, scope: Scope, pid: int) -> tuple[tuple[Saisie, ...],
@@ -304,23 +313,34 @@ def options_tableau(db: Session, scope: Scope, choix: dict | None = None) -> dic
 def filtrer(pd: PeriodeData | None, service: Choix, site: Choix, *,
             type_site: Choix = None, poste: Choix = None,
             salarie_id: int | None = None, activite: Choix = None,
-            type_contrat: Choix = None) -> PeriodeData | None:
+            type_contrat: Choix = None, sexe: Choix = None, age: Choix = None,
+            anciennete: Choix = None) -> PeriodeData | None:
     """Filtre d'affichage choisi par l'utilisateur, appliqué après le périmètre (jamais en deçà)."""
     if pd is None:
         return None
     service, site, type_site = ens(service), ens(site), ens(type_site)
     poste, activite, type_contrat = ens(poste), ens(activite), ens(type_contrat)
+    sexe, age, anciennete = ens(sexe), ens(age), ens(anciennete)
+
+    def profil_garde(L: Ligne) -> bool:
+        # âge et ancienneté au dernier jour du mois chargé ; « nr » : valeur non renseignée
+        return ((not sexe or (L.sexe if L.sexe in ("H", "F") else "nr") in sexe)
+                and (not age or tranche(L.date_naissance, pd.fin, TRANCHES_AGE) in age)
+                and (not anciennete
+                     or tranche(L.date_embauche, pd.fin, TRANCHES_ANCIENNETE) in anciennete))
     lignes = tuple(L for L in pd.lignes
                    if (not service or L.service in service) and (not site or L.site in site)
                    and (not type_site or L.type_site in type_site)
                    and (not poste or L.poste in poste)
                    and (not activite or L.activite in activite)
                    and (not type_contrat or L.contrat in type_contrat)
-                   and (salarie_id is None or L.salarie_id == salarie_id))
+                   and (salarie_id is None or L.salarie_id == salarie_id)
+                   and profil_garde(L))
     # Une saisie (CA, marge, OR, devis, factures) n'est gardée que si son niveau permet de
     # répondre au filtre : un filtre site ou type de site veut un site renseigné, un filtre service
-    # un service renseigné. Poste, activité, contrat et personne n'ont aucune saisie.
-    sans_saisie = poste or activite or type_contrat or salarie_id is not None
+    # un service renseigné. Poste, activité, contrat, profil et personne n'ont aucune saisie.
+    sans_saisie = (poste or activite or type_contrat or sexe or age or anciennete
+                   or salarie_id is not None)
 
     def gardee(s: Saisie) -> bool:
         return not sans_saisie and (
@@ -330,7 +350,7 @@ def filtrer(pd: PeriodeData | None, service: Choix, site: Choix, *,
 
     saisies = tuple(s for s in pd.saisies if gardee(s))
     return PeriodeData(lignes, pd.exclues, ca=_total(saisies, "ca"), marge=_total(saisies, "marge"),
-                       saisies=saisies, vides=tuple(s for s in pd.vides if gardee(s)))
+                       saisies=saisies, vides=tuple(s for s in pd.vides if gardee(s)), fin=pd.fin)
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:

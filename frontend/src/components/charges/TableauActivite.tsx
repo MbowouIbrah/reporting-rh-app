@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { EnteteCol } from './VueAxe'
 import type { Charges } from '../../api/types'
 import { NB, bas, coutParVente, ent, fp, mt, num, pcServeur, sa, sensVar, signeEnt } from '../../lib/charges'
 import type { Libelles } from './Cartes'
@@ -75,11 +76,19 @@ export default function TableauActivite({ d, lib, periode }: { d: Charges; lib: 
   return (
     <>
       <h2 className="axe-titre" id="axe-titre" tabIndex={-1}>Activité · {periode}</h2>
+      <p className="periode-titre">Chiffres de <strong>{periode}</strong>, évolution par rapport à <strong>{lib.prec}</strong></p>
       <div className="table-scroll">
         <table className="dense axe-table">
           <thead>
             <tr>
-              {['Indicateur', 'Période', bas(lib.prec), 'Écart', 'Objectif', 'Réalisé'].map((h) => <th key={h} scope="col">{h}</th>)}
+              {[
+                { h: 'Indicateur' },
+                { h: 'Période sélectionnée', sous: periode, aide: `Valeur sur la période sélectionnée : ${periode}` },
+                { h: 'Période comparée', sous: bas(lib.prec), aide: `Valeur sur la période à comparer : ${bas(lib.prec)}` },
+                { h: 'Écart', aide: 'Écart entre la période sélectionnée et la période comparée' },
+                { h: 'Objectif' },
+                { h: 'Réalisé', aide: 'Part de l’objectif atteinte sur la période sélectionnée' },
+              ].map((e) => <EnteteCol key={e.h} e={e} num={false} />)}
             </tr>
           </thead>
           <tbody>{corps}</tbody>

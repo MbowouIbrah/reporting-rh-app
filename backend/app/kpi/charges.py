@@ -29,6 +29,8 @@ AXES: dict[str, str | None] = {"type": None, "site": "site", "service": "service
                                "activite": "activite", "contrat": "contrat"}
 # Axes dont chaque ligne se détaille par activité (Front office / Back office).
 AXES_AVEC_ENFANTS = ("type", "site", "service", "contrat")
+# Détail d'une ligne d'axe : par service pour un site, par activité ailleurs.
+SOUS_AXE: dict[str, str] = {"site": "service"}
 
 # Le budget n'est saisi qu'à partir de janvier 2025 (indice de mois : année * 12 + mois - 1).
 BUD_DEBUT = 2025 * 12
@@ -39,7 +41,8 @@ class Contexte:
     """Ce qui décide de l'affichage du budget : début de la période (indice de mois) et filtres
     actifs. `perimetre` : compte à périmètre restreint ; `perim_service` et `perim_site` : le
     périmètre du compte restreint les services ou les sites ; `departement` : filtre Département
-    choisi dans la barre (distinct du périmètre du compte)."""
+    choisi dans la barre (distinct du périmètre du compte) ; `profil` : filtre Sexe, Âge ou
+    Ancienneté."""
 
     debut: int
     service: bool = False
@@ -50,6 +53,7 @@ class Contexte:
     perimetre: bool = False
     perim_service: bool = False
     perim_site: bool = False
+    profil: bool = False
     departement: bool = False
 
 
@@ -66,6 +70,8 @@ def raison_budget(ctx: Contexte | None, axe: str) -> str | None:
         return "Budget non suivi par nature de contrat."
     if ctx.poste:
         return "Budget non suivi par poste ni par personne."
+    if ctx.profil:
+        return "Budget non suivi par sexe, âge ni ancienneté."
     ac = ctx.activite or ctx.contrat
     if axe == "type" and (ctx.departement or ctx.service or ctx.site or ctx.perimetre or ac):
         dep = "Département, " if ctx.departement else ""
@@ -208,11 +214,12 @@ def _tri(lignes: list[dict]) -> list[dict]:
 
 
 def _enfants(mois_n: list[PeriodeData], mois_n1: list[PeriodeData], valeur: Valeur,
-             garde: Garde, parent: Decimal) -> list[dict]:
-    """Détail d'une ligne par activité, part calculée sur la ligne parente."""
-    acts = _valeurs([*mois_n, *mois_n1], "activite", garde)
+             garde: Garde, parent: Decimal, attr: str = "activite") -> list[dict]:
+    """Détail d'une ligne par `attr` (activité, ou service pour un site), part calculée sur la
+    ligne parente."""
+    vals = _valeurs([*mois_n, *mois_n1], attr, garde)
     return _tri([_ligne(a, mois_n, mois_n1, valeur,
-                        lambda L, a=a: garde(L) and L.activite == a, parent) for a in acts])
+                        lambda L, a=a: garde(L) and getattr(L, attr) == a, parent) for a in vals])
 
 
 def _axe(cle: str, mois_n: list[PeriodeData], mois_n1: list[PeriodeData], rubriques: list[str],
@@ -245,7 +252,8 @@ def _axe(cle: str, mois_n: list[PeriodeData], mois_n1: list[PeriodeData], rubriq
         if cle == "site":
             x["type_site"] = next(L.type_site for pd in tous for L in pd.lignes if garde(L))
         if cle in AXES_AVEC_ENFANTS:
-            x["enfants"] = _enfants(mois_n, comparees, valeur, garde, x["m"])
+            x["enfants"] = _enfants(mois_n, comparees, valeur, garde, x["m"],
+                                    SOUS_AXE.get(cle, "activite"))
         lignes.append(x)
     ordre = {r: i for i, r in enumerate(rubriques)}
     if attr is None:
@@ -315,6 +323,7 @@ def personnes(n: Sequence[PeriodeData | None], n1: Sequence[PeriodeData | None],
     mois_n, mois_n1, _ = _appaires(n, n1)
     primes = None if n1_primes is None else _appaires(n, n1_primes)[1]
     attr = AXES[axe]
+    sous = SOUS_AXE.get(axe, "activite")  # `activite` : sous-ligne (service pour un site)
     if attr is None:
         if valeur not in rubriques_connues(paie, (*mois_n, *mois_n1, *(primes or ()))):
             return None
@@ -329,7 +338,7 @@ def personnes(n: Sequence[PeriodeData | None], n1: Sequence[PeriodeData | None],
             return getattr(L, attr) == valeur
 
     def garde(L: Ligne) -> bool:
-        return base(L) and (activite is None or L.activite == activite)
+        return base(L) and (activite is None or getattr(L, sous) == activite)
 
     a = _par_personne(mois_n, mesure, garde)
     b = _par_personne(mois_n1, mesure, garde)

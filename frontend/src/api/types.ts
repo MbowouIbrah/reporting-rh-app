@@ -330,6 +330,10 @@ export interface Annuel {
   primes_cumul: Cell
   frais_mission_ytd: Dec | null
   logement_ytd: Dec | null
+  /** Suivi mensuel : logement de la période et de la période comparée. */
+  logement_cumul?: Cell
+  /** Taux de marge de la période comparée ; absent sans le droit « marge ». */
+  taux_marge_cmp?: Val
   effectif_moyen: Cell
   /** Dernier mois saisi de la période : base de l'effectif de fin. */
   mois_fin: number | null
@@ -341,16 +345,22 @@ export interface Annuel {
   cmp_au?: string
   effectif_fin: Cell
   front_back?: FrontBack | null
-  effectif_fin_contrat: Record<string, Cell & { part: Val }>
+  /** 34-f : répartition front / back de la période comparée, et son évolution en %. */
+  front_back1?: FrontBack | null
+  front_back_var?: { front: Val; back: Val } | null
+  effectif_fin_contrat: Record<string, Cell & { part: Val; part1?: Val }>
   effectif_moyen_mad: Cell
   part_mad: { m: Val; m1: Val }
   mad_fin: Cell
   mad_deportes_fin: Cell & { part: Val }
-  ms_contrat: Record<string, Cell & { part: Val }>
+  ms_contrat: Record<string, Cell & { part: Val; part1?: Val }>
   ca_avec_marge?: Val
   ca_par_effectif?: Cell
   /** R9 : masse salariale cumulée en front et en back office, et leurs parts. */
-  ms_front_back?: { front: Val; back: Val; front_pct: Val; back_pct: Val } | null
+  ms_front_back?: {
+    front: Val; back: Val; front_pct: Val; back_pct: Val
+    front1?: Val; back1?: Val; front_pct1?: Val; back_pct1?: Val; front_var_pct?: Val; back_var_pct?: Val
+  } | null
   effectif_moyen_front?: Val
   /** R9 (C2) : CA et marge par employé front office ; absents sans le droit « marge ». */
   ca_par_front?: Val

@@ -1,3 +1,4 @@
+import re
 from dataclasses import replace
 from decimal import Decimal
 from typing import Literal
@@ -24,7 +25,7 @@ from app.security.policy import Principal, authorize, is_allowed
 
 router = APIRouter(prefix="/rapports", tags=["rapports"])
 CLES_MARGE = {"ca", "marge", "taux_marge", "marge_ytd", "nb_mois_marge", "nb_mois_ca", "ca_ytd",
-              "taux_marge_ytd", "ca_cumul", "ca_par_effectif", "lignes_ca_marge",
+              "taux_marge_ytd", "taux_marge_cmp", "ca_cumul", "ca_par_effectif", "lignes_ca_marge",
               "ca_individuel", "marge_individuelle", "ca_avec_marge", "ca_par_front",
               "marge_par_front"}
 
@@ -175,10 +176,32 @@ def salaries(
 # R4 : un filtre peut porter plusieurs valeurs, séparées par « | » dans le même paramètre.
 MAX_MULTI = 4000
 TYPES_SITE = r"^(principal|agence|deporte)(\|(principal|agence|deporte))*$"
+
+
+def _valeurs(cles) -> str:
+    """Motif d'un filtre multiple « A|B » dont les valeurs sont fixes (« nr » : non renseigné)."""
+    alt = "|".join(re.escape(c) for c in (*cles, "nr"))
+    return rf"^({alt})(\|({alt}))*$"
+
+
+def filtre_profil(
+    sexe: str | None = Query(None, max_length=20, pattern=_valeurs(("H", "F"))),
+    age: str | None = Query(None, max_length=60,
+                            pattern=_valeurs(c for _, c in moteur.TRANCHES_AGE)),
+    anciennete: str | None = Query(None, max_length=60,
+                                   pattern=_valeurs(c for _, c in moteur.TRANCHES_ANCIENNETE)),
+) -> dict:
+    """Filtres de profil des salariés (sexe, tranche d'âge, tranche d'ancienneté), bruts « A|B »."""
+    return {"sexe": sexe, "age": age, "anciennete": anciennete}
 # Comparaison du rapport annuel : vide = même période d'un autre exercice (ref_annee)
 Comparaison = Literal["", "prec", "aucune"]
+# R9 : filtre dont une seconde valeur (sélection B) est comparée à la sélection A
+DimComparee = Literal["departement", "service", "site", "type_site", "activite", "type_contrat",
+                      "poste"]
 # Période choisie au calendrier : mois « AAAA-MM » de début et de fin, et de la comparaison
 MOIS_AAAA_MM = r"^\d{4}-(0[1-9]|1[0-2])$"
+# Plus longue période acceptée (docs/etude-periode-libre.md) : borne le nombre de mois chargés
+MAX_MOIS = 60
 
 
 def _liste(v: str | None) -> frozenset[str] | None:
@@ -206,10 +229,12 @@ def _salarie_id(db: Session, p: Principal, matricule: str | None) -> int | None:
 
 
 def _params(db, crit: dict, annee: int, mois: int):
-    """Paramètres du mois ; pas de budget employé pour un poste, un type de contrat ou une
-    personne (seulement pour un effectif d'ensemble), en mensuel comme en annuel."""
+    """Paramètres du mois ; pas de budget employé pour un poste, un type de contrat, un profil
+    (sexe, âge, ancienneté) ou une personne (seulement pour un effectif d'ensemble), en mensuel
+    comme en annuel."""
     params = ch.charger_params(db, annee, mois)
-    if crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None:
+    if (crit["poste"] or crit["type_contrat"] or crit["salarie_id"] is not None
+            or crit.get("sexe") or crit.get("age") or crit.get("anciennete")):
         params = replace(params, budget_employe=None)
     return params
 
@@ -295,9 +320,12 @@ def mensuel_export(
 
 def _plage(du, au, cmp_du, cmp_au):
     """Période choisie au calendrier (`du`, `au`, `cmp_du`, `cmp_au` : « AAAA-MM ») ->
-    (début d'exercice, premier mois de l'exercice, indices de mois du début et de la fin, indice du
-    début de la comparaison). Les 12 rangs du moteur démarrent en janvier si la période tient dans
-    une année civile, sinon au mois `du`. Sans comparaison choisie : mêmes mois 12 mois plus tôt."""
+    (début du cadre, premier mois du cadre, indices de mois du début et de la fin, indice du début
+    de la comparaison, nombre de rangs du cadre, années de décalage de la comparaison par défaut).
+    Le cadre du moteur fait 12 rangs, à partir de janvier si la période tient dans une année civile,
+    sinon du mois `du` ; une période de plus de 12 mois est son propre cadre. Sans comparaison
+    choisie : mêmes mois, décalés du nombre d'années entières qui couvre la période (sans
+    chevauchement, janvier contre janvier)."""
     if (du is None) != (au is None):
         raise HTTPException(422, "Le début et la fin de la période vont ensemble")
     if (cmp_du is None) != (cmp_au is None):
@@ -305,28 +333,31 @@ def _plage(du, au, cmp_du, cmp_au):
     a, b = ex.indice(du), ex.indice(au)
     if a > b:
         raise HTTPException(422, "Le début de la période est après sa fin")
-    if b - a + 1 > 12:
-        raise HTTPException(422, "La période ne peut pas dépasser 12 mois")
+    nb = b - a + 1
+    if nb > MAX_MOIS:
+        raise HTTPException(422, f"La période ne peut pas dépasser {MAX_MOIS} mois")
+    ans = -(-nb // 12)
     if cmp_du is None:
-        c = a - 12
+        c = a - 12 * ans
     else:
         c = ex.indice(cmp_du)
         if ex.indice(cmp_au) - c != b - a:
             raise HTTPException(
                 422, "La comparaison doit couvrir le même nombre de mois que la période")
     depart = 1 if a // 12 == b // 12 else a % 12 + 1
-    return a // 12, depart, a, b, c
+    return a // 12, depart, a, b, c, max(12, nb), ans
 
 
 def _criteres(db, p, service, site, type_site, poste, matricule, activite, type_contrat,
-              departement):
+              departement, profil: dict | None = None):
     """Filtres de l'utilisateur (valeurs multiples « A|B ») et périmètre restreint au département :
     (périmètre, service, site, type de site, autres critères de `ch.filtrer`)."""
     service, site, type_site, poste, activite, type_contrat, departement = map(
         _liste, (service, site, type_site, poste, activite, type_contrat, departement))
     scope = restreindre(db, scope_for(db, p), departement)
     crit = {"type_site": type_site, "poste": poste, "salarie_id": _salarie_id(db, p, matricule),
-            "activite": activite, "type_contrat": type_contrat}
+            "activite": activite, "type_contrat": type_contrat,
+            **{k: _liste(v) for k, v in (profil or {}).items()}}
     return scope, service, site, type_site, crit
 
 
@@ -341,15 +372,16 @@ def _charger_mois(db, scope, service, site, crit, mois_reels) -> dict[int, moteu
 
 
 def _mois_comptes(db, p, service, site, type_site, poste, matricule, activite, type_contrat,
-                  departement, du, au, cmp_du, cmp_au):
+                  departement, du, au, cmp_du, cmp_au, profil: dict | None = None):
     """Mois de la période choisie (`du`, `au`), de sa comparaison et, pour un mois seul comparé au
     mois d'avant, du même mois un an plus tôt (comparaison des primes) : un `PeriodeData` ou None
     par mois, dans l'ordre, puis la période servie. Mêmes règles de période que `/annuel` ; 404
     sans aucune donnée."""
     authorize(p, "report:read")
-    _, _, a, b, c = _plage(du, au, cmp_du, cmp_au)
+    _, _, a, b, c, _, _ = _plage(du, au, cmp_du, cmp_au)
     scope, service, site, _, crit = _criteres(
-        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
+        profil)
     nb = b - a + 1
 
     def mois(debut: int) -> list[moteur.PeriodeData | None]:
@@ -372,36 +404,63 @@ def _mois_comptes(db, p, service, site, type_site, poste, matricule, activite, t
 def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=None, poste=None,
                    matricule=None, activite=None, type_contrat=None,
                    calendrier: Calendrier = "civil", departement=None, debut=None, cmp="",
-                   du=None, au=None, cmp_du=None, cmp_au=None) -> dict:
+                   du=None, au=None, cmp_du=None, cmp_au=None,
+                   cmp_dim: DimComparee | None = None, cmp_val: str | None = None,
+                   profil: dict | None = None) -> dict:
     """Cumul de la période, montants en `Decimal` (comme `_calcul_mensuel`). `annee` : début de
     l'exercice ; `mois` : vrai mois de fin du cumul (None : fin de l'exercice) ; `debut` : vrai
     mois de début (None : début de l'exercice). `cmp` : vide = même période de `ref_annee`, `prec`
     = les mêmes nombre de mois juste avant, `aucune`. Le moteur
     reçoit des rangs 1 à 12 (kpi/exercice.py). `du` et `au` (« AAAA-MM »), quand ils sont fournis,
     remplacent `annee`, `mois`, `debut`, `calendrier`, `ref_annee` et `cmp` ; `cmp_du` et `cmp_au`
-    : période comparée (mêmes mois 12 mois plus tôt si absents)."""
+    : période comparée (règle de `_plage` si absents). Une période de plus de 12 mois a autant de
+    rangs que de mois. `cmp_dim` et `cmp_val` (R9) : la comparaison devient la sélection B, mêmes
+    mois et mêmes filtres que A, le filtre `cmp_dim` valant `cmp_val`."""
     authorize(p, "report:read")
+    if (cmp_dim is None) != (cmp_val is None):
+        raise HTTPException(422, "cmp_dim et cmp_val vont ensemble")
+    if cmp_val is not None and (not cmp_val.strip() or "|" in cmp_val):
+        raise HTTPException(422, "La sélection B est une seule valeur")
+    if cmp_dim is not None and du is None:
+        raise HTTPException(422, "La comparaison de deux sélections demande une période (du, au)")
     plage = None
+    nb_rangs, ans = 12, 1
     if du is not None or au is not None:
-        annee, calendrier, a, b, c = plage = _plage(du, au, cmp_du, cmp_au)
+        annee, calendrier, a, b, c, nb_rangs, ans = plage = _plage(du, au, cmp_du, cmp_au)
         mois, debut, ref_annee, cmp = b % 12 + 1, a % 12 + 1, None, ""
     elif annee is None:
         raise HTTPException(422, "L'année ou la période (du, au) est obligatoire")
-    scope, service, site, type_site, crit = _criteres(
-        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+    filtres = {"service": service, "site": site, "type_site": type_site, "poste": poste,
+               "activite": activite, "type_contrat": type_contrat, "departement": departement}
+
+    def criteres(f: dict):
+        return _criteres(db, p, f["service"], f["site"], f["type_site"], f["poste"], matricule,
+                         f["activite"], f["type_contrat"], f["departement"], profil)
+
+    scope, service, site, type_site, crit = criteres(filtres)
 
     def pds(mois_reels) -> dict[int, moteur.PeriodeData]:
         return _charger_mois(db, scope, service, site, crit, mois_reels)
 
-    def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
-        return pds(enumerate(ex.mois_exercice(a, calendrier), 1))
+    def pds_b(mois_reels) -> dict[int, moteur.PeriodeData]:
+        # sélection B : même périmètre (filtre de dépôt), le filtre comparé remplacé
+        sc, sv, st, _, cr = criteres(filtres | {cmp_dim: cmp_val})
+        return _charger_mois(db, sc, sv, st, cr, mois_reels)
 
-    reels = ex.mois_exercice(annee, calendrier)
-    fin = 12 if mois is None else ex.rang(mois, calendrier)
-    d = 1 if debut is None else ex.rang(debut, calendrier)
+    def annee_pds(a: int) -> dict[int, moteur.PeriodeData]:
+        return pds(enumerate(ex.mois_exercice(a, calendrier, nb_rangs), 1))
+
+    reels = ex.mois_exercice(annee, calendrier, nb_rangs)
+    if plage is not None:
+        # rangs dans le cadre (il peut dépasser 12 mois : `ex.rang` ne s'applique plus)
+        cadre = annee * 12 + ex.premier_mois(calendrier) - 1
+        d, fin = plage[2] - cadre + 1, plage[3] - cadre + 1
+    else:
+        fin = 12 if mois is None else ex.rang(mois, calendrier)
+        d = 1 if debut is None else ex.rang(debut, calendrier)
     if d > fin:
         raise HTTPException(422, "Le début de la période est après sa fin")
-    ref = ref_annee or annee - 1
+    ref = ref_annee or annee - ans
     n = annee_pds(annee)
     if not moteur.avec_donnees(n):
         raise HTTPException(404, "Aucune donnée pour cette année")
@@ -414,7 +473,12 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     comparaison = None
     debut_reel = reels[d - 1][0] * 12 + reels[d - 1][1] - 1
     k = None  # indice de mois du début de la période comparée ; None : aucune comparaison
-    if cmp == "aucune":
+    serie_ref = None
+    if cmp_dim is not None:
+        k, ref = debut_reel, annee
+        comparaison = pds_b((d + i, ((k + i) // 12, (k + i) % 12 + 1)) for i in range(fin - d + 1))
+        serie_ref = pds_b(enumerate(reels, 1))
+    elif cmp == "aucune":
         comparaison = {}
     elif plage is not None or cmp == "prec":
         # les mois comparés, rangés dans l'ordre sur les mois de la période : la période choisie
@@ -424,18 +488,31 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     else:
         y, m = ex.mois_exercice(ref, calendrier)[d - 1]
         k = y * 12 + m - 1
-    res = moteur.annuel(n, annee_pds(ref), fin, refs, params_fin, budgets, params_mois, d,
-                        comparaison)
-    res = ex.en_mois_reels(res, annee, ref, calendrier)
+    n1 = annee_pds(ref) if serie_ref is None else serie_ref
+    res = moteur.annuel(n, n1, fin, refs, params_fin, budgets, params_mois, d, comparaison,
+                        nb_rangs)
+    res = ex.en_mois_reels(res, annee, ref, calendrier, nb_rangs)
     # période et comparaison effectives, au format du calendrier (« AAAA-MM »)
     res |= {"du": ex.texte(debut_reel), "au": ex.texte(debut_reel + fin - d),
             "cmp_du": None if k is None else ex.texte(k),
-            "cmp_au": None if k is None else ex.texte(k + fin - d)}
+            "cmp_au": None if k is None else ex.texte(k + fin - d),
+            "cmp_sel": None if cmp_dim is None else {"dim": cmp_dim, "val": cmp_val}}
     return res
 
 
+def _masquer_profil(p: Principal, res: dict) -> dict:
+    """Profil d'un groupe de moins de 3 personnes : réservé à l'accès nominatif (il désignerait
+    quelqu'un). Chaque période (m, m1) est jugée seule, après le calcul."""
+    profil = res.get("profil")
+    if not profil or is_allowed(p, "nominatif:read"):
+        return res
+    return {**res, "profil": {k: ({"effectif": v["effectif"], "masque": True}
+                                  if v and v["effectif"] < moteur.CONFIDENTIALITE_PROFIL else v)
+                              for k, v in profil.items()}}
+
+
 def _annuel(db, p, *args, **kwargs) -> dict:
-    return _sortie(p, _calcul_annuel(db, p, *args, **kwargs))
+    return _sortie(p, _masquer_profil(p, _calcul_annuel(db, p, *args, **kwargs)))
 
 
 @router.get("/annuel")
@@ -458,12 +535,15 @@ def annuel(
     au: str | None = Query(None, pattern=MOIS_AAAA_MM),
     cmp_du: str | None = Query(None, pattern=MOIS_AAAA_MM),
     cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
+    cmp_dim: DimComparee | None = None,
+    cmp_val: str | None = Query(None, max_length=200),
+    profil: dict = Depends(filtre_profil),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     return _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
                    activite, type_contrat, calendrier, departement, debut, cmp,
-                   du, au, cmp_du, cmp_au)
+                   du, au, cmp_du, cmp_au, cmp_dim, cmp_val, profil=profil)
 
 
 @router.get("/annuel/export")
@@ -488,6 +568,7 @@ def annuel_export(
     cmp_au: str | None = Query(None, pattern=MOIS_AAAA_MM),
     graphiques: bool = False,
     graphes: str | None = Query(None, max_length=400, pattern="^[a-z_,]*$"),
+    profil: dict = Depends(filtre_profil),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -495,7 +576,7 @@ def annuel_export(
     (`graphes` : identifiants, séparés par des virgules, des graphes cochés ; absent = tous)."""
     res = _annuel(db, p, annee, mois, service, site, ref_annee, type_site, poste, matricule,
                   activite, type_contrat, calendrier, departement, debut, cmp,
-                  du, au, cmp_du, cmp_au)
+                  du, au, cmp_du, cmp_au, profil=profil)
     choisie = du is not None
     an_fin, mois_fin = (int(res["au"][:4]), int(res["au"][5:])) if choisie else ex.fin_cumul(
         annee, mois, calendrier)
@@ -505,7 +586,7 @@ def annuel_export(
                   "matricule": matricule, "activite": activite,
                   "type_contrat": type_contrat, "calendrier": calendrier,
                   "departement": departement, "debut": debut, "cmp": cmp,
-                  "du": du, "au": au, "cmp_du": cmp_du, "cmp_au": cmp_au})
+                  "du": du, "au": au, "cmp_du": cmp_du, "cmp_au": cmp_au, **profil})
     db.commit()
     if choisie:
         # libellés des deux périodes, nom de fichier à l'image de la période choisie
@@ -539,6 +620,7 @@ def _contexte_charges(db, p, service, site, type_site, crit, debut: int, departe
         debut=debut, service=bool(service), site=bool(site or type_site),
         activite=bool(crit["activite"]), contrat=bool(crit["type_contrat"]),
         poste=bool(crit["poste"] or crit["salarie_id"]), perimetre=not compte.unrestricted,
+        profil=bool(crit.get("sexe") or crit.get("age") or crit.get("anciennete")),
         perim_service=bool(compte.rules.get("service")), perim_site=bool(compte.rules.get("site")),
         departement=bool(_liste(departement)))
 
@@ -588,6 +670,7 @@ def charges(
     activite: str | None = Query(None, max_length=MAX_MULTI),
     type_contrat: str | None = Query(None, max_length=MAX_MULTI),
     departement: str | None = Query(None, max_length=MAX_MULTI),
+    profil: dict = Depends(filtre_profil),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -597,9 +680,10 @@ def charges(
     au mois d'avant compare ses primes au même mois un an plus tôt."""
     n, n1, periode, n1_primes = _mois_comptes(
         db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
-        du, au, cmp_du, cmp_au)
+        du, au, cmp_du, cmp_au, profil)
     scope, svc, st, ts, crit = _criteres(
-        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement)
+        db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
+        profil)
     debut = ex.indice(du)
     ctx = _contexte_charges(db, p, svc, st, ts, crit, debut, departement)
     # budgets de chaque mois de la période qui a des données (rien avant leur saisie)
@@ -638,6 +722,7 @@ def charges_personnes(
     activite: str | None = Query(None, max_length=MAX_MULTI),
     type_contrat: str | None = Query(None, max_length=MAX_MULTI),
     departement: str | None = Query(None, max_length=MAX_MULTI),
+    profil: dict = Depends(filtre_profil),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
@@ -647,7 +732,7 @@ def charges_personnes(
     authorize(p, "nominatif:read")
     n, n1, periode, n1_primes = _mois_comptes(
         db, p, service, site, type_site, poste, matricule, activite, type_contrat, departement,
-        du, au, cmp_du, cmp_au)
+        du, au, cmp_du, cmp_au, profil)
     # rubriques de paie du référentiel (actives ou non) et celles que les données portent
     lignes = charges_kpi.personnes(n, n1, ch.rubriques_paie(db), axe, valeur, ligne_activite,
                                    n1_primes)
@@ -660,7 +745,8 @@ def charges_personnes(
     audit.record(db, p.user_id, "lecture_charges_personnes", axe, valeur, None,
                  {**periode, "ligne_activite": ligne_activite, "service": service, "site": site,
                   "type_site": type_site, "poste": poste, "matricule": matricule,
-                  "activite": activite, "type_contrat": type_contrat, "departement": departement})
+                  "activite": activite, "type_contrat": type_contrat, "departement": departement,
+                  **profil})
     db.commit()
     return _sortie(p, [{"matricule": identite[x["salarie_id"]][0],
                         "nom": identite[x["salarie_id"]][1],

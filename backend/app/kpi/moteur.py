@@ -5,6 +5,7 @@ Aucune dépendance base de données : l'entrée est une liste de `Ligne` par pé
 
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
+from datetime import date
 from decimal import Decimal
 
 from app.imports.regles import COMPOSANTES_BRUT
@@ -68,6 +69,9 @@ class Ligne:
     indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
     reference: str | None = None  # référence reporting (texte libre)
     productif: bool = False  # service marqué productif
+    sexe: str | None = None  # « H » ou « F » ; None : non renseigné
+    date_naissance: date | None = None
+    date_embauche: date | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +95,7 @@ class PeriodeData:
     marge: Decimal | None = None  # saisie avec le CA
     saisies: tuple[Saisie, ...] = ()
     vides: tuple[Saisie, ...] = ()  # cases attendues sans valeur (valeur None)
+    fin: date | None = None  # dernier jour du mois (date de référence des âges et anciennetés)
 
     @property
     def partiel(self) -> frozenset[str]:
@@ -149,6 +154,60 @@ class Budgets:
 def _bud(m: Decimal | None, b: Decimal | None) -> dict:
     ecart, pct = f.ecart_budget(m, b)
     return {"budget": b, "ecart": ecart, "ecart_pct": pct}
+
+
+TRANCHES_AGE = ((25, "<25"), (35, "25-34"), (45, "35-44"), (55, "45-54"), (None, "55+"))
+TRANCHES_ANCIENNETE = ((1, "<1"), (3, "1-3"), (5, "3-5"), (10, "5-10"), (None, "10+"))
+CONFIDENTIALITE_PROFIL = 3  # en dessous, le profil n'est montré qu'avec l'accès nominatif
+
+
+def _contrat(L: Ligne) -> str:
+    return L.contrat.strip().casefold()
+
+
+def _mois_revolus(debut: date, fin: date) -> int:
+    return (fin.year - debut.year) * 12 + fin.month - debut.month - (fin.day < debut.day)
+
+
+def _tranches(mois: list[int], bornes) -> list[dict]:
+    """Effectif par tranche d'années révolues : borne basse incluse, borne haute exclue."""
+    comptes = [0] * len(bornes)
+    for m in mois:
+        a = m // 12
+        comptes[next(i for i, (haut, _) in enumerate(bornes) if haut is None or a < haut)] += 1
+    return [{"cle": cle, "n": n} for (_, cle), n in zip(bornes, comptes, strict=True)]
+
+
+def tranche(debut: date | None, fin: date | None, bornes) -> str:
+    """Tranche d'années révolues au jour `fin`, même découpage que `profil` ; « nr » sans date
+    connue ou pour une date postérieure à `fin`."""
+    if debut is None or fin is None or debut > fin:
+        return "nr"
+    a = _mois_revolus(debut, fin) // 12
+    return next(cle for haut, cle in bornes if haut is None or a < haut)
+
+
+def profil(pd: PeriodeData | None) -> dict | None:
+    """Sexe, âge et ancienneté des salariés distincts de la période, à son dernier jour. Une valeur
+    absente (ou une date postérieure à la période) est « non renseignée », jamais devinée."""
+    if pd is None or pd.fin is None:
+        return None
+    gens = {L.salarie_id: L for L in pd.lignes}.values()
+    sexe = {"H": 0, "F": 0, "nr": 0}
+    for L in gens:
+        sexe[L.sexe if L.sexe in ("H", "F") else "nr"] += 1
+    ages = [_mois_revolus(L.date_naissance, pd.fin) for L in gens
+            if L.date_naissance is not None and L.date_naissance <= pd.fin]
+    anc = [_mois_revolus(L.date_embauche, pd.fin) for L in gens
+           if L.date_embauche is not None and L.date_embauche <= pd.fin]
+
+    def moyenne(mois: list[int]) -> Decimal | None:
+        return Decimal(sum(mois)) / (12 * len(mois)) if mois else None
+    return {"effectif": len(gens), "sexe": sexe,
+            "age": {"moyenne": moyenne(ages), "tranches": _tranches(ages, TRANCHES_AGE),
+                    "nr": len(gens) - len(ages)},
+            "anciennete": {"moyenne": moyenne(anc), "tranches": _tranches(anc, TRANCHES_ANCIENNETE),
+                           "nr": len(gens) - len(anc)}}
 
 
 def _ok(pd: PeriodeData | None) -> PeriodeData | None:
@@ -342,6 +401,13 @@ def _par(pd: PeriodeData | None, cle, mesure) -> dict:
 def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> list[tuple]:
     a, b = _par(cur, cle, mesure), _par(prev, cle, mesure)
     return [(n, cell(a.get(n, ZERO), b.get(n, ZERO) if prev else None)) for n in noms]
+
+
+def _front_back_var(fb: dict | None, fb1: dict | None) -> dict | None:
+    """34-f : évolution en % de l'effectif front et back entre la période et la période comparée."""
+    if not fb or not fb1:
+        return None
+    return {k: f.variation_pct(Decimal(fb[k]), Decimal(fb1[k])) for k in ("front", "back")}
 
 
 def _front_back(pd: PeriodeData | None) -> dict | None:
@@ -670,8 +736,9 @@ def _controle(libelle: str, *valeurs: Decimal) -> dict:
     return {"controle": libelle, "ecart": ecart, "bloquant": ecart > f.TOLERANCE}
 
 
-def avec_donnees(pds: dict[int, PeriodeData], jusqu_au: int = 12) -> list[int]:
-    return [m for m in sorted(pds) if m <= jusqu_au and _ok(pds[m])]
+def avec_donnees(pds: dict[int, PeriodeData], jusqu_au: int | None = None) -> list[int]:
+    """Rangs qui ont des données (jusqu'au rang `jusqu_au` ; absent : tous)."""
+    return [m for m in sorted(pds) if (jusqu_au is None or m <= jusqu_au) and _ok(pds[m])]
 
 
 def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
@@ -807,13 +874,13 @@ def _blocs_annuels(n, ok, n1, ok1, refs: Refs, params: Params,
 def annuel(
     n: dict[int, PeriodeData], n1: dict[int, PeriodeData], mois: int, refs: Refs, params: Params,
     budgets: dict[int, Budgets] | None = None, params_mois: dict[int, Params] | None = None,
-    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None,
+    debut: int = 1, comparaison: dict[int, PeriodeData] | None = None, nb_rangs: int = 12,
 ) -> dict:
     """n, n1 : mois -> données de l'année N et N-1. Cumul des mois `debut` à `mois`. `budgets` et
     `params_mois` : budgets et paramètres de chaque mois de N (série des objectifs ; `params` à
     défaut). `comparaison` : données comparées au cumul, rangées sur les mois de N (période
     précédente ; vide : aucune comparaison) ; absent : les mêmes mois de N-1. Les séries mensuelles
-    restent les deux années entières."""
+    restent les deux cadres entiers (`nb_rangs` mois : 12, ou la période si elle est plus longue)."""
     refs = _contrats_vus(refs, *n.values(), *n1.values(), *(comparaison or {}).values())
     n_tout, n1_tout = n, n1
     n = {m: pd for m, pd in n_tout.items() if m >= debut}
@@ -852,7 +919,7 @@ def annuel(
                  **_ca_marge(pds.get(m)),
                  "activite": _activite(pds.get(m)),
                  **({"objectifs": objectifs[m]} if objectifs is not None else {})}
-                for m in range(1, 13)]
+                for m in range(1, nb_rangs + 1)]
 
     def cumul(pds):
         mois_ok = avec_donnees(pds, mois)
@@ -883,7 +950,8 @@ def annuel(
     complet1 = sum((n1_tout[m].ms for m in avec_donnees(n1_tout)), ZERO)
     blocs = _blocs_annuels(n, ok, n1, ok1, refs, params, budgets or {})
     objectifs_n = {m: _objectifs(n_tout.get(m), (budgets or {}).get(m, Budgets()),
-                                 (params_mois or {}).get(m, params)) for m in range(1, 13)}
+                                 (params_mois or {}).get(m, params))
+                   for m in range(1, nb_rangs + 1)}
 
     manque: set[str] = set()
 
@@ -915,6 +983,7 @@ def annuel(
     ca1 = sum((n1[m].ca for m in avec_ca1), ZERO) if avec_ca1 else None
     avec_marge1 = [m for m in avec_ca1 if n1[m].marge is not None]
     marge1 = sum((n1[m].marge for m in avec_marge1), ZERO) if avec_marge1 else None
+    ca_avec_marge1 = sum((n1[m].ca for m in avec_marge1), ZERO) if avec_marge1 else None
     eff = blocs["effectif_global"]
     partiel_n = frozenset().union(*(n[m].partiel for m in n if m <= mois))
     obj_ca, obj_marge = objectif_cumul("ca", avec_ca), objectif_cumul("marge", avec_marge)
@@ -933,13 +1002,15 @@ def annuel(
         return cell(compte(fin), compte(fin1))
 
     def avec_part(c: dict, total: dict) -> dict:
-        return {**c, "part": ratio(c["m"], total["m"])}
+        # Part de la période comparée aussi : la carte de détail affiche les deux côtés (34-f).
+        return {**c, "part": ratio(c["m"], total["m"]),
+                "part1": ratio(c.get("m1"), total.get("m1"))}
 
     eff_fin_total = eff_fin(lambda L: True)
     mad_fin = eff_fin(lambda L: L.contrat == "MAD")
     mad_moyen = next((c for c in blocs["d_contrat"]["effectifs"] if c["contrat"] == "MAD"),
                      {"m": ZERO, "m1": ZERO})
-    ms_total = {"m": c if nb else None}
+    ms_total = {"m": c if nb else None, "m1": c1 if nb1 else None}
 
     def ms_contrat(pds, mois_ok, contrat) -> Decimal | None:
         return sum((pds[m].total(L) for m in mois_ok for L in pds[m].lignes
@@ -950,10 +1021,11 @@ def annuel(
 
     # R9 (réunion du 17/11) : masse salariale cumulée en front et en back office ; CA et marge par
     # employé front office = cumul / effectif moyen front office des mois de paie (C2).
-    def ms_fb(mot: str) -> Decimal:
-        return sum((n[m].total(L) for m in ok for L in n[m].lignes if _est(L, mot)), ZERO)
+    def ms_fb(mot: str, pds=n, mois_ok=ok) -> Decimal:
+        return sum((pds[m].total(L) for m in mois_ok for L in pds[m].lignes if _est(L, mot)), ZERO)
 
     ms_front, ms_back = (ms_fb("front"), ms_fb("back")) if nb else (None, None)
+    ms_front1, ms_back1 = (ms_fb("front", n1, ok1), ms_fb("back", n1, ok1)) if ok1 else (None, None)
     eff_front = (Decimal(sum(len({L.salarie_id for L in n[m].lignes if _est(L, "front")})
                              for m in ok)) / nb) if nb else None
 
@@ -997,12 +1069,31 @@ def annuel(
             sum((n1[m].rubrique(r) for m in ok1 for r in PRIMES_TOUTES), ZERO) if ok1 else None),
         "frais_mission_ytd": cumul_rub(FRAIS_MISSION),
         "logement_ytd": cumul_rub(LOGEMENT),
+        # Suivi mensuel du Résumé : ligne « total de la période comparée » (réunion du 23/11).
+        "logement_cumul": cell(cumul_rub(LOGEMENT),
+                               sum((n1[m].rubrique(LOGEMENT) for m in ok1), ZERO) if ok1 else None),
+        "taux_marge_cmp": f.taux_marge(ca_avec_marge1, marge1),
         "effectif_moyen": eff,
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
+        "profil": {"m": profil(fin), "m1": profil(fin1)},
+        # Effectif de fin par type de contrat : CDI, CDD et tout le reste (MAD, stagiaires…).
+        "contrat_fin": {
+            "CDI": avec_part(eff_fin(lambda L: _contrat(L) == "cdi"), eff_fin_total),
+            "CDD": avec_part(eff_fin(lambda L: _contrat(L) == "cdd"), eff_fin_total),
+            "autres": avec_part(eff_fin(lambda L: _contrat(L) not in ("cdi", "cdd")),
+                                eff_fin_total)},
         "front_back": _front_back(fin),
+        # 34-f : répartition de la période comparée, pour la carte de détail (deux côtés).
+        "front_back1": _front_back(fin1),
+        "front_back_var": _front_back_var(_front_back(fin), _front_back(fin1)),
         "ms_front_back": {"front": ms_front, "back": ms_back, "front_pct": ratio(ms_front, c),
-                          "back_pct": ratio(ms_back, c)} if nb else None,
+                          "back_pct": ratio(ms_back, c),
+                          "front1": ms_front1, "back1": ms_back1,
+                          "front_pct1": ratio(ms_front1, c1), "back_pct1": ratio(ms_back1, c1),
+                          "front_var_pct": f.variation_pct(ms_front, ms_front1),
+                          "back_var_pct": f.variation_pct(ms_back, ms_back1)}
+        if nb else None,
         "effectif_moyen_front": eff_front,
         "ca_par_front": ratio(ca_ytd, eff_front),
         "marge_par_front": ratio(marge_ytd, eff_front),

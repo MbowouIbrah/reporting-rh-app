@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte de détail : comparatif des parts</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #e3001b; --red-deep: #b40015; --navy: #1a1f3c; --navy-3: #3d4470; --ink: #0e1126;
+  --paper: #fff; --paper-2: #fafafa; --paper-3: #f5f5f5; --rule: #e7e7ea; --rule-strong: #cfd0d8;
+  --muted: #6b6f82; --muted-2: #9499ab; --success: #14663a;
+  --fs-xs: max(12px, .75rem); --fs-sm: max(12.5px, .8125rem); --fs-md: .875rem; --fs-xl: clamp(1.25rem, 1.1rem + .6vw, 1.5rem);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper-2); color: var(--ink); font: 400 var(--fs-md)/1.45 'DM Sans', system-ui, sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: var(--fs-xl); color: var(--navy); margin: 0 0 4px; }
+.consigne { color: var(--muted); margin: 0 0 16px; max-width: 85ch; }
+.barre { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; margin-bottom: 20px; }
+.barre > span { color: var(--muted); font-weight: 600; }
+.bascule { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; }
+.bascule button { font: inherit; font-weight: 600; border: 0; background: var(--paper); color: var(--navy); padding: 6px 14px; cursor: pointer; }
+.bascule button[aria-pressed='true'] { background: var(--navy); color: #fff; }
+.bascule button:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+.cartes { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.colonne { display: grid; gap: 6px; }
+.colonne > p { margin: 0; color: var(--muted); font-size: var(--fs-sm); max-width: 340px; }
+.colonne > p strong { color: var(--navy); }
+
+/* Carte : reprise exacte des styles de l'application */
+.bulle-case { width: 340px; max-width: calc(100vw - 32px); background: var(--surface, #fff); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgb(14 17 38 / 14%); font-size: var(--fs-xs); }
+.bulle-case header { padding: 10px 14px 8px; border-bottom: 1px solid var(--rule); background: var(--paper-3); }
+.bulle-case header h2 { margin: 0; font-size: var(--fs-md); color: var(--navy); }
+.bulle-case header p { margin: 2px 0 0; color: var(--muted); }
+.bulle-case section { padding: 8px 14px; border-bottom: 1px solid var(--rule); }
+.bulle-case section:last-child { border-bottom: 0; }
+.bulle-case h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.bulle-case h3 .leg { text-transform: none; letter-spacing: 0; font-weight: 400; display: inline-flex; gap: 8px; }
+.leg i { display: inline-block; width: 10px; height: 6px; background: var(--navy-3); vertical-align: middle; margin-right: 3px; }
+.leg i.cmp { background: var(--muted-2); height: 3px; }
+.bc-ligne { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+.bc-ligne > span:first-child { color: var(--muted); }
+.bc-ligne > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bc-ligne.fort > span:last-child { font-weight: 700; color: var(--navy); }
+.bc-compo { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; }
+.bc-compo.ecart { grid-template-columns: auto 1fr auto 3.6em; }
+.bc-compo-ligne { display: contents; }
+.bc-compo .nom { color: var(--muted); white-space: nowrap; }
+.barre-part { height: 8px; background: var(--paper-3); }
+.barre-part i { display: block; height: 100%; background: var(--navy-3); }
+.barre-part.double { height: auto; background: none; display: grid; gap: 2px; }
+.barre-part.double > span { display: block; background: var(--paper-3); }
+.barre-part.double > span:first-child { height: 7px; }
+.barre-part.double > span:last-child { height: 3px; }
+.barre-part.double > span:last-child i { background: var(--muted-2); }
+.bc-compo .val { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bc-compo .val em { font-style: normal; color: var(--muted); }
+.bc-compo .val small { display: block; font-size: 11px; color: var(--muted-2); line-height: 1.1; }
+.d { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: var(--muted); font-size: 11px; }
+.d.fort { color: var(--navy); font-weight: 700; }
+/* Tableau comparatif : une colonne par côté, chiffres alignés */
+.bulle-case.large { width: 400px; }
+table.cmp { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.cmp th, table.cmp td { padding: 2px 0; white-space: nowrap; }
+table.cmp thead th { font-size: 11px; font-weight: 700; color: var(--muted); text-align: right; border-bottom: 1px solid var(--rule); padding-bottom: 3px; }
+table.cmp thead th:first-child { text-align: left; letter-spacing: .08em; text-transform: uppercase; }
+table.cmp thead th.cote { padding-left: 10px; }
+table.cmp thead th.cote span { display: block; font-weight: 400; color: var(--muted-2); }
+table.cmp tbody th { text-align: left; font-weight: 400; color: var(--muted); }
+table.cmp td { text-align: right; padding-left: 10px; }
+table.cmp td.m { color: var(--ink); }
+table.cmp td.p { color: var(--muted); padding-left: 6px; }
+table.cmp td.a.m, table.cmp td.a.p { font-weight: 600; color: var(--navy); }
+table.cmp td.e { color: var(--muted); border-left: 1px solid var(--rule); padding-left: 8px; }
+table.cmp td.e.fort { color: var(--navy); font-weight: 700; }
+table.cmp tbody tr + tr :is(th, td) { border-top: 1px dotted var(--rule); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Carte de détail : afficher le comparatif dans les parts</h1>
+  <p class="consigne">Carte de la case « Masse salariale ». En comparaison, chaque répartition devient un petit tableau : une colonne par côté (montant et part), puis l’évolution du montant en %. Le côté principal est en gras, la référence en gris. Évolution de 10 % ou plus en gras. Sans comparaison, la carte ne change pas.</p>
+  <div class="barre">
+    <span>Mode</span>
+    <div class="bascule" id="mode">
+      <button aria-pressed="true" data-v="per">Période vs « Comparer à »</button>
+      <button aria-pressed="false" data-v="ab">Comparer A / B</button>
+      <button aria-pressed="false" data-v="sans">Sans comparaison</button>
+    </div>
+  </div>
+  <div class="cartes" id="cartes"></div>
+</main>
+<script>
+const NF = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const pc = (v) => NF.format(v) + ' %'
+const pt = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + NF.format(Math.abs(v)) + ' %'
+const M = (v) => new Intl.NumberFormat('fr-FR').format(v) + ' k'
+const DATA = {
+  per: {
+    titre: 'Masse salariale', periodes: 'Jan.–Sept. 2026 · comparé à Jan.–Sept. 2025',
+    lignes: [['Période', '4 812 k', true], ['Comparer à', '4 530 k'], ['Évolution', '+6,2 %']],
+    legA: '2026', legB: '2025', nomA: 'Jan.–Sept.', nomB: 'Jan.–Sept.',
+    blocs: [
+      { titre: 'Type de contrat', parts: [['CDI', 3920, 81.5, 3760, 83.0], ['CDD', 610, 12.7, 520, 11.5], ['Stagiaires', 182, 3.8, 160, 3.5], ['Intérim', 100, 2.1, 90, 2.0]] },
+      { titre: 'Front / back office', parts: [['Front office', 2930, 60.9, 2650, 58.5], ['Back office', 1882, 39.1, 1880, 41.5]] },
+    ],
+  },
+  ab: {
+    titre: 'Masse salariale', periodes: 'Jan.–Sept. 2026 · Front office (A) vs Back office (B)',
+    lignes: [['A · Front office', '2 930 k', true], ['B · Back office', '1 882 k'], ['Écart A − B', '+1 048 k']],
+    legA: 'A', legB: 'B', nomA: 'Front office', nomB: 'Back office',
+    blocs: [
+      { titre: 'Type de contrat', parts: [['CDI', 2320, 79.2, 1600, 85.0], ['CDD', 420, 14.3, 190, 10.1], ['Stagiaires', 120, 4.1, 62, 3.3], ['Intérim', 70, 2.4, 30, 1.6]] },
+    ],
+  },
+}
+DATA.sans = { ...DATA.per, periodes: 'Jan.–Sept. 2026', lignes: [['Période', '4 812 k', true]], sans: true }
+
+function carte(d) {
+  const cmp = !d.sans
+  let h = `<div class="bulle-case${cmp ? ' large' : ''}"><header><h2>${d.titre}</h2><p>${d.periodes}</p></header><section>`
+  h += d.lignes.map(([k, v, f]) => `<div class="bc-ligne${f ? ' fort' : ''}"><span>${k}</span><span>${v}</span></div>`).join('') + '</section>'
+  for (const b of d.blocs) {
+    if (!cmp) {
+      h += `<section><h3><span>${b.titre}</span></h3><div class="bc-compo">`
+      for (const [nom, v, p] of b.parts)
+        h += `<div class="bc-compo-ligne"><span class="nom">${nom}</span><span class="barre-part"><i style="width:${p}%"></i></span><span class="val">${M(v)} <em>${pc(p)}</em></span></div>`
+      h += '</div></section>'
+      continue
+    }
+    h += `<section><table class="cmp"><colgroup><col style="width:27%"><col style="width:16%"><col style="width:14%"><col style="width:15%"><col style="width:13%"><col style="width:15%"></colgroup><thead><tr><th>${b.titre}</th>` +
+      `<th class="cote" colspan="2">${d.legA}<span>${d.nomA}</span></th>` +
+      `<th class="cote" colspan="2">${d.legB}<span>${d.nomB}</span></th><th>Écart</th></tr></thead><tbody>`
+    for (const [nom, v, p, v2, p2] of b.parts) {
+      const e = (v / v2 - 1) * 100
+      h += `<tr><th>${nom}</th><td class="a m">${M(v)}</td><td class="a p">${pc(p)}</td>` +
+        `<td class="m">${M(v2)}</td><td class="p">${pc(p2)}</td>` +
+        `<td class="e${Math.abs(e) >= 10 ? ' fort' : ''}">${pt(e)}</td></tr>`
+    }
+    h += '</tbody></table></section>'
+  }
+  return h + '</div>'
+}
+function rendre(mode) {
+  const d = DATA[mode]
+  document.getElementById('cartes').innerHTML = `<div class="colonne">${carte(d)}</div>`
+}
+document.getElementById('mode').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', String(x === b))
+  rendre(b.dataset.v)
+})
+rendre('per')
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 import hashlib
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -18,10 +18,13 @@ from app.imports.regles import (
     ATTRIBUTS,
     BLOQUANT,
     BRUT,
+    CIVILITE_COLONNE,
     CODES_FORMULE,
     COMPOSANTES_BRUT,
+    EMBAUCHE_COLONNE,
     FACTEURS,
     MOIS,
+    NAISSANCE_COLONNE,
     REFERENCE_COLONNE,
     Refs,
     colonnes,
@@ -266,7 +269,13 @@ def _ecrire(db: Session, lot: LotImport, lignes, anos, stats) -> None:
                         "indicateurs": {k: str(v) for k, v in L.indicateurs.items()},
                         "reference": L.reference,
                         "colonnes_activite": list(L.colonnes_activite),
-                        "reference_presente": L.reference_presente},
+                        "reference_presente": L.reference_presente,
+                        "sexe": L.sexe,
+                        "date_naissance": L.date_naissance.isoformat() if L.date_naissance else None,
+                        "date_embauche": L.date_embauche.isoformat() if L.date_embauche else None,
+                        "civilite_presente": L.civilite_presente,
+                        "naissance_presente": L.naissance_presente,
+                        "embauche_presente": L.embauche_presente},
         } for L in lignes])
     if anos:
         db.execute(insert(ImportAnomalie), [{
@@ -414,7 +423,8 @@ def appliquer_decisions(db: Session, user_id: int, lot_id: int, corrections: dic
     rattaches = [_verifier_alias(db, a) for a in alias or []]
     refs = _refs_du_lot(db, lot, tout)
     cols = colonnes(feuille.entetes, refs)
-    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
+    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE, CIVILITE_COLONNE, NAISSANCE_COLONNE,
+                                                    EMBAUCHE_COLONNE}
     presents = {n for n, _ in feuille.lignes}
     traces = []
     for num, valeurs in corrections.items():
@@ -502,7 +512,8 @@ def corriger_ligne(db: Session, user_id: int, lot_id: int, num: int,
         raise HTTPException(404, "Ligne introuvable")
     refs = _refs_du_lot(db, lot)
     cols = colonnes(feuille.entetes, refs)
-    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE}
+    texte_libre = (set(ATTRIBUTS) - {"ANNÉE"}) | {REFERENCE_COLONNE, CIVILITE_COLONNE, NAISSANCE_COLONNE,
+                                                    EMBAUCHE_COLONNE}
     row, avant = list(feuille.lignes[k][1]), {}
     for col, v in valeurs.items():
         j = cols.get(col)
@@ -1062,6 +1073,18 @@ def valider_lot(db: Session, user_id: int | None, lot_id: int, garder: set[Cle] 
             db.flush()
             salaries[k] = s.id
             nouveaux.add(k)
+    # Profil (sexe, dates) : une valeur lue remplace celle connue, la ligne du mois le plus récent l'emporte ;
+    # une colonne absente ou une cellule vide n'efface jamais une valeur connue.
+    for r in sorted(rows, key=lambda r: (r.annee or 0, r.mois or 0)):
+        d = r.donnees
+        lu = {"sexe": d.get("sexe"),
+              "date_naissance": date.fromisoformat(d["date_naissance"]) if d.get("date_naissance") else None,
+              "date_embauche": date.fromisoformat(d["date_embauche"]) if d.get("date_embauche") else None}
+        if any(v is not None for v in lu.values()):
+            s = db.get(Salarie, salaries[r.matricule.casefold()])
+            for champ, v in lu.items():
+                if v is not None:
+                    setattr(s, champ, v)
     # « Mettre à jour le nom » (point de nom accepté) : le nom du fichier remplace le nom enregistré.
     ignores = set((lot.feuille or {}).get("ignores", []))
     for r in rows:

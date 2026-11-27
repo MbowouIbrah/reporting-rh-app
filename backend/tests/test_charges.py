@@ -163,7 +163,8 @@ def test_charges_periode_invalide_et_sans_donnee(charge):
     assert get(charge, "charges").status_code == 422
     assert get(charge, "charges", du="2026-01").status_code == 422
     assert get(charge, "charges", du="2026-03", au="2026-02").status_code == 422
-    assert get(charge, "charges", du="2025-01", au="2026-01").status_code == 422  # 13 mois
+    assert get(charge, "charges", du="2021-01", au="2026-01").status_code == 422  # 61 mois
+    assert get(charge, "charges", du="2025-01", au="2026-02").status_code == 200  # 14 mois
     assert get(charge, "charges", du="2026-01", au="2026-02", cmp_du="2025-01",
                cmp_au="2025-01").status_code == 422
     assert get(charge, "charges", du="2020-01", au="2020-02").status_code == 404
@@ -227,6 +228,11 @@ def test_personnes_par_axe_et_sous_ligne_activite(charge, make_client):
     assert [x["matricule"] for x in pers(drh, "service", "SAV PL", **FEV,
                                          ligne_activite="Front office").json()] == ["E1", "E4"]
     assert pers(drh, "service", "SAV PL", **FEV, ligne_activite="Back Office").json() == []
+    # site : la sous-ligne est un service
+    assert [x["matricule"] for x in pers(drh, "site", "Yaoundé", **FEV,
+                                         ligne_activite="Commerce VN").json()] == ["E2"]
+    assert [x["matricule"] for x in pers(drh, "site", "Yaoundé", **FEV,
+                                         ligne_activite="Administration").json()] == ["E3"]
     assert pers(drh, "site", "Inconnu", **FEV).json() == []
     # `activite` reste le filtre de la barre
     assert pers(drh, "type", BR, **FEV, activite="Back Office").status_code == 404
@@ -386,8 +392,9 @@ def test_axes_contenu(charge):
     assert all(x["type_site"] in ("principal", "agence") for x in lignes_axe(r, "site"))
     yaounde = axe(r, "site", "Yaoundé")
     assert D(yaounde["m"]) == 6270 and yaounde["effectif"] == 2 and yaounde["effectif1"] is None
-    assert [(e["libelle"], D(e["m"]), D(e["part"])) for e in yaounde["enfants"]] == [
-        ("Front office", D(6270), D(1))]
+    # Site détaillé par service (et non par activité).
+    assert [(e["libelle"], D(e["m"])) for e in yaounde["enfants"]] == [
+        ("Administration", D(4070)), ("Commerce VN", D(2200))]
     assert [x["libelle"] for x in lignes_axe(r, "service")] == [
         "Administration", "Commerce VN", "SAV PL"]
     assert [x["libelle"] for x in lignes_axe(r, "contrat")] == ["CDI", "CDD"]
@@ -727,3 +734,9 @@ def test_part_par_personne_calculee_par_le_serveur(charge, make_client):
     assert total == 3700
     assert all(D(x["part"]) == D(x["m"]) / total for x in liste)
     assert sum(D(x["part"]) for x in liste) == pytest.approx(D(1))
+
+
+def test_raison_budget_sous_filtre_de_profil():
+    ctx = kc.Contexte(2025 * 12, profil=True)
+    assert kc.raison_budget(ctx, "type") == "Budget non suivi par sexe, âge ni ancienneté."
+    assert kc.raison_budget(ctx, "activite") == "Budget non suivi par activité."

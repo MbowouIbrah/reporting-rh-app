@@ -1,6 +1,6 @@
 import { ListFilter } from 'lucide-react'
-import type { ReactNode } from 'react'
-import type { FiltresPage } from '../api/rapports'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import type { DimComparee, FiltresPage } from '../api/rapports'
 import type { Periode } from '../api/types'
 import ChoixSalarie, { type Salarie } from './ChoixSalarie'
 import type { ClePartagee, Partage } from '../lib/filtresPartages'
@@ -10,8 +10,12 @@ import {
   anneeDe, indice, libelle, lireTexte, longueur, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
 } from '../lib/periode'
 import BoutonReinitialiser from './BoutonReinitialiser'
+import ChoixFiltres, { FILTRES_PAR_DEFAUT, lireAffiches } from './ChoixFiltres'
 import ChoixPeriode from './ChoixPeriode'
-import MultiChoix from './MultiChoix'
+import { usePreference } from '../lib/preference'
+import MultiChoix, { type ModeListe } from './MultiChoix'
+
+type Comparer = Parameters<typeof MultiChoix>[0]['comparer']
 
 type Patch = Record<string, string | number | undefined>
 
@@ -43,6 +47,40 @@ interface Props {
   onChange: (patch: Patch) => void
   /** Valeurs choisies (filtres partagés) : seules elles rendent Réinitialiser actif. */
   partage: Partage
+  /** R9 : liste en mode « Comparer » (null : aucune) ; absent : page sans comparaison de sélections. */
+  cmpDim?: DimComparee | null
+  /** Filtres de profil des salariés (sexe, tranche d'âge, tranche d'ancienneté), filtrés côté serveur. */
+  avecProfil?: boolean
+  /** Barre compacte : filtres en puces, ni titre ni Réinitialiser ; ligne « Périmètre » et « Tout effacer » dessous. */
+  puces?: boolean
+}
+
+const LIBELLE_DIM: Record<DimComparee, string> = {
+  departement: 'Département', service: 'Service', site: 'Site', type_site: 'Type de site',
+  activite: 'Activité', type_contrat: 'Contrat', poste: 'Poste',
+}
+
+type DimProfil = 'sexe' | 'age' | 'anciennete'
+
+/** Filtres de profil : valeurs fixes (« nr » : non renseigné), sans mode Comparer. */
+const PROFIL: { id: DimProfil; libelle: string; court?: string; pluriel: string; valeurs: [string, string][] }[] = [
+  { id: 'sexe', libelle: 'Sexe', pluriel: 'sexes', valeurs: [['H', 'Hommes'], ['F', 'Femmes'], ['nr', 'Non renseigné']] },
+  { id: 'age', libelle: "Tranche d'âge", court: 'Âge', pluriel: 'tranches', valeurs: [
+    ['<25', 'Moins de 25 ans'], ['25-34', '25 à 34 ans'], ['35-44', '35 à 44 ans'], ['45-54', '45 à 54 ans'],
+    ['55+', '55 ans et plus'], ['nr', 'Non renseigné'],
+  ] },
+  { id: 'anciennete', libelle: "Tranche d'ancienneté", court: 'Ancienneté', pluriel: 'tranches', valeurs: [
+    ['<1', "Moins d'un an"], ['1-3', '1 à 3 ans'], ['3-5', '3 à 5 ans'], ['5-10', '5 à 10 ans'],
+    ['10+', '10 ans et plus'], ['nr', 'Non renseigné'],
+  ] },
+]
+
+/** Groupes du menu des filtres, dans l'ordre de la barre : de l'organisation à la personne. */
+const GROUPE: Record<DimComparee | DimProfil, string> = {
+  type_site: 'Implantation', site: 'Implantation',
+  departement: 'Organisation', service: 'Organisation', activite: 'Organisation',
+  poste: 'Emploi', type_contrat: 'Emploi',
+  sexe: 'Profil des salariés', age: 'Profil des salariés', anciennete: 'Profil des salariés',
 }
 
 /** Période précédant (annee, mois) : mois d'avant, décembre de l'année d'avant en janvier. */
@@ -107,7 +145,12 @@ function ChoixMois({ filtres: f, periodes, comparaison, onChange }: {
 }
 
 /** Pages annuelles (R6) : période et comparaison dans un calendrier compact. */
-function ChoixPeriodes({ periode, onChange }: { periode: PeriodeChoisie; onChange: (patch: Patch) => void }) {
+function ChoixPeriodes({ periode, selectionB, onChange }: {
+  periode: PeriodeChoisie
+  /** R9 : nom de la sélection B ; la comparaison de période est alors suspendue. */
+  selectionB?: string
+  onChange: (patch: Patch) => void
+}) {
   return (
     <>
       <ChoixPeriode
@@ -115,11 +158,18 @@ function ChoixPeriodes({ periode, onChange }: { periode: PeriodeChoisie; onChang
         onChange={(s) => onChange({ periode: versTexte(s), comparee: undefined })}
       />
       {FLECHE}
-      <ChoixPeriode
+      {selectionB ? (
+        <div className="filtre">
+          <span id="cmp-sel-lib">Comparer à</span>
+          <button type="button" className="multi-bouton" disabled aria-labelledby="cmp-sel-lib cmp-sel-val" title="Comparaison de deux sélections en cours : même période pour A et B">
+            <span id="cmp-sel-val">Sélection B : {selectionB}</span>
+          </button>
+        </div>
+      ) : <ChoixPeriode
         titre="Comparer à" valeur={periode.cmp} min={periode.min} max={periode.max}
         longueur={longueur(periode.sel)} modele={periode.sel}
         onChange={(s) => onChange({ comparee: versTexte(s) })}
-      />
+      />}
     </>
   )
 }
@@ -161,7 +211,9 @@ export const LIBELLE_TYPE_SITE: Record<string, string> = {
   deporte: 'Déporté',
 }
 
-export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange }: {
+export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange, comparer, puce }: {
+  comparer?: Comparer
+  puce?: boolean
   valeur: string
   types: string[]
   tous?: string
@@ -170,18 +222,20 @@ export function ChoixTypeSite({ valeur, types, tous = 'Tous', onChange }: {
   return (
     <MultiChoix
       libelle="Type de site" pluriel="types" tous={tous} options={types} valeur={valeur} onChange={onChange}
-      nomOption={(t) => LIBELLE_TYPE_SITE[t] ?? t} souple={false}
+      nomOption={(t) => LIBELLE_TYPE_SITE[t] ?? t} souple={false} comparer={comparer} puce={puce}
     />
   )
 }
 
-export function ChoixPoste({ valeur, postes, tous = 'Tous', onChange }: {
+export function ChoixPoste({ valeur, postes, tous = 'Tous', onChange, comparer, puce }: {
+  comparer?: Comparer
+  puce?: boolean
   valeur: string
   postes: string[]
   tous?: string
   onChange: (v: string) => void
 }) {
-  return <MultiChoix libelle="Poste" pluriel="postes" tous={tous} options={postes} valeur={valeur} onChange={onChange} />
+  return <MultiChoix libelle="Poste" pluriel="postes" tous={tous} options={postes} valeur={valeur} onChange={onChange} comparer={comparer} puce={puce} />
 }
 
 /** Titre de la barre : dit au premier coup d'œil que ce qui suit sont des filtres. */
@@ -210,7 +264,7 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 
 export default function FiltresPeriode({
   filtres, annees = [], departements, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
-  periode, children, onChange, partage,
+  periode, children, onChange, partage, cmpDim, avecProfil, puces = false,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
@@ -231,49 +285,158 @@ export default function FiltresPeriode({
     ...(avecContrat ? (['type_contrat'] as const) : []),
     ...(avecPoste ? (['poste'] as const) : []),
     ...(salaries ? (['matricule'] as const) : []),
+    ...(cmpDim !== undefined ? (['cmp_dim'] as const) : []),
+    ...(avecProfil ? (['sexe', 'age', 'anciennete'] as const) : []),
   ]
-  return (
-    <div className="filtres filtres-rapport" role="group" aria-label="Filtres">
-      <TitreFiltres />
-      {avecMois ? (
+  // R9 : la liste comparée montre A et B ; les filtres envoyés au serveur n'ont que A dans la dimension.
+  const val = (d: DimComparee) =>
+    (cmpDim === d && filtres.cmp_val ? `${filtres[d] ?? ''}|${filtres.cmp_val}` : filtres[d]) ?? ''
+  const comparer = (d: DimComparee): Comparer => cmpDim === undefined ? undefined : {
+    actif: cmpDim === d,
+    autre: cmpDim && cmpDim !== d ? LIBELLE_DIM[cmpDim] : undefined,
+    onMode: (m: ModeListe) => onChange(
+      m === 'comparer' ? { ...(cmpDim && { [cmpDim]: undefined }), cmp_dim: d, [d]: val(d).split('|').filter(Boolean).slice(0, 2).join('|') || undefined }
+      : m === 'cumuler' ? { cmp_dim: undefined }
+      : { [d]: undefined, ...(cmpDim === d && { cmp_dim: undefined }) },
+    ),
+  }
+  // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
+  const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
+  const dispo = ([
+    [avecType, 'type_site', LIBELLE_DIM.type_site], [!!sites, 'site', LIBELLE_DIM.site],
+    [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
+    [avecActivite, 'activite', LIBELLE_DIM.activite],
+    [avecPoste, 'poste', LIBELLE_DIM.poste], [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat],
+    ...PROFIL.map((f) => [!!avecProfil, f.id, f.libelle] as const),
+  ] as const).filter(([ok]) => ok).map(([, d, nom]) => ({ id: d, nom, groupe: GROUPE[d] }))
+  const voir = (d: DimComparee | DimProfil) => affiches.includes(d) || !!filtres[d] || cmpDim === d
+  const basculer = (d: string, afficher: boolean) => {
+    setAffiches(afficher ? [...affiches, d] : affiches.filter((x) => x !== d))
+    const dim = d as DimComparee | DimProfil
+    if (!afficher && (filtres[dim] || cmpDim === dim)) onChange({ [dim]: undefined, ...(cmpDim === dim && { cmp_dim: undefined }) })
+  }
+  const nomType = (t: string) => LIBELLE_TYPE_SITE[t] ?? t
+  const noms = (d: DimComparee) => val(d).split('|').filter(Boolean).map(d === 'type_site' ? nomType : (x: string) => x)
+  const nomsProfil = (d: DimProfil) => {
+    const f = PROFIL.find((p) => p.id === d)!
+    return (filtres[d] ?? '').split('|').filter(Boolean).map((v) => f.valeurs.find(([c]) => c === v)?.[1] ?? v)
+  }
+  // Liste restreinte par son parent : Département → Service, Type de site → Site.
+  const limite = (parent: DimComparee) => (puces && noms(parent).length ? noms(parent).join(', ') : undefined)
+  const effacer = () => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))
+  const DIMS_PERIMETRE: [ClePartagee, string][] = [
+    ['type_site', 'Type de site'], ['site', 'Site'], ['departement', 'Département'], ['service', 'Service'], ['activite', 'Activité'],
+    ['poste', 'Poste'], ['type_contrat', 'Contrat'], ['sexe', 'Sexe'], ['age', "Tranche d'âge"], ['anciennete', "Tranche d'ancienneté"],
+    ['matricule', 'Employé'],
+  ]
+  const valeursPerimetre = (k: ClePartagee) =>
+    k === 'matricule' ? (filtres.matricule ? [filtres.matricule] : [])
+    : k === 'sexe' || k === 'age' || k === 'anciennete' ? nomsProfil(k)
+    : noms(k as DimComparee)
+  const actifs = DIMS_PERIMETRE.filter(([k]) => cles.includes(k) && valeursPerimetre(k).length > 0)
+  const selectionB = cmpDim && filtres.cmp_val
+    ? (cmpDim === 'type_site' ? LIBELLE_TYPE_SITE[filtres.cmp_val] ?? filtres.cmp_val : filtres.cmp_val)
+    : undefined
+  const choixFiltres = dispo.length > 0 && (
+    <div className="filtres-choix">
+      <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} libelle={puces ? 'Filtres' : undefined} />
+    </div>
+  )
+  const choixPeriode = (
+    avecMois ? (
         <ChoixMois filtres={filtres} periodes={periodes ?? []} comparaison={comparaison === 'periode'} onChange={onChange} />
       ) : comparaison === 'annee' ? (
-        periode && <ChoixPeriodes periode={periode} onChange={onChange} />
+        periode && <ChoixPeriodes periode={periode} selectionB={selectionB} onChange={onChange} />
       ) : (
         <>
           {avecCalendrier && <ChoixCalendrier filtres={filtres} onChange={onChange} />}
           <ChoixAnnee filtres={filtres} annees={annees} onChange={onChange} />
         </>
+      )
+  )
+  // Grille équilibrée : autant de colonnes égales que la largeur permet, lignes remplies de façon homogène.
+  const grille = useRef<HTMLDivElement>(null)
+  const [cols, setCols] = useState(0)
+  useLayoutEffect(() => {
+    const el = grille.current
+    if (!puces || !el || typeof ResizeObserver === 'undefined') return
+    const calculer = () => {
+      const n = el.querySelectorAll(':scope > .filtre').length
+      const max = Math.max(1, Math.floor((el.clientWidth + 8) / (200 + 8)))
+      setCols(n ? Math.ceil(n / Math.ceil(n / max)) : max)
+    }
+    calculer()
+    const ro = new ResizeObserver(calculer)
+    ro.observe(el)
+    const mo = new MutationObserver(calculer)
+    mo.observe(el, { childList: true })
+    return () => { ro.disconnect(); mo.disconnect() }
+  }, [puces])
+  const barre = (
+    <div
+      className={`filtres filtres-rapport${puces ? ' filtres-puces' : ''}`} role="group" aria-label="Filtres"
+      ref={grille} style={puces && cols ? ({ '--cols': cols } as React.CSSProperties) : undefined}
+    >
+      {!puces && <TitreFiltres />}
+      {!puces && choixPeriode}
+      {!puces && choixFiltres}
+      {avecType && voir('type_site') && (
+        <ChoixTypeSite puce={puces} comparer={comparer('type_site')} valeur={val('type_site')} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
-      {departements && (
-        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={filtres.departement ?? ''} onChange={(v) => onChange({ departement: v })} />
+      {sites && voir('site') && (
+        <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={val('site')} onChange={(v) => onChange({ site: v })} comparer={comparer('site')} puce={puces} limite={limite('type_site')} />
       )}
-      {services && (
-        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={filtres.service ?? ''} onChange={(v) => onChange({ service: v })} />
+      {departements && voir('departement') && (
+        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={val('departement')} onChange={(v) => onChange({ departement: v })} comparer={comparer('departement')} puce={puces} />
       )}
-      {avecType && (
-        <ChoixTypeSite valeur={filtres.type_site ?? ''} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
+      {services && voir('service') && (
+        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={val('service')} onChange={(v) => onChange({ service: v })} comparer={comparer('service')} puce={puces} limite={limite('departement')} />
       )}
-      {sites && (
-        <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={filtres.site ?? ''} onChange={(v) => onChange({ site: v })} />
+      {avecActivite && voir('activite') && (
+        <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={val('activite')} onChange={(v) => onChange({ activite: v })} comparer={comparer('activite')} puce={puces} />
       )}
-      {avecActivite && (
-        <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={filtres.activite ?? ''} onChange={(v) => onChange({ activite: v })} />
+      {avecPoste && voir('poste') && <ChoixPoste puce={puces} comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
+      {avecContrat && voir('type_contrat') && (
+        <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={val('type_contrat')} onChange={(v) => onChange({ type_contrat: v })} souple={false} comparer={comparer('type_contrat')} puce={puces} />
       )}
-      {avecContrat && (
-        <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={filtres.type_contrat ?? ''} onChange={(v) => onChange({ type_contrat: v })} souple={false} />
-      )}
-      {avecPoste && <ChoixPoste valeur={filtres.poste ?? ''} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
+      {avecProfil && PROFIL.filter((f) => voir(f.id)).map((f) => (
+        <MultiChoix
+          key={f.id} libelle={(puces && f.court) || f.libelle} pluriel={f.pluriel} options={f.valeurs.map(([v]) => v)}
+          nomOption={(v) => f.valeurs.find(([c]) => c === v)?.[1] ?? v}
+          valeur={filtres[f.id] ?? ''} onChange={(v) => onChange({ [f.id]: v })} souple={false} puce={puces}
+        />
+      ))}
       {salaries && (
         <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
       )}
-      <div className="filtres-actions">
-        <BoutonReinitialiser
-          actif={cles.some((k) => partage[k])}
-          onClick={() => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))}
-        />
-        {children}
+      {(!puces || children) && (
+        <div className="filtres-actions">
+          {!puces && <BoutonReinitialiser actif={cles.some((k) => partage[k])} onClick={effacer} />}
+          {children}
+        </div>
+      )}
+    </div>
+  )
+  if (!puces) return barre
+  const temps = periode
+    ? `${libelle(periode.sel)}${selectionB ? '' : ` comparé à ${libelle(periode.cmp)}`}`
+    : ''
+  return (
+    <div className="filtres-panneau">
+      <div className="filtres-entete">
+        {choixFiltres}
+        {choixFiltres && <span className="filtres-sep" aria-hidden="true" />}
+        <div className="filtres filtres-rapport filtres-puces filtres-temps" role="group" aria-label="Période">{choixPeriode}</div>
+        <span className="filtres-sep" aria-hidden="true" />
+        <p className="filtres-perimetre" aria-live="polite">
+          <span className="lib">Périmètre :</span> <span className="sr-only">{temps} </span>
+          {actifs.length
+            ? actifs.map(([k, nom], i) => <span key={k}>{i ? ' · ' : ' '}{nom} : {valeursPerimetre(k).join(cmpDim === k ? ' / ' : ', ')}</span>)
+            : ' tous les salariés'}
+        </p>
+        {cles.some((k) => partage[k]) && <BoutonReinitialiser actif onClick={effacer} libelle="Réinitialiser" />}
       </div>
+      {barre}
     </div>
   )
 }

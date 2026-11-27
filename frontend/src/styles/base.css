@@ -302,12 +302,53 @@ table.dense td.num { text-align: right; }
 .cases .case .ratio-fb { font-size: var(--fs-sm); color: var(--muted); border-top: 1px dotted var(--rule); padding-top: 2px; margin-top: 2px; }
 /* Bulle de détail au survol : chiffres exacts, même lecture que les bulles des graphiques. */
 .cases .case { position: relative; }
-.bulle-case { position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none; display: grid; gap: 2px; min-width: 240px; padding: 6px 10px; border-radius: 0; background: var(--surface); border: 1px solid var(--rule-strong); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); font-size: var(--fs-xs); color: var(--ink); opacity: 0; visibility: hidden; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), opacity 150ms ease, visibility 0s linear 150ms; }
-.bulle-case.visible { opacity: 1; visibility: visible; transition: transform 220ms cubic-bezier(.22, 1, .36, 1), opacity 150ms ease, visibility 0s; }
-.bulle-case.saut { transition: opacity 150ms ease, visibility 0s; }
-.bulle-case > div { display: flex; justify-content: space-between; gap: 16px; white-space: nowrap; }
-.bulle-case > div > span:first-child { color: var(--muted); }
-@media (prefers-reduced-motion: reduce) { .bulle-case, .bulle-case.visible { transition: none; } }
+.bulle-case { position: fixed; top: 0; left: 0; z-index: 50; width: 340px; max-width: calc(100vw - 32px); max-height: calc(100vh - 24px); overflow: auto; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 0; box-shadow: 0 8px 24px rgb(14 17 38 / 14%); font-size: var(--fs-xs); color: var(--ink); opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s ease, transform .18s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .15s, top .2s cubic-bezier(.22, 1, .36, 1), left .2s cubic-bezier(.22, 1, .36, 1); }
+.bulle-case.visible { opacity: 1; visibility: visible; transform: none; transition: opacity .15s ease, transform .18s cubic-bezier(.22, 1, .36, 1), visibility 0s, top .2s cubic-bezier(.22, 1, .36, 1), left .2s cubic-bezier(.22, 1, .36, 1); }
+.bulle-case.saut { transition: opacity .15s ease, transform .18s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .bulle-case, .bulle-case.visible { transition: none; transform: none; } }
+.bulle-case header { padding: 10px 14px 8px; border-bottom: 1px solid var(--rule); background: var(--paper-3); }
+.bulle-case header h2 { margin: 0; font-size: var(--fs-md); color: var(--navy); }
+.bulle-case header p { margin: 2px 0 0; color: var(--muted); }
+.bulle-case section { padding: 8px 14px; border-bottom: 1px solid var(--rule); }
+.bulle-case section:last-child { border-bottom: 0; }
+.bulle-case h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.bc-ligne { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+.bc-ligne > span:first-child { color: var(--muted); }
+.bc-ligne > span:last-child { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bc-ligne.fort > span:last-child { font-weight: 700; color: var(--navy); }
+.bc-ligne.sep { border-top: 1px dotted var(--rule-strong); margin-top: 2px; padding-top: 3px; }
+.bc-bon { color: var(--success); font-weight: 700; }
+.bc-mal { color: var(--red-deep); font-weight: 700; }
+.bc-neutre { color: var(--navy); font-weight: 700; }
+.bc-compo { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; }
+.bc-compo-ligne { display: contents; }
+.bc-compo .nom { color: var(--muted); white-space: nowrap; }
+.bc-compo .barre-part { height: 8px; background: var(--paper-3); }
+.bc-compo .barre-part i { display: block; height: 100%; background: var(--navy-3); }
+.bc-compo .barre-part.bo i { background: var(--muted-2); }
+.bc-compo .val { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bc-compo .val em { font-style: normal; color: var(--muted); }
+.bc-courbe svg { display: block; width: 100%; height: 64px; }
+.bc-leg { display: flex; gap: 12px; color: var(--muted); margin-top: 2px; }
+.bc-leg i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--navy); vertical-align: middle; margin-right: 4px; }
+.bc-leg i.cmp { border-top: 2px dashed var(--muted-2); }
+.bc-calcul { color: var(--muted); margin: 0; }
+.bc-mention { display: inline-block; background: var(--warning-soft); color: var(--warning); padding: 0 6px; font-weight: 600; margin-top: 4px; }
+/* 34-f : en comparaison, chaque répartition est un petit tableau (une colonne par côté, écart en %). */
+.bulle-case.large { width: 400px; }
+.bulle-case table.cmp { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.bulle-case table.cmp :is(th, td) { padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulle-case table.cmp thead th { font-size: 11px; font-weight: 700; color: var(--muted); text-align: right; border-bottom: 1px solid var(--rule); padding-bottom: 3px; vertical-align: bottom; }
+.bulle-case table.cmp thead th:first-child { text-align: left; letter-spacing: .08em; text-transform: uppercase; white-space: normal; overflow: visible; line-height: 1.25; }
+.bulle-case table.cmp thead th.cote { padding-left: 10px; }
+.bulle-case table.cmp thead th.cote span { display: block; font-weight: 400; color: var(--muted-2); overflow: hidden; text-overflow: ellipsis; }
+.bulle-case table.cmp tbody th { text-align: left; font-weight: 400; color: var(--muted); }
+.bulle-case table.cmp td { text-align: right; padding-left: 10px; }
+.bulle-case table.cmp td.m { color: var(--ink); }
+.bulle-case table.cmp td.p { color: var(--muted); padding-left: 6px; }
+.bulle-case table.cmp td.a:is(.m, .p) { font-weight: 600; color: var(--navy); }
+.bulle-case table.cmp td.e { color: var(--muted); border-left: 1px solid var(--rule); padding-left: 8px; }
+.bulle-case table.cmp tbody tr + tr :is(th, td) { border-top: 1px dotted var(--rule); }
 @media print { .bulle-case { display: none !important; } }
 .regle { background: var(--paper-3); color: var(--muted); font-style: italic; font-size: var(--fs-xs); padding: 8px 14px; margin: 0; }
 .suivi thead th { background: var(--gris-etiq); color: var(--muted); font-size: var(--fs-xs); text-align: right; }
@@ -315,6 +356,16 @@ table.dense td.num { text-align: right; }
 .suivi tbody th[scope='row'] { color: var(--brun); font-weight: 700; }
 .suivi td.saisi { background: var(--creme); border-bottom: 1px dotted var(--pointille); }
 .suivi tfoot :is(th, td) { background: var(--gris-etiq); border-top: 1px solid var(--rule-strong); font-weight: 700; color: var(--navy); }
+/* Suivi mensuel : totaux figés en bas du tableau (réunion du 23/11) */
+.suivi tfoot { position: sticky; bottom: 0; z-index: 2; }
+/* Bordures fusionnées non déplacées avec les cellules figées : séparateurs dessinés en ombre, sinon les mois transparaissent */
+.suivi tfoot :is(th, td) { border-block: 0; box-shadow: inset 0 -1px 0 var(--rule); }
+.suivi tfoot tr:first-child :is(th, td) { box-shadow: inset 0 1px 0 var(--rule-strong), inset 0 -1px 0 var(--rule); }
+.suivi .mois-3 { display: inline-block; width: 2.6em; }
+.suivi tbody th { font-variant-numeric: tabular-nums; }
+.suivi tfoot th[scope='row'] { text-align: left; white-space: nowrap; }
+.suivi tfoot tr.cmp :is(th, td) { font-weight: 600; color: var(--muted); border-top: 0; }
+.suivi tfoot tr.evol :is(th, td) { font-weight: 600; border-top: 0; }
 @media (max-width: 720px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } .periode { flex-wrap: wrap; } }
 /* Résumé : filtre d'année */
 .filtre-annee { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: var(--sp-3); }
@@ -337,8 +388,7 @@ table.dense td.num { text-align: right; }
   .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
   .resume-excel .cases .case strong { font-size: var(--fs-xl); min-height: 0; padding-top: 0; }
   .resume-excel .regle { padding: calc(var(--v) * .4) 14px; font-size: var(--fs-xs); }
-  .resume-excel > .table-scroll { flex: 1; min-height: 0; max-height: none; overflow: auto; margin: 0; }
-  .resume-excel .suivi { height: 100%; }
+  .resume-corps > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: none; overflow: auto; margin: 0; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: clamp(0px, .4vh, 4px); line-height: 1.2; font-size: var(--fs-sm); }
 }
 
@@ -721,7 +771,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .fl { align-self: flex-end; height: 32px; display: flex; align-items: center; color: var(--muted); font-size: 18px; }
 .multi-compte { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 .multi-liste { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
-.filtres .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
+.filtres .multi-liste label, :is(.filtres-pied, .filtres-entete) .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
   display: flex; justify-content: flex-start; align-items: center; gap: var(--sp-2); width: auto; margin: 0; padding: 5px 4px;
   background: none; color: var(--ink); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; cursor: pointer; white-space: nowrap;
 }
@@ -731,8 +781,23 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
   position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--rule); font-weight: 600;
 }
 .filtres .multi-liste label.multi-tout:hover { background: var(--surface-hover); }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'], :is(.filtres-pied, .filtres-entete) .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
 .multi-liste .choix-vide { margin: 0; padding: 5px 4px; color: var(--muted); }
+/* R9 : mode « Cumuler / Comparer » en tête de liste, repères A (marine) et B (gris pointillé) */
+.multi-bouton.cmp { background: var(--info-soft); }
+.multi-bouton:disabled { color: var(--muted); cursor: default; }
+.multi-bouton:disabled::after { content: none; }
+.multi-mode { display: flex; }
+.multi-mode button { flex: 1; height: 28px; border: 1px solid var(--rule-strong); border-radius: 0; background: var(--surface); color: var(--navy); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+.multi-mode button:first-child { border-radius: 8px 0 0 8px; }
+.multi-mode button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
+.multi-mode button[aria-pressed='true'] { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 600; }
+.multi-aide { margin: 0; color: var(--muted); font-size: var(--fs-xs); white-space: normal; }
+.multi-liste label:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
+.multi-rep { margin-left: auto; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.multi-rep.rep-a { background: var(--navy); color: #fff; }
+.multi-rep.rep-b { border: 1px dashed var(--muted); color: var(--muted); }
+.multi-pied { border-top: 1px solid var(--rule); padding-top: 6px; }
 /* Grille de saisie : valeurs proposées sous une cellule Poste, Site, Service… (sobre, angles droits) */
 .liste-choix { position: fixed; z-index: var(--z-menu); max-height: 240px; max-width: 360px; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 4px 0; list-style: none; background: var(--surface); border: 1px solid var(--rule); box-shadow: var(--shadow-2); font-size: var(--fs-sm); color: var(--ink); }
 .liste-choix li { padding: 6px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border-left: 2px solid transparent; }
@@ -815,7 +880,9 @@ html, body { overscroll-behavior: none; }
 /* Dossier de paie : liste des fichiers déposés, au-dessus des deux façons de renseigner */
 .dossier-paie { margin-top: var(--sp-4); }
 .dossier-paie-entete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-.dossier-paie-entete .saisie-sous-bandeau { margin: 0; }
+.dossier-paie .dossier-paie-entete .saisie-sous-bandeau { margin: 0; }
+.dossier-paie-actions { display: inline-flex; align-items: center; gap: var(--sp-4); }
+.admin-excel .dossier-paie-actions .admin-case { margin-top: 0; height: auto; font-size: var(--fs-sm); }
 .dossier-paie .note { margin: 0 0 var(--sp-3); }
 .dossier-paie-mois { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .dossier-paie-mois input[type="number"] { width: 6em; }
@@ -1284,6 +1351,9 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .resume-excel .cases .case .second-libelle { grid-row: 2; grid-column: 1 / -1; padding-right: 5.5em; }
   /* Ligne secondaire en petit : le libellé d'évolution reste entier à côté de sa valeur */
   .resume-excel .cases .case :is(.second-libelle, .variation, .second, .note) { font-size: var(--fs-xs); }
+  /* Squelette de l'évolution : tient dans les 5,5 em réservés, sans recouvrir la fin du libellé */
+  [aria-busy='true'] .cases .case > :is(.variation, .second) { min-width: 4.5em; }
+  [aria-busy='true'] .cases .case > :is(.variation, .second)::after { left: auto; right: 0; width: min(100%, 5em); }
   .resume-excel .cases .case .ratio-fb { grid-row: 3; grid-column: 1 / -1; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
@@ -1298,12 +1368,11 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   :root { --ligne-max: 2.25rem; }
 
   .resume-excel .regle { margin-bottom: 0; }
-  /* Le tableau occupe toute la hauteur restante, les 12 mois se partagent l'espace à parts égales */
-  .resume-excel > .table-scroll { flex: 1 1 0; min-height: 0; max-height: calc(14 * 3rem); }
+  /* Le tableau garde sa taille (mois de la période seulement) ; défilement au-delà, totaux figés */
+  /* Tableau : 12 mois sans défilement interne (règle en fin de fichier) */
   /* Cases plus hautes quand l'écran est haut (24'') : la page se répartit sur toute la hauteur */
   .resume-excel .cases .case { padding-block: clamp(var(--sp-3), 2.2vh, 28px); }
   .resume-excel { padding-bottom: var(--v); }
-  .resume-excel .suivi { height: 100%; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: var(--ligne-pad); line-height: 1.35; }
 
   /* Mensuel, Annuel, DONNEES, Individuel : même hauteur de ligne que le Résumé dans toutes les sections */
@@ -1522,8 +1591,8 @@ table.tableau-squelette td { height: 2.1em; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .souple .multi-bouton { width: 100%; min-width: 92px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie { min-width: 0; }
   /* Filtres à choix multiples (hors Période) : ils rétrécissent avant de faire passer la barre à la ligne */
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: 0 1 auto; min-width: 0; }
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: 100%; min-width: 60px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: 0 1 auto; min-width: min-content; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: 100%; min-width: 84px; }
 }
 .filtres-titre {
   display: inline-flex; align-items: center; gap: var(--sp-1); height: 32px;
@@ -1542,7 +1611,7 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-onglets a:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
 .admin-excel .admin-entete { margin: 0 0 var(--sp-3); }
 .admin-excel .admin-entete .bandeau-titre { margin: 0 0 2px; }
-.admin-excel .admin-entete p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.admin-entete p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .admin-excel .panneau { flex: 0 1 auto; margin-bottom: var(--sp-3); }
 .admin-excel .panneau table.dense thead th { text-align: left; }
 .admin-excel .panneau table.dense tbody th[scope='row'] { text-align: left; font-weight: var(--fw-bold); color: var(--navy); }
@@ -1571,13 +1640,15 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .renommer p { flex-basis: 100%; margin: 0; white-space: normal; }
 .admin-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; min-height: 0; }
 .admin-excel .admin-duo .panneau { margin-bottom: 0; }
+.admin-excel .admin-duo .panneau-corps { overflow-x: auto; }
+.admin-excel .admin-duo table.dense td select { max-width: 104px; }
 /* Sites, services et colonnes : sites et services, puis la liste fixe des contrats sous les services (écran moyen)
    ou en troisième colonne plus étroite (grand écran) ; elle garde sa hauteur, jamais étirée */
 .admin-trio { grid-template-areas: "site service" "site contrat"; grid-template-rows: auto 1fr; }
 .admin-trio > :nth-child(1) { grid-area: site; }
 .admin-trio > :nth-child(2) { grid-area: service; }
 .admin-trio > .ref-contrats { grid-area: contrat; align-self: start; }
-.ref-contrats .note { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
+.ref-contrats .note, .admin-excel .panneau-corps > .note:first-child { margin: 0; padding: var(--sp-2) 12px; color: var(--muted); font-size: var(--fs-xs); border-bottom: 1px solid var(--rule); }
 /* Colonnes (rubriques) : pleine largeur sous les sites et services */
 .admin-excel .ref-colonnes { margin-top: var(--sp-4); margin-bottom: 0; }
 .ref-colonnes-tete { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); padding: var(--sp-2) 12px; border-bottom: 1px solid var(--rule); }
@@ -1596,16 +1667,26 @@ table.tableau-squelette td { height: 2.1em; }
 .admin-excel .fiche-compte .panneau-corps { overflow: visible; }
 /* Grand écran : les deux colonnes remplissent la hauteur restante et chacune défile seule (cadres étirés, jamais de lignes vides) */
 @media (min-width: 1360px) {
-  .admin-excel :is(.admin-duo, .comptes-duo) { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
-  .admin-excel :is(.admin-duo, .comptes-duo) .panneau .panneau-corps { overflow: auto; }
-  .admin-excel :is(.admin-duo, .comptes-duo) .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
+  .admin-excel .comptes-duo { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .admin-excel .comptes-duo .panneau .panneau-corps { overflow: auto; }
+  .admin-excel .comptes-duo .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
+  /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
+  .admin-excel .comptes-duo .fiche-barre { bottom: 0; }
+  /* Écran pas assez haut pour partager la hauteur : la page Sites, services et colonnes défile seule. */
+  .page-ecran:has(> .admin-duo) { overflow-y: auto; }
+  .page-ecran:has(> .admin-duo) > * { flex-shrink: 0; }
+}
+/* Sites, services et Colonnes se partagent la hauteur seulement si l'écran est assez haut ;
+   sinon la page défile normalement (évite que les cadres écrasés se chevauchent). */
+@media (min-width: 1360px) and (min-height: 1000px) {
+  .admin-excel .admin-duo { flex: 1; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .admin-excel .admin-duo .panneau { overflow: hidden; }
+  .admin-excel .admin-duo .panneau .panneau-corps { overflow: auto; }
+  .admin-excel .admin-duo .panneau table.dense thead th { position: sticky; top: 0; z-index: 1; }
   .admin-excel .admin-trio { grid-template-rows: minmax(0, 1fr) auto; }
-  /* Sites, services et Colonnes se partagent la hauteur ; chaque cadre défile seul */
   .admin-excel .ref-colonnes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .admin-excel .ref-colonnes .panneau-corps { flex: 1; min-height: 0; overflow: auto; }
   .admin-excel .ref-colonnes table.dense thead th { position: sticky; top: 0; z-index: 1; }
-  /* Cadre qui défile seul, déjà raccourci du bandeau : la barre reste au bas du cadre. */
-  .admin-excel :is(.admin-duo, .comptes-duo) .fiche-barre { bottom: 0; }
 }
 .comptes-liste .fonction { display: block; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
 .bouton-copier { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--navy); cursor: pointer; }
@@ -1967,3 +2048,149 @@ td.cel-poids .etiq { margin-left: 10px; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child { box-shadow: 0 -2px 0 0 var(--info-soft); overflow: clip; overflow-clip-margin: 3px; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee > :first-child::before { content: ""; position: absolute; left: 0; top: -3px; bottom: -1px; width: 3px; background: var(--navy); pointer-events: none; }
 .charges-corps .panneau table.arbre > tbody:not(.pied) > tr.collee:has(+ tr.collee) > * { border-bottom-color: var(--info-soft); }
+
+/* Répartition des charges : période lue d'abord, en-têtes de détail en bleu nuit comme les autres sections. */
+.periode-titre { margin: 0 0 var(--sp-3); font-size: var(--fs-md, 15px); color: var(--muted); }
+.periode-titre strong { color: var(--navy); font-weight: 700; }
+.charges-excel .panneau table.dense thead th,
+.charges-excel .panneau table.repartition thead th:not(.gouttiere) { background: var(--navy); color: #fff; }
+/* Résumé : mois du suivi hors de la période choisie (non comptés dans le total). */
+/* Suivi mensuel : mois de la période en blanc (barre marine), autres mois grisés jusque dans la colonne
+   des mois, totaux en bleu comme les lignes de total des autres tableaux. */
+.suivi tr.hors-periode :is(th, td), .suivi tbody tr.hors-periode th[scope='row'], .suivi tr.hors-periode td.saisi { color: var(--muted); background: var(--gris-etiq); font-weight: 400; }
+.suivi tbody tr.en-periode th[scope='row'] { box-shadow: inset 4px 0 0 var(--navy); color: var(--navy); font-weight: 700; }
+.suivi tfoot tr:first-child :is(th, td) { background: var(--rapport-total); color: var(--navy); box-shadow: inset 0 2px 0 var(--navy), inset 0 -1px 0 var(--rule); }
+.suivi tfoot tr:not(:first-child) :is(th, td) { background: var(--surface); }
+/* Seul le corps du résumé défile : titre et filtres restent figés en haut, l'en-tête du tableau colle
+   en haut du corps (aucune ligne ne passe au-dessus), les totaux collent en bas. */
+@media (min-width: 1100px) {
+  .layout-ecran:has(.resume-excel) { height: calc(100dvh - var(--bandeau-h, 0px)); display: flex; flex-direction: column; }
+  .layout-ecran:has(.resume-excel) > .page { flex: 1; min-height: 0; width: 100%; }
+  .resume-excel.page-ecran { display: flex; flex-direction: column; min-height: 0; }
+  .resume-excel { height: 100%; }
+  .resume-excel > * { flex-shrink: 0; }
+  .resume-excel > .resume-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 4px; margin-inline: -4px; }
+  .resume-corps > .table-scroll { flex: none; min-height: 0; max-height: none; overflow: visible; }
+  .resume-excel .suivi thead th { position: sticky; top: 0; z-index: 3; }
+  .layout-ecran:has(.resume-excel) > .page { overflow: hidden; padding-bottom: 0; }
+}
+/* Petits écrans : pas de hauteur max non plus, la page seule défile. */
+.resume-corps > .table-scroll { max-height: none; overflow-y: visible; }
+.periode-legende { margin-left: auto; font-size: var(--fs-sm, 13px); color: var(--muted); }
+/* En-têtes de colonnes : période en petit sous le libellé. */
+th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }
+th[title] { cursor: help; }
+.rapport-excel .panneau table.dense thead th[title] { height: auto; white-space: normal; vertical-align: bottom; line-height: 1.25; }
+
+/* Téléphone : filtres des rapports sur deux colonnes, pour ne pas occuper tout le premier écran. */
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(.filtres-titre, .filtres-actions, .choix-salarie, :has(.periode-bouton)) { grid-column: 1 / -1; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > :is(label, .filtre) { width: auto; min-width: 0; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport :is(select, input, .multi-bouton) { width: 100%; max-width: none; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie input { width: 100%; }
+}
+
+/* Filtre de filtres : entre la période et les filtres de données, séparé par un trait de chaque côté. */
+.filtres-choix { display: flex; align-items: end; align-self: stretch; padding: 0 var(--sp-3); border-left: 1px solid var(--rule-strong); border-right: 1px solid var(--rule-strong); }
+.filtres-choix-pied { color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtres-choix { grid-column: 1 / -1; padding: 0; border: 0; }
+}
+/* Intertitres de groupe du menu « Filtrer par » (groupes d'indicateurs). */
+:is(.filtres, :is(.filtres-pied, .filtres-entete)) .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+:is(.filtres, :is(.filtres-pied, .filtres-entete)) .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
+.filtres-choix .multi-liste { max-height: 440px; }
+/* Barre de filtres en puces (Budget réalisé) : « Libellé : valeur ▾ » dans un seul bouton visuel,
+   navy et × quand le filtre est actif ; tout sur une ligne, sans titre ni Réinitialiser permanent. */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { flex-wrap: wrap; align-items: center; margin-bottom: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre { flex: none; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre {
+  position: relative; display: inline-flex; align-items: center; gap: 0; height: 32px; padding-left: 10px;
+  border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap;
+}
+.filtres-puces > .filtre > span:first-child::after { content: ' :'; }
+.filtres-puces > .filtre:hover { border-color: var(--navy); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton {
+  width: auto; max-width: 220px; height: 30px; min-width: 0; padding: 0 8px 0 4px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-weight: 600;
+}
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton:disabled { font-weight: 400; color: var(--muted); }
+.filtres-puces .multi-bouton:focus-visible, .filtres-puces .puce-croix:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif { background: var(--navy); border-color: var(--navy); color: rgba(255, 255, 255, .8); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif > .multi-bouton { color: #fff; }
+.filtres-puces > .filtre.actif > .multi-bouton::after { color: #fff; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif:has(.multi-bouton.cmp) { background: var(--info-soft); border-color: var(--navy); color: var(--muted); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif:has(.multi-bouton.cmp) > :is(.multi-bouton, .puce-croix) { color: var(--navy); }
+.puce-croix {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 30px; padding: 0;
+  border: 0; border-left: 1px solid rgba(255, 255, 255, .3); border-radius: 0 8px 8px 0; background: none;
+  color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.puce-croix:hover { background: rgba(255, 255, 255, .15); }
+.filtres-puces > .fl { color: var(--muted); }
+/* Ligne sous la barre : périmètre à gauche, « N filtres actifs · Tout effacer » à droite. */
+.filtres-perimetre { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--muted); }
+.filtres-perimetre p { margin: 0; min-width: 0; }
+.filtres-perimetre .lib { font-weight: 700; color: var(--navy); }
+.filtres-compte { flex: none; white-space: nowrap; }
+.lien-effacer { padding: 0; border: 0; background: none; color: var(--red); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.lien-effacer:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.multi-limite { color: var(--navy); }
+/* Raccourcis du calendrier « Période ». */
+.cal-raccourcis { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.cal-raccourcis button { height: 28px; padding: 0 6px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.cal-raccourcis button:hover { border-color: var(--navy); }
+.cal-raccourcis button.sel { background: var(--navy); border-color: var(--navy); color: #fff; }
+/* Puces de largeur fixe (période exceptée) : valeur tronquée, « +N » toujours visible, liste complète au survol. */
+/* Taille standard : libellé + zone de valeur fixe ; le × prend sa place dans la zone, la puce ne grandit jamais. */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; width: auto; }
+/* Grille équilibrée des puces (colonnes calculées : --cols) ; la période vit dans l'en-tête. */
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix { width: 100%; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix > .multi-bouton { width: 100%; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix > .multi-bouton > span { flex: 1 1 0; min-width: 0; width: auto !important; }
+/* « Employé » (recherche) prend la forme d'une puce : champ sans cadre, valeur en gras. */
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.souple { width: 100%; padding-right: 4px; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.souple > .choix-salarie { flex: 1 1 0; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.souple > .choix-salarie input { width: 100%; height: 30px; padding: 0 0 0 4px; border: 0; background: none; font-weight: 600; color: var(--navy); box-shadow: none; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.souple > .choix-salarie input:focus-visible { outline: none; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.souple:focus-within { border-color: var(--navy); outline: 2px solid var(--navy); outline-offset: 2px; }
+:is(.rapport-excel, .resume-excel) .filtres-entete > .filtres.filtres-rapport.filtres-puces { flex: none; flex-wrap: nowrap; margin: 0; padding: 0; background: none; gap: 6px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > span:first-child { flex: none; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton { flex: 1; width: auto; max-width: none; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { display: flex; flex: none; width: 120px; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix.actif:not(:has(.periode-bouton)) > .multi-bouton > span { width: 94px; }
+.puce-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.puce-plus { flex: none; font-weight: 700; white-space: pre; }
+.filtres-puces .multi-bouton.periode-bouton > span, .filtres-puces > .filtre:has(.periode-bouton) .multi-bouton > span { flex: none; }
+/* Un seul panneau : période | puces de périmètre, puis pied « Périmètre … » / Tout effacer / Filtres affichés. */
+.filtres-panneau { margin: 0 0 var(--sp-3); padding: 10px 12px 8px; border: 1px solid var(--rule); background: var(--surface-sunken); }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces { margin: 0; padding: 0; background: none; gap: 8px; }
+.filtres-sep { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--rule-strong); }
+.filtres-puces > .fl { margin: 0 -2px; }
+.filtres-entete { display: flex; margin: -2px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.filtres-entete .filtres-choix > .filtre > span:first-child { color: var(--navy); font-weight: 700; }
+.filtres-panneau > .filtres-perimetre { align-items: center; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); }
+:is(.filtres-pied, .filtres-entete) { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix { align-self: auto; padding: 0; border: 0; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix > .filtre { position: relative; display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-bouton { width: auto; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-bouton:hover { border-color: var(--navy); }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-menu { left: auto; right: 0; }
+.filtres-entete .filtres-choix .multi-menu { left: 0; right: auto; }
+.filtres-entete > .filtres-perimetre { display: block; flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filtres-entete > .reinitialiser { flex: none; height: 28px; margin-left: auto; padding: 0 12px; font-size: var(--fs-sm); }
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > :is(.filtre, .filtre:has(.periode-bouton)) { width: auto; max-width: 100%; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { width: 100%; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { flex: 1 1 0; min-width: 0; width: auto !important; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces .multi-bouton { width: auto; min-width: 0; }
+  .filtres-puces > .fl { display: none; }
+  .filtres-perimetre { flex-direction: column; align-items: flex-start !important; gap: 6px; }
+  :is(.filtres-pied, .filtres-entete) { flex-wrap: wrap; }
+  .filtres-sep { display: none; }
+  .filtres-entete > .filtres-perimetre { order: 3; flex-basis: 100%; }
+}

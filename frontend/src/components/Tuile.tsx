@@ -14,7 +14,12 @@ interface Props {
 }
 
 /** Variation lisible sans la couleur : flèche, signe et texte. */
-export function Variation({ v, vs = '' }: { v: Cell['var_pct'] | undefined; vs?: string }) {
+export function Variation({ v, vs = '', neutre = false }: {
+  v: Cell['var_pct'] | undefined
+  vs?: string
+  /** Écart entre deux sélections (R9) : ni « mieux » ni « moins bien », jamais en rouge. */
+  neutre?: boolean
+}) {
   if (v === null || v === undefined) return <span className="variation">— {vs}</span>
   if (v === 'n/a') return <span className="variation" title="Non calculable : la référence est nulle">— {vs}</span>
   const n = Number(v)
@@ -22,7 +27,7 @@ export function Variation({ v, vs = '' }: { v: Cell['var_pct'] | undefined; vs?:
   const signe = n > 0 ? '+' : ''
   const fleche = etat === 'stable' ? '▬' : etat === 'baisse' ? '▼' : '▲'
   return (
-    <span className={`variation ${etat === 'baisse' ? 'neg' : ''}`}>
+    <span className={`variation ${etat === 'baisse' && !neutre ? 'neg' : ''}`}>
       <span aria-hidden="true">{fleche}</span> {signe}
       {pct(v)} {vs}
       <span className="sr-only"> ({etat})</span>

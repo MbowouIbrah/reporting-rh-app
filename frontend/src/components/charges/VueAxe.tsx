@@ -36,6 +36,22 @@ function amener(racine: HTMLElement | null, niveau: number, nom: string) {
   r.querySelector<HTMLElement>('.depli-ligne')?.focus({ preventScroll: true })
 }
 
+interface Entete {
+  h: string
+  sous?: string
+  aide?: string
+}
+
+/** En-tête de colonne : libellé, période en petit dessous, explication au survol. */
+export function EnteteCol({ e, num }: { e: Entete; num: boolean }) {
+  return (
+    <th scope="col" className={num ? 'num' : undefined} title={e.aide}>
+      {e.h}
+      {e.sous && <span className="th-sous">{e.sous}</span>}
+    </th>
+  )
+}
+
 interface LigneProps {
   x: Noeud
   niveau: number
@@ -83,7 +99,7 @@ function Ligne({ x, niveau, ouverte, ouvrable, eff, onBascule }: LigneProps) {
   )
 }
 
-/** Tableau d'un axe, dépliable sur place : ligne, puis activité, puis personnes. */
+/** Tableau d'un axe, dépliable sur place : ligne, puis activité (service pour un site), puis personnes. */
 export default function VueAxe({ d, axe, filtres, lib, peutNominatif }: Props) {
   const eff = axe === 'eff'
   const nom = NOM_AXE[axe]
@@ -179,15 +195,25 @@ export default function VueAxe({ d, axe, filtres, lib, peutNominatif }: Props) {
   const bt = eff || raison ? null : d.axes[axe].budget_total
   const buT = bt ? num(bt.budget) : null
   const premier = PREMIER_LIBELLE[axe]
-  const entetes = eff
-    ? [premier, `Effectif ${lib.prec}`, `Effectif ${lib.cour}`, 'Variation', 'Part', 'Entrées', 'Sorties']
-    : [premier, lib.prec, lib.cour, 'Variation', 'Part', 'Effectif', 'Budget']
+  // En-têtes explicites : ce que montre la colonne, la période en petit dessous, le détail au survol.
+  const quoi = eff ? 'Effectif' : 'Charges'
+  const entetes: Entete[] = [
+    { h: premier },
+    { h: 'Période comparée', sous: lib.prec, aide: `${quoi} sur la période à comparer : ${lib.prec}` },
+    { h: 'Période sélectionnée', sous: lib.cour, aide: `${quoi} sur la période sélectionnée : ${lib.cour}` },
+    { h: 'Variation', aide: `Écart entre la période sélectionnée (${lib.cour}) et la période comparée (${lib.prec})` },
+    { h: 'Part', aide: eff ? 'Part de l’effectif total sur la période sélectionnée' : 'Part du total des charges sur la période sélectionnée' },
+    ...(eff
+      ? [{ h: 'Entrées', aide: 'Arrivées sur la période sélectionnée' }, { h: 'Sorties', aide: 'Départs sur la période sélectionnée' }]
+      : [{ h: 'Effectif', aide: 'Effectif sur la période sélectionnée' }, { h: 'Budget', aide: 'Budget de la période sélectionnée' }]),
+  ]
   const e1 = d.effectif.n1
   const eVar = d.effectif.var
 
   return (
     <>
       <h2 className="sr-only" id="axe-titre" tabIndex={-1}>{nom}</h2>
+      <p className="periode-titre">Chiffres de <strong>{lib.cour}</strong>, évolution par rapport à <strong>{lib.prec}</strong></p>
       <div className="charges-corps">
         <section className="panneau" aria-label={nom} ref={racine}>
           <div className="panneau-corps">
@@ -197,7 +223,7 @@ export default function VueAxe({ d, axe, filtres, lib, peutNominatif }: Props) {
                 {Array.from({ length: nc - 1 }, (_, i) => <col key={i} />)}
               </colgroup>
               <thead>
-                <tr>{entetes.map((h, i) => <th key={i} scope="col" className={i ? 'num' : undefined}>{h}</th>)}</tr>
+                <tr>{entetes.map((e, i) => <EnteteCol key={i} e={e} num={i > 0} />)}</tr>
               </thead>
               <tbody>{lignes}</tbody>
               <tbody className="pied">

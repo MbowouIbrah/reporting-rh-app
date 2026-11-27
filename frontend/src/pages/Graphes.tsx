@@ -233,17 +233,20 @@ export default function Graphes() {
     orProd1: num(n1?.[i]?.activite?.or_par_productif),
     ...Object.fromEntries(contrats.map((c) => [c, m.effectif_contrat?.[c] ?? null])),
   }))
-  // Valeur sur chaque point : la courbe la plus basse du mois écrit la sienne dessous, les autres dessus,
-  // pour que deux courbes proches ne se masquent pas ; un mois à zéro n'écrit rien.
+  // Valeur au-dessus de chaque point ; quand deux courbes sont trop proches pour que les valeurs se lisent,
+  // seule la plus haute écrit la sienne (le détail reste dans la bulle) ; un mois à zéro n'écrit rien.
+  const hautEffectif = Math.max(0, ...(serie ?? []).flatMap((m) => contrats.map((k) => Number((m as Record<string, unknown>)[k] ?? 0) || 0)))
+  const ecartMin = (hautEffectif > 0 ? haut4(hautEffectif * 1.15) : 4) * 0.08
   const etiquette = (c: string) => ({ x, y, value, index }: { x?: number | string; y?: number | string; value?: unknown; index?: number }) => {
     const v = Number(value)
     if (!v || index == null || !serie) return null
+    const rang = contrats.indexOf(c)
     const valeurs = contrats.map((k) => Number(serie[index][k as keyof (typeof serie)[number]] ?? NaN))
-    const positifs = valeurs.filter((u) => u > 0)
-    // Dessous seulement s'il y a une courbe au-dessus : seule valeur du mois, elle reste au-dessus de l'axe.
-    const bas = positifs.some((u) => u > v) && valeurs.findIndex((w) => w === Math.min(...positifs)) === contrats.indexOf(c)
+    // Masquée si une autre courbe, plus haute (ou égale et listée avant), a son étiquette trop près.
+    const masquee = valeurs.some((u, i) => i !== rang && u > 0 && (u > v || (u === v && i < rang)) && u - v < ecartMin)
+    if (masquee) return null
     return (
-      <text x={Number(x)} y={Number(y)} dy={bas ? 16 : -8} textAnchor="middle" fill="var(--ink)" fontSize={11}>
+      <text x={Number(x)} y={Number(y)} dy={-8} textAnchor="middle" fill="var(--ink)" fontSize={11}>
         {v}
       </text>
     )
@@ -423,7 +426,7 @@ export default function Graphes() {
     <section className={`page-ecran page-etroite rapport-excel graphes-excel${relais ? ' relais' : ''}${!rapport && rendus.length > 1 ? ' graphes-tout' : ''}`}>
       <TitreRapport titre="GRAPHES D’ÉVOLUTION" onGraphiques={rapport ? undefined : () => { setCoches([]); setExportEtat('') }} />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} periode={f.periode} onChange={f.set} />
+        <FiltresPeriode avecMois={false} avecProfil comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} salaries={f.garderSalaries(salaries)} partage={f.partage} periode={f.periode} onChange={f.set} puces />
       )}
       {/* Le menu fait partie de la structure : présent dès le squelette, avec le groupe d'ouverture.
           Plusieurs groupes : le titre du groupe visible est sur la même ligne que le menu. */}

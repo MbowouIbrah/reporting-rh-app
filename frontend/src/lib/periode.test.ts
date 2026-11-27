@@ -29,6 +29,8 @@ test('comparaison par défaut : mois d\'avant, ou mêmes mois un an avant', () =
   expect(defautCmp(mois(indice(2026, 1)))).toEqual(mois(indice(2025, 12)))
   expect(libelle(defautCmp(plage(indice(2026, 1), OCT_26, OCT_26)))).toBe('Janv. → oct. 2025')
   expect(libelle(defautCmp(plage(indice(2025, 4), indice(2026, 3))))).toBe('Avr. 2024 → mars 2025')
+  // plus de 12 mois : mêmes mois décalés d'années entières, sans chevauchement
+  expect(libelle(defautCmp(plage(indice(2025, 1), indice(2026, 2))))).toBe('Janv. 2023 → févr. 2024')
 })
 
 test('clics sur les mois : sélection, plage, désélection', () => {
@@ -44,6 +46,20 @@ test('clics sur les mois : sélection, plage, désélection', () => {
   expect(cliqueMois(anneeEntiere(2025, JANV_23, OCT_26), a)).toEqual(mois(a))
 })
 
+test('clic sur un mois : plage sur plusieurs années, jamais plus de 60 mois', () => {
+  const oct25 = indice(2025, 10)
+  // octobre 2025 → septembre 2026 : 12 mois, acceptés et relus tels quels
+  const p = cliqueMois(mois(oct25), indice(2026, 9))
+  expect(p).toEqual({ type: 'plage', d: oct25, f: indice(2026, 9) })
+  expect(lireTexte(versTexte(p!))).toEqual(p)
+  // octobre 2025 → octobre 2026 : 13 mois, acceptés
+  expect(cliqueMois(mois(oct25), indice(2026, 10))).toEqual({ type: 'plage', d: oct25, f: indice(2026, 10) })
+  // octobre 2025 → septembre 2030 : 60 mois ; un mois de plus est refusé, le clic recommence au mois cliqué
+  expect(lireTexte('2025-10..2030-09')).toEqual({ type: 'plage', d: oct25, f: indice(2030, 9) })
+  expect(cliqueMois(mois(oct25), indice(2030, 10))).toEqual(mois(indice(2030, 10)))
+  expect(lireTexte('2025-10..2030-10')).toBeNull()
+})
+
 test('texte d\'URL : aller-retour et valeurs refusées', () => {
   expect(versTexte(mois(OCT_26))).toBe('2026-10')
   const s = plage(indice(2025, 4), indice(2026, 3))
@@ -55,7 +71,7 @@ test('texte d\'URL : aller-retour et valeurs refusées', () => {
   expect(lireTexte('n_importe')).toBeNull()
   expect(lireTexte('2026-13')).toBeNull()
   expect(lireTexte('2026-10..2026-03')).toBeNull()
-  expect(lireTexte('2024-01..2025-01')).toBeNull()
+  expect(lireTexte('2020-01..2025-01')).toBeNull()
 })
 
 test('longueur et exercice de base', () => {

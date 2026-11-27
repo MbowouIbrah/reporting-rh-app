@@ -17,10 +17,11 @@ def premier_mois(calendrier: Depart = "civil") -> int:
     return DEBUT_FISCAL if calendrier == "fiscal" else 1
 
 
-def mois_exercice(annee: int, calendrier: Depart = "civil") -> list[tuple[int, int]]:
-    """Les 12 (année, mois) de l'exercice, dans l'ordre ; l'indice + 1 est le rang."""
+def mois_exercice(annee: int, calendrier: Depart = "civil",
+                  nb: int = 12) -> list[tuple[int, int]]:
+    """Les `nb` (année, mois) du cadre (12 : l'exercice), dans l'ordre ; l'indice + 1 est le rang."""
     p = premier_mois(calendrier)
-    return [(annee + (p - 1 + k) // 12, (p - 1 + k) % 12 + 1) for k in range(12)]
+    return [(annee + (p - 1 + k) // 12, (p - 1 + k) % 12 + 1) for k in range(nb)]
 
 
 def rang(mois: int, calendrier: Depart = "civil") -> int:
@@ -33,20 +34,21 @@ def fin_cumul(annee: int, mois: int | None, calendrier: Depart = "civil") -> tup
     return mois_exercice(annee, calendrier)[11 if mois is None else rang(mois, calendrier) - 1]
 
 
-def serie_reelle(items: list[dict], annee: int, calendrier: Depart) -> list[dict]:
-    """Éléments indexés par rang (`mois` de 1 à 12) -> vrais `mois` et `annee`."""
-    reels = mois_exercice(annee, calendrier)
+def serie_reelle(items: list[dict], annee: int, calendrier: Depart, nb: int = 12) -> list[dict]:
+    """Éléments indexés par rang (`mois` de 1 à `nb`) -> vrais `mois` et `annee`."""
+    reels = mois_exercice(annee, calendrier, nb)
     return [{**x, "annee": reels[x["mois"] - 1][0], "mois": reels[x["mois"] - 1][1]}
             for x in items]
 
 
-def en_mois_reels(res: dict, annee: int, ref_annee: int, calendrier: Depart) -> dict:
+def en_mois_reels(res: dict, annee: int, ref_annee: int, calendrier: Depart,
+                  nb: int = 12) -> dict:
     """Réponse du moteur annuel (rangs) -> vrais mois : `mois` et `annee` dans chaque mois des
-    séries, `mois_fin` et `annee_fin` pour le dernier mois saisi."""
-    out = {**res, "serie_n": serie_reelle(res["serie_n"], annee, calendrier),
-           "serie_n1": serie_reelle(res["serie_n1"], ref_annee, calendrier), "annee_fin": None}
+    séries, `mois_fin` et `annee_fin` pour le dernier mois saisi. `nb` : rangs du cadre."""
+    out = {**res, "serie_n": serie_reelle(res["serie_n"], annee, calendrier, nb),
+           "serie_n1": serie_reelle(res["serie_n1"], ref_annee, calendrier, nb), "annee_fin": None}
     if res.get("mois_fin"):
-        out["annee_fin"], out["mois_fin"] = mois_exercice(annee, calendrier)[res["mois_fin"] - 1]
+        out["annee_fin"], out["mois_fin"] = mois_exercice(annee, calendrier, nb)[res["mois_fin"] - 1]
     return out
 
 

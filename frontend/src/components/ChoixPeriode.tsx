@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
-  anneeDe, anneeEntiere, cliqueMois, indice, libelle, longueur as nbMois, moisDe, MOIS_GRILLE, mois as moisSel, plage, type Sel,
+  anneeDe, anneeEntiere, cliqueMois, indice, libelle, longueur as nbMois, MAX_MOIS, moisDe, MOIS_GRILLE, mois as moisSel, plage, type Sel,
 } from '../lib/periode'
 
 interface Props {
@@ -68,13 +68,25 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
   const cliqueAnnee = () => setBrouillon(anneeChoisie ? null : (memesMois() ?? anneeEntiere(annee, min, max)))
   const cliqueUnMois = (i: number) => setBrouillon(moisSeul ? moisSel(i) : cliqueMois(brouillon, i, max))
 
+  // Raccourcis du sélecteur de période (pas de la comparaison, qui impose sa longueur).
+  const raccourcis = moisSeul || longueur !== undefined ? [] : [
+    { nom: '12 derniers mois', s: plage(Math.max(max - 11, min), max, max) },
+    { nom: 'Année en cours', s: anneeEntiere(anneeDe(max), min, max) },
+    { nom: 'Année précédente', s: anneeEntiere(anneeDe(max) - 1, min, max) },
+    { nom: '3 derniers mois', s: plage(Math.max(max - 2, min), max, max) },
+  ].filter((r) => r.s.d <= r.s.f && r.s.d >= min)
+  const prendre = (s: Sel) => {
+    setBrouillon(s)
+    setAnnee(anneeDe(s.f))
+  }
+
   const mauvaiseLongueur = !!brouillon && longueur !== undefined && nbMois(brouillon) !== longueur
   const aide = !brouillon
     ? (moisSeul ? 'Cliquez un mois.' : 'Cliquez l’année ou un mois.')
     : mauvaiseLongueur
       ? `Il faut ${longueur} mois, comme la période`
       : brouillon.type === 'mois' && !moisSeul && longueur === undefined
-        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période</>
+        ? <><strong>{libelle(brouillon)}</strong> · un 2e mois pour une période, sur cette année ou une autre (◀ ▶), {MAX_MOIS} mois au plus</>
         : <strong>{libelle(brouillon)}</strong>
 
   const appliquer = () => {
@@ -84,6 +96,7 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
   }
   const apercu = (i: number) => {
     if (moisSeul || survol === null || !brouillon || brouillon.type !== 'mois') return false
+    if (Math.abs(survol - brouillon.d) + 1 > MAX_MOIS) return false
     return i !== brouillon.d && i >= Math.min(brouillon.d, survol) && i <= Math.max(brouillon.d, survol)
   }
 
@@ -113,6 +126,18 @@ export default function ChoixPeriode({ titre, valeur, onChange, min, max, longue
       </button>
       {ouvert && (
         <div id={`${id}-menu`} className="multi-menu cal" role="dialog" aria-label={titre}>
+          {raccourcis.length > 0 && (
+            <div className="cal-raccourcis" role="group" aria-label="Raccourcis">
+              {raccourcis.map((r) => {
+                const actif = !!brouillon && brouillon.d === r.s.d && brouillon.f === r.s.f
+                return (
+                  <button key={r.nom} type="button" className={actif ? 'sel' : undefined} aria-pressed={actif} onClick={() => prendre(r.s)}>
+                    {r.nom}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <div className="cal-tete">
             <button
               type="button" className="bouton bouton-secondaire" aria-label="Année précédente"

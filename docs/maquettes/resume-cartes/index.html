@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartes de détail du Résumé</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red: #e3001b; --red-deep: #b40015; --navy: #1a1f3c; --navy-2: #2a3157; --navy-3: #3d4470; --ink: #0e1126;
+  --paper: #fff; --paper-2: #fafafa; --paper-3: #f5f5f5; --rule: #e7e7ea; --rule-strong: #cfd0d8;
+  --muted: #6b6f82; --muted-2: #9499ab; --success: #14663a; --info-soft: #e6eefc;
+  --fs-xs: max(12px, .75rem); --fs-sm: max(12.5px, .8125rem); --fs-md: .875rem; --fs-xl: clamp(1.25rem, 1.1rem + .6vw, 1.5rem);
+  --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper-2); color: var(--ink); font: 400 var(--fs-md)/1.45 'DM Sans', system-ui, sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: var(--fs-xl); color: var(--navy); margin: 0 0 4px; letter-spacing: .02em; }
+.consigne { color: var(--muted); margin: 0 0 16px; max-width: 80ch; }
+.barre { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 16px; }
+.bascule { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; }
+.bascule button { font: inherit; font-weight: 600; border: 0; background: var(--paper); color: var(--navy); padding: 6px 14px; cursor: pointer; }
+.bascule button[aria-pressed='true'] { background: var(--navy); color: #fff; }
+.bascule button:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+.periode-titre { color: var(--muted); margin: 0 0 8px; }
+.periode-titre strong { color: var(--navy); }
+.cases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 900px) { .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.case { background: var(--paper); border: 1px solid var(--rule); padding: var(--sp-3) var(--sp-4); display: grid; gap: 2px; cursor: default; position: relative; transition: border-color .15s; }
+.case:hover, .case.ouverte { border-color: var(--navy-3); }
+.case:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.case .micro { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.case .micro i { font-style: normal; color: var(--muted-2); font-weight: 400; }
+.case strong { font-size: var(--fs-xl); color: var(--navy); font-variant-numeric: tabular-nums; }
+.case strong small { font-size: var(--fs-sm); color: var(--muted); font-weight: 400; }
+.case .lib2 { font-size: var(--fs-xs); color: var(--muted); }
+.case .var { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+.case .var b { color: var(--navy); }
+.case .var .bas { color: var(--red-deep); }
+.case .fb { font-size: var(--fs-xs); color: var(--muted); border-top: 1px dotted var(--rule); padding-top: 2px; }
+
+/* Carte de détail */
+.carte { position: fixed; z-index: 50; width: 340px; max-width: calc(100vw - 32px); max-height: calc(100vh - 24px); overflow: auto;
+  background: var(--paper); border: 1px solid var(--rule-strong); box-shadow: 0 8px 24px rgb(14 17 38 / 14%);
+  font-size: var(--fs-xs); opacity: 0; visibility: hidden; transform: translateY(4px);
+  transition: opacity .15s ease, transform .18s cubic-bezier(.22,1,.36,1), visibility 0s linear .15s, top .2s cubic-bezier(.22,1,.36,1), left .2s cubic-bezier(.22,1,.36,1); }
+.carte.visible { opacity: 1; visibility: visible; transform: none; transition: opacity .15s ease, transform .18s cubic-bezier(.22,1,.36,1), visibility 0s, top .2s cubic-bezier(.22,1,.36,1), left .2s cubic-bezier(.22,1,.36,1); }
+.carte.saut { transition: opacity .15s ease, transform .18s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .carte, .carte.visible { transition: none; transform: none; } }
+.carte header { padding: 10px 14px 8px; border-bottom: 1px solid var(--rule); background: var(--paper-3); }
+.carte header h2 { margin: 0; font-size: var(--fs-md); color: var(--navy); }
+.carte header p { margin: 2px 0 0; color: var(--muted); }
+.carte section { padding: 8px 14px; border-bottom: 1px solid var(--rule); }
+.carte section:last-child { border-bottom: 0; }
+.carte h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.ligne { display: flex; justify-content: space-between; gap: 16px; padding: 1px 0; }
+.ligne span:first-child { color: var(--muted); }
+.ligne span:last-child { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.ligne.fort span:last-child { font-weight: 700; color: var(--navy); }
+.ligne.sep { border-top: 1px dotted var(--rule-strong); margin-top: 2px; padding-top: 3px; }
+.hausse-bon { color: var(--success); font-weight: 700; }
+.baisse-mal { color: var(--red-deep); font-weight: 700; }
+.neutre { color: var(--navy); font-weight: 700; }
+.compo { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; }
+.compo .nom { color: var(--muted); white-space: nowrap; }
+.compo .barre-part { height: 8px; background: var(--paper-3); }
+.compo .barre-part i { display: block; height: 100%; background: var(--navy-3); }
+.compo .barre-part.bo i { background: var(--muted-2); }
+.compo .val { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.compo .val em { font-style: normal; color: var(--muted); }
+.courbe svg { display: block; width: 100%; height: 64px; }
+.courbe .leg { display: flex; gap: 12px; color: var(--muted); margin-top: 2px; }
+.courbe .leg i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--navy); vertical-align: middle; margin-right: 4px; }
+.courbe .leg i.cmp { border-top: 2px dashed var(--muted-2); }
+.calcul { color: var(--muted); margin: 0; }
+.mention { display: inline-block; background: #fff4d6; color: #8a5a00; padding: 0 6px; font-weight: 600; margin-top: 4px; }
+.sans-courbe .courbe { display: none; }
+
+.notes { margin-top: 32px; background: var(--paper); border: 1px solid var(--rule); padding: 16px 20px; max-width: 900px; }
+.notes h2 { font-size: var(--fs-md); color: var(--navy); margin: 0 0 8px; }
+.notes li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Résumé : cartes de détail au survol</h1>
+  <p class="consigne">Survolez une case, donnez-lui le focus (Tab) ou touchez-la. La carte reste ouverte quand la souris passe dessus ; Échap ou un clic ailleurs la ferme. Données fictives.</p>
+  <div class="barre">
+    <span class="bascule" role="group" aria-label="Variante">
+      <button type="button" id="v-c" aria-pressed="true">Avec mini-courbe (C)</button>
+      <button type="button" id="v-b" aria-pressed="false">Sans courbe (B)</button>
+    </span>
+  </div>
+  <p class="periode-titre">Chiffres de <strong>Janv.–Août 2026</strong>, évolution par rapport à <strong>Janv.–Août 2025</strong></p>
+  <div class="cases" id="ligne1"></div>
+  <div class="cases" id="ligne2"></div>
+
+  <div class="notes">
+    <h2>Ce qui est à valider</h2>
+    <ul>
+      <li><b>Structure commune</b> : en-tête (KPI et périodes) → comparaison → mini-courbe → composition → calcul.</li>
+      <li><b>Mini-courbe</b> (variante C) : mois de la période en trait plein, comparaison en pointillé. Absente pour Part des MAD et CA par salarié (pas de série mensuelle).</li>
+      <li><b>Couleurs</b> : vert/rouge seulement pour CA, marge et CA par salarié ; ailleurs la variation reste neutre.</li>
+      <li><b>Part des MAD</b> : regroupée en trois blocs (part, effectifs moyens, fin de période) au lieu de 8 lignes.</li>
+      <li><b>Effectif global</b> : composition par contrat avec front / back office en colonnes.</li>
+    </ul>
+  </div>
+</main>
+<div class="carte" id="carte" role="tooltip" aria-hidden="true"></div>
+<script>
+const P = 'Janv.–Août 2026', C = 'Janv.–Août 2025', MOIS = ['J','F','M','A','M','J','J','A']
+const fmt = (n, d = 0) => n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/ /g, ' ')
+const fc = (n) => `${fmt(n, 3)} FCFA`
+const signe = (n, s) => (n > 0 ? '+' : n < 0 ? '−' : '') + s
+const evol = (a, b, couleur) => {
+  const v = (a - b) / b * 100
+  const cls = !couleur ? 'neutre' : v >= 0 ? 'hausse-bon' : 'baisse-mal'
+  return `<span class="${cls}">${v >= 0 ? '▲' : '▼'} ${signe(v, fmt(Math.abs(v), 2))} %</span>`
+}
+const ligne = (k, v, c = '') => `<div class="ligne ${c}"><span>${k}</span><span>${v}</span></div>`
+const comparaison = (a, b, couleur, f = fc) => `<section><h3>Comparaison</h3>
+  ${ligne(P, f(a), 'fort')}${ligne(C, f(b))}
+  ${ligne('Écart', signe(a - b, f(Math.abs(a - b))), 'sep')}${ligne('Évolution', evol(a, b, couleur))}</section>`
+const courbe = (n, n1) => {
+  const all = [...n, ...n1], min = Math.min(...all), max = Math.max(...all), w = 312, h = 56
+  const pt = (s) => s.map((v, i) => `${(i / (s.length - 1) * (w - 8) + 4).toFixed(1)},${(h - 4 - (v - min) / (max - min || 1) * (h - 12)).toFixed(1)}`).join(' ')
+  return `<section class="courbe"><h3>Mois par mois</h3>
+  <svg viewBox="0 0 ${w} ${h + 8}" role="img" aria-label="Évolution mensuelle, période et comparaison">
+    <polyline points="${pt(n1)}" fill="none" stroke="var(--muted-2)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <polyline points="${pt(n)}" fill="none" stroke="var(--navy)" stroke-width="2"/>
+    ${MOIS.map((m, i) => `<text x="${(i / 7 * (w - 8) + 4).toFixed(1)}" y="${h + 7}" font-size="9" fill="var(--muted)" text-anchor="middle">${m}</text>`).join('')}
+  </svg>
+  <div class="leg"><span><i></i>2026</span><span><i class="cmp"></i>2025</span></div></section>`
+}
+const compo = (titre, lignes) => `<section><h3>${titre}</h3><div class="compo">${lignes.map(([nom, val, part, bo]) =>
+  `<span class="nom">${nom}</span><span class="barre-part${bo ? ' bo' : ''}"><i style="width:${part}%"></i></span><span class="val">${val} <em>${fmt(part, 1)} %</em></span>`).join('')}</div></section>`
+const calcul = (txt, extra = '') => `<section><h3>Calcul</h3><p class="calcul">${txt}</p>${extra}</section>`
+const serie = (base, pente, bruit) => MOIS.map((_, i) => base * (1 + pente * i) * (1 + bruit[i % bruit.length]))
+const B1 = [0, .04, -.03, .05, -.02, .03, -.04, .02], B2 = [.02, -.03, .01, .04, -.05, .02, .03, -.01]
+
+const KPI = [
+  { id: 'ca', titre: 'Chiffre d’affaires', valeur: '4,81 Md', lib2: 'Évolution par rapport à Janv.–Août 2025', var: ['▲', '6,4 %', false], fb: 'Par employé front office 52,3 M',
+    carte: () => comparaison(4812350000, 4521000000, true) + courbe(serie(580e6, .01, B1), serie(552e6, .008, B2))
+      + `<section><h3>Front office</h3>${ligne('CA par employé front office', fc(52307065.217))}${ligne('Effectif moyen front office', fmt(92, 2))}</section>`
+      + calcul('Somme des CA saisis sur les mois de la période.', '<span class="mention">Partiel : juillet non saisi pour 1 site</span>') },
+  { id: 'com', titre: 'Commissions', valeur: '6,42 M', lib2: 'Évolution par rapport à Janv.–Août 2025', var: ['▲', '5,5 %', false],
+    carte: () => comparaison(6416000, 6080000, false) + courbe(serie(780e3, .01, B2), serie(745e3, .009, B1))
+      + calcul('Somme des commissions des fichiers de paie de la période.') },
+  { id: 'ms', titre: 'Masse salariale', valeur: '642,3 M', lib2: 'Évolution par rapport à Janv.–Août 2025', var: ['▲', '5,1 %', false], fb: 'Front office 61,2 % · Back office 38,8 %',
+    carte: () => comparaison(642340220.88, 611200000, false) + courbe(serie(78e6, .006, B1), serie(74.5e6, .005, B2))
+      + compo('Par type de contrat', [['CDI', '498,1 M', 77.5], ['CDD', '96,3 M', 15.0], ['MAD', '47,9 M', 7.5]])
+      + compo('Front / back office', [['Front office', '393,1 M', 61.2], ['Back office', '249,2 M', 38.8, true]])
+      + calcul('Somme des masses salariales mensuelles. Moyenne par mois : ' + fc(80292527.61) + '.') },
+  { id: 'mad', titre: 'Part des MAD', valeur: '12,50 %', devise: false, lib2: 'Pourcentage MAD sites déportés', second: '6 · 33,3 %',
+    carte: () => `<section><h3>Part des MAD dans l’effectif moyen</h3>${ligne(P, '12,50 %', 'fort')}${ligne(C, '11,80 %')}${ligne('Écart', '+0,70 pt', 'sep')}</section>
+      <section><h3>Effectifs moyens (${P})</h3>${ligne('MAD', fmt(18, 2))}${ligne('Total', fmt(144, 2))}</section>
+      <section><h3>Fin de période</h3>${ligne('', '<b>Août 2026</b> · Août 2025')}${ligne('MAD globaux', '<b>18</b> · 17')}${ligne('dont sites déportés', '<b>6</b> · 5')}${ligne('Part des sites déportés', '<b>33,3 %</b> · 29,4 %')}</section>`
+      + calcul('Effectif moyen MAD ÷ effectif moyen total.') },
+  { id: 'marge', titre: 'Marge', valeur: '1,11 Md', lib2: 'Taux de marge', second: '23,0 %', fb: 'Par employé front office 12,0 M',
+    carte: () => `<section><h3>Comparaison</h3>${ligne('Marge ' + P, fc(1106840000), 'fort')}${ligne('Taux de marge ' + P, '23,00 %', 'fort')}${ligne('Taux de marge ' + C, '22,10 %')}${ligne('Écart de taux', '<span class="hausse-bon">▲ +0,90 pt</span>', 'sep')}</section>`
+      + courbe(serie(132e6, .012, B2), serie(124e6, .01, B1))
+      + `<section><h3>Base</h3>${ligne('CA des mois avec marge', fc(4812350000))}${ligne('Mois saisis', '8 sur 8')}${ligne('Marge par employé front office', fc(12030869.565))}</section>`
+      + calcul('Taux = marge cumulée ÷ CA des mois où la marge est saisie.') },
+  { id: 'primes', titre: 'Primes de productivité', valeur: '5,20 M', lib2: 'Évolution par rapport à Janv.–Août 2025', var: ['▼', '4,6 %', true],
+    carte: () => comparaison(5200000, 5450000, false) + courbe(serie(650e3, -.004, B1), serie(680e3, .002, B2))
+      + calcul('Somme des primes de productivité des fichiers de paie de la période.') },
+  { id: 'eff', titre: 'Effectif global', valeur: '144', devise: false, lib2: 'Évolution par rapport à Août 2025', var: ['▲', '3,6 %', false], fb: 'Front office 63,9 % · Back office 36,1 %',
+    carte: () => comparaison(144, 139, false, (n) => fmt(n)).replace(P, 'Fin août 2026').replace(C, 'Fin août 2025') + courbe([138, 139, 141, 140, 142, 143, 143, 144], [133, 134, 134, 136, 137, 138, 138, 139])
+      + `<section><h3>Par type de contrat</h3>${ligne('', 'Total · FO · BO')}${ligne('CDI', '<b>108</b> · 70 · 38')}${ligne('CDD', '<b>18</b> · 12 · 6')}${ligne('MAD', '<b>18</b> · 10 · 8')}</section>`
+      + compo('Front / back office', [['Front office', '92', 63.9], ['Back office', '52', 36.1, true]])
+      + calcul('Salariés présents à la fin du dernier mois saisi (août 2026). Effectif moyen de la période : 143,25.') },
+  { id: 'caeff', titre: 'CA par salarié', valeur: '33,6 M', lib2: 'Évolution par rapport à Janv.–Août 2025', var: ['▲', '2,9 %', false],
+    carte: () => comparaison(33593368.237, 32640000, true)
+      + `<section><h3>Calcul</h3>${ligne('CA cumulé', fc(4812350000))}${ligne('÷ Effectif moyen', fmt(143.25, 2))}${ligne('= CA par salarié', fc(33593368.237), 'sep fort')}</section>` },
+]
+
+const htmlCase = (k) => `<div class="case" tabindex="0" data-id="${k.id}" aria-describedby="carte">
+  <span class="micro">${k.titre}<i aria-hidden="true">ⓘ</i></span>
+  <strong>${k.valeur}${k.devise === false ? '' : ' <small>FCFA</small>'}</strong>
+  <span class="lib2">${k.lib2}</span>
+  ${k.var ? `<span class="var"><b class="${k.var[2] ? 'bas' : ''}">${k.var[0]}</b> ${k.var[1]}</span>` : `<span class="var" style="text-align:right;font-weight:400">${k.second}</span>`}
+  ${k.fb ? `<span class="fb">${k.fb}</span>` : ''}</div>`
+document.getElementById('ligne1').innerHTML = KPI.slice(0, 4).map(htmlCase).join('')
+document.getElementById('ligne2').innerHTML = KPI.slice(4).map(htmlCase).join('')
+
+// Comportement WCAG 1.4.13 : survolable, persistante, masquable (Échap).
+const carte = document.getElementById('carte')
+let ouverte = null, tOuvrir, tFermer
+const placer = (el) => {
+  const r = el.getBoundingClientRect(), w = carte.offsetWidth, h = carte.offsetHeight
+  let left = Math.min(Math.max(16, r.left), innerWidth - w - 16)
+  let top = r.bottom + 6
+  if (top + h > innerHeight - 12 && r.top - h - 6 > 12) top = r.top - h - 6
+  carte.style.left = left + 'px'; carte.style.top = Math.max(12, top) + 'px'
+}
+const ouvrir = (el) => {
+  clearTimeout(tFermer); clearTimeout(tOuvrir)
+  if (ouverte === el) return
+  const k = KPI.find((x) => x.id === el.dataset.id)
+  carte.classList.toggle('saut', !ouverte)
+  ouverte?.classList.remove('ouverte')
+  carte.innerHTML = `<header><h2>${k.titre}</h2><p>${P} · comparé à ${k.id === 'eff' ? 'août 2025' : C}</p></header>` + k.carte()
+  placer(el); el.classList.add('ouverte'); carte.classList.add('visible'); carte.setAttribute('aria-hidden', 'false'); ouverte = el
+}
+const fermer = () => { clearTimeout(tOuvrir); clearTimeout(tFermer); ouverte?.classList.remove('ouverte'); ouverte = null; carte.classList.remove('visible'); carte.setAttribute('aria-hidden', 'true') }
+const fermerBientot = () => { clearTimeout(tOuvrir); clearTimeout(tFermer); tFermer = setTimeout(fermer, 200) }
+document.querySelectorAll('.case').forEach((el) => {
+  el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'touch') return; clearTimeout(tFermer); clearTimeout(tOuvrir); tOuvrir = setTimeout(() => ouvrir(el), ouverte ? 0 : 150) })
+  el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') fermerBientot() })
+  el.addEventListener('focus', () => ouvrir(el))
+  el.addEventListener('blur', fermerBientot)
+  el.addEventListener('click', (e) => { if (ouverte === el && e.pointerType === 'touch') fermer(); else ouvrir(el) })
+})
+carte.addEventListener('pointerenter', () => clearTimeout(tFermer))
+carte.addEventListener('pointerleave', fermerBientot)
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ouverte) fermer() })
+document.addEventListener('pointerdown', (e) => { if (ouverte && !e.target.closest('.case, .carte')) fermer() })
+addEventListener('scroll', () => ouverte && placer(ouverte), true)
+addEventListener('resize', () => ouverte && placer(ouverte))
+
+const vc = document.getElementById('v-c'), vb = document.getElementById('v-b')
+const variante = (c) => { vc.setAttribute('aria-pressed', c); vb.setAttribute('aria-pressed', !c); carte.classList.toggle('sans-courbe', !c); if (ouverte) placer(ouverte) }
+vc.onclick = () => variante(true); vb.onclick = () => variante(false)
+</script>
+</body>
+</html>

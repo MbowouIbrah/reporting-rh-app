@@ -59,6 +59,7 @@ export default function FichiersDossier({ onOuvrir }: Props) {
     <section className="dossier-paie" aria-label="Fichiers du dossier de paie">
       <div className="dossier-paie-entete">
         <h3 className="saisie-sous-bandeau">FICHIERS DU DOSSIER DE PAIE</h3>
+        <div className="dossier-paie-actions">
         {q.data?.actif && auto.data && (
           <label className="admin-case" title="Un fichier sans problème, ou dont le dernier problème vient d’être réglé, est rendu disponible sans clic. Jamais quand il modifie des lignes déjà enregistrées.">
             <input type="checkbox" checked={auto.data.actif} disabled={reglage} onChange={(e) => void basculer(e.target.checked)} />{' '}
@@ -66,6 +67,7 @@ export default function FichiersDossier({ onOuvrir }: Props) {
           </label>
         )}
         <Bouton variante="lien" onClick={() => void q.refetch()} disabled={q.isFetching}>Actualiser</Bouton>
+        </div>
       </div>
       {erreur && <p className="bandeau ko" role="alert">{erreur}</p>}
       {q.isLoading ? (
