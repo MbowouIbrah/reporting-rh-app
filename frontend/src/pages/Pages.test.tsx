@@ -294,7 +294,7 @@ test('Répartition des charges : filtres type de site, poste et employé (employ
   // filtre de filtres : Département et Site par défaut, les autres ajoutés à la demande
   expect(screen.getByRole('button', { name: /^Site/ })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /^Type de site/ })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: /^Filtrer par/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Filtres/ }))
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Type de site' }))
   fireEvent.click(screen.getByRole('checkbox', { name: 'Poste' }))
   fireEvent.click(screen.getByRole('checkbox', { name: 'Site' }))
@@ -310,10 +310,10 @@ test('Répartition des charges : filtres type de site, poste et employé (employ
   expect(screen.queryByRole('combobox', { name: 'Employé' })).toBeNull()
 })
 
-test('Filtrer par : champs rangés par groupe, filtres de profil envoyés au serveur et réinitialisés', async () => {
+test('Filtres : champs rangés par groupe, filtres de profil envoyés au serveur et réinitialisés', async () => {
   rendu(<Charges />, '/charges', ['report:read'])
-  fireEvent.click(await screen.findByRole('button', { name: /^Filtrer par/ }))
-  const menu = await screen.findByRole('group', { name: 'Filtrer par' })
+  fireEvent.click(await screen.findByRole('button', { name: /^Filtres/ }))
+  const menu = (await screen.findAllByRole('group', { name: 'Filtres' })).find((e) => e.classList.contains('multi-menu'))!
   const textes = [...menu.querySelectorAll('.filtres-choix-groupe, label')].map((e) => e.textContent)
   expect(textes.indexOf('Profil des salariés')).toBeGreaterThan(textes.indexOf('Emploi'))
   expect(textes.indexOf('Emploi')).toBeGreaterThan(textes.indexOf('Organisation'))
@@ -329,9 +329,9 @@ test('Filtrer par : champs rangés par groupe, filtres de profil envoyés au ser
   fireEvent.click(screen.getByRole('checkbox', { name: 'Femmes' }))
   await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes('sexe=H%7Cnr'))).toBe(true))
   const reinit = screen.getByRole('button', { name: /Réinitialiser/ })
-  expect(reinit).toBeEnabled()
   fireEvent.click(reinit)
-  await waitFor(() => expect(screen.getByRole('button', { name: /Réinitialiser/ })).toBeDisabled())
+  // sans filtre actif, le bouton disparaît de l'en-tête
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Réinitialiser/ })).toBeNull())
 })
 
 test('Individuel : tous les salariés par défaut', async () => {
