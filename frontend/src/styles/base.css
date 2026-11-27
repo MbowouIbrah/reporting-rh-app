@@ -771,7 +771,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .fl { align-self: flex-end; height: 32px; display: flex; align-items: center; color: var(--muted); font-size: 18px; }
 .multi-compte { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 .multi-liste { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
-.filtres .multi-liste label, .filtres-pied .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
+.filtres .multi-liste label, :is(.filtres-pied, .filtres-entete) .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
   display: flex; justify-content: flex-start; align-items: center; gap: var(--sp-2); width: auto; margin: 0; padding: 5px 4px;
   background: none; color: var(--ink); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; cursor: pointer; white-space: nowrap;
 }
@@ -781,7 +781,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
   position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--rule); font-weight: 600;
 }
 .filtres .multi-liste label.multi-tout:hover { background: var(--surface-hover); }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'], .filtres-pied .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'], :is(.filtres-pied, .filtres-entete) .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
 .multi-liste .choix-vide { margin: 0; padding: 5px 4px; color: var(--muted); }
 /* R9 : mode « Cumuler / Comparer » en tête de liste, repères A (marine) et B (gris pointillé) */
 .multi-bouton.cmp { background: var(--info-soft); }
@@ -2098,8 +2098,8 @@ th[title] { cursor: help; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtres-choix { grid-column: 1 / -1; padding: 0; border: 0; }
 }
 /* Intertitres de groupe du menu « Filtrer par » (groupes d'indicateurs). */
-:is(.filtres, .filtres-pied) .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-:is(.filtres, .filtres-pied) .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
+:is(.filtres, :is(.filtres-pied, .filtres-entete)) .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+:is(.filtres, :is(.filtres-pied, .filtres-entete)) .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
 .filtres-choix .multi-liste { max-height: 440px; }
 /* Barre de filtres en puces (Budget réalisé) : « Libellé : valeur ▾ » dans un seul bouton visuel,
    navy et × quand le filtre est actif ; tout sur une ligne, sans titre ni Réinitialiser permanent. */
@@ -2155,14 +2155,19 @@ th[title] { cursor: help; }
 :is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces { margin: 0; padding: 0; background: none; gap: 8px; }
 .filtres-sep { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--rule-strong); }
 .filtres-puces > .fl { margin: 0 -2px; }
+.filtres-entete { display: flex; margin: -2px 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.filtres-entete .filtres-choix > .filtre > span:first-child { color: var(--navy); font-weight: 700; }
 .filtres-panneau > .filtres-perimetre { align-items: center; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); }
-.filtres-pied { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
-.filtres-pied .filtres-choix { align-self: auto; padding: 0; border: 0; }
-.filtres-pied .filtres-choix > .filtre { position: relative; display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap; }
-.filtres-pied .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
-.filtres-pied .filtres-choix .multi-bouton { width: auto; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
-.filtres-pied .filtres-choix .multi-bouton:hover { border-color: var(--navy); }
-.filtres-pied .filtres-choix .multi-menu { left: auto; right: 0; }
+:is(.filtres-pied, .filtres-entete) { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix { align-self: auto; padding: 0; border: 0; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix > .filtre { position: relative; display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-bouton { width: auto; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-bouton:hover { border-color: var(--navy); }
+:is(.filtres-pied, .filtres-entete) .filtres-choix .multi-menu { left: auto; right: 0; }
+.filtres-entete .filtres-choix .multi-menu { left: 0; right: auto; }
+.filtres-entete > .filtres-perimetre { display: block; flex: 1; min-width: 0; margin: 0; }
+.filtres-entete > .reinitialiser { flex: none; height: 28px; margin-left: auto; padding: 0 12px; font-size: var(--fs-sm); }
 @media (max-width: 720px) {
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { display: flex; flex-wrap: wrap; gap: 6px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > :is(.filtre, .filtre:has(.periode-bouton)) { width: auto; max-width: 100%; }
@@ -2170,6 +2175,7 @@ th[title] { cursor: help; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces .multi-bouton { width: auto; min-width: 0; }
   .filtres-puces > .fl { display: none; }
   .filtres-perimetre { flex-direction: column; align-items: flex-start !important; gap: 6px; }
-  .filtres-pied { flex-wrap: wrap; }
+  :is(.filtres-pied, .filtres-entete) { flex-wrap: wrap; }
   .filtres-sep { display: none; }
+  .filtres-entete > .filtres-perimetre { order: 3; flex-basis: 100%; }
 }

@@ -75,10 +75,10 @@ const PROFIL: { id: DimProfil; libelle: string; pluriel: string; valeurs: [strin
   ] },
 ]
 
-/** Groupes du menu « Filtrer par », dans l'ordre des groupes d'indicateurs. */
+/** Groupes du menu des filtres, dans l'ordre de la barre : de l'organisation à la personne. */
 const GROUPE: Record<DimComparee | DimProfil, string> = {
-  activite: 'Activité et productivité', poste: 'Profil des salariés',
-  departement: 'Effectif', service: 'Effectif', type_site: 'Effectif', site: 'Effectif', type_contrat: 'Effectif',
+  departement: 'Organisation', service: 'Organisation', type_site: 'Organisation', site: 'Organisation', activite: 'Organisation',
+  type_contrat: 'Emploi', poste: 'Emploi',
   sexe: 'Profil des salariés', age: 'Profil des salariés', anciennete: 'Profil des salariés',
 }
 
@@ -302,9 +302,9 @@ export default function FiltresPeriode({
   // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
   const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
   const dispo = ([
-    [avecActivite, 'activite', LIBELLE_DIM.activite],
     [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
     [avecType, 'type_site', LIBELLE_DIM.type_site], [!!sites, 'site', LIBELLE_DIM.site],
+    [avecActivite, 'activite', LIBELLE_DIM.activite],
     [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat], [avecPoste, 'poste', LIBELLE_DIM.poste],
     ...PROFIL.map((f) => [!!avecProfil, f.id, f.libelle] as const),
   ] as const).filter(([ok]) => ok).map(([, d, nom]) => ({ id: d, nom, groupe: GROUPE[d] }))
@@ -324,7 +324,7 @@ export default function FiltresPeriode({
   const limite = (parent: DimComparee) => (puces && noms(parent).length ? noms(parent).join(', ') : undefined)
   const effacer = () => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))
   const DIMS_PERIMETRE: [ClePartagee, string][] = [
-    ['activite', 'Activité'], ['departement', 'Département'], ['service', 'Service'], ['type_site', 'Type de site'], ['site', 'Site'],
+    ['departement', 'Département'], ['service', 'Service'], ['type_site', 'Type de site'], ['site', 'Site'], ['activite', 'Activité'],
     ['type_contrat', 'Contrat'], ['poste', 'Poste'], ['sexe', 'Sexe'], ['age', "Tranche d'âge"], ['anciennete', "Tranche d'ancienneté"],
     ['matricule', 'Employé'],
   ]
@@ -333,14 +333,12 @@ export default function FiltresPeriode({
     : k === 'sexe' || k === 'age' || k === 'anciennete' ? nomsProfil(k)
     : noms(k as DimComparee)
   const actifs = DIMS_PERIMETRE.filter(([k]) => cles.includes(k) && valeursPerimetre(k).length > 0)
-  const periodeChangee = cles.some((k) => ['periode', 'comparee', 'annee', 'mois', 'cmp_periode', 'calendrier', 'exercice'].includes(k) && partage[k])
-  const nbActifs = actifs.length + (periodeChangee ? 1 : 0)
   const selectionB = cmpDim && filtres.cmp_val
     ? (cmpDim === 'type_site' ? LIBELLE_TYPE_SITE[filtres.cmp_val] ?? filtres.cmp_val : filtres.cmp_val)
     : undefined
   const choixFiltres = dispo.length > 0 && (
     <div className="filtres-choix">
-      <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} libelle={puces ? 'Filtres affichés' : undefined} />
+      <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} libelle={puces ? 'Filtres' : undefined} />
     </div>
   )
   const barre = (
@@ -401,24 +399,18 @@ export default function FiltresPeriode({
     : ''
   return (
     <div className="filtres-panneau">
-      {barre}
-      <div className="filtres-perimetre">
-        <p aria-live="polite">
+      <div className="filtres-entete">
+        {choixFiltres}
+        {choixFiltres && <span className="filtres-sep" aria-hidden="true" />}
+        <p className="filtres-perimetre" aria-live="polite">
           <span className="lib">Périmètre :</span> {temps}
           {actifs.length
             ? actifs.map(([k, nom]) => <span key={k}> · {nom} : {valeursPerimetre(k).join(cmpDim === k ? ' / ' : ', ')}</span>)
             : ' · tous les salariés'}
         </p>
-        <div className="filtres-pied">
-          {cles.some((k) => partage[k]) && (
-            <p className="filtres-compte">
-              {nbActifs > 0 && <>{nbActifs} filtre{nbActifs > 1 ? 's' : ''} actif{nbActifs > 1 ? 's' : ''} · </>}
-              <button type="button" className="lien-effacer" onClick={effacer}>Tout effacer</button>
-            </p>
-          )}
-          {choixFiltres}
-        </div>
+        {cles.some((k) => partage[k]) && <BoutonReinitialiser actif onClick={effacer} libelle="Réinitialiser" />}
       </div>
+      {barre}
     </div>
   )
 }
