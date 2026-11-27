@@ -340,7 +340,7 @@ export default function FiltresPeriode({
     : undefined
   const choixFiltres = dispo.length > 0 && (
     <div className="filtres-choix">
-      <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} />
+      <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} libelle={puces ? 'Filtres affichés' : undefined} />
     </div>
   )
   const barre = (
@@ -357,6 +357,7 @@ export default function FiltresPeriode({
         </>
       )}
       {!puces && choixFiltres}
+      {puces && <span className="filtres-sep" aria-hidden="true" />}
       {departements && voir('departement') && (
         <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={val('departement')} onChange={(v) => onChange({ departement: v })} comparer={comparer('departement')} puce={puces} />
       )}
@@ -386,8 +387,6 @@ export default function FiltresPeriode({
       {salaries && (
         <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
       )}
-      {/* En puces, « Filtrer par » gère la barre : rangé à la fin, comme un « + Filtre ». */}
-      {puces && choixFiltres}
       {(!puces || children) && (
         <div className="filtres-actions">
           {!puces && <BoutonReinitialiser actif={cles.some((k) => partage[k])} onClick={effacer} />}
@@ -401,7 +400,7 @@ export default function FiltresPeriode({
     ? `${libelle(periode.sel)}${selectionB ? '' : ` comparé à ${libelle(periode.cmp)}`}`
     : ''
   return (
-    <>
+    <div className="filtres-panneau">
       {barre}
       <div className="filtres-perimetre">
         <p aria-live="polite">
@@ -410,13 +409,16 @@ export default function FiltresPeriode({
             ? actifs.map(([k, nom]) => <span key={k}> · {nom} : {valeursPerimetre(k).join(cmpDim === k ? ' / ' : ', ')}</span>)
             : ' · tous les salariés'}
         </p>
-        {cles.some((k) => partage[k]) && (
-          <p className="filtres-compte">
-            {nbActifs > 0 && <>{nbActifs} filtre{nbActifs > 1 ? 's' : ''} actif{nbActifs > 1 ? 's' : ''} · </>}
-            <button type="button" className="lien-effacer" onClick={effacer}>Tout effacer</button>
-          </p>
-        )}
+        <div className="filtres-pied">
+          {cles.some((k) => partage[k]) && (
+            <p className="filtres-compte">
+              {nbActifs > 0 && <>{nbActifs} filtre{nbActifs > 1 ? 's' : ''} actif{nbActifs > 1 ? 's' : ''} · </>}
+              <button type="button" className="lien-effacer" onClick={effacer}>Tout effacer</button>
+            </p>
+          )}
+          {choixFiltres}
+        </div>
       </div>
-    </>
+    </div>
   )
 }

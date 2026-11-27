@@ -11,7 +11,8 @@ export function lireAffiches(v: unknown): string[] | null {
 }
 
 /** « Filtre de filtres » : choisit quels filtres de données apparaissent dans la barre. */
-export default function ChoixFiltres({ dispo, affiches, onChange }: {
+export default function ChoixFiltres({ dispo, affiches, onChange, libelle = 'Filtrer par' }: {
+  libelle?: string
   dispo: FiltreDispo[]
   affiches: string[]
   onChange: (id: string, afficher: boolean) => void
@@ -45,7 +46,7 @@ export default function ChoixFiltres({ dispo, affiches, onChange }: {
         }
       }}
     >
-      <span id={`${id}-lib`}>Filtrer par</span>
+      <span id={`${id}-lib`}>{libelle}</span>
       <button
         ref={bouton}
         type="button"

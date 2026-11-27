@@ -771,7 +771,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
 .fl { align-self: flex-end; height: 32px; display: flex; align-items: center; color: var(--muted); font-size: 18px; }
 .multi-compte { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
 .multi-liste { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
-.filtres .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
+.filtres .multi-liste label, .filtres-pied .multi-liste label, :is(.rapport-excel, .resume-excel) .filtres .multi-liste label {
   display: flex; justify-content: flex-start; align-items: center; gap: var(--sp-2); width: auto; margin: 0; padding: 5px 4px;
   background: none; color: var(--ink); font-size: var(--fs-sm); font-weight: 400; text-transform: none; letter-spacing: 0; cursor: pointer; white-space: nowrap;
 }
@@ -781,7 +781,7 @@ table.dense.tab-global th:not(:first-child), table.dense.tab-global td:not(:firs
   position: sticky; top: 0; z-index: 1; background: var(--surface); border-bottom: 1px solid var(--rule); font-weight: 600;
 }
 .filtres .multi-liste label.multi-tout:hover { background: var(--surface-hover); }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .multi-liste input[type='checkbox'], .filtres-pied .multi-liste input[type='checkbox'] { flex: none; width: 15px; min-width: 0; height: 15px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--navy); }
 .multi-liste .choix-vide { margin: 0; padding: 5px 4px; color: var(--muted); }
 /* R9 : mode « Cumuler / Comparer » en tête de liste, repères A (marine) et B (gris pointillé) */
 .multi-bouton.cmp { background: var(--info-soft); }
@@ -2098,8 +2098,8 @@ th[title] { cursor: help; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtres-choix { grid-column: 1 / -1; padding: 0; border: 0; }
 }
 /* Intertitres de groupe du menu « Filtrer par » (groupes d'indicateurs). */
-.filtres .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.filtres .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
+:is(.filtres, .filtres-pied) .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+:is(.filtres, .filtres-pied) .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
 .filtres-choix .multi-liste { max-height: 440px; }
 /* Barre de filtres en puces (Budget réalisé) : « Libellé : valeur ▾ » dans un seul bouton visuel,
    navy et × quand le filtre est actif ; tout sur une ligne, sans titre ni Réinitialiser permanent. */
@@ -2146,16 +2146,25 @@ th[title] { cursor: help; }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: auto; min-width: 0; }
 .filtres-puces .multi-bouton > span { flex: none; }
-/* « Filtrer par » en fin de barre : puce à bord pointillé, sans les traits de séparation. */
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix { align-self: center; padding: 0; border: 0; }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix > .filtre {
-  display: inline-flex; align-items: center; height: 32px; padding-left: 10px; border: 1px dashed var(--rule-strong); border-radius: 8px;
-  font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap;
-}
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix > .filtre:hover { border-color: var(--navy); }
-.filtres-puces > .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix .multi-bouton { width: auto; height: 30px; padding: 0 8px 0 4px; border: 0; background: none; color: var(--ink); font-weight: 600; }
+/* Un seul panneau : période | puces de périmètre, puis pied « Périmètre … » / Tout effacer / Filtres affichés. */
+.filtres-panneau { margin: 0 0 var(--sp-3); padding: 10px 12px 8px; border: 1px solid var(--rule); background: var(--surface-sunken); }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces { margin: 0; padding: 0; background: none; gap: 8px; }
+.filtres-sep { flex: none; width: 1px; height: 24px; margin: 0 4px; background: var(--rule-strong); }
+.filtres-puces > .fl { margin: 0 -2px; }
+.filtres-panneau > .filtres-perimetre { align-items: center; margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--rule); }
+.filtres-pied { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
+.filtres-pied .filtres-choix { align-self: auto; padding: 0; border: 0; }
+.filtres-pied .filtres-choix > .filtre { position: relative; display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap; }
+.filtres-pied .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
+.filtres-pied .filtres-choix .multi-bouton { width: auto; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.filtres-pied .filtres-choix .multi-bouton:hover { border-color: var(--navy); }
+.filtres-pied .filtres-choix .multi-menu { left: auto; right: 0; }
 @media (max-width: 720px) {
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton { flex: 1; width: auto; }
-  .filtres-perimetre { flex-direction: column; gap: 4px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { display: flex; flex-wrap: wrap; gap: 6px; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > :is(.filtre, .filtre:has(.periode-bouton)) { width: auto; max-width: 100%; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces .multi-bouton { width: auto; min-width: 0; }
+  .filtres-puces > .fl { display: none; }
+  .filtres-perimetre { flex-direction: column; align-items: flex-start !important; gap: 6px; }
+  .filtres-pied { flex-wrap: wrap; }
+  .filtres-sep { display: none; }
 }
