@@ -77,8 +77,9 @@ const PROFIL: { id: DimProfil; libelle: string; pluriel: string; valeurs: [strin
 
 /** Groupes du menu des filtres, dans l'ordre de la barre : de l'organisation à la personne. */
 const GROUPE: Record<DimComparee | DimProfil, string> = {
-  departement: 'Organisation', service: 'Organisation', type_site: 'Organisation', site: 'Organisation', activite: 'Organisation',
-  type_contrat: 'Emploi', poste: 'Emploi',
+  type_site: 'Implantation', site: 'Implantation',
+  departement: 'Organisation', service: 'Organisation', activite: 'Organisation',
+  poste: 'Emploi', type_contrat: 'Emploi',
   sexe: 'Profil des salariés', age: 'Profil des salariés', anciennete: 'Profil des salariés',
 }
 
@@ -302,10 +303,10 @@ export default function FiltresPeriode({
   // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
   const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
   const dispo = ([
-    [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
     [avecType, 'type_site', LIBELLE_DIM.type_site], [!!sites, 'site', LIBELLE_DIM.site],
+    [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
     [avecActivite, 'activite', LIBELLE_DIM.activite],
-    [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat], [avecPoste, 'poste', LIBELLE_DIM.poste],
+    [avecPoste, 'poste', LIBELLE_DIM.poste], [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat],
     ...PROFIL.map((f) => [!!avecProfil, f.id, f.libelle] as const),
   ] as const).filter(([ok]) => ok).map(([, d, nom]) => ({ id: d, nom, groupe: GROUPE[d] }))
   const voir = (d: DimComparee | DimProfil) => affiches.includes(d) || !!filtres[d] || cmpDim === d
@@ -324,8 +325,8 @@ export default function FiltresPeriode({
   const limite = (parent: DimComparee) => (puces && noms(parent).length ? noms(parent).join(', ') : undefined)
   const effacer = () => onChange(Object.fromEntries(cles.map((k) => [k, undefined])))
   const DIMS_PERIMETRE: [ClePartagee, string][] = [
-    ['departement', 'Département'], ['service', 'Service'], ['type_site', 'Type de site'], ['site', 'Site'], ['activite', 'Activité'],
-    ['type_contrat', 'Contrat'], ['poste', 'Poste'], ['sexe', 'Sexe'], ['age', "Tranche d'âge"], ['anciennete', "Tranche d'ancienneté"],
+    ['type_site', 'Type de site'], ['site', 'Site'], ['departement', 'Département'], ['service', 'Service'], ['activite', 'Activité'],
+    ['poste', 'Poste'], ['type_contrat', 'Contrat'], ['sexe', 'Sexe'], ['age', "Tranche d'âge"], ['anciennete', "Tranche d'ancienneté"],
     ['matricule', 'Employé'],
   ]
   const valeursPerimetre = (k: ClePartagee) =>
@@ -356,25 +357,25 @@ export default function FiltresPeriode({
       )}
       {!puces && choixFiltres}
       {puces && <span className="filtres-sep" aria-hidden="true" />}
-      {departements && voir('departement') && (
-        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={val('departement')} onChange={(v) => onChange({ departement: v })} comparer={comparer('departement')} puce={puces} />
-      )}
-      {services && voir('service') && (
-        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={val('service')} onChange={(v) => onChange({ service: v })} comparer={comparer('service')} puce={puces} limite={limite('departement')} />
-      )}
       {avecType && voir('type_site') && (
         <ChoixTypeSite puce={puces} comparer={comparer('type_site')} valeur={val('type_site')} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
       {sites && voir('site') && (
         <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={val('site')} onChange={(v) => onChange({ site: v })} comparer={comparer('site')} puce={puces} limite={limite('type_site')} />
       )}
+      {departements && voir('departement') && (
+        <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={val('departement')} onChange={(v) => onChange({ departement: v })} comparer={comparer('departement')} puce={puces} />
+      )}
+      {services && voir('service') && (
+        <MultiChoix libelle="Service" pluriel="services" options={services} valeur={val('service')} onChange={(v) => onChange({ service: v })} comparer={comparer('service')} puce={puces} limite={limite('departement')} />
+      )}
       {avecActivite && voir('activite') && (
         <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={val('activite')} onChange={(v) => onChange({ activite: v })} comparer={comparer('activite')} puce={puces} />
       )}
+      {avecPoste && voir('poste') && <ChoixPoste puce={puces} comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
       {avecContrat && voir('type_contrat') && (
         <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={val('type_contrat')} onChange={(v) => onChange({ type_contrat: v })} souple={false} comparer={comparer('type_contrat')} puce={puces} />
       )}
-      {avecPoste && voir('poste') && <ChoixPoste puce={puces} comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
       {avecProfil && PROFIL.filter((f) => voir(f.id)).map((f) => (
         <MultiChoix
           key={f.id} libelle={f.libelle} pluriel={f.pluriel} options={f.valeurs.map(([v]) => v)}
