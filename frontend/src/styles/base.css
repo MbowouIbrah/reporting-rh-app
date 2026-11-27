@@ -388,7 +388,7 @@ table.dense td.num { text-align: right; }
   .resume-excel .cases .case { min-height: clamp(48px, 9vh, 84px); padding: 3px 10px 2px; }
   .resume-excel .cases .case strong { font-size: var(--fs-xl); min-height: 0; padding-top: 0; }
   .resume-excel .regle { padding: calc(var(--v) * .4) 14px; font-size: var(--fs-xs); }
-  .resume-excel > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: none; overflow: auto; margin: 0; }
+  .resume-corps > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: none; overflow: auto; margin: 0; }
   .resume-excel .suivi th, .resume-excel .suivi td { padding-block: clamp(0px, .4vh, 4px); line-height: 1.2; font-size: var(--fs-sm); }
 }
 
@@ -2061,17 +2061,21 @@ td.cel-poids .etiq { margin-left: 10px; }
 .suivi tbody tr.en-periode th[scope='row'] { box-shadow: inset 4px 0 0 var(--navy); color: var(--navy); font-weight: 700; }
 .suivi tfoot tr:first-child :is(th, td) { background: var(--rapport-total); color: var(--navy); box-shadow: inset 0 2px 0 var(--navy), inset 0 -1px 0 var(--rule); }
 .suivi tfoot tr:not(:first-child) :is(th, td) { background: var(--surface); }
-/* Le tableau montre toujours ses 12 mois, sans défilement interne (pas de défilement imbriqué) :
-   si l'écran est trop bas, seule la page défile, en-tête et totaux restant collés au cadre de la page. */
-@media (min-width: 1360px) {
-  .resume-excel { height: auto; }
+/* Seul le corps du résumé défile : titre et filtres restent figés en haut, l'en-tête du tableau colle
+   en haut du corps (aucune ligne ne passe au-dessus), les totaux collent en bas. */
+@media (min-width: 1100px) {
+  .layout-ecran:has(.resume-excel) { height: calc(100dvh - var(--bandeau-h, 0px)); display: flex; flex-direction: column; }
+  .layout-ecran:has(.resume-excel) > .page { flex: 1; min-height: 0; width: 100%; }
+  .resume-excel.page-ecran { display: flex; flex-direction: column; min-height: 0; }
+  .resume-excel { height: 100%; }
   .resume-excel > * { flex-shrink: 0; }
-  .resume-excel > .table-scroll { flex: none; min-height: 0; max-height: none; overflow: visible; }
+  .resume-excel > .resume-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 4px; margin-inline: -4px; }
+  .resume-corps > .table-scroll { flex: none; min-height: 0; max-height: none; overflow: visible; }
   .resume-excel .suivi thead th { position: sticky; top: 0; z-index: 3; }
-  .layout-ecran:has(.resume-excel) > .page { overflow-y: auto; padding-bottom: 0; }
+  .layout-ecran:has(.resume-excel) > .page { overflow: hidden; padding-bottom: 0; }
 }
 /* Petits écrans : pas de hauteur max non plus, la page seule défile. */
-.resume-excel > .table-scroll { max-height: none; overflow-y: visible; }
+.resume-corps > .table-scroll { max-height: none; overflow-y: visible; }
 .periode-legende { margin-left: auto; font-size: var(--fs-sm, 13px); color: var(--muted); }
 /* En-têtes de colonnes : période en petit sous le libellé. */
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }

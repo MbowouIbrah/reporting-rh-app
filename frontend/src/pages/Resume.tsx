@@ -276,6 +276,8 @@ export default function Resume() {
       {f.filtres && (
         <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} />
       )}
+      {/* Seul le corps défile : titre et filtres restent figés, l’en-tête du tableau colle en haut du corps. */}
+      <div className="resume-corps">
       {f.erreur ? <Etat type={etatErreur(f.erreur)} onRetry={f.relancer} /> : f.vide && <Etat type="vide" />}
       {erreur && <Etat type={etatErreur(erreur)} onRetry={() => ann.refetch()} />}
       {a && (
@@ -581,6 +583,7 @@ export default function Resume() {
           </div>
         </>
       )}
+      </div>
       </BulleCases>
     </section>
   )
