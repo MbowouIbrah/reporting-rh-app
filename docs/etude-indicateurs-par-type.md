@@ -51,7 +51,7 @@ Références : ISO 30414 (familles d'indicateurs RH : coûts, productivité, eff
 
 ## 6. Impacts
 
-- Migration : `salarie.civilite`, `salarie.date_naissance`, `salarie.date_embauche` (nullables).
+- Migration : `salarie.sexe` (H / F, déduit de la civilité à l'import ; la civilité brute n'est pas stockée), `salarie.date_naissance`, `salarie.date_embauche` (nullables).
 - Import : lecture des 3 colonnes (noms de `etude-import-paie.md`, dates `JJ/MM/AAAA`) ; fichiers déjà importés : « Non renseigné » jusqu'au prochain import.
 - Export PDF / Excel : inchangé, garde tout.
 

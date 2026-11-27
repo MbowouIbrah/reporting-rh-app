@@ -1,5 +1,6 @@
 """Lecture des données (toujours filtrées par périmètre) vers les structures du moteur."""
 
+import calendar
 from collections import defaultdict
 from collections.abc import Collection
 from datetime import date
@@ -141,7 +142,9 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
     q = apply_scope(
         select(SituationMensuelle.id, SituationMensuelle.salarie_id, Service.libelle,
                Site.libelle, Activite.libelle, TypeContrat.libelle, Site.type_site, Poste.libelle,
-               SituationMensuelle.reference_activite, Service.productif)
+               SituationMensuelle.reference_activite, Service.productif,
+               Salarie.sexe, Salarie.date_naissance, Salarie.date_embauche)
+        .join(Salarie, Salarie.id == SituationMensuelle.salarie_id)
         .join(Service, Service.id == SituationMensuelle.service_id)
         .join(Site, Site.id == SituationMensuelle.site_id)
         .join(Activite, Activite.id == SituationMensuelle.activite_id)
@@ -161,11 +164,13 @@ def charger_periode(db: Session, scope: Scope, annee: int, mois: int) -> Periode
             # jamais une rubrique d'activité
             (montants if nature == "paie" else indicateurs)[sid][rub] = Decimal(str(val))
     lignes = tuple(Ligne(sal, srv, site, act, ctr, montants.get(sid, {}), tsite, poste,
-                         indicateurs.get(sid, {}), ref, bool(prod))
-                   for sid, sal, srv, site, act, ctr, tsite, poste, ref, prod in rows)
+                         indicateurs.get(sid, {}), ref, bool(prod), sexe, naiss, emb)
+                   for (sid, sal, srv, site, act, ctr, tsite, poste, ref, prod,
+                        sexe, naiss, emb) in rows)
     saisies, vides = _saisies_visibles(db, scope, periode.id)
+    fin = date(annee, mois, calendar.monthrange(annee, mois)[1])
     return PeriodeData(lignes, exclues_a_date(db, annee, mois), ca=_total(saisies, "ca"),
-                       marge=_total(saisies, "marge"), saisies=saisies, vides=vides)
+                       marge=_total(saisies, "marge"), saisies=saisies, vides=vides, fin=fin)
 
 
 def _saisies_visibles(db: Session, scope: Scope, pid: int) -> tuple[tuple[Saisie, ...],
@@ -330,7 +335,7 @@ def filtrer(pd: PeriodeData | None, service: Choix, site: Choix, *,
 
     saisies = tuple(s for s in pd.saisies if gardee(s))
     return PeriodeData(lignes, pd.exclues, ca=_total(saisies, "ca"), marge=_total(saisies, "marge"),
-                       saisies=saisies, vides=tuple(s for s in pd.vides if gardee(s)))
+                       saisies=saisies, vides=tuple(s for s in pd.vides if gardee(s)), fin=pd.fin)
 
 
 def precedente(annee: int, mois: int) -> tuple[int, int]:

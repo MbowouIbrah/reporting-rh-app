@@ -5,6 +5,7 @@ Aucune dépendance base de données : l'entrée est une liste de `Ligne` par pé
 
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
+from datetime import date
 from decimal import Decimal
 
 from app.imports.regles import COMPOSANTES_BRUT
@@ -68,6 +69,9 @@ class Ligne:
     indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
     reference: str | None = None  # référence reporting (texte libre)
     productif: bool = False  # service marqué productif
+    sexe: str | None = None  # « H » ou « F » ; None : non renseigné
+    date_naissance: date | None = None
+    date_embauche: date | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +95,7 @@ class PeriodeData:
     marge: Decimal | None = None  # saisie avec le CA
     saisies: tuple[Saisie, ...] = ()
     vides: tuple[Saisie, ...] = ()  # cases attendues sans valeur (valeur None)
+    fin: date | None = None  # dernier jour du mois (date de référence des âges et anciennetés)
 
     @property
     def partiel(self) -> frozenset[str]:
@@ -149,6 +154,51 @@ class Budgets:
 def _bud(m: Decimal | None, b: Decimal | None) -> dict:
     ecart, pct = f.ecart_budget(m, b)
     return {"budget": b, "ecart": ecart, "ecart_pct": pct}
+
+
+TRANCHES_AGE = ((25, "<25"), (35, "25-34"), (45, "35-44"), (55, "45-54"), (None, "55+"))
+TRANCHES_ANCIENNETE = ((1, "<1"), (3, "1-3"), (5, "3-5"), (10, "5-10"), (None, "10+"))
+CONFIDENTIALITE_PROFIL = 3  # en dessous, le profil n'est montré qu'avec l'accès nominatif
+
+
+def _contrat(L: Ligne) -> str:
+    return L.contrat.strip().casefold()
+
+
+def _mois_revolus(debut: date, fin: date) -> int:
+    return (fin.year - debut.year) * 12 + fin.month - debut.month - (fin.day < debut.day)
+
+
+def _tranches(mois: list[int], bornes) -> list[dict]:
+    """Effectif par tranche d'années révolues : borne basse incluse, borne haute exclue."""
+    comptes = [0] * len(bornes)
+    for m in mois:
+        a = m // 12
+        comptes[next(i for i, (haut, _) in enumerate(bornes) if haut is None or a < haut)] += 1
+    return [{"cle": cle, "n": n} for (_, cle), n in zip(bornes, comptes, strict=True)]
+
+
+def profil(pd: PeriodeData | None) -> dict | None:
+    """Sexe, âge et ancienneté des salariés distincts de la période, à son dernier jour. Une valeur
+    absente (ou une date postérieure à la période) est « non renseignée », jamais devinée."""
+    if pd is None or pd.fin is None:
+        return None
+    gens = {L.salarie_id: L for L in pd.lignes}.values()
+    sexe = {"H": 0, "F": 0, "nr": 0}
+    for L in gens:
+        sexe[L.sexe if L.sexe in ("H", "F") else "nr"] += 1
+    ages = [_mois_revolus(L.date_naissance, pd.fin) for L in gens
+            if L.date_naissance is not None and L.date_naissance <= pd.fin]
+    anc = [_mois_revolus(L.date_embauche, pd.fin) for L in gens
+           if L.date_embauche is not None and L.date_embauche <= pd.fin]
+
+    def moyenne(mois: list[int]) -> Decimal | None:
+        return Decimal(sum(mois)) / (12 * len(mois)) if mois else None
+    return {"effectif": len(gens), "sexe": sexe,
+            "age": {"moyenne": moyenne(ages), "tranches": _tranches(ages, TRANCHES_AGE),
+                    "nr": len(gens) - len(ages)},
+            "anciennete": {"moyenne": moyenne(anc), "tranches": _tranches(anc, TRANCHES_ANCIENNETE),
+                           "nr": len(gens) - len(anc)}}
 
 
 def _ok(pd: PeriodeData | None) -> PeriodeData | None:
@@ -1017,6 +1067,13 @@ def annuel(
         "effectif_moyen": eff,
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
+        "profil": {"m": profil(fin), "m1": profil(fin1)},
+        # Effectif de fin par type de contrat : CDI, CDD et tout le reste (MAD, stagiaires…).
+        "contrat_fin": {
+            "CDI": avec_part(eff_fin(lambda L: _contrat(L) == "cdi"), eff_fin_total),
+            "CDD": avec_part(eff_fin(lambda L: _contrat(L) == "cdd"), eff_fin_total),
+            "autres": avec_part(eff_fin(lambda L: _contrat(L) not in ("cdi", "cdd")),
+                                eff_fin_total)},
         "front_back": _front_back(fin),
         # 34-f : répartition de la période comparée, pour la carte de détail (deux côtés).
         "front_back1": _front_back(fin1),

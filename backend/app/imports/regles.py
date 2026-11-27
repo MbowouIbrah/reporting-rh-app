@@ -3,9 +3,11 @@
 Fonction pure : aucune lecture en base, aucun float dans les montants.
 """
 
+import calendar
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from itertools import combinations
 
@@ -30,6 +32,21 @@ ATTRIBUTS = ["ANNÉE", "MOIS", "MATRICULE", "Noms", "Poste", "Type Contrat", "Ac
 # Colonne texte facultative : référence vers le reporting d'activité (lue comme le Poste).
 REFERENCE_COLONNE = "Référence reporting"
 REFERENCE_ALIAS = ("Référence Annick",)
+# Colonnes facultatives du profil du salarié : civilité (donne le sexe), dates de naissance et d'embauche.
+CIVILITE_COLONNE = "Civilité"
+CIVILITE_ALIAS = ("Sexe",)
+NAISSANCE_COLONNE = "Date de naissance"
+NAISSANCE_ALIAS = ("Date naissance",)
+EMBAUCHE_COLONNE = "Date d'embauche"
+EMBAUCHE_ALIAS = ("Date d’embauche", "Date d'entrée", "Date d’entrée", "Date entrée")
+COLONNES_TEXTE = (REFERENCE_COLONNE, CIVILITE_COLONNE, NAISSANCE_COLONNE, EMBAUCHE_COLONNE)
+# Civilité normalisée (sans accents, casse ni points) -> sexe.
+CIVILITES = {"m": "H", "mr": "H", "monsieur": "H", "h": "H", "homme": "H",
+             "mme": "F", "madame": "F", "mlle": "F", "mademoiselle": "F", "f": "F", "femme": "F"}
+ANNEE_NAISSANCE_MIN = 1900
+RE_DATE_JMA = re.compile(r"^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$")
+RE_DATE_AMJ = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+RE_HEURE = re.compile(r"[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$")
 ANNEE_MIN, ANNEE_MAX = 2000, 2100
 ABSENCES_MAX = 31
 BORNE = Decimal(10) ** 15  # 15 chiffres avant la virgule ; décimales gardées telles quelles
@@ -100,9 +117,15 @@ class Ligne:
     montants: dict[str, Decimal] = field(default_factory=dict)
     indicateurs: dict[str, Decimal] = field(default_factory=dict)  # rubriques d'activité
     reference: str | None = None
-    # colonnes d'activité et de référence présentes dans le fichier (absente = valeurs conservées)
+    sexe: str | None = None  # « H » ou « F », déduit de la civilité
+    date_naissance: date | None = None
+    date_embauche: date | None = None
+    # colonnes d'activité, de référence et de profil présentes dans le fichier (absente = valeurs conservées)
     colonnes_activite: tuple[str, ...] = ()
     reference_presente: bool = False
+    civilite_presente: bool = False
+    naissance_presente: bool = False
+    embauche_presente: bool = False
     bloquant: bool = False
 
 
@@ -265,7 +288,34 @@ def _rubriques_canon(refs: Refs) -> dict[str, str]:
 
 def _texte_canon() -> dict[str, str]:
     """Colonnes texte facultatives hors attributs : en-tête normalisé -> libellé canonique."""
-    return {norm(x): REFERENCE_COLONNE for x in (REFERENCE_COLONNE, *REFERENCE_ALIAS)}
+    return {norm(x): canon for canon, alias in (
+        (REFERENCE_COLONNE, REFERENCE_ALIAS), (CIVILITE_COLONNE, CIVILITE_ALIAS),
+        (NAISSANCE_COLONNE, NAISSANCE_ALIAS), (EMBAUCHE_COLONNE, EMBAUCHE_ALIAS)
+    ) for x in (canon, *alias)}
+
+
+def sexe_de(civilite: str) -> str | None:
+    """« H » ou « F » d'après une civilité (M., Mme, Mlle, Homme…) ; None si elle n'est pas reconnue."""
+    return CIVILITES.get(norm(civilite).replace(".", ""))
+
+
+def lire_date(v) -> date | None:
+    """Date d'une cellule date ou d'un texte JJ/MM/AAAA, AAAA-MM-JJ ou JJ-MM-AAAA ; None si illisible."""
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    t = RE_HEURE.sub("", texte(v) or "")
+    if (m := RE_DATE_JMA.match(t)) is not None:
+        j, mo, a = int(m[1]), int(m[2]), int(m[3])
+    elif (m := RE_DATE_AMJ.match(t)) is not None:
+        a, mo, j = int(m[1]), int(m[2]), int(m[3])
+    else:
+        return None
+    try:
+        return date(a, mo, j)
+    except ValueError:
+        return None
 
 
 def entetes_reconnus(refs: Refs) -> set[str]:
@@ -335,6 +385,41 @@ def somme_brut(montants: dict[str, Decimal]) -> Decimal:
     return sum((montants.get(c, Decimal(0)) for c in COMPOSANTES_BRUT), Decimal(0))
 
 
+def _profil(L: Ligne, g, cols: dict[str, int], add) -> None:
+    """Sexe et dates de la ligne : une valeur illisible ou incohérente est signalée puis laissée vide."""
+    if CIVILITE_COLONNE in cols and (t := texte(g(CIVILITE_COLONNE))):
+        L.sexe = sexe_de(t)
+        if L.sexe is None:
+            add(L.num, CIVILITE_COLONNE, "CIVILITE_INCONNUE", AVERT, t,
+                "Civilité non reconnue, laissée vide (attendu : M., Mme, Mlle, Monsieur, Madame, H, F).")
+    # Dernier jour du mois de la ligne : une date plus tardive est incohérente.
+    fin = (date(L.annee, L.mois, calendar.monthrange(L.annee, L.mois)[1])
+           if L.annee and L.mois and 1 <= L.mois <= 12 and 1 <= L.annee <= 9999 else None)
+    for nom, attr in ((NAISSANCE_COLONNE, "date_naissance"), (EMBAUCHE_COLONNE, "date_embauche")):
+        v = g(nom) if nom in cols else None
+        if v is None or (isinstance(v, str) and not v.strip()):
+            continue
+        d = lire_date(v)
+        if d is None:
+            add(L.num, nom, "DATE_INVALIDE", AVERT, v,
+                "Date illisible, laissée vide (attendu : JJ/MM/AAAA).")
+            continue
+        incoherente = None
+        if attr == "date_naissance":
+            if d.year < ANNEE_NAISSANCE_MIN:
+                incoherente = f"Naissance avant {ANNEE_NAISSANCE_MIN}"
+            elif fin and d > fin:
+                incoherente = "Naissance après la fin du mois de la ligne"
+        elif fin and d > fin:
+            incoherente = "Embauche après la fin du mois de la ligne"
+        elif L.date_naissance and d < L.date_naissance:
+            incoherente = "Embauche avant la naissance"
+        if incoherente:
+            add(L.num, nom, "DATE_INCOHERENTE", AVERT, v, f"{incoherente} : date laissée vide.")
+        else:
+            setattr(L, attr, d)
+
+
 def _brut_reel(lignes: list[Ligne], refs: Refs, add) -> None:
     """Brut Réel saisi : il doit valoir Salaire brut garantie + Commission + Bonus + Primes sur ventes."""
     noms = {n for n, _u in refs.rubriques}
@@ -383,7 +468,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 "garder une seule de ces colonnes.")
             continue
         cols[canon] = j
-        if (canon in rub_canon.values() or canon == REFERENCE_COLONNE) and norm(canon) != n:
+        if (canon in rub_canon.values() or canon in COLONNES_TEXTE) and norm(canon) != n:
             add(feuille.entete_ligne, str(v), "ENTETE_ALIAS", AVERT, v, f"Renommée « {canon} ».")
     if feuille.ligne_ignoree:
         add(feuille.ligne_ignoree, None, "LIGNES_IGNOREES", BLOQUANT, None,
@@ -437,7 +522,8 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
             continue  # seules des colonnes non lues (calculées, inconnues) sont remplies
 
         L = Ligne(num, colonnes_activite=tuple(n for n, _ in refs.rubriques_activite if n in cols),
-                  reference_presente=REFERENCE_COLONNE in cols)
+                  reference_presente=REFERENCE_COLONNE in cols, civilite_presente=CIVILITE_COLONNE in cols,
+                  naissance_presente=NAISSANCE_COLONNE in cols, embauche_presente=EMBAUCHE_COLONNE in cols)
         nb_avant = nb_bloq
         inconnu = False
 
@@ -541,6 +627,7 @@ def valider(feuille: Feuille, refs: Refs) -> tuple[list[Ligne], list[Anomalie], 
                 add(num, REFERENCE_COLONNE, "TEXTE_TROP_LONG", BLOQUANT, t, "200 caractères maximum.")
             elif t:
                 L.reference = t
+        _profil(L, g, cols, add)
 
         if L.annee and L.mois and mat and not re.search(r"\s", mat):
             cles[(L.annee, L.mois, mat.casefold())].append(num)

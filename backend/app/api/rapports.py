@@ -477,8 +477,19 @@ def _calcul_annuel(db, p, annee, mois, service, site, ref_annee=None, type_site=
     return res
 
 
+def _masquer_profil(p: Principal, res: dict) -> dict:
+    """Profil d'un groupe de moins de 3 personnes : réservé à l'accès nominatif (il désignerait
+    quelqu'un). Chaque période (m, m1) est jugée seule, après le calcul."""
+    profil = res.get("profil")
+    if not profil or is_allowed(p, "nominatif:read"):
+        return res
+    return {**res, "profil": {k: ({"effectif": v["effectif"], "masque": True}
+                                  if v and v["effectif"] < moteur.CONFIDENTIALITE_PROFIL else v)
+                              for k, v in profil.items()}}
+
+
 def _annuel(db, p, *args, **kwargs) -> dict:
-    return _sortie(p, _calcul_annuel(db, p, *args, **kwargs))
+    return _sortie(p, _masquer_profil(p, _calcul_annuel(db, p, *args, **kwargs)))
 
 
 @router.get("/annuel")
