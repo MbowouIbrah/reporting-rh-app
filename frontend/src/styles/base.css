@@ -334,6 +334,21 @@ table.dense td.num { text-align: right; }
 .bc-leg i.cmp { border-top: 2px dashed var(--muted-2); }
 .bc-calcul { color: var(--muted); margin: 0; }
 .bc-mention { display: inline-block; background: var(--warning-soft); color: var(--warning); padding: 0 6px; font-weight: 600; margin-top: 4px; }
+/* 34-f : en comparaison, chaque répartition est un petit tableau (une colonne par côté, écart en %). */
+.bulle-case.large { width: 400px; }
+.bulle-case table.cmp { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.bulle-case table.cmp :is(th, td) { padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulle-case table.cmp thead th { font-size: 11px; font-weight: 700; color: var(--muted); text-align: right; border-bottom: 1px solid var(--rule); padding-bottom: 3px; vertical-align: bottom; }
+.bulle-case table.cmp thead th:first-child { text-align: left; letter-spacing: .08em; text-transform: uppercase; white-space: normal; overflow: visible; line-height: 1.25; }
+.bulle-case table.cmp thead th.cote { padding-left: 10px; }
+.bulle-case table.cmp thead th.cote span { display: block; font-weight: 400; color: var(--muted-2); overflow: hidden; text-overflow: ellipsis; }
+.bulle-case table.cmp tbody th { text-align: left; font-weight: 400; color: var(--muted); }
+.bulle-case table.cmp td { text-align: right; padding-left: 10px; }
+.bulle-case table.cmp td.m { color: var(--ink); }
+.bulle-case table.cmp td.p { color: var(--muted); padding-left: 6px; }
+.bulle-case table.cmp td.a:is(.m, .p) { font-weight: 600; color: var(--navy); }
+.bulle-case table.cmp td.e { color: var(--muted); border-left: 1px solid var(--rule); padding-left: 8px; }
+.bulle-case table.cmp tbody tr + tr :is(th, td) { border-top: 1px dotted var(--rule); }
 @media print { .bulle-case { display: none !important; } }
 .regle { background: var(--paper-3); color: var(--muted); font-style: italic; font-size: var(--fs-xs); padding: 8px 14px; margin: 0; }
 .suivi thead th { background: var(--gris-etiq); color: var(--muted); font-size: var(--fs-xs); text-align: right; }
@@ -1336,6 +1351,9 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
   .resume-excel .cases .case .second-libelle { grid-row: 2; grid-column: 1 / -1; padding-right: 5.5em; }
   /* Ligne secondaire en petit : le libellé d'évolution reste entier à côté de sa valeur */
   .resume-excel .cases .case :is(.second-libelle, .variation, .second, .note) { font-size: var(--fs-xs); }
+  /* Squelette de l'évolution : tient dans les 5,5 em réservés, sans recouvrir la fin du libellé */
+  [aria-busy='true'] .cases .case > :is(.variation, .second) { min-width: 4.5em; }
+  [aria-busy='true'] .cases .case > :is(.variation, .second)::after { left: auto; right: 0; width: min(100%, 5em); }
   .resume-excel .cases .case .ratio-fb { grid-row: 3; grid-column: 1 / -1; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
@@ -1351,7 +1369,7 @@ table.points td.cellule-ok.cellule-cible::after { border-color: #147a41; }
 
   .resume-excel .regle { margin-bottom: 0; }
   /* Le tableau garde sa taille (mois de la période seulement) ; défilement au-delà, totaux figés */
-  .resume-excel > .table-scroll { flex: 0 1 auto; min-height: 0; max-height: calc(14 * 3rem); }
+  /* Tableau : 12 mois sans défilement interne (règle en fin de fichier) */
   /* Cases plus hautes quand l'écran est haut (24'') : la page se répartit sur toute la hauteur */
   .resume-excel .cases .case { padding-block: clamp(var(--sp-3), 2.2vh, 28px); }
   .resume-excel { padding-bottom: var(--v); }
@@ -2043,11 +2061,17 @@ td.cel-poids .etiq { margin-left: 10px; }
 .suivi tbody tr.en-periode th[scope='row'] { box-shadow: inset 4px 0 0 var(--navy); color: var(--navy); font-weight: 700; }
 .suivi tfoot tr:first-child :is(th, td) { background: var(--rapport-total); color: var(--navy); box-shadow: inset 0 2px 0 var(--navy), inset 0 -1px 0 var(--rule); }
 .suivi tfoot tr:not(:first-child) :is(th, td) { background: var(--surface); }
-/* Écran peu haut : le tableau garde au moins l'en-tête, quelques mois et les totaux ; la page défile */
+/* Le tableau montre toujours ses 12 mois, sans défilement interne (pas de défilement imbriqué) :
+   si l'écran est trop bas, seule la page défile, en-tête et totaux restant collés au cadre de la page. */
 @media (min-width: 1360px) {
-  .resume-excel > .table-scroll { min-height: min(calc(10 * 1.9rem), 22rem); }
-  .layout-ecran:has(.resume-excel) > .page { overflow-y: auto; }
+  .resume-excel { height: auto; }
+  .resume-excel > * { flex-shrink: 0; }
+  .resume-excel > .table-scroll { flex: none; min-height: 0; max-height: none; overflow: visible; }
+  .resume-excel .suivi thead th { position: sticky; top: 0; z-index: 3; }
+  .layout-ecran:has(.resume-excel) > .page { overflow-y: auto; padding-bottom: 0; }
 }
+/* Petits écrans : pas de hauteur max non plus, la page seule défile. */
+.resume-excel > .table-scroll { max-height: none; overflow-y: visible; }
 .periode-legende { margin-left: auto; font-size: var(--fs-sm, 13px); color: var(--muted); }
 /* En-têtes de colonnes : période en petit sous le libellé. */
 th .th-sous { display: block; font-size: var(--fs-xs); font-weight: 400; opacity: .85; white-space: nowrap; }

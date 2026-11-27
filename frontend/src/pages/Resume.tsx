@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Info } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
-import { BulleCases, useBulleCase, type Carte, type Section } from '../components/BulleCases'
+import type { ReactNode } from 'react'
+import { BulleCases, useBulleCase, type Carte, type Part, type Section } from '../components/BulleCases'
 import { getAnnuel } from '../api/rapports'
 import type { Annuel, Cell, SerieMois, Val } from '../api/types'
 import { usePeut } from '../auth/AuthContext'
@@ -51,6 +51,7 @@ const comparaison = (
 })
 /** Ratio (0 à 1) de l'API en pourcentage de 0 à 100, pour la largeur des barres de part. */
 const enPourcent = (v: Val | undefined) => Number(v) * 100
+const pourcentOuNul = (v: Val | undefined) => (vide(v) ? null : enPourcent(v))
 /** Écart de taux en points ; null si l'un des deux taux manque. */
 const ecartPoints = (t: Val | undefined, t1: Val | undefined) => (vide(t) || vide(t1) ? null : (Number(t) - Number(t1)) * 100)
 const textePoints = (d: number) => `${d > 0 ? '+' : ''}${dec(String(d))}${SEP}pt`
@@ -59,10 +60,13 @@ const texteEcart = (d: number | null) => (d === null ? '—' : textePoints(d))
 const evolutionPoints = (d: number | null, couleur = true): ReactNode =>
   d === null ? '—' : <span className={d === 0 || !couleur ? 'bc-neutre' : d > 0 ? 'bc-bon' : 'bc-mal'}>{d < 0 ? '▼' : d > 0 ? '▲' : '■'} {textePoints(d)}</span>
 /** Parts par type de contrat : valeur et part du total (les lignes sans part sont écartées). */
-const partsContrat = (d: Record<string, Cell & { part: Val }> | undefined, fmt: (v: Val | undefined) => string) =>
+const partsContrat = (d: Record<string, Cell & { part: Val; part1?: Val }> | undefined, fmt: (v: Val | undefined) => string): Part[] =>
   Object.entries(d ?? {})
-    .filter(([, x]) => !vide(x.part))
-    .map(([c, x]) => ({ nom: c, valeur: fmt(x.m), part: enPourcent(x.part) }))
+    .filter(([, x]) => !vide(x.part) || !vide(x.part1))
+    .map(([c, x]) => ({
+      nom: c, valeur: fmt(x.m), part: vide(x.part) ? 0 : enPourcent(x.part),
+      valeur1: fmt(x.m1), part1: vide(x.part1) ? null : enPourcent(x.part1), ecart: pourcentOuNul(x.var_pct),
+    }))
 
 function Case({
   titre,
@@ -168,8 +172,11 @@ export default function Resume() {
     <Case titre={titre} valeur="—" devise={false} libelle2="Non disponible pour ces filtres" />
   )
   const fb = a?.front_back && a.front_back.total > 0 ? a.front_back : null
+  const fb1 = fb && a?.front_back1 && a.front_back1.total > 0 ? a.front_back1 : null
   // R9 : front / back office sur la masse salariale, le CA et la marge (3e ligne, détail au survol).
   const msFb = a?.ms_front_back && !vide(a.ms_front_back.front_pct) ? a.ms_front_back : null
+  // 34-f : en comparaison, montants abrégés pour tenir dans les colonnes du tableau de la carte.
+  const msFmt = Object.values(a?.ms_contrat ?? {}).some((x) => !vide(x.part1)) || !vide(msFb?.front_pct1) ? compact : exact
   const parFront = (titre: string, v: Val | undefined): Section[] => vide(v) ? [] : [{
     type: 'lignes',
     titre: 'Front office',
@@ -235,36 +242,28 @@ export default function Resume() {
     }
   }
   /** Parts front / back office (0 à 100) d'un montant ou d'un effectif. */
-  const partsFrontBack = (front: string, back: string, fpct: Val | undefined, bpct: Val | undefined): Section[] =>
-    vide(fpct) || vide(bpct) ? [] : [{
+  /** 34-f : en comparaison, la répartition s'affiche en tableau A / B (ou période / période comparée). */
+  const cotes = (a1: string, b1: string) => (sel ? { a: 'A', sa: nomSel(sel.a), b: 'B', sb: nomSel(sel.b) } : { a: a1, b: b1 })
+  type CoteFB = { v: string; pct: Val | undefined }
+  /** Parts front / back office (0 à 100) d'un montant ou d'un effectif, avec le côté comparé s'il existe. */
+  const partsFrontBack = (f0: CoteFB, b0: CoteFB, f1?: CoteFB, b1?: CoteFB, ecarts?: [Val | undefined, Val | undefined],
+    libs: [string, string] = [an, n1]): Section[] => {
+    if (vide(f0.pct) || vide(b0.pct)) return []
+    const avec = !!f1 && !!b1 && !vide(f1.pct) && !vide(b1.pct)
+    const ligne = (nom: string, x: CoteFB, x1: CoteFB | undefined, e: Val | undefined, bo?: boolean): Part => ({
+      nom, valeur: x.v, part: enPourcent(x.pct), bo,
+      ...(avec && x1 ? { valeur1: x1.v, part1: enPourcent(x1.pct), ecart: pourcentOuNul(e) } : {}),
+    })
+    return [{
       type: 'parts',
       titre: 'Front / back office',
-      parts: [
-        { nom: 'Front office', valeur: front, part: enPourcent(fpct) },
-        { nom: 'Back office', valeur: back, part: enPourcent(bpct), bo: true },
-      ],
+      ...(avec ? { cmp: cotes(...libs) } : {}),
+      parts: [ligne('Front office', f0, f1, ecarts?.[0]), ligne('Back office', b0, b1, ecarts?.[1], true)],
     }]
-  const sectionContrats = (titre: string, parts: ReturnType<typeof partsContrat>): Section[] =>
-    parts.length ? [{ type: 'parts', titre, parts }] : []
+  }
+  const sectionContrats = (titre: string, parts: Part[], libs: [string, string] = [an, n1]): Section[] =>
+    parts.length ? [{ type: 'parts', titre, ...(parts.some((p) => p.part1 != null) ? { cmp: cotes(...libs) } : {}), parts }] : []
   const evol = (c: Cell | undefined) => <td className="num"><Variation v={c?.var_pct} neutre={!!sel} /></td>
-  // Le premier mois de la période en haut du tableau : jamais caché sous les totaux figés
-  const defile = useRef<HTMLDivElement>(null)
-  const cle = `${a?.du ?? ''}-${a?.serie_n[0]?.annee ?? ''}-${a?.serie_n[0]?.mois ?? ''}`
-  useEffect(() => {
-    const zone = defile.current
-    const ligne = zone?.querySelector<HTMLElement>('tbody tr.en-periode')
-    if (!zone || !ligne) return
-    // Recalé aussi quand la zone change de hauteur (fenêtre redimensionnée, cases qui changent de taille
-    // en passant en comparaison) : la période choisie reste en vue au lieu des mois grisés.
-    const recale = () => {
-      const entete = zone.querySelector('thead')?.getBoundingClientRect().height ?? 0
-      zone.scrollTop = ligne.offsetTop - entete
-    }
-    recale()
-    const obs = new ResizeObserver(recale)
-    obs.observe(zone)
-    return () => obs.disconnect()
-  }, [cle])
   const colonnes = [
     'MOIS', ...(aCa ? ['CA', 'MARGE', '% MARGE'] : []), 'MASSE SALARIALE', 'COMMISSIONS', 'PRIMES PROD.',
     'FRAIS DE MISSION', 'LOGEMENT SITE DÉPORTÉ',
@@ -330,8 +329,11 @@ export default function Resume() {
                 sections: [
                   comparaison(a.cumul_ytd, an, n1, false),
                   courbe(a, 'ms'),
-                  ...sectionContrats('Par type de contrat', partsContrat(a.ms_contrat, exact)),
-                  ...(msFb ? partsFrontBack(exact(msFb.front), exact(msFb.back), msFb.front_pct, msFb.back_pct) : []),
+                  ...sectionContrats('Par type de contrat', partsContrat(a.ms_contrat, msFmt)),
+                  ...(msFb ? partsFrontBack(
+                    { v: msFmt(msFb.front), pct: msFb.front_pct }, { v: msFmt(msFb.back), pct: msFb.back_pct },
+                    { v: msFmt(msFb.front1), pct: msFb.front_pct1 }, { v: msFmt(msFb.back1), pct: msFb.back_pct1 },
+                    [msFb.front_var_pct, msFb.back_var_pct]) : []),
                   { type: 'calcul', texte: `Somme des masses salariales mensuelles. Moyenne par mois : ${exact(a.moyenne_mensuelle?.m)}.` },
                 ],
               }}
@@ -453,7 +455,11 @@ export default function Resume() {
                       }),
                     ],
                   }] : []),
-                  ...(fb ? partsFrontBack(dec(String(fb.front)), dec(String(fb.back)), fb.front_pct, fb.back_pct) : []),
+                  ...(fb ? partsFrontBack(
+                    { v: dec(String(fb.front)), pct: fb.front_pct }, { v: dec(String(fb.back)), pct: fb.back_pct },
+                    fb1 ? { v: dec(String(fb1.front)), pct: fb1.front_pct } : undefined,
+                    fb1 ? { v: dec(String(fb1.back)), pct: fb1.back_pct } : undefined,
+                    [a.front_back_var?.front, a.front_back_var?.back], [`Fin ${moisFin} ${finAn}`, finCmp]) : []),
                   { type: 'calcul', texte: `Salariés présents à la fin du dernier mois saisi (${moisFin} ${finAn}). Effectif moyen de la période : ${dec(a.effectif_moyen.m)}.` },
                 ],
               }}
@@ -509,7 +515,7 @@ export default function Resume() {
             )}
             {horsPeriode && <span className="periode-legende">Mois grisés : hors période, non comptés dans les totaux.</span>}
           </div>
-          <div className="table-scroll" ref={defile}>
+          <div className="table-scroll">
             <table className="dense suivi">
               <thead>
                 <tr>{colonnes.map((c) => <th key={c} scope="col">{c}</th>)}</tr>

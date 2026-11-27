@@ -344,6 +344,13 @@ def _cells(cur: PeriodeData, prev: PeriodeData | None, noms, cle, mesure) -> lis
     return [(n, cell(a.get(n, ZERO), b.get(n, ZERO) if prev else None)) for n in noms]
 
 
+def _front_back_var(fb: dict | None, fb1: dict | None) -> dict | None:
+    """34-f : évolution en % de l'effectif front et back entre la période et la période comparée."""
+    if not fb or not fb1:
+        return None
+    return {k: f.variation_pct(Decimal(fb[k]), Decimal(fb1[k])) for k in ("front", "back")}
+
+
 def _front_back(pd: PeriodeData | None) -> dict | None:
     """Retours N2 : effectif de fin de mois en front office et en back office, et leurs parts de
     l'effectif total (ratios). Une ligne sans activité ne compte dans aucune des deux parts."""
@@ -936,13 +943,15 @@ def annuel(
         return cell(compte(fin), compte(fin1))
 
     def avec_part(c: dict, total: dict) -> dict:
-        return {**c, "part": ratio(c["m"], total["m"])}
+        # Part de la période comparée aussi : la carte de détail affiche les deux côtés (34-f).
+        return {**c, "part": ratio(c["m"], total["m"]),
+                "part1": ratio(c.get("m1"), total.get("m1"))}
 
     eff_fin_total = eff_fin(lambda L: True)
     mad_fin = eff_fin(lambda L: L.contrat == "MAD")
     mad_moyen = next((c for c in blocs["d_contrat"]["effectifs"] if c["contrat"] == "MAD"),
                      {"m": ZERO, "m1": ZERO})
-    ms_total = {"m": c if nb else None}
+    ms_total = {"m": c if nb else None, "m1": c1 if nb1 else None}
 
     def ms_contrat(pds, mois_ok, contrat) -> Decimal | None:
         return sum((pds[m].total(L) for m in mois_ok for L in pds[m].lignes
@@ -953,10 +962,11 @@ def annuel(
 
     # R9 (réunion du 17/11) : masse salariale cumulée en front et en back office ; CA et marge par
     # employé front office = cumul / effectif moyen front office des mois de paie (C2).
-    def ms_fb(mot: str) -> Decimal:
-        return sum((n[m].total(L) for m in ok for L in n[m].lignes if _est(L, mot)), ZERO)
+    def ms_fb(mot: str, pds=n, mois_ok=ok) -> Decimal:
+        return sum((pds[m].total(L) for m in mois_ok for L in pds[m].lignes if _est(L, mot)), ZERO)
 
     ms_front, ms_back = (ms_fb("front"), ms_fb("back")) if nb else (None, None)
+    ms_front1, ms_back1 = (ms_fb("front", n1, ok1), ms_fb("back", n1, ok1)) if ok1 else (None, None)
     eff_front = (Decimal(sum(len({L.salarie_id for L in n[m].lignes if _est(L, "front")})
                              for m in ok)) / nb) if nb else None
 
@@ -1008,8 +1018,16 @@ def annuel(
         "mois_fin": der,
         "effectif_fin": eff_fin_total,
         "front_back": _front_back(fin),
+        # 34-f : répartition de la période comparée, pour la carte de détail (deux côtés).
+        "front_back1": _front_back(fin1),
+        "front_back_var": _front_back_var(_front_back(fin), _front_back(fin1)),
         "ms_front_back": {"front": ms_front, "back": ms_back, "front_pct": ratio(ms_front, c),
-                          "back_pct": ratio(ms_back, c)} if nb else None,
+                          "back_pct": ratio(ms_back, c),
+                          "front1": ms_front1, "back1": ms_back1,
+                          "front_pct1": ratio(ms_front1, c1), "back_pct1": ratio(ms_back1, c1),
+                          "front_var_pct": f.variation_pct(ms_front, ms_front1),
+                          "back_var_pct": f.variation_pct(ms_back, ms_back1)}
+        if nb else None,
         "effectif_moyen_front": eff_front,
         "ca_par_front": ratio(ca_ytd, eff_front),
         "marge_par_front": ratio(marge_ytd, eff_front),

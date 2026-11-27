@@ -8,8 +8,19 @@ import { createPortal } from 'react-dom'
 export type Section =
   | { type: 'lignes'; titre: string; lignes: { k: string; v: ReactNode; fort?: boolean; sep?: boolean }[] }
   | { type: 'courbe'; mois: string[]; n: (number | null)[]; n1: (number | null)[]; legendeN: string; legendeN1: string }
-  | { type: 'parts'; titre: string; parts: { nom: string; valeur: string; part: number; bo?: boolean }[] }
+  | {
+      type: 'parts'; titre: string
+      /** 34-f : en comparaison, libellés des deux côtés ; la section devient un tableau. */
+      cmp?: { a: string; sa?: string; b: string; sb?: string }
+      parts: Part[]
+    }
   | { type: 'calcul'; texte: string; mention?: string }
+
+/** Une ligne de répartition ; valeur1, part1 et ecart (en %) pour le côté comparé. */
+export interface Part {
+  nom: string; valeur: string; part: number; bo?: boolean
+  valeur1?: string; part1?: number | null; ecart?: number | null
+}
 
 /** Carte de détail d'une case : titre, périodes, puis sections. */
 export interface Carte {
@@ -42,6 +53,8 @@ const MARGE = 16
 
 const NF1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const partTexte = (p: number) => `${NF1.format(p).replace(/[  ]/g, ' ')} %`
+const ecartTexte = (e: number | null | undefined) =>
+  e == null ? '—' : `${e > 0 ? '+' : e < 0 ? '−' : ''}${partTexte(Math.abs(e))}`
 
 const LARGEUR = 312
 const HAUTEUR = 56
@@ -115,6 +128,37 @@ function SectionCarte({ s }: { s: Section }) {
         ))}
       </section>
     )
+  if (s.type === 'parts' && s.cmp)
+    return (
+      <section>
+        <table className="cmp">
+          <colgroup>
+            <col style={{ width: '24%' }} /><col style={{ width: '16%' }} /><col style={{ width: '14%' }} />
+            <col style={{ width: '15%' }} /><col style={{ width: '13%' }} /><col style={{ width: '18%' }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">{s.titre}</th>
+              <th scope="col" className="cote" colSpan={2}>{s.cmp.a}{s.cmp.sa && <span>{s.cmp.sa}</span>}</th>
+              <th scope="col" className="cote" colSpan={2}>{s.cmp.b}{s.cmp.sb && <span>{s.cmp.sb}</span>}</th>
+              <th scope="col">Écart</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.parts.map((p, i) => (
+              <tr key={`${p.nom}-${i}`}>
+                <th scope="row">{p.nom}</th>
+                <td className="a m">{p.valeur}</td>
+                <td className="a p">{partTexte(p.part)}</td>
+                <td className="m">{p.valeur1 ?? '—'}</td>
+                <td className="p">{p.part1 == null ? '—' : partTexte(p.part1)}</td>
+                <td className="e">{ecartTexte(p.ecart)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    )
   if (s.type === 'parts')
     return (
       <section>
@@ -164,11 +208,22 @@ export function BulleCases({ children, inactif = false }: { children: ReactNode;
     const el = refCase.current
     if (!carte || !el) return
     const r = el.getBoundingClientRect()
+    carte.style.maxHeight = ''
     const w = carte.offsetWidth
     const h = carte.offsetHeight
     const left = Math.min(Math.max(MARGE, r.left), window.innerWidth - w - MARGE)
+    // Place sous la case, sinon au-dessus ; si elle ne tient d'aucun côté, côté le plus grand,
+    // hauteur limitée à cette place et défilement dans la carte : jamais coupée par le bas de l'écran.
+    const bas = window.innerHeight - r.bottom - ECART - 12
+    const haut = r.top - ECART - 12
     let top = r.bottom + ECART
-    if (top + h > window.innerHeight - 12 && r.top - h - ECART > 12) top = r.top - h - ECART
+    if (h > bas) {
+      if (h <= haut) top = r.top - h - ECART
+      else if (haut > bas) {
+        carte.style.maxHeight = `${haut}px`
+        top = 12
+      } else carte.style.maxHeight = `${Math.max(120, bas)}px`
+    }
     carte.style.left = `${left}px`
     carte.style.top = `${Math.max(12, top)}px`
   }, [])
@@ -263,7 +318,7 @@ export function BulleCases({ children, inactif = false }: { children: ReactNode;
             ref={refCarte}
             id={id}
             role="tooltip"
-            className={`bulle-case${visible ? ' visible' : ''}${saut ? ' saut' : ''}`}
+            className={`bulle-case${etat.carte.sections.some((x) => x.type === 'parts' && x.cmp) ? ' large' : ''}${visible ? ' visible' : ''}${saut ? ' saut' : ''}`}
             aria-hidden={!visible}
             onPointerEnter={annuler}
             onPointerLeave={fermerBientot}
