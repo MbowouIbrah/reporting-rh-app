@@ -2145,6 +2145,12 @@ th[title] { cursor: help; }
 /* Puces de largeur fixe (période exceptée) : valeur tronquée, « +N » toujours visible, liste complète au survol. */
 /* Taille standard : libellé + zone de valeur fixe ; le × prend sa place dans la zone, la puce ne grandit jamais. */
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; width: auto; }
+/* Grille équilibrée des puces (colonnes calculées : --cols) ; la période vit dans l'en-tête. */
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix { width: 100%; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix > .multi-bouton { width: 100%; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces:not(.filtres-temps) > .filtre.multi-choix > .multi-bouton > span { flex: 1 1 0; min-width: 0; width: auto !important; }
+:is(.rapport-excel, .resume-excel) .filtres-entete > .filtres.filtres-rapport.filtres-puces { flex: none; flex-wrap: nowrap; margin: 0; padding: 0; background: none; gap: 6px; }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > span:first-child { flex: none; }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton { flex: 1; width: auto; max-width: none; min-width: 0; }
 :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { display: flex; flex: none; width: 120px; min-width: 0; }
@@ -2168,13 +2174,13 @@ th[title] { cursor: help; }
 :is(.filtres-pied, .filtres-entete) .filtres-choix .multi-bouton:hover { border-color: var(--navy); }
 :is(.filtres-pied, .filtres-entete) .filtres-choix .multi-menu { left: auto; right: 0; }
 .filtres-entete .filtres-choix .multi-menu { left: 0; right: auto; }
-.filtres-entete > .filtres-perimetre { display: block; flex: 1; min-width: 0; margin: 0; }
+.filtres-entete > .filtres-perimetre { display: block; flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filtres-entete > .reinitialiser { flex: none; height: 28px; margin-left: auto; padding: 0 12px; font-size: var(--fs-sm); }
 @media (max-width: 720px) {
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { display: flex; flex-wrap: wrap; gap: 6px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > :is(.filtre, .filtre:has(.periode-bouton)) { width: auto; max-width: 100%; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { width: 100%; }
-  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { flex: 1; width: auto !important; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { flex: 1 1 0; min-width: 0; width: auto !important; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces .multi-bouton { width: auto; min-width: 0; }
   .filtres-puces > .fl { display: none; }
   .filtres-perimetre { flex-direction: column; align-items: flex-start !important; gap: 6px; }

@@ -1,5 +1,5 @@
 import { ListFilter } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DimComparee, FiltresPage } from '../api/rapports'
 import type { Periode } from '../api/types'
 import ChoixSalarie, { type Salarie } from './ChoixSalarie'
@@ -63,13 +63,13 @@ const LIBELLE_DIM: Record<DimComparee, string> = {
 type DimProfil = 'sexe' | 'age' | 'anciennete'
 
 /** Filtres de profil : valeurs fixes (« nr » : non renseigné), sans mode Comparer. */
-const PROFIL: { id: DimProfil; libelle: string; pluriel: string; valeurs: [string, string][] }[] = [
+const PROFIL: { id: DimProfil; libelle: string; court?: string; pluriel: string; valeurs: [string, string][] }[] = [
   { id: 'sexe', libelle: 'Sexe', pluriel: 'sexes', valeurs: [['H', 'Hommes'], ['F', 'Femmes'], ['nr', 'Non renseigné']] },
-  { id: 'age', libelle: "Tranche d'âge", pluriel: 'tranches', valeurs: [
+  { id: 'age', libelle: "Tranche d'âge", court: 'Âge', pluriel: 'tranches', valeurs: [
     ['<25', 'Moins de 25 ans'], ['25-34', '25 à 34 ans'], ['35-44', '35 à 44 ans'], ['45-54', '45 à 54 ans'],
     ['55+', '55 ans et plus'], ['nr', 'Non renseigné'],
   ] },
-  { id: 'anciennete', libelle: "Tranche d'ancienneté", pluriel: 'tranches', valeurs: [
+  { id: 'anciennete', libelle: "Tranche d'ancienneté", court: 'Ancienneté', pluriel: 'tranches', valeurs: [
     ['<1', "Moins d'un an"], ['1-3', '1 à 3 ans'], ['3-5', '3 à 5 ans'], ['5-10', '5 à 10 ans'],
     ['10+', '10 ans et plus'], ['nr', 'Non renseigné'],
   ] },
@@ -342,10 +342,8 @@ export default function FiltresPeriode({
       <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} libelle={puces ? 'Filtres' : undefined} />
     </div>
   )
-  const barre = (
-    <div className={`filtres filtres-rapport${puces ? ' filtres-puces' : ''}`} role="group" aria-label="Filtres">
-      {!puces && <TitreFiltres />}
-      {avecMois ? (
+  const choixPeriode = (
+    avecMois ? (
         <ChoixMois filtres={filtres} periodes={periodes ?? []} comparaison={comparaison === 'periode'} onChange={onChange} />
       ) : comparaison === 'annee' ? (
         periode && <ChoixPeriodes periode={periode} selectionB={selectionB} onChange={onChange} />
@@ -354,9 +352,34 @@ export default function FiltresPeriode({
           {avecCalendrier && <ChoixCalendrier filtres={filtres} onChange={onChange} />}
           <ChoixAnnee filtres={filtres} annees={annees} onChange={onChange} />
         </>
-      )}
+      )
+  )
+  // Grille équilibrée : autant de colonnes égales que la largeur permet, lignes remplies de façon homogène.
+  const grille = useRef<HTMLDivElement>(null)
+  const [cols, setCols] = useState(0)
+  useLayoutEffect(() => {
+    const el = grille.current
+    if (!puces || !el || typeof ResizeObserver === 'undefined') return
+    const calculer = () => {
+      const n = el.querySelectorAll(':scope > .filtre').length
+      const max = Math.max(1, Math.floor((el.clientWidth + 8) / (200 + 8)))
+      setCols(n ? Math.ceil(n / Math.ceil(n / max)) : max)
+    }
+    calculer()
+    const ro = new ResizeObserver(calculer)
+    ro.observe(el)
+    const mo = new MutationObserver(calculer)
+    mo.observe(el, { childList: true })
+    return () => { ro.disconnect(); mo.disconnect() }
+  }, [puces])
+  const barre = (
+    <div
+      className={`filtres filtres-rapport${puces ? ' filtres-puces' : ''}`} role="group" aria-label="Filtres"
+      ref={grille} style={puces && cols ? ({ '--cols': cols } as React.CSSProperties) : undefined}
+    >
+      {!puces && <TitreFiltres />}
+      {!puces && choixPeriode}
       {!puces && choixFiltres}
-      {puces && <span className="filtres-sep" aria-hidden="true" />}
       {avecType && voir('type_site') && (
         <ChoixTypeSite puce={puces} comparer={comparer('type_site')} valeur={val('type_site')} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
@@ -378,7 +401,7 @@ export default function FiltresPeriode({
       )}
       {avecProfil && PROFIL.filter((f) => voir(f.id)).map((f) => (
         <MultiChoix
-          key={f.id} libelle={f.libelle} pluriel={f.pluriel} options={f.valeurs.map(([v]) => v)}
+          key={f.id} libelle={(puces && f.court) || f.libelle} pluriel={f.pluriel} options={f.valeurs.map(([v]) => v)}
           nomOption={(v) => f.valeurs.find(([c]) => c === v)?.[1] ?? v}
           valeur={filtres[f.id] ?? ''} onChange={(v) => onChange({ [f.id]: v })} souple={false} puce={puces}
         />
@@ -403,11 +426,13 @@ export default function FiltresPeriode({
       <div className="filtres-entete">
         {choixFiltres}
         {choixFiltres && <span className="filtres-sep" aria-hidden="true" />}
+        <div className="filtres filtres-rapport filtres-puces filtres-temps" role="group" aria-label="Période">{choixPeriode}</div>
+        <span className="filtres-sep" aria-hidden="true" />
         <p className="filtres-perimetre" aria-live="polite">
-          <span className="lib">Périmètre :</span> {temps}
+          <span className="lib">Périmètre :</span> <span className="sr-only">{temps} </span>
           {actifs.length
-            ? actifs.map(([k, nom]) => <span key={k}> · {nom} : {valeursPerimetre(k).join(cmpDim === k ? ' / ' : ', ')}</span>)
-            : ' · tous les salariés'}
+            ? actifs.map(([k, nom], i) => <span key={k}>{i ? ' · ' : ' '}{nom} : {valeursPerimetre(k).join(cmpDim === k ? ' / ' : ', ')}</span>)
+            : ' tous les salariés'}
         </p>
         {cles.some((k) => partage[k]) && <BoutonReinitialiser actif onClick={effacer} libelle="Réinitialiser" />}
       </div>
