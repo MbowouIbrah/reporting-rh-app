@@ -10,7 +10,9 @@ import {
   anneeDe, indice, libelle, lireTexte, longueur, moisDe, mois as moisSel, type PeriodeChoisie, texteMois, versTexte,
 } from '../lib/periode'
 import BoutonReinitialiser from './BoutonReinitialiser'
+import ChoixFiltres, { FILTRES_PAR_DEFAUT, lireAffiches } from './ChoixFiltres'
 import ChoixPeriode from './ChoixPeriode'
+import { usePreference } from '../lib/preference'
 import MultiChoix, { type ModeListe } from './MultiChoix'
 
 type Comparer = Parameters<typeof MultiChoix>[0]['comparer']
@@ -268,6 +270,18 @@ export default function FiltresPeriode({
       : { [d]: undefined, ...(cmpDim === d && { cmp_dim: undefined }) },
     ),
   }
+  // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
+  const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
+  const dispo = ([
+    [!!departements, 'departement'], [!!services, 'service'], [avecType, 'type_site'], [!!sites, 'site'],
+    [avecActivite, 'activite'], [avecContrat, 'type_contrat'], [avecPoste, 'poste'],
+  ] as const).filter(([ok]) => ok).map(([, d]) => ({ id: d, nom: LIBELLE_DIM[d] }))
+  const voir = (d: DimComparee) => affiches.includes(d) || !!filtres[d] || cmpDim === d
+  const basculer = (d: string, afficher: boolean) => {
+    setAffiches(afficher ? [...affiches, d] : affiches.filter((x) => x !== d))
+    const dim = d as DimComparee
+    if (!afficher && (filtres[dim] || cmpDim === dim)) onChange({ [dim]: undefined, ...(cmpDim === dim && { cmp_dim: undefined }) })
+  }
   const selectionB = cmpDim && filtres.cmp_val
     ? (cmpDim === 'type_site' ? LIBELLE_TYPE_SITE[filtres.cmp_val] ?? filtres.cmp_val : filtres.cmp_val)
     : undefined
@@ -284,25 +298,30 @@ export default function FiltresPeriode({
           <ChoixAnnee filtres={filtres} annees={annees} onChange={onChange} />
         </>
       )}
-      {departements && (
+      {dispo.length > 0 && (
+        <div className="filtres-choix">
+          <ChoixFiltres dispo={dispo} affiches={affiches} onChange={basculer} />
+        </div>
+      )}
+      {departements && voir('departement') && (
         <MultiChoix libelle="Département" pluriel="départements" options={departements} valeur={val('departement')} onChange={(v) => onChange({ departement: v })} comparer={comparer('departement')} />
       )}
-      {services && (
+      {services && voir('service') && (
         <MultiChoix libelle="Service" pluriel="services" options={services} valeur={val('service')} onChange={(v) => onChange({ service: v })} comparer={comparer('service')} />
       )}
-      {avecType && (
+      {avecType && voir('type_site') && (
         <ChoixTypeSite comparer={comparer('type_site')} valeur={val('type_site')} types={typesSite!} onChange={(v) => onChange({ type_site: v })} />
       )}
-      {sites && (
+      {sites && voir('site') && (
         <MultiChoix libelle="Site" pluriel="sites" options={sites} valeur={val('site')} onChange={(v) => onChange({ site: v })} comparer={comparer('site')} />
       )}
-      {avecActivite && (
+      {avecActivite && voir('activite') && (
         <MultiChoix libelle="Activité" pluriel="activités" tous="Toutes" options={activites!} valeur={val('activite')} onChange={(v) => onChange({ activite: v })} comparer={comparer('activite')} />
       )}
-      {avecContrat && (
+      {avecContrat && voir('type_contrat') && (
         <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={val('type_contrat')} onChange={(v) => onChange({ type_contrat: v })} souple={false} comparer={comparer('type_contrat')} />
       )}
-      {avecPoste && <ChoixPoste comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
+      {avecPoste && voir('poste') && <ChoixPoste comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
       {salaries && (
         <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
       )}

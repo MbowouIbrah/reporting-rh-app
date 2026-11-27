@@ -291,6 +291,14 @@ test('Répartition des charges : pas de bandeau de cumul au-dessus des cartes', 
 test('Répartition des charges : filtres type de site, poste et employé (employé réservé au nominatif)', async () => {
   const { unmount } = rendu(<Charges />, '/charges', ['report:read', 'nominatif:read'])
   expect(await screen.findByRole('combobox', { name: 'Employé' })).toBeInTheDocument()
+  // filtre de filtres : Département et Site par défaut, les autres ajoutés à la demande
+  expect(screen.getByRole('button', { name: /^Site/ })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Type de site/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /^Filtrer par/ }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Type de site' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Poste' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Site' }))
+  expect(screen.queryByRole('button', { name: /^Site/ })).toBeNull()
   // sélection multiple (R4) : le panneau s'ouvre au clic, une case par valeur
   fireEvent.click(await screen.findByRole('button', { name: /^Type de site/ }))
   expect(screen.getByRole('checkbox', { name: 'Agence' })).toBeInTheDocument()

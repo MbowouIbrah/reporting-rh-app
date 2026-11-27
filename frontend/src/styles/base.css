@@ -2090,3 +2090,10 @@ th[title] { cursor: help; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport :is(select, input, .multi-bouton) { width: 100%; max-width: none; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie input { width: 100%; }
 }
+
+/* Filtre de filtres : entre la période et les filtres de données, séparé par un trait de chaque côté. */
+.filtres-choix { display: flex; align-items: end; align-self: stretch; padding: 0 var(--sp-3); border-left: 1px solid var(--rule-strong); border-right: 1px solid var(--rule-strong); }
+.filtres-choix-pied { color: var(--muted); font-size: var(--fs-xs); font-weight: 400; }
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtres-choix { grid-column: 1 / -1; padding: 0; border: 0; }
+}
