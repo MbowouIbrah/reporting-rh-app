@@ -2090,3 +2090,41 @@ th[title] { cursor: help; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport :is(select, input, .multi-bouton) { width: 100%; max-width: none; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport .choix-salarie input { width: 100%; }
 }
+
+/* Résumé : indicateurs regroupés par type (titre puis trois cartes), filtre « Types d'indicateurs » */
+.type-groupe { margin-bottom: var(--sp-3); }
+.type-groupe h2 { margin: 0 0 4px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--navy-2); display: flex; align-items: center; gap: 8px; }
+.type-groupe h2::after { content: ''; flex: 1; border-top: 1px solid var(--rule); }
+.type-neuf, .types-neuf { font-style: normal; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: none; background: var(--navy); color: #fff; padding: 1px 6px; border-radius: 0; }
+.resume-excel .cases.type-cases { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 0; }
+.resume-excel .cases.type-cases .case:nth-child(3n) { border-right: 0; }
+@media (max-width: 899px) {
+  .resume-excel .cases.type-cases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .resume-excel .cases.type-cases .case:nth-child(3n) { border-right: 1px solid var(--rule); }
+  .resume-excel .cases.type-cases .case:nth-child(2n) { border-right: 0; }
+}
+@media (max-width: 519px) {
+  .resume-excel .cases.type-cases { grid-template-columns: minmax(0, 1fr); }
+  .resume-excel .cases.type-cases .case { border-right: 0; }
+}
+.type-bloc, .type-barre, .type-legende, .type-petite { grid-column: 1 / -1; }
+.type-barre { display: flex; height: 10px; margin-top: 6px; background: var(--paper-3); }
+.type-barre i { display: block; height: 100%; }
+.type-legende { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; padding: 0; list-style: none; font-size: var(--fs-xs); color: var(--muted); }
+.type-legende li { display: inline-flex; align-items: center; gap: 4px; }
+.type-legende b { display: inline-block; width: 8px; height: 8px; }
+.type-tranches { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 6px; margin-top: 6px; align-items: center; font-size: var(--fs-xs); color: var(--muted); }
+.type-tranche { display: contents; }
+.type-t { display: block; height: 7px; background: var(--paper-3); }
+.type-t i { display: block; height: 100%; background: var(--data-1); }
+.type-v { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.type-nr { margin: 4px 0 0; font-style: italic; font-size: var(--fs-xs); color: var(--muted); }
+.type-petite { margin-top: 6px; padding: 8px; border: 1px dashed var(--rule-strong); background: var(--paper-2); color: var(--muted); font-size: var(--fs-sm); text-align: center; }
+.type-rappel { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
+.type-aucun, .type-vide-tab { margin: 0 0 var(--sp-3); padding: var(--sp-4); border: 1px dashed var(--rule-strong); color: var(--muted); font-size: var(--fs-sm); text-align: center; }
+.types-menu { width: max(100%, 300px); }
+.types-menu .multi-liste label { align-items: flex-start; white-space: normal; }
+.types-nom { display: grid; gap: 1px; }
+.types-nom small { display: block; white-space: normal; color: var(--muted); font-size: var(--fs-xs); }
+.types-neuf { margin-left: 6px; }
+.types-pied { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); }

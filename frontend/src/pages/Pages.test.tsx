@@ -13,6 +13,13 @@ import Resume from './Resume'
 let serieCa = false
 // Cumuls CA renseignés (comparaison avec évolution positive, CA par salarié en baisse).
 let cumulCa = false
+// Profil des salariés servi « trop petit » (moins de 3 personnes, sans accès nominatif).
+let profilMasque = false
+const profilOk = (femmes: number) => ({
+  effectif: 10, sexe: { H: 10 - femmes, F: femmes, nr: 0 },
+  age: { moyenne: '38.4', tranches: [{ cle: '<25', n: 1 }, { cle: '25-34', n: 3 }, { cle: '35-44', n: 4 }, { cle: '45-54', n: 2 }, { cle: '55+', n: 0 }], nr: 0 },
+  anciennete: { moyenne: '4.2', tranches: [{ cle: '<1', n: 2 }, { cle: '1-3', n: 3 }, { cle: '3-5', n: 2 }, { cle: '5-10', n: 3 }, { cle: '10+', n: 0 }], nr: 1 },
+})
 const cell = (m: string | null) => ({ m1: m, m, var: '0', var_pct: '0' })
 const serie = Array.from({ length: 12 }, (_, i) => ({
   mois: i + 1, ms: i < 2 ? '1000' : null, effectif: null, absences: null, commissions: null, primes: null,
@@ -54,6 +61,10 @@ function routes(avecMarge: boolean, perms: string[]) {
         frais_mission_ytd: '7', logement_ytd: '3', mois_fin: 2, effectif_fin: cell('4'),
         effectif_fin_contrat: { CDI: { ...cell('3'), part: '0.75' }, MAD: { ...cell('1'), part: '0.25' } },
         effectif_moyen_mad: cell('3'), part_mad: { m: '0.2', m1: '0.25' },
+        profil: profilMasque ? { m: { effectif: 2, masque: true }, m1: { effectif: 2, masque: true } } : { m: profilOk(6), m1: profilOk(5) },
+        contrat_fin: {
+          CDI: { ...cell('6'), part: '0.6', part1: '0.5' }, CDD: { ...cell('3'), part: '0.3', part1: '0.4' }, autres: { ...cell('1'), part: '0.1', part1: '0.1' },
+        },
         mad_fin: cell('2'), mad_deportes_fin: { ...cell('1'), part: '0.5' },
         ms_contrat: { CDI: { ...cell('1500'), part: '0.75' }, MAD: { ...cell('500'), part: '0.25' } },
         ...(avecMarge ? (cumulCa
@@ -421,11 +432,89 @@ test('Résumé : au tout premier chargement, le squelette a les cases, les mois 
     expect(z).not.toBeNull()
     return z!
   })
-  expect(zone.querySelectorAll('.cases')).toHaveLength(2)
-  expect(zone.querySelectorAll('.cases .case')).toHaveLength(8)
-  expect(zone.querySelectorAll('.cases .case .second-libelle')).toHaveLength(8)
+  expect(zone.querySelectorAll('.cases')).toHaveLength(4)
+  expect(zone.querySelectorAll('.cases .case')).toHaveLength(12)
+  expect(zone.querySelectorAll('.cases .case .second-libelle')).toHaveLength(12)
   // Réunion du 23/11 : les 12 mois du cadre, ceux hors période grisés
   expect(zone.querySelectorAll('.suivi tbody tr')).toHaveLength(12)
   expect(zone).toHaveTextContent('SUIVI MENSUEL')
   expect(zone.querySelector('.suivi tfoot')).toHaveTextContent('TOTAL')
+})
+
+const TITRES = ['Activité et productivité', 'Masse salariale', 'Effectif', 'Profil des salariés']
+const titresGroupes = () => [...document.querySelectorAll('.type-groupe > h2')].map((h) => h.firstChild?.textContent)
+const rappel = () => document.querySelector('.type-rappel')
+
+test('Résumé : quatre groupes d’indicateurs, trois cartes chacun', async () => {
+  localStorage.clear()
+  rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
+  await chargee()
+  await screen.findByText('Sexe', { selector: '.micro' })
+  expect(titresGroupes()).toEqual(TITRES)
+  document.querySelectorAll('.type-groupe').forEach((g) => expect(g.querySelectorAll('.cases .case')).toHaveLength(3))
+  expect(screen.getByText('Type de contrat', { selector: '.micro' })).toBeInTheDocument()
+  expect(screen.getByText('Âge', { selector: '.micro' })).toBeInTheDocument()
+  expect(screen.getByText('Ancienneté', { selector: '.micro' })).toBeInTheDocument()
+})
+
+test('Résumé : décocher un type masque ses cartes et ses colonnes, « Tout afficher » les rétablit, la préférence est envoyée', async () => {
+  localStorage.clear()
+  rendu(<Resume />, '/resume', ['report:read', 'marge:read'], true)
+  await chargee()
+  await screen.findByText('Sexe', { selector: '.micro' })
+  expect(rappel()).toBeNull()
+  expect(screen.getByRole('columnheader', { name: 'MASSE SALARIALE' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Types d’indicateurs/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Masse salariale/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Profil des salariés/ }))
+  await waitFor(() => expect(titresGroupes()).toEqual(['Activité et productivité', 'Effectif']))
+  expect(screen.queryByText('Sexe', { selector: '.micro' })).toBeNull()
+  expect(screen.queryByText('Primes de productivité', { selector: '.micro' })).toBeNull()
+  expect(screen.queryByRole('columnheader', { name: 'MASSE SALARIALE' })).toBeNull()
+  expect(screen.getByRole('columnheader', { name: 'CA' })).toBeInTheDocument()
+  expect(rappel()).toHaveTextContent('2 types d’indicateurs masqués (Masse salariale, Profil des salariés)')
+  const puts = vi.mocked(fetch).mock.calls.filter((c) => String(c[0]).includes('/auth/preferences/graphes.resume_types') && (c[1] as RequestInit | undefined)?.method === 'PUT')
+  expect(puts.length).toBeGreaterThan(0)
+  expect(JSON.parse(String((puts[puts.length - 1][1] as RequestInit).body))).toEqual({ valeur: ['masse', 'profil'] })
+  fireEvent.click(within(rappel() as HTMLElement).getByRole('button', { name: 'Tout afficher' }))
+  await waitFor(() => expect(titresGroupes()).toEqual(TITRES))
+  expect(rappel()).toBeNull()
+  expect(screen.getByRole('columnheader', { name: 'MASSE SALARIALE' })).toBeInTheDocument()
+})
+
+test('Résumé : sans colonne pour les types cochés, le tableau le dit', async () => {
+  localStorage.clear()
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  await screen.findByText('Sexe', { selector: '.micro' })
+  fireEvent.click(screen.getByRole('button', { name: /Types d’indicateurs/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Masse salariale/ }))
+  await waitFor(() => expect(screen.getByText('Pas de colonne pour les types cochés.')).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Activité et productivité/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Effectif/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Profil des salariés/ }))
+  await waitFor(() => expect(screen.getByText(/Aucun type d’indicateurs coché/)).toBeInTheDocument())
+  expect(titresGroupes()).toEqual([])
+})
+
+test('Résumé : profil trop petit, « Sélection trop petite » à la place des chiffres', async () => {
+  localStorage.clear()
+  profilMasque = true
+  try {
+    rendu(<Resume />, '/resume', ['report:read'])
+    await chargee()
+    await screen.findByText('Sexe', { selector: '.micro' })
+    expect(document.querySelectorAll('.type-petite')).toHaveLength(3)
+    expect(screen.getAllByText(/Sélection trop petite/).length).toBeGreaterThanOrEqual(3)
+  } finally {
+    profilMasque = false
+  }
+})
+
+test('Résumé : sans droit marge, pas de groupe Activité et productivité', async () => {
+  localStorage.clear()
+  rendu(<Resume />, '/resume', ['report:read'])
+  await chargee()
+  await screen.findByText('Sexe', { selector: '.micro' })
+  expect(titresGroupes()).toEqual(TITRES.slice(1))
 })

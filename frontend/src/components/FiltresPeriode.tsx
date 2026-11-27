@@ -42,6 +42,8 @@ interface Props {
   periode?: PeriodeChoisie | null
   /** Champs supplémentaires, alignés sur la même ligne que les filtres. */
   children?: ReactNode
+  /** Filtre d'affichage propre à la page, rangé après les filtres de données et avant les actions. */
+  extra?: ReactNode
   onChange: (patch: Patch) => void
   /** Valeurs choisies (filtres partagés) : seules elles rendent Réinitialiser actif. */
   partage: Partage
@@ -233,7 +235,7 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 
 export default function FiltresPeriode({
   filtres, annees = [], departements, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
-  periode, children, onChange, partage, cmpDim,
+  periode, children, extra, onChange, partage, cmpDim,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
@@ -306,6 +308,7 @@ export default function FiltresPeriode({
       {salaries && (
         <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
       )}
+      {extra}
       <div className="filtres-actions">
         <BoutonReinitialiser
           actif={cles.some((k) => partage[k])}
