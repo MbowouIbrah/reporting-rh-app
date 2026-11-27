@@ -2142,10 +2142,14 @@ th[title] { cursor: help; }
 .cal-raccourcis button { height: 28px; padding: 0 6px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
 .cal-raccourcis button:hover { border-color: var(--navy); }
 .cal-raccourcis button.sel { background: var(--navy); border-color: var(--navy); color: #fff; }
-/* Puces ajustées à leur contenu (l'écran large étire sinon les listes). */
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; }
-:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: auto; min-width: 0; }
-.filtres-puces .multi-bouton > span { flex: none; }
+/* Puces de largeur fixe (période exceptée) : valeur tronquée, « +N » toujours visible, liste complète au survol. */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; width: 210px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > span:first-child { flex: none; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton { flex: 1; width: auto; max-width: none; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) > .multi-bouton > span { display: flex; flex: 1; min-width: 0; }
+.puce-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.puce-plus { flex: none; font-weight: 700; white-space: pre; }
+.filtres-puces .multi-bouton.periode-bouton > span, .filtres-puces > .filtre:has(.periode-bouton) .multi-bouton > span { flex: none; }
 /* Un seul panneau : période | puces de périmètre, puis pied « Périmètre … » / Tout effacer / Filtres affichés. */
 .filtres-panneau { margin: 0 0 var(--sp-3); padding: 10px 12px 8px; border: 1px solid var(--rule); background: var(--surface-sunken); }
 :is(.rapport-excel, .resume-excel) .filtres-panneau > .filtres.filtres-rapport.filtres-puces { margin: 0; padding: 0; background: none; gap: 8px; }
@@ -2162,6 +2166,7 @@ th[title] { cursor: help; }
 @media (max-width: 720px) {
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { display: flex; flex-wrap: wrap; gap: 6px; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > :is(.filtre, .filtre:has(.periode-bouton)) { width: auto; max-width: 100%; }
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { width: 100%; }
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces .multi-bouton { width: auto; min-width: 0; }
   .filtres-puces > .fl { display: none; }
   .filtres-perimetre { flex-direction: column; align-items: flex-start !important; gap: 6px; }

@@ -64,8 +64,11 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
   const resume = cmp ? (coches.length === 2 ? `⇄ ${coches.map(nomOption).join(' / ')}` : '⇄ Cochez 2 valeurs')
     : aucun ? 'Aucun'
     : choisis.length === 0 ? tous
+    : puce ? nomOption(choisis[0]) // en puce : 1er nom (tronqué si besoin) puis « +N »
     : choisis.length <= 2 ? choisis.map(nomOption).join(', ')
     : `${choisis.length} ${pluriel}`
+  const enPlus = puce && !cmp && !aucun ? Math.max(0, choisis.length - 1) : 0
+  const complet = cmp ? resume : choisis.map(nomOption).join(', ')
   const t = plier(saisie.trim())
   const visibles = t ? options.filter((o) => plier(nomOption(o)).includes(t)) : options
   const appliquer = (s: Set<string>) => {
@@ -113,13 +116,16 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
         aria-expanded={ouvert}
         aria-controls={`${id}-menu`}
         aria-labelledby={`${id}-lib ${id}-val`}
-        title={!cmp && choisis.length > 2 ? choisis.map(nomOption).join(', ') : undefined}
+        title={puce ? (cmp || choisis.length ? complet : undefined) : !cmp && choisis.length > 2 ? complet : undefined}
         onClick={() => {
           setSaisie('')
           setOuvert(!ouvert)
         }}
       >
-        <span id={`${id}-val`}>{resume}</span>
+        <span id={`${id}-val`}>
+          {puce ? <span className="puce-nom">{resume}</span> : resume}
+          {enPlus > 0 && <span className="puce-plus" aria-label={`et ${enPlus} autre${enPlus > 1 ? 's' : ''}`}> +{enPlus}</span>}
+        </span>
       </button>
       {puce && (cmp || choisis.length > 0) && (
         <button
