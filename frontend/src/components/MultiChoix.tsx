@@ -11,7 +11,11 @@ const plier = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').t
  *  deux valeurs, la 1re est A, la 2e est B (ordre de clic gardé dans la valeur). */
 export type ModeListe = 'cumuler' | 'comparer' | 'effacer'
 
-export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true, comparer }: {
+export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, valeur, onChange, nomOption = (v) => v, souple = true, comparer, puce = false, limite }: {
+  /** Présentation en puce « Libellé : valeur ▾ », navy et × quand le filtre est actif. */
+  puce?: boolean
+  /** Liste restreinte par un filtre parent (« Limité à : Commercial »). */
+  limite?: string
   libelle: string
   /** Résumé au-delà de deux choix : « 3 sites ». */
   pluriel: string
@@ -90,7 +94,7 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
 
   return (
     <div
-      className={`filtre multi-choix${souple ? ' souple' : ''}`}
+      className={`filtre multi-choix${souple ? ' souple' : ''}${puce ? ' puce' : ''}${puce && (cmp || choisis.length > 0) ? ' actif' : ''}`}
       ref={racine}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && ouvert) {
@@ -117,6 +121,19 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
       >
         <span id={`${id}-val`}>{resume}</span>
       </button>
+      {puce && (cmp || choisis.length > 0) && (
+        <button
+          type="button" className="puce-croix" aria-label={`Effacer le filtre ${libelle}`} title={`Effacer le filtre ${libelle}`}
+          onClick={() => {
+            setOuvert(false)
+            if (comparer) comparer.onMode('effacer')
+            else onChange('')
+            bouton.current?.focus()
+          }}
+        >
+          ×
+        </button>
+      )}
       {ouvert && (
         <div id={`${id}-menu`} className="multi-menu" role="group" aria-labelledby={`${id}-lib`}>
           {comparer && (
@@ -132,6 +149,7 @@ export default function MultiChoix({ libelle, pluriel, tous = 'Tous', options, v
               </p>
             </>
           )}
+          {limite && <p className="multi-aide multi-limite">Limité à : {limite}</p>}
           {options.length > 8 && (
             <input
               type="search"

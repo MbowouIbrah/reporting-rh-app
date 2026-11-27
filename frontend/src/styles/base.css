@@ -2101,3 +2101,61 @@ th[title] { cursor: help; }
 .filtres .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .filtres .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
 .filtres-choix .multi-liste { max-height: 440px; }
+/* Barre de filtres en puces (Budget réalisé) : « Libellé : valeur ▾ » dans un seul bouton visuel,
+   navy et × quand le filtre est actif ; tout sur une ligne, sans titre ni Réinitialiser permanent. */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces { flex-wrap: wrap; align-items: center; margin-bottom: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre { flex: none; min-width: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre {
+  position: relative; display: inline-flex; align-items: center; gap: 0; height: 32px; padding-left: 10px;
+  border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap;
+}
+.filtres-puces > .filtre > span:first-child::after { content: ' :'; }
+.filtres-puces > .filtre:hover { border-color: var(--navy); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton {
+  width: auto; max-width: 220px; height: 30px; min-width: 0; padding: 0 8px 0 4px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-weight: 600;
+}
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton:disabled { font-weight: 400; color: var(--muted); }
+.filtres-puces .multi-bouton:focus-visible, .filtres-puces .puce-croix:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif { background: var(--navy); border-color: var(--navy); color: rgba(255, 255, 255, .8); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif > .multi-bouton { color: #fff; }
+.filtres-puces > .filtre.actif > .multi-bouton::after { color: #fff; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif:has(.multi-bouton.cmp) { background: var(--info-soft); border-color: var(--navy); color: var(--muted); }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.actif:has(.multi-bouton.cmp) > :is(.multi-bouton, .puce-croix) { color: var(--navy); }
+.puce-croix {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 30px; padding: 0;
+  border: 0; border-left: 1px solid rgba(255, 255, 255, .3); border-radius: 0 8px 8px 0; background: none;
+  color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.puce-croix:hover { background: rgba(255, 255, 255, .15); }
+.filtres-puces > .fl { color: var(--muted); }
+/* Ligne sous la barre : périmètre à gauche, « N filtres actifs · Tout effacer » à droite. */
+.filtres-perimetre { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--muted); }
+.filtres-perimetre p { margin: 0; min-width: 0; }
+.filtres-perimetre .lib { font-weight: 700; color: var(--navy); }
+.filtres-compte { flex: none; white-space: nowrap; }
+.lien-effacer { padding: 0; border: 0; background: none; color: var(--red); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.lien-effacer:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.multi-limite { color: var(--navy); }
+/* Raccourcis du calendrier « Période ». */
+.cal-raccourcis { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.cal-raccourcis button { height: 28px; padding: 0 6px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.cal-raccourcis button:hover { border-color: var(--navy); }
+.cal-raccourcis button.sel { background: var(--navy); border-color: var(--navy); color: #fff; }
+/* Puces ajustées à leur contenu (l'écran large étire sinon les listes). */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) { flex: none; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre.multi-choix:not(:has(.periode-bouton)) .multi-bouton { width: auto; min-width: 0; }
+.filtres-puces .multi-bouton > span { flex: none; }
+/* « Filtrer par » en fin de barre : puce à bord pointillé, sans les traits de séparation. */
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix { align-self: center; padding: 0; border: 0; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix > .filtre {
+  display: inline-flex; align-items: center; height: 32px; padding-left: 10px; border: 1px dashed var(--rule-strong); border-radius: 8px;
+  font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); white-space: nowrap;
+}
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix > .filtre:hover { border-color: var(--navy); }
+.filtres-puces > .filtres-choix > .filtre > span:first-child::after { content: ' :'; }
+:is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtres-choix .multi-bouton { width: auto; height: 30px; padding: 0 8px 0 4px; border: 0; background: none; color: var(--ink); font-weight: 600; }
+@media (max-width: 720px) {
+  :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport.filtres-puces > .filtre > .multi-bouton { flex: 1; width: auto; }
+  .filtres-perimetre { flex-direction: column; gap: 4px; }
+}

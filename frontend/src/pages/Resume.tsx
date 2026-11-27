@@ -279,7 +279,7 @@ export default function Resume() {
       <BulleCases inactif={premier || maj}>
       <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} avecProfil comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} />
+        <FiltresPeriode avecMois={false} avecProfil comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} postes={f.postes} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} puces />
       )}
       {/* Seul le corps défile : titre et filtres restent figés, l’en-tête du tableau colle en haut du corps. */}
       <div className="resume-corps">
