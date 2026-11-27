@@ -136,11 +136,15 @@ export default function Resume() {
     type_site: f.filtres.type_site,
     activite: f.filtres.activite,
     type_contrat: f.filtres.type_contrat,
+    sexe: f.filtres.sexe,
+    age: f.filtres.age,
+    anciennete: f.filtres.anciennete,
     cmp_dim: f.filtres.cmp_dim,
     cmp_val: f.filtres.cmp_val,
   }
   // Sous filtre, le serveur renvoie le CA et la marge s'ils existent à ce niveau (site, service, employés) ; sinon null.
-  const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat))
+  const filtre = !!(base && (base.departement || base.service || base.site || base.type_site || base.activite || base.type_contrat
+    || base.sexe || base.age || base.anciennete))
   const ann = useQuery({
     queryKey: ['annuel', base],
     queryFn: () => getAnnuel(base!),
@@ -274,7 +278,7 @@ export default function Resume() {
       <BulleCases inactif={premier || maj}>
       <TitreRapport titre="BUDGET RÉALISÉ" />
       {f.filtres && (
-        <FiltresPeriode avecMois={false} comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} />
+        <FiltresPeriode avecMois={false} avecProfil comparaison="annee" filtres={f.filtres} departements={f.departements} services={f.services} sites={f.sites} typesSite={f.typesSite} activites={f.activites} typesContrat={f.typesContrat} partage={f.partage} periode={f.periode} cmpDim={f.cmpDim} onChange={f.set} />
       )}
       {/* Seul le corps défile : titre et filtres restent figés, l’en-tête du tableau colle en haut du corps. */}
       <div className="resume-corps">

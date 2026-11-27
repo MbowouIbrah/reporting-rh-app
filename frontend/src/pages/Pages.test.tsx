@@ -310,6 +310,25 @@ test('Répartition des charges : filtres type de site, poste et employé (employ
   expect(screen.queryByRole('combobox', { name: 'Employé' })).toBeNull()
 })
 
+test('Filtrer par : champs rangés par groupe, filtres de profil envoyés au serveur et réinitialisés', async () => {
+  rendu(<Charges />, '/charges', ['report:read'])
+  fireEvent.click(await screen.findByRole('button', { name: /^Filtrer par/ }))
+  const menu = await screen.findByRole('group', { name: 'Filtrer par' })
+  const textes = [...menu.querySelectorAll('.filtres-choix-groupe, label')].map((e) => e.textContent)
+  expect(textes.indexOf('Profil des salariés')).toBeGreaterThan(textes.indexOf('Effectif'))
+  expect(textes.indexOf('Sexe')).toBe(textes.indexOf('Profil des salariés') + 1)
+  expect(textes).toEqual(expect.arrayContaining(['Masse salariale', 'Poste', "Tranche d'âge", "Tranche d'ancienneté"]))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Sexe' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^Sexe/ }))
+  // tout est coché par défaut : décocher Femmes garde Hommes et Non renseigné
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Femmes' }))
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((c) => String(c[0]).includes('sexe=H%7Cnr'))).toBe(true))
+  const reinit = screen.getByRole('button', { name: /Réinitialiser/ })
+  expect(reinit).toBeEnabled()
+  fireEvent.click(reinit)
+  await waitFor(() => expect(screen.getByRole('button', { name: /Réinitialiser/ })).toBeDisabled())
+})
+
 test('Individuel : tous les salariés par défaut', async () => {
   rendu(<Individuel />, '/individuel', ['report:read', 'nominatif:read'])
   expect(await screen.findByRole('region', { name: 'Reporting individuel' })).toBeInTheDocument()

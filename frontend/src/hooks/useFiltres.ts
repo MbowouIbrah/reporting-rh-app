@@ -242,6 +242,9 @@ export function useFiltres({ avecMois = true, comparaison, avecCalendrier = fals
     poste: choix.poste,
     activite: choix.activite,
     type_contrat: choix.type_contrat,
+    sexe: p.sexe,
+    age: p.age,
+    anciennete: p.anciennete,
     // Un matricule partagé (lien, autre page) n'est transmis qu'avec le droit nominatif : sinon 403.
     matricule: nominatif ? choix.matricule : undefined,
     ...(selection && { [selection.dim]: selection.a, cmp_dim: selection.dim, cmp_val: selection.b }),

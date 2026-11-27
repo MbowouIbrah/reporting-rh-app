@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 
-export interface FiltreDispo { id: string; nom: string }
+export interface FiltreDispo { id: string; nom: string; groupe?: string }
 
 /** Filtres de données montrés par défaut : les autres s'ajoutent à la demande. */
 export const FILTRES_PAR_DEFAUT = ['departement', 'site']
@@ -63,11 +63,14 @@ export default function ChoixFiltres({ dispo, affiches, onChange }: {
         <div id={`${id}-menu`} className="multi-menu" role="group" aria-labelledby={`${id}-lib`}>
           <p className="multi-compte" aria-live="polite">{choisis.length} sur {dispo.length}</p>
           <div className="multi-liste">
-            {dispo.map((d) => (
-              <label key={d.id}>
-                <input type="checkbox" checked={affiches.includes(d.id)} onChange={(e) => onChange(d.id, e.target.checked)} />
-                {d.nom}
-              </label>
+            {dispo.map((d, i) => (
+              <Fragment key={d.id}>
+                {d.groupe && d.groupe !== dispo[i - 1]?.groupe && <p className="filtres-choix-groupe">{d.groupe}</p>}
+                <label>
+                  <input type="checkbox" checked={affiches.includes(d.id)} onChange={(e) => onChange(d.id, e.target.checked)} />
+                  {d.nom}
+                </label>
+              </Fragment>
             ))}
           </div>
           <div className="multi-pied filtres-choix-pied">Mémorisé pour votre compte</div>

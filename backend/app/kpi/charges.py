@@ -41,7 +41,8 @@ class Contexte:
     """Ce qui décide de l'affichage du budget : début de la période (indice de mois) et filtres
     actifs. `perimetre` : compte à périmètre restreint ; `perim_service` et `perim_site` : le
     périmètre du compte restreint les services ou les sites ; `departement` : filtre Département
-    choisi dans la barre (distinct du périmètre du compte)."""
+    choisi dans la barre (distinct du périmètre du compte) ; `profil` : filtre Sexe, Âge ou
+    Ancienneté."""
 
     debut: int
     service: bool = False
@@ -52,6 +53,7 @@ class Contexte:
     perimetre: bool = False
     perim_service: bool = False
     perim_site: bool = False
+    profil: bool = False
     departement: bool = False
 
 
@@ -68,6 +70,8 @@ def raison_budget(ctx: Contexte | None, axe: str) -> str | None:
         return "Budget non suivi par nature de contrat."
     if ctx.poste:
         return "Budget non suivi par poste ni par personne."
+    if ctx.profil:
+        return "Budget non suivi par sexe, âge ni ancienneté."
     ac = ctx.activite or ctx.contrat
     if axe == "type" and (ctx.departement or ctx.service or ctx.site or ctx.perimetre or ac):
         dep = "Département, " if ctx.departement else ""

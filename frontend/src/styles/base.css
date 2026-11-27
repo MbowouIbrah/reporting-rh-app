@@ -2097,3 +2097,7 @@ th[title] { cursor: help; }
 @media (max-width: 720px) {
   :is(.rapport-excel, .resume-excel) .filtres.filtres-rapport > .filtres-choix { grid-column: 1 / -1; padding: 0; border: 0; }
 }
+/* Intertitres de groupe du menu « Filtrer par » (groupes d'indicateurs). */
+.filtres .multi-liste .filtres-choix-groupe { margin: var(--sp-2) 0 2px; padding: 0 4px; color: var(--muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.filtres .multi-liste .filtres-choix-groupe:first-child { margin-top: 0; }
+.filtres-choix .multi-liste { max-height: 440px; }

@@ -178,6 +178,15 @@ def _tranches(mois: list[int], bornes) -> list[dict]:
     return [{"cle": cle, "n": n} for (_, cle), n in zip(bornes, comptes, strict=True)]
 
 
+def tranche(debut: date | None, fin: date | None, bornes) -> str:
+    """Tranche d'années révolues au jour `fin`, même découpage que `profil` ; « nr » sans date
+    connue ou pour une date postérieure à `fin`."""
+    if debut is None or fin is None or debut > fin:
+        return "nr"
+    a = _mois_revolus(debut, fin) // 12
+    return next(cle for haut, cle in bornes if haut is None or a < haut)
+
+
 def profil(pd: PeriodeData | None) -> dict | None:
     """Sexe, âge et ancienneté des salariés distincts de la période, à son dernier jour. Une valeur
     absente (ou une date postérieure à la période) est « non renseignée », jamais devinée."""

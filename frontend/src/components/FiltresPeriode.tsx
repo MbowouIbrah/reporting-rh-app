@@ -49,11 +49,35 @@ interface Props {
   partage: Partage
   /** R9 : liste en mode « Comparer » (null : aucune) ; absent : page sans comparaison de sélections. */
   cmpDim?: DimComparee | null
+  /** Filtres de profil des salariés (sexe, tranche d'âge, tranche d'ancienneté), filtrés côté serveur. */
+  avecProfil?: boolean
 }
 
 const LIBELLE_DIM: Record<DimComparee, string> = {
   departement: 'Département', service: 'Service', site: 'Site', type_site: 'Type de site',
   activite: 'Activité', type_contrat: 'Contrat', poste: 'Poste',
+}
+
+type DimProfil = 'sexe' | 'age' | 'anciennete'
+
+/** Filtres de profil : valeurs fixes (« nr » : non renseigné), sans mode Comparer. */
+const PROFIL: { id: DimProfil; libelle: string; pluriel: string; valeurs: [string, string][] }[] = [
+  { id: 'sexe', libelle: 'Sexe', pluriel: 'sexes', valeurs: [['H', 'Hommes'], ['F', 'Femmes'], ['nr', 'Non renseigné']] },
+  { id: 'age', libelle: "Tranche d'âge", pluriel: 'tranches', valeurs: [
+    ['<25', 'Moins de 25 ans'], ['25-34', '25 à 34 ans'], ['35-44', '35 à 44 ans'], ['45-54', '45 à 54 ans'],
+    ['55+', '55 ans et plus'], ['nr', 'Non renseigné'],
+  ] },
+  { id: 'anciennete', libelle: "Tranche d'ancienneté", pluriel: 'tranches', valeurs: [
+    ['<1', "Moins d'un an"], ['1-3', '1 à 3 ans'], ['3-5', '3 à 5 ans'], ['5-10', '5 à 10 ans'],
+    ['10+', '10 ans et plus'], ['nr', 'Non renseigné'],
+  ] },
+]
+
+/** Groupes du menu « Filtrer par », dans l'ordre des groupes d'indicateurs. */
+const GROUPE: Record<DimComparee | DimProfil, string> = {
+  activite: 'Activité et productivité', poste: 'Masse salariale',
+  departement: 'Effectif', service: 'Effectif', type_site: 'Effectif', site: 'Effectif', type_contrat: 'Effectif',
+  sexe: 'Profil des salariés', age: 'Profil des salariés', anciennete: 'Profil des salariés',
 }
 
 /** Période précédant (annee, mois) : mois d'avant, décembre de l'année d'avant en janvier. */
@@ -235,7 +259,7 @@ export function ChoixEmploye({ salaries, valeur, onChange }: {
 
 export default function FiltresPeriode({
   filtres, annees = [], departements, services, sites, typesSite, postes, activites, typesContrat, salaries, avecMois = true, comparaison, avecCalendrier, periodes,
-  periode, children, onChange, partage, cmpDim,
+  periode, children, onChange, partage, cmpDim, avecProfil,
 }: Props) {
   const avecType = !!typesSite?.length
   const avecPoste = !!postes?.length
@@ -257,6 +281,7 @@ export default function FiltresPeriode({
     ...(avecPoste ? (['poste'] as const) : []),
     ...(salaries ? (['matricule'] as const) : []),
     ...(cmpDim !== undefined ? (['cmp_dim'] as const) : []),
+    ...(avecProfil ? (['sexe', 'age', 'anciennete'] as const) : []),
   ]
   // R9 : la liste comparée montre A et B ; les filtres envoyés au serveur n'ont que A dans la dimension.
   const val = (d: DimComparee) =>
@@ -273,13 +298,16 @@ export default function FiltresPeriode({
   // Filtre de filtres : seuls les filtres choisis sont montrés ; un filtre qui porte une valeur reste visible.
   const [affiches, setAffiches] = usePreference('graphes.filtres_affiches', lireAffiches, FILTRES_PAR_DEFAUT)
   const dispo = ([
-    [!!departements, 'departement'], [!!services, 'service'], [avecType, 'type_site'], [!!sites, 'site'],
-    [avecActivite, 'activite'], [avecContrat, 'type_contrat'], [avecPoste, 'poste'],
-  ] as const).filter(([ok]) => ok).map(([, d]) => ({ id: d, nom: LIBELLE_DIM[d] }))
-  const voir = (d: DimComparee) => affiches.includes(d) || !!filtres[d] || cmpDim === d
+    [avecActivite, 'activite', LIBELLE_DIM.activite], [avecPoste, 'poste', LIBELLE_DIM.poste],
+    [!!departements, 'departement', LIBELLE_DIM.departement], [!!services, 'service', LIBELLE_DIM.service],
+    [avecType, 'type_site', LIBELLE_DIM.type_site], [!!sites, 'site', LIBELLE_DIM.site],
+    [avecContrat, 'type_contrat', LIBELLE_DIM.type_contrat],
+    ...PROFIL.map((f) => [!!avecProfil, f.id, f.libelle] as const),
+  ] as const).filter(([ok]) => ok).map(([, d, nom]) => ({ id: d, nom, groupe: GROUPE[d] }))
+  const voir = (d: DimComparee | DimProfil) => affiches.includes(d) || !!filtres[d] || cmpDim === d
   const basculer = (d: string, afficher: boolean) => {
     setAffiches(afficher ? [...affiches, d] : affiches.filter((x) => x !== d))
-    const dim = d as DimComparee
+    const dim = d as DimComparee | DimProfil
     if (!afficher && (filtres[dim] || cmpDim === dim)) onChange({ [dim]: undefined, ...(cmpDim === dim && { cmp_dim: undefined }) })
   }
   const selectionB = cmpDim && filtres.cmp_val
@@ -322,6 +350,13 @@ export default function FiltresPeriode({
         <MultiChoix libelle="Contrat" pluriel="contrats" options={typesContrat!} valeur={val('type_contrat')} onChange={(v) => onChange({ type_contrat: v })} souple={false} comparer={comparer('type_contrat')} />
       )}
       {avecPoste && voir('poste') && <ChoixPoste comparer={comparer('poste')} valeur={val('poste')} postes={postes!} onChange={(v) => onChange({ poste: v })} />}
+      {avecProfil && PROFIL.filter((f) => voir(f.id)).map((f) => (
+        <MultiChoix
+          key={f.id} libelle={f.libelle} pluriel={f.pluriel} options={f.valeurs.map(([v]) => v)}
+          nomOption={(v) => f.valeurs.find(([c]) => c === v)?.[1] ?? v}
+          valeur={filtres[f.id] ?? ''} onChange={(v) => onChange({ [f.id]: v })} souple={false}
+        />
+      ))}
       {salaries && (
         <ChoixEmploye salaries={salaries} valeur={filtres.matricule ?? ''} onChange={(m) => onChange({ matricule: m })} />
       )}

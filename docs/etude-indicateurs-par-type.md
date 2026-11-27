@@ -59,3 +59,35 @@ Références : ISO 30414 (familles d'indicateurs RH : coûts, productivité, eff
 
 - Q1 client (noms exacts des colonnes) toujours sans réponse : défauts ci-dessus.
 - « Durée du contrat » compris comme l'ancienneté ; la date de fin des CDD n'est pas dans le fichier.
+
+## 8. Menu « Filtrer par » groupé et filtres de profil (35-f)
+
+**Besoin.** Le menu « Filtrer par » (35-e) liste tous les filtres, rangés sous les groupes d'indicateurs, avec trois nouveaux filtres : Sexe, Tranche d'âge, Tranche d'ancienneté. Les cartes ne changent pas.
+
+**Existant.** `ChoixFiltres.tsx` (liste plate), `FiltresPeriode.tsx` (filtres de données, `MultiChoix`), filtres partagés dans l'URL (`filtresPartages.ts`). Côté serveur, `chargement.filtrer` filtre les lignes déjà chargées ; chaque `Ligne` porte `sexe`, `date_naissance`, `date_embauche` (35-b) et la période sa date de fin. « Front / back office » vient de l'Activité du poste (`referentiel.py`).
+
+**Groupes du menu.**
+
+| Groupe | Filtres |
+|---|---|
+| Activité et productivité | Activité (front / back office) |
+| Masse salariale | Poste |
+| Effectif | Département, Service, Type de site, Site, Contrat |
+| Profil des salariés | Sexe, Tranche d'âge, Tranche d'ancienneté |
+
+**Options comparées pour les filtres de profil.**
+
+| Option | Pour | Contre |
+|---|---|---|
+| A. Filtre serveur dans `chargement.filtrer` (retenue) | Même chemin que Poste / Contrat, périmètre appliqué avant, tous les calculs suivent | Paramètres à ajouter aux routes annuelles |
+| B. Filtre en SQL au chargement | Moins de lignes lues | Le chargement est mis en cache par mois et partagé ; âge relatif au mois |
+| C. Filtre côté écran | Rien au serveur | Interdit : calculs et filtres côté serveur |
+
+**Règles.**
+- Valeurs : sexe `H`, `F` ; âge `<25`, `25-34`, `35-44`, `45-54`, `55+` ; ancienneté `<1`, `1-3`, `3-5`, `5-10`, `10+` ; `nr` = non renseigné (proposé, jamais deviné). Choix multiples « A|B ».
+- Âge et ancienneté calculés au dernier jour de **chaque mois** : une personne change de tranche dans l'année comme dans la réalité.
+- Comme Poste et Contrat : pas de budget, pas de saisie (CA, marge…) sous un filtre de profil ; la Répartition des charges l'explique (« Budget non suivi par sexe, âge ni ancienneté »).
+- Pages : Budget réalisé, Répartition des charges, Graphiques (routes annuelles, exports compris). Pas de mode « Comparer » (R9) pour ces filtres dans ce cycle.
+- Le groupe Activité et productivité reste visible sans droit marge : le filtre Activité ne montre aucune marge.
+
+**Risques.** Un filtre très fin (Sexe + Site) peut viser peu de personnes : même situation qu'avec Poste aujourd'hui (droit `report:read`) ; le masquage sous 3 personnes ne couvre que la carte Profil. Point à suivre avec le client, noté au backlog si besoin.

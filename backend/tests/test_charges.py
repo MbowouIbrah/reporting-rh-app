@@ -734,3 +734,9 @@ def test_part_par_personne_calculee_par_le_serveur(charge, make_client):
     assert total == 3700
     assert all(D(x["part"]) == D(x["m"]) / total for x in liste)
     assert sum(D(x["part"]) for x in liste) == pytest.approx(D(1))
+
+
+def test_raison_budget_sous_filtre_de_profil():
+    ctx = kc.Contexte(2025 * 12, profil=True)
+    assert kc.raison_budget(ctx, "type") == "Budget non suivi par sexe, âge ni ancienneté."
+    assert kc.raison_budget(ctx, "activite") == "Budget non suivi par activité."

@@ -17,6 +17,10 @@ export interface FiltresPage {
   poste?: string
   activite?: string
   type_contrat?: string
+  /** Profil des salariés (« A|B », « nr » : non renseigné) : H/F, tranche d'âge, tranche d'ancienneté. */
+  sexe?: string
+  age?: string
+  anciennete?: string
   /** Employé (réservé à nominatif:read). */
   matricule?: string
   /** Période de comparaison choisie ; absente : N-1 (annuel) ou M-1 (mensuel). */

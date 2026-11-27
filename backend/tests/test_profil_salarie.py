@@ -18,7 +18,14 @@ from app.imports.regles import (
     sexe_de,
     valider,
 )
-from app.kpi.moteur import Ligne, PeriodeData, profil
+from app.kpi.moteur import (
+    TRANCHES_AGE,
+    TRANCHES_ANCIENNETE,
+    Ligne,
+    PeriodeData,
+    profil,
+    tranche,
+)
 from app.models.donnees import Salarie
 from tests.test_import_paie import ENTETE, LIENS, RUBRIQUES, csv_bytes, employe
 from tests.test_import_regles import ENTETES, ligne, refs, xlsx
@@ -272,3 +279,36 @@ def test_api_annuel_profil_masque_sous_le_seuil(charge, make_client):
     # avec l'accès nominatif, le même groupe reste visible
     adm = get(charge, "annuel", annee=2026, mois=2, service="SAV PL").json()["profil"]["m"]
     assert adm["effectif"] == 1 and "masque" not in adm and adm["sexe"] == {"H": 0, "F": 1, "nr": 0}
+
+
+# ---------- filtres Sexe, Tranche d'âge, Tranche d'ancienneté (35-f) ----------
+def test_tranche_au_jour_donne():
+    assert tranche(date(2001, 1, 31), FIN, TRANCHES_AGE) == "25-34"
+    assert tranche(date(2001, 2, 1), FIN, TRANCHES_AGE) == "<25"
+    assert tranche(None, FIN, TRANCHES_AGE) == "nr"
+    assert tranche(date(2026, 2, 1), FIN, TRANCHES_ANCIENNETE) == "nr"  # embauche future
+    assert tranche(date(2016, 1, 31), FIN, TRANCHES_ANCIENNETE) == "10+"
+
+
+@pytest.mark.parametrize(("filtre", "effectif"), [
+    ({"sexe": "F"}, 2), ({"sexe": "nr"}, 1), ({"sexe": "H|F"}, 4),
+    ({"age": "25-34|nr"}, 3), ({"anciennete": "10+"}, 1),
+    ({"sexe": "F", "anciennete": "5-10"}, 2), ({"sexe": "H", "age": "25-34"}, 1),
+])
+def test_api_annuel_filtres_de_profil(charge, filtre, effectif):
+    r = get(charge, "annuel", annee=2026, mois=1, **filtre)
+    assert r.status_code == 200
+    assert D(r.json()["effectif_fin"]["m"] or 0) == effectif
+
+
+@pytest.mark.parametrize("filtre", [{"sexe": "X"}, {"age": "20-30"}, {"anciennete": "1-3|"}])
+def test_api_annuel_filtre_de_profil_invalide(charge, filtre):
+    # aucune personne dans la sélection : même réponse que les autres filtres
+    assert get(charge, "annuel", annee=2026, mois=1, age="55+").status_code == 404
+    assert get(charge, "annuel", annee=2026, mois=1, **filtre).status_code == 422
+
+
+def test_api_charges_sans_budget_sous_filtre_de_profil(charge):
+    r = get(charge, "charges", du="2026-01", au="2026-01", sexe="F").json()
+    raisons = {r["axes"][a]["budget_raison"] for a in ("type", "site", "service")}
+    assert raisons == {"Budget non suivi par sexe, âge ni ancienneté."}
